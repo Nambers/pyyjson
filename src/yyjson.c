@@ -21,7 +21,7 @@
  *============================================================================*/
 
 #include "yyjson.h"
-#include <Python.h>
+#include "pyglue.h"
 #include <math.h>
 
 
@@ -6265,110 +6265,220 @@ fail_garbage:
 }
 
 /** Read JSON document (accept all style, but optimized for pretty). */
-static_inline yyjson_doc *read_root_pretty(u8 *hdr,
-                                           u8 *cur,
-                                           u8 *end,
-                                           yyjson_alc alc,
-                                           yyjson_read_flag flg,
-                                           yyjson_read_err *err) {
-    
-#define return_err(_pos, _code, _msg) do { \
-    if (is_truncated_end(hdr, _pos, end, YYJSON_READ_ERROR_##_code, flg)) { \
-        err->pos = (usize)(end - hdr); \
-        err->code = YYJSON_READ_ERROR_UNEXPECTED_END; \
-        err->msg = "unexpected end of data"; \
-    } else { \
-        err->pos = (usize)(_pos - hdr); \
-        err->code = YYJSON_READ_ERROR_##_code; \
-        err->msg = _msg; \
-    } \
-    if (val_hdr) alc.free(alc.ctx, (void *)val_hdr); \
-    return NULL; \
-} while (false)
-    
-#define val_incr() do { \
-    val++; \
-    if (unlikely(val >= val_end)) { \
-        usize alc_old = alc_len; \
-        usize val_ofs = (usize)(val - val_hdr); \
-        usize ctn_ofs = (usize)(ctn - val_hdr); \
-        alc_len += alc_len / 2; \
-        if ((sizeof(usize) < 8) && (alc_len >= alc_max)) goto fail_alloc; \
-        val_tmp = (yyjson_val *)alc.realloc(alc.ctx, (void *)val_hdr, \
-            alc_old * sizeof(yyjson_val), \
-            alc_len * sizeof(yyjson_val)); \
-        if ((!val_tmp)) goto fail_alloc; \
-        val = val_tmp + val_ofs; \
-        ctn = val_tmp + ctn_ofs; \
-        val_hdr = val_tmp; \
-        val_end = val_tmp + (alc_len - 2); \
-    } \
-} while (false)
-    
-    usize dat_len; /* data length in bytes, hint for allocator */
-    usize hdr_len; /* value count used by yyjson_doc */
-    usize alc_len; /* value count allocated */
-    usize alc_max; /* maximum value count for allocator */
-    usize ctn_len; /* the number of elements in current container */
-    yyjson_val *val_hdr; /* the head of allocated values */
-    yyjson_val *val_end; /* the end of allocated values */
-    yyjson_val *val_tmp; /* temporary pointer for realloc */
-    yyjson_val *val; /* current JSON value */
-    yyjson_val *ctn; /* current container */
-    yyjson_val *ctn_parent; /* parent of current container */
-    yyjson_doc *doc; /* the JSON document, equals to val_hdr */
-    const char *msg; /* error message */
-    
-    bool raw; /* read number as raw */
-    bool inv; /* allow invalid unicode */
-    u8 *raw_end; /* raw end for null-terminator */
-    u8 **pre; /* previous raw end pointer */
-    
-    dat_len = has_read_flag(STOP_WHEN_DONE) ? 256 : (usize)(end - cur);
-    hdr_len = sizeof(yyjson_doc) / sizeof(yyjson_val);
-    hdr_len += (sizeof(yyjson_doc) % sizeof(yyjson_val)) > 0;
-    alc_max = USIZE_MAX / sizeof(yyjson_val);
-    alc_len = hdr_len + (dat_len / YYJSON_READER_ESTIMATED_PRETTY_RATIO) + 4;
-    alc_len = yyjson_min(alc_len, alc_max);
-    
-    val_hdr = (yyjson_val *)alc.malloc(alc.ctx, alc_len * sizeof(yyjson_val));
-    if (unlikely(!val_hdr)) goto fail_alloc;
-    val_end = val_hdr + (alc_len - 2); /* padding for key-value pair reading */
-    val = val_hdr + hdr_len;
-    ctn = val;
-    ctn_len = 0;
-    raw = has_read_flag(NUMBER_AS_RAW) || has_read_flag(BIGNUM_AS_RAW);
-    inv = has_read_flag(ALLOW_INVALID_UNICODE) != 0;
-    raw_end = NULL;
-    pre = raw ? &raw_end : NULL;
-    
+static_inline PyObject *read_root_pretty(const char *dat, usize len) {
+#define return_err(_pos, _type, _msg)                                               \
+    do {                                                                            \
+        if (_type == JSONDecodeError) {                                             \
+            PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, _pos - dat); \
+        } else {                                                                    \
+            PyErr_SetString(_type, _msg);                                           \
+        }                                                                           \
+        goto failed_cleanup;                                                        \
+    } while (0)
+
+    // #define return_err(_pos, _code, _msg) do { \
+//     if (is_truncated_end(hdr, _pos, end, YYJSON_READ_ERROR_##_code, flg)) { \
+//         err->pos = (usize)(end - hdr); \
+//         err->code = YYJSON_READ_ERROR_UNEXPECTED_END; \
+//         err->msg = "unexpected end of data"; \
+//     } else { \
+//         err->pos = (usize)(_pos - hdr); \
+//         err->code = YYJSON_READ_ERROR_##_code; \
+//         err->msg = _msg; \
+//     } \
+//     if (val_hdr) alc.free(alc.ctx, (void *)val_hdr); \
+//     return NULL; \
+// } while (false)
+
+    // #define val_incr() do { \
+//     val++; \
+//     if (unlikely(val >= val_end)) { \
+//         usize alc_old = alc_len; \
+//         usize val_ofs = (usize)(val - val_hdr); \
+//         usize ctn_ofs = (usize)(ctn - val_hdr); \
+//         alc_len += alc_len / 2; \
+//         if ((sizeof(usize) < 8) && (alc_len >= alc_max)) goto fail_alloc; \
+//         val_tmp = (yyjson_val *)alc.realloc(alc.ctx, (void *)val_hdr, \
+//             alc_old * sizeof(yyjson_val), \
+//             alc_len * sizeof(yyjson_val)); \
+//         if ((!val_tmp)) goto fail_alloc; \
+//         val = val_tmp + val_ofs; \
+//         ctn = val_tmp + ctn_ofs; \
+//         val_hdr = val_tmp; \
+//         val_end = val_tmp + (alc_len - 2); \
+//     } \
+// } while (false)
+
+    typedef struct container_type {
+        Py_ssize_t size : sizeof(Py_ssize_t) * 8 - 1;
+        Py_ssize_t tag : 1;
+    } container_type;
+    static_assert(sizeof(container_type) == sizeof(Py_ssize_t), "container_type size must be 8 bytes");
+
+#define CONTAINER_ARR_TYPE 1
+#define CONTAINER_OBJ_TYPE 0
+
+    // stack buffer length
+#define STACK_BUFFER_SIZE 1024
+#define OP_BUFFER_INIT_SIZE (STACK_BUFFER_SIZE * (sizeof(pyyjson_int_op) / sizeof(pyyjson_op)))
+    // stack buffer
+    container_type __stack_ctn_buffer[STACK_BUFFER_SIZE];
+    pyyjson_op *__stack_buffer[OP_BUFFER_INIT_SIZE];
+    // buffer start pointer
+    pyyjson_op *py_operations;
+    char *string_buffer_head = NULL;
+    container_type *ctn_start = __stack_ctn_buffer;
+
+    usize required_len = max(
+            OP_BUFFER_INIT_SIZE,
+            len / YYJSON_READER_ESTIMATED_PRETTY_RATIO * (sizeof(pyyjson_int_op) / sizeof(pyyjson_op)));
+
+    // py_operations ptr
+    pyyjson_op *py_operations_end;
+    if (unlikely(required_len > OP_BUFFER_INIT_SIZE)) {
+        py_operations = (pyyjson_op *) malloc(required_len * sizeof(pyyjson_op));
+        if(!py_operations) goto fail_alloc;
+        py_operations_end = py_operations + required_len;
+    } else {
+        py_operations = __stack_buffer;
+        py_operations_end = __stack_buffer + OP_BUFFER_INIT_SIZE;
+    }
+    pyyjson_op *cur_write_op = py_operations;
+
+#define OP_BUFFER_REALLOC_CHECK()        \
+    do {                                 \
+        if (new_py_operations == NULL) { \
+            PyErr_NoMemory();            \
+            goto fail_alloc;             \
+        }                                \
+    } while (0)
+#define OP_BUFFER_GROW(offset)                                                                                \
+    do {                                                                                                      \
+        if (yyjson_unlikely(offset + (u8 *) cur_write_op > (u8 *) py_operations_end)) {                       \
+            size_t old_capacity = py_operations_end - py_operations;                                          \
+            size_t new_capacity = old_capacity + old_capacity / 2;                                            \
+            pyyjson_op *new_py_operations;                                                                    \
+            if (yyjson_likely(py_operations == __stack_buffer)) {                                             \
+                new_py_operations = (pyyjson_op *) malloc(new_capacity * sizeof(pyyjson_op));                 \
+                OP_BUFFER_REALLOC_CHECK();                                                                    \
+                memcpy(new_py_operations, py_operations, old_capacity * sizeof(pyyjson_op));                  \
+            } else {                                                                                          \
+                new_py_operations = (pyyjson_op *) realloc(py_operations, new_capacity * sizeof(pyyjson_op)); \
+                OP_BUFFER_REALLOC_CHECK();                                                                    \
+            }                                                                                                 \
+            py_operations = new_py_operations;                                                                \
+            cur_write_op = new_py_operations + old_capacity;                                                  \
+            py_operations_end = new_py_operations + new_capacity;                                             \
+        }                                                                                                     \
+    } while (0)
+
+    // container ptr
+    container_type *ctn_end = __stack_ctn_buffer + STACK_BUFFER_SIZE;
+    container_type *ctn = ctn_start;
+
+    // container buffer grow macros
+#define CTN_REALLOC_CHECK()          \
+    do {                             \
+        if (new_ctn_start == NULL) { \
+            PyErr_NoMemory();        \
+            goto fail_alloc;         \
+        }                            \
+    } while (0)
+#define CTN_BUFFER_GROW()                                                                                     \
+    do {                                                                                                      \
+        if (yyjson_unlikely(ctn + 1 >= ctn_end)) {                                                            \
+            size_t old_capacity = ctn_end - ctn_start;                                                        \
+            size_t new_capacity = old_capacity + old_capacity / 2;                                            \
+            container_type *new_ctn_start;                                                                    \
+            if (yyjson_likely(ctn_start == __stack_ctn_buffer)) {                                             \
+                new_ctn_start = (container_type *) malloc(new_capacity * sizeof(container_type));             \
+                CTN_REALLOC_CHECK();                                                                          \
+                memcpy(new_ctn_start, ctn_start, old_capacity * sizeof(container_type));                      \
+            } else {                                                                                          \
+                new_ctn_start = (container_type *) realloc(ctn_start, new_capacity * sizeof(container_type)); \
+                CTN_REALLOC_CHECK();                                                                          \
+            }                                                                                                 \
+            ctn_start = new_ctn_start;                                                                        \
+            ctn = new_ctn_start + old_capacity;                                                               \
+            ctn_end = new_ctn_start + new_capacity;                                                           \
+        }                                                                                                     \
+        ctn++;                                                                                                \
+    } while (0)
+
+    //
+    string_buffer_head = malloc(4 * len);
+    if (!string_buffer_head) goto fail_alloc;
+    char *string_buffer = string_buffer_head;
+    //
+    const char *cur = dat;
+    const char *end = dat + len;
+    // usize dat_len; /* data length in bytes, hint for allocator */
+    // usize hdr_len; /* value count used by yyjson_doc */
+    // usize alc_len; /* value count allocated */
+    // usize alc_max; /* maximum value count for allocator */
+    // usize ctn_len; /* the number of elements in current container */
+    // yyjson_val *val_hdr; /* the head of allocated values */
+    // yyjson_val *val_end; /* the end of allocated values */
+    // yyjson_val *val_tmp; /* temporary pointer for realloc */
+    // yyjson_val *val; /* current JSON value */
+    // yyjson_val *ctn; /* current container */
+    // yyjson_val *ctn_parent; /* parent of current container */
+    // yyjson_doc *doc; /* the JSON document, equals to val_hdr */
+    // const char *msg; /* error message */
+
+    // bool raw; /* read number as raw */
+    // bool inv; /* allow invalid unicode */
+    // u8 *raw_end; /* raw end for null-terminator */
+    // u8 **pre; /* previous raw end pointer */
+
+    // dat_len = has_read_flag(STOP_WHEN_DONE) ? 256 : (usize)(end - cur);
+    // hdr_len = sizeof(yyjson_doc) / sizeof(yyjson_val);
+    // hdr_len += (sizeof(yyjson_doc) % sizeof(yyjson_val)) > 0;
+    // alc_max = USIZE_MAX / sizeof(yyjson_val);
+    // alc_len = hdr_len + (dat_len / YYJSON_READER_ESTIMATED_PRETTY_RATIO) + 4;
+    // alc_len = yyjson_min(alc_len, alc_max);
+
+    // val_hdr = (yyjson_val *)alc.malloc(alc.ctx, alc_len * sizeof(yyjson_val));
+    // if (unlikely(!val_hdr)) goto fail_alloc;
+    // val_end = val_hdr + (alc_len - 2); /* padding for key-value pair reading */
+    // val = val_hdr + hdr_len;
+    // ctn = val;
+    // ctn_len = 0;
+    // raw = has_read_flag(NUMBER_AS_RAW) || has_read_flag(BIGNUM_AS_RAW);
+    // inv = has_read_flag(ALLOW_INVALID_UNICODE) != 0;
+    // raw_end = NULL;
+    // pre = raw ? &raw_end : NULL;
+    static_assert(STACK_BUFFER_SIZE > 0);
     if (*cur++ == '{') {
-        ctn->tag = YYJSON_TYPE_OBJ;
-        ctn->uni.ofs = 0;
+        ctn->tag = CONTAINER_OBJ_TYPE;
+        ctn->size = 0;
+        ctn++;
         if (*cur == '\n') cur++;
         goto obj_key_begin;
     } else {
-        ctn->tag = YYJSON_TYPE_ARR;
-        ctn->uni.ofs = 0;
+        ctn->tag = CONTAINER_ARR_TYPE;
+        ctn->size = 0;
+        ctn++;
         if (*cur == '\n') cur++;
         goto arr_val_begin;
     }
-    
+
 arr_begin:
-    /* save current container */
-    ctn->tag = (((u64)ctn_len + 1) << YYJSON_TAG_BIT) |
-               (ctn->tag & YYJSON_TAG_MASK);
-    
+    // /* save current container */
+    // ctn->tag = (((u64)ctn_len + 1) << YYJSON_TAG_BIT) |
+    //            (ctn->tag & YYJSON_TAG_MASK);
+
     /* create a new array value, save parent container offset */
-    val_incr();
-    val->tag = YYJSON_TYPE_ARR;
-    val->uni.ofs = (usize)((u8 *)val - (u8 *)ctn);
-    
+    CTN_BUFFER_GROW();
+    ctn->tag = CONTAINER_ARR_TYPE;
+    ctn->size = 0;
+    //val->uni.ofs = (usize)((u8 *)val - (u8 *)ctn);
+
     /* push the new array value as current container */
-    ctn = val;
-    ctn_len = 0;
+    //ctn = val;
+    // ctn_len = 0;
     if (*cur == '\n') cur++;
-    
+
 arr_val_begin:
 #if YYJSON_IS_REAL_GCC
     while (true) repeat16({
@@ -6381,7 +6491,7 @@ arr_val_begin:
         else break;
     })
 #endif
-    
+
     if (*cur == '{') {
         cur++;
         goto obj_begin;
@@ -6391,42 +6501,74 @@ arr_val_begin:
         goto arr_begin;
     }
     if (char_is_number(*cur)) {
-        val_incr();
-        ctn_len++;
-        if (likely(read_number(&cur, pre, flg, val, &msg))) goto arr_val_end;
+        // val_incr();
+        // ctn_len++;
+        OP_BUFFER_GROW(yyjson_max(sizeof(pyyjson_nan_op), yyjson_max(sizeof(pyyjson_inf_op), yyjson_max(sizeof(pyyjson_int_op), sizeof(pyyjson_float_op)))));
+        //ctn->size++;
+        pyyjson_op *now_write_op = cur_write_op;
+        read_number(&cur, &cur_write_op);
+        if(likely(PYYJSON_READ_OP(now_write_op) != PYYJSON_NO_OP)) {
+            ctn->size++;
+            goto arr_val_end;
+        }
         goto fail_number;
     }
     if (*cur == '"') {
-        val_incr();
-        ctn_len++;
-        if (likely(read_string(&cur, end, inv, val, &msg))) goto arr_val_end;
+        // val_incr();
+        // ctn_len++;
+        OP_BUFFER_GROW(sizeof(pyyjson_string_op));
+        if (likely(read_string(&cur, &cur_write_op, &string_buffer))) {
+            CHECK_STRING_BUFFER_OVERFLOW();
+            ctn->size++;
+            goto arr_val_end;
+        }
         goto fail_string;
     }
     if (*cur == 't') {
-        val_incr();
-        ctn_len++;
-        if (likely(read_true(&cur, val))) goto arr_val_end;
+        // val_incr();
+        // ctn_len++;
+        OP_BUFFER_GROW(sizeof(pyyjson_op));
+        if (likely(read_true(&cur))) {
+            PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_TRUE);
+            cur_write_op++;
+            ctn->size++;
+            goto arr_val_end;
+        }
         goto fail_literal_true;
     }
     if (*cur == 'f') {
-        val_incr();
-        ctn_len++;
-        if (likely(read_false(&cur, val))) goto arr_val_end;
+        // val_incr();
+        // ctn_len++;
+        OP_BUFFER_GROW(sizeof(pyyjson_op));
+        if (likely(read_false(&cur))) {
+            PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_FALSE);
+            cur_write_op++;
+            ctn->size++;
+            goto arr_val_end;
+        }
         goto fail_literal_false;
     }
     if (*cur == 'n') {
-        val_incr();
-        ctn_len++;
-        if (likely(read_null(&cur, val))) goto arr_val_end;
-        if (has_read_flag(ALLOW_INF_AND_NAN)) {
-            if (read_nan(false, &cur, pre, val)) goto arr_val_end;
+        // val_incr();
+        // ctn_len++;
+        OP_BUFFER_GROW(sizeof(pyyjson_nan_op));
+        if (likely(read_null(&cur))) {
+            PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_NULL);
+            cur_write_op++;
+            ctn->size++;
+            goto arr_val_end;
+        }
+        if (read_nan(false, &cur, &cur_write_op)) {
+            ctn->size++;
+            goto arr_val_end;
         }
         goto fail_literal_null;
     }
     if (*cur == ']') {
         cur++;
-        if (likely(ctn_len == 0)) goto arr_end;
-        if (has_read_flag(ALLOW_TRAILING_COMMAS)) goto arr_end;
+        // if (likely(ctn_len == 0)) goto arr_end;
+        if (likely(ctn->size == 0)) goto arr_end;
+        //if (has_read_flag(ALLOW_TRAILING_COMMAS)) goto arr_end;
         while (*cur != ',') cur--;
         goto fail_trailing_comma;
     }
@@ -6434,17 +6576,21 @@ arr_val_begin:
         while (char_is_space(*++cur));
         goto arr_val_begin;
     }
-    if (has_read_flag(ALLOW_INF_AND_NAN) &&
-        (*cur == 'i' || *cur == 'I' || *cur == 'N')) {
-        val_incr();
-        ctn_len++;
-        if (read_inf_or_nan(false, &cur, pre, val)) goto arr_val_end;
+    if ( //has_read_flag(ALLOW_INF_AND_NAN) &&
+            (*cur == 'i' || *cur == 'I' || *cur == 'N')) {
+        // val_incr();
+        // ctn_len++;
+        OP_BUFFER_GROW(yyjson_max(sizeof(pyyjson_inf_op), sizeof(pyyjson_nan_op)));
+        if (read_inf_or_nan(false, &cur, &cur_write_op)) {
+            ctn->size++;
+            goto arr_val_end;
+        }
         goto fail_character_val;
     }
-    if (has_read_flag(ALLOW_COMMENTS)) {
-        if (skip_spaces_and_comments(&cur)) goto arr_val_begin;
-        if (byte_match_2(cur, "/*")) goto fail_comment;
-    }
+    // if (has_read_flag(ALLOW_COMMENTS)) {
+    //     if (skip_spaces_and_comments(&cur)) goto arr_val_begin;
+    //     if (byte_match_2(cur, "/*")) goto fail_comment;
+    // }
     goto fail_character_val;
     
 arr_val_end:
@@ -6464,41 +6610,51 @@ arr_val_end:
         while (char_is_space(*++cur));
         goto arr_val_end;
     }
-    if (has_read_flag(ALLOW_COMMENTS)) {
-        if (skip_spaces_and_comments(&cur)) goto arr_val_end;
-        if (byte_match_2(cur, "/*")) goto fail_comment;
-    }
+    // if (has_read_flag(ALLOW_COMMENTS)) {
+    //     if (skip_spaces_and_comments(&cur)) goto arr_val_end;
+    //     if (byte_match_2(cur, "/*")) goto fail_comment;
+    // }
     goto fail_character_arr_end;
-    
+
 arr_end:
     /* get parent container */
-    ctn_parent = (yyjson_val *)(void *)((u8 *)ctn - ctn->uni.ofs);
+    // ctn_parent = (yyjson_val *)(void *)((u8 *)ctn - ctn->uni.ofs);
     
     /* save the next sibling value offset */
-    ctn->uni.ofs = (usize)((u8 *)val - (u8 *)ctn) + sizeof(yyjson_val);
-    ctn->tag = ((ctn_len) << YYJSON_TAG_BIT) | YYJSON_TYPE_ARR;
-    if (unlikely(ctn == ctn_parent)) goto doc_end;
-    
+    // ctn->uni.ofs = (usize)((u8 *)val - (u8 *)ctn) + sizeof(yyjson_val);
+    // ctn->tag = ((ctn_len) << YYJSON_TAG_BIT) | YYJSON_TYPE_ARR;
+    OP_BUFFER_GROW(sizeof(pyyjson_list_op));
+    pyyjson_list_op* list_op = (pyyjson_list_op*) cur_write_op;
+    list_op->len = ctn->size;
+    cur_write_op = (pyyjson_op*) (list_op + 1);
+    assert(ctn->tag == CONTAINER_ARR_TYPE);
     /* pop parent as current container */
-    ctn = ctn_parent;
-    ctn_len = (usize)(ctn->tag >> YYJSON_TAG_BIT);
+    if (unlikely(ctn-- == ctn_start)) {
+        goto doc_end;
+    }
+    
+    // ctn = ctn_parent;
+    // ctn_len = (usize)(ctn->tag >> YYJSON_TAG_BIT);
     if (*cur == '\n') cur++;
-    if ((ctn->tag & YYJSON_TYPE_MASK) == YYJSON_TYPE_OBJ) {
+    if (ctn->tag == CONTAINER_OBJ_TYPE) {
         goto obj_val_end;
     } else {
         goto arr_val_end;
     }
+    ///// ABOVE CHECKED
     
 obj_begin:
     /* push container */
-    ctn->tag = (((u64)ctn_len + 1) << YYJSON_TAG_BIT) |
+    CTN_BUFFER_GROW();
+    ctn->tag = CONTAINER_OBJ_TYPE;
+    // ctn->tag = (((u64)ctn_len + 1) << YYJSON_TAG_BIT) |
                (ctn->tag & YYJSON_TAG_MASK);
-    val_incr();
-    val->tag = YYJSON_TYPE_OBJ;
-    /* offset to the parent */
-    val->uni.ofs = (usize)((u8 *)val - (u8 *)ctn);
-    ctn = val;
-    ctn_len = 0;
+    // val_incr();
+    // val->tag = YYJSON_TYPE_OBJ;
+    // /* offset to the parent */
+    // val->uni.ofs = (usize)((u8 *)val - (u8 *)ctn);
+    // ctn = val;
+    // ctn_len = 0;
     if (*cur == '\n') cur++;
     
 obj_key_begin:
@@ -6514,15 +6670,20 @@ obj_key_begin:
     })
 #endif
     if (likely(*cur == '"')) {
-        val_incr();
-        ctn_len++;
-        if (likely(read_string(&cur, end, inv, val, &msg))) goto obj_key_end;
+        // val_incr();
+        // ctn_len++;
+        OP_BUFFER_GROW(sizeof(pyyjson_string_op));
+        if (likely(read_string(&cur, &cur_write_op, &string_buffer))) {
+            CHECK_STRING_BUFFER_OVERFLOW();
+            //ctn->size++; // key does not need to increase dict container count
+            goto obj_key_end;
+        }
         goto fail_string;
     }
     if (likely(*cur == '}')) {
         cur++;
-        if (likely(ctn_len == 0)) goto obj_end;
-        if (has_read_flag(ALLOW_TRAILING_COMMAS)) goto obj_end;
+        if (likely(ctn->size == 0)) goto obj_end;
+        // if (has_read_flag(ALLOW_TRAILING_COMMAS)) goto obj_end;
         while (*cur != ',') cur--;
         goto fail_trailing_comma;
     }
@@ -6530,10 +6691,10 @@ obj_key_begin:
         while (char_is_space(*++cur));
         goto obj_key_begin;
     }
-    if (has_read_flag(ALLOW_COMMENTS)) {
-        if (skip_spaces_and_comments(&cur)) goto obj_key_begin;
-        if (byte_match_2(cur, "/*")) goto fail_comment;
-    }
+    // if (has_read_flag(ALLOW_COMMENTS)) {
+    //     if (skip_spaces_and_comments(&cur)) goto obj_key_begin;
+    //     if (byte_match_2(cur, "/*")) goto fail_comment;
+    // }
     goto fail_character_obj_key;
     
 obj_key_end:
@@ -6549,23 +6710,34 @@ obj_key_end:
         while (char_is_space(*++cur));
         goto obj_key_end;
     }
-    if (has_read_flag(ALLOW_COMMENTS)) {
-        if (skip_spaces_and_comments(&cur)) goto obj_key_end;
-        if (byte_match_2(cur, "/*")) goto fail_comment;
-    }
+    // if (has_read_flag(ALLOW_COMMENTS)) {
+    //     if (skip_spaces_and_comments(&cur)) goto obj_key_end;
+    //     if (byte_match_2(cur, "/*")) goto fail_comment;
+    // }
     goto fail_character_obj_sep;
     
 obj_val_begin:
     if (*cur == '"') {
-        val++;
-        ctn_len++;
-        if (likely(read_string(&cur, end, inv, val, &msg))) goto obj_val_end;
+        // val++;
+        // ctn_len++;
+        OP_BUFFER_GROW(sizeof(pyyjson_string_op));
+        if (likely(read_string(&cur, &cur_write_op, &string_buffer))) {
+            CHECK_STRING_BUFFER_OVERFLOW();
+            ctn->size++;
+            goto obj_val_end;
+        }
         goto fail_string;
     }
     if (char_is_number(*cur)) {
-        val++;
-        ctn_len++;
-        if (likely(read_number(&cur, pre, flg, val, &msg))) goto obj_val_end;
+        // val++;
+        // ctn_len++;
+        OP_BUFFER_GROW(yyjson_max(sizeof(pyyjson_nan_op), yyjson_max(sizeof(pyyjson_inf_op), yyjson_max(sizeof(pyyjson_int_op), sizeof(pyyjson_float_op)))));
+        pyyjson_op *now_write_op = cur_write_op;
+        read_number(&cur, &cur_write_op);
+        if (likely(PYYJSON_READ_OP(now_write_op) != PYYJSON_NO_OP)) {
+            ctn->size++;
+            goto obj_val_end;
+        }
         goto fail_number;
     }
     if (*cur == '{') {
@@ -6577,23 +6749,42 @@ obj_val_begin:
         goto arr_begin;
     }
     if (*cur == 't') {
-        val++;
-        ctn_len++;
-        if (likely(read_true(&cur, val))) goto obj_val_end;
+        // val++;
+        // ctn_len++;
+        OP_BUFFER_GROW(sizeof(pyyjson_op));
+        if (likely(read_true(&cur))) {
+            PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_TRUE);
+            cur_write_op++;
+            ctn->size++;
+            goto obj_val_end;
+        }
         goto fail_literal_true;
     }
     if (*cur == 'f') {
-        val++;
-        ctn_len++;
-        if (likely(read_false(&cur, val))) goto obj_val_end;
+        // val++;
+        // ctn_len++;
+        OP_BUFFER_GROW(sizeof(pyyjson_op));
+        if (likely(read_false(&cur))) {
+            PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_FALSE);
+            cur_write_op++;
+            ctn->size++;
+            goto obj_val_end;
+        }
         goto fail_literal_false;
     }
     if (*cur == 'n') {
-        val++;
-        ctn_len++;
-        if (likely(read_null(&cur, val))) goto obj_val_end;
-        if (has_read_flag(ALLOW_INF_AND_NAN)) {
-            if (read_nan(false, &cur, pre, val)) goto obj_val_end;
+        // val++;
+        // ctn_len++;
+        OP_BUFFER_GROW(sizeof(pyyjson_nan_op));
+        if (likely(read_null(&cur))) {
+            PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_NULL);
+            cur_write_op++;
+            ctn->size++;
+            goto obj_val_end;
+        }
+        if (read_nan(false, &cur, &cur_write_op)) {
+            ctn->size++;
+            goto obj_val_end;
         }
         goto fail_literal_null;
     }
@@ -6601,17 +6792,21 @@ obj_val_begin:
         while (char_is_space(*++cur));
         goto obj_val_begin;
     }
-    if (has_read_flag(ALLOW_INF_AND_NAN) &&
+    if (//has_read_flag(ALLOW_INF_AND_NAN) &&
         (*cur == 'i' || *cur == 'I' || *cur == 'N')) {
-        val++;
-        ctn_len++;
-        if (read_inf_or_nan(false, &cur, pre, val)) goto obj_val_end;
+        // val++;
+        // ctn_len++;
+        OP_BUFFER_GROW(yyjson_max(sizeof(pyyjson_inf_op), sizeof(pyyjson_nan_op)));
+        if (read_inf_or_nan(false, &cur, &cur_write_op)) {
+            ctn->size++;
+            goto obj_val_end;
+        }
         goto fail_character_val;
     }
-    if (has_read_flag(ALLOW_COMMENTS)) {
-        if (skip_spaces_and_comments(&cur)) goto obj_val_begin;
-        if (byte_match_2(cur, "/*")) goto fail_comment;
-    }
+    // if (has_read_flag(ALLOW_COMMENTS)) {
+    //     if (skip_spaces_and_comments(&cur)) goto obj_val_begin;
+    //     if (byte_match_2(cur, "/*")) goto fail_comment;
+    // }
     goto fail_character_val;
     
 obj_val_end:
@@ -6631,23 +6826,30 @@ obj_val_end:
         while (char_is_space(*++cur));
         goto obj_val_end;
     }
-    if (has_read_flag(ALLOW_COMMENTS)) {
-        if (skip_spaces_and_comments(&cur)) goto obj_val_end;
-        if (byte_match_2(cur, "/*")) goto fail_comment;
-    }
+    // if (has_read_flag(ALLOW_COMMENTS)) {
+    //     if (skip_spaces_and_comments(&cur)) goto obj_val_end;
+    //     if (byte_match_2(cur, "/*")) goto fail_comment;
+    // }
     goto fail_character_obj_end;
     
 obj_end:
+    OP_BUFFER_GROW(sizeof(pyyjson_dict_op));
+    pyyjson_dict_op* dict_op = (pyyjson_dict_op*) cur_write_op;
+    dict_op->len = ctn->size;
+    cur_write_op = (pyyjson_op*) (dict_op + 1);
+    assert(ctn->tag == CONTAINER_OBJ_TYPE);
     /* pop container */
-    ctn_parent = (yyjson_val *)(void *)((u8 *)ctn - ctn->uni.ofs);
+    // ctn_parent = (yyjson_val *)(void *)((u8 *)ctn - ctn->uni.ofs);
     /* point to the next value */
-    ctn->uni.ofs = (usize)((u8 *)val - (u8 *)ctn) + sizeof(yyjson_val);
-    ctn->tag = (ctn_len << (YYJSON_TAG_BIT - 1)) | YYJSON_TYPE_OBJ;
-    if (unlikely(ctn == ctn_parent)) goto doc_end;
-    ctn = ctn_parent;
-    ctn_len = (usize)(ctn->tag >> YYJSON_TAG_BIT);
+    // ctn->uni.ofs = (usize)((u8 *)val - (u8 *)ctn) + sizeof(yyjson_val);
+    // ctn->tag = (ctn_len << (YYJSON_TAG_BIT - 1)) | YYJSON_TYPE_OBJ;
+    if (unlikely(ctn-- == ctn_start)) {
+        goto doc_end;
+    }
+    // ctn = ctn_parent;
+    // ctn_len = (usize)(ctn->tag >> YYJSON_TAG_BIT);
     if (*cur == '\n') cur++;
-    if ((ctn->tag & YYJSON_TYPE_MASK) == YYJSON_TYPE_OBJ) {
+    if (ctn->tag == CONTAINER_OBJ_TYPE) {
         goto obj_val_end;
     } else {
         goto arr_val_end;
@@ -6655,70 +6857,103 @@ obj_end:
     
 doc_end:
     /* check invalid contents after json document */
-    if (unlikely(cur < end) && !has_read_flag(STOP_WHEN_DONE)) {
-        if (has_read_flag(ALLOW_COMMENTS)) {
-            skip_spaces_and_comments(&cur);
-            if (byte_match_2(cur, "/*")) goto fail_comment;
-        } else {
-            while (char_is_space(*cur)) cur++;
-        }
+    if (unlikely(cur < end)// && !has_read_flag(STOP_WHEN_DONE)
+    ) {
+        // if (has_read_flag(ALLOW_COMMENTS)) {
+        //     skip_spaces_and_comments(&cur);
+        //     if (byte_match_2(cur, "/*")) goto fail_comment;
+        // } else {
+        //     while (char_is_space(*cur)) cur++;
+        // }
+        while (char_is_space(*cur)) cur++;
         if (unlikely(cur < end)) goto fail_garbage;
     }
-    
-    if (pre && *pre) **pre = '\0';
-    doc = (yyjson_doc *)val_hdr;
-    doc->root = val_hdr + hdr_len;
-    doc->alc = alc;
-    doc->dat_read = (usize)(cur - hdr);
-    doc->val_read = (usize)((val - val_hdr)) - hdr_len + 1;
-    doc->str_pool = has_read_flag(INSITU) ? NULL : (char *)hdr;
-    return doc;
+
+    assert(ctn == ctn_start - 1);
+    // free ctn buffer before calling pyyjson_op_loads.
+    if (ctn_start != __stack_ctn_buffer) {
+        free(ctn_start);
+    }
+    // if (pre && *pre) **pre = '\0';
+    PyObject *obj;
+    obj = pyyjson_op_loads(py_operations);
+    // free py_operations
+    if (py_operations != __stack_buffer) {
+        free(py_operations);
+    }
+    // free string buffer
+    free(string_buffer_head);
+    // check
+    if (!obj && !PyErr_Occurred()) {
+        PyErr_SetString(PyExc_RuntimeError, "Unknown error: pyyjson_op_loads() failed");
+    }
+
+    return obj;
     
 fail_string:
-    return_err(cur, INVALID_STRING, msg);
+    return_err(cur, JSONDecodeError, "invalid string");
 fail_number:
-    return_err(cur, INVALID_NUMBER, msg);
+    return_err(cur, JSONDecodeError, "invalid number");
 fail_alloc:
-    return_err(cur, MEMORY_ALLOCATION,
+    return_err(cur, PyExc_MemoryError,
                "memory allocation failed");
 fail_trailing_comma:
-    return_err(cur, JSON_STRUCTURE,
+    return_err(cur, JSONDecodeError,
                "trailing comma is not allowed");
 fail_literal_true:
-    return_err(cur, LITERAL,
+    return_err(cur, JSONDecodeError,
                "invalid literal, expected a valid literal such as 'true'");
 fail_literal_false:
-    return_err(cur, LITERAL,
+    return_err(cur, JSONDecodeError,
                "invalid literal, expected a valid literal such as 'false'");
 fail_literal_null:
-    return_err(cur, LITERAL,
+    return_err(cur, JSONDecodeError,
                "invalid literal, expected a valid literal such as 'null'");
 fail_character_val:
-    return_err(cur, UNEXPECTED_CHARACTER,
+    return_err(cur, JSONDecodeError,
                "unexpected character, expected a valid JSON value");
 fail_character_arr_end:
-    return_err(cur, UNEXPECTED_CHARACTER,
+    return_err(cur, JSONDecodeError,
                "unexpected character, expected a comma or a closing bracket");
 fail_character_obj_key:
-    return_err(cur, UNEXPECTED_CHARACTER,
+    return_err(cur, JSONDecodeError,
                "unexpected character, expected a string for object key");
 fail_character_obj_sep:
-    return_err(cur, UNEXPECTED_CHARACTER,
+    return_err(cur, JSONDecodeError,
                "unexpected character, expected a colon after object key");
 fail_character_obj_end:
-    return_err(cur, UNEXPECTED_CHARACTER,
+    return_err(cur, JSONDecodeError,
                "unexpected character, expected a comma or a closing brace");
 fail_comment:
-    return_err(cur, INVALID_COMMENT,
+    return_err(cur, JSONDecodeError,
                "unclosed multiline comment");
 fail_garbage:
-    return_err(cur, UNEXPECTED_CONTENT,
+    return_err(cur, JSONDecodeError,
                "unexpected content after document");
     
-#undef val_incr
+failed_cleanup:
+    // free ctn_start
+    if (ctn_start != __stack_ctn_buffer) {
+        free(ctn_start);
+    }
+    // free py_operations
+    if (py_operations != __stack_buffer) {
+        free(py_operations);
+    }
+    // free string buffer. this need NULL check
+    if (string_buffer_head) free(string_buffer_head);
+    return NULL;
+// #undef val_incr
+#undef CTN_BUFFER_GROW
+#undef CTN_REALLOC_CHECK
+#undef OP_BUFFER_GROW
+#undef OP_BUFFER_REALLOC_CHECK
+#undef OP_BUFFER_INIT_SIZE
+#undef STACK_BUFFER_SIZE
+#undef CONTAINER_OBJ_TYPE
+#undef CONTAINER_ARR_TYPE
 #undef return_err
 }
-
 
 
 /*==============================================================================
@@ -6770,11 +7005,9 @@ PyObject *yyjson_read_opts(const char *dat,
         return_err(0, JSONDecodeError, "input length is 0");
     }
     
-    /* add 4-byte zero padding for input data if necessary */
-    if (unlikely(len >= USIZE_MAX - YYJSON_PADDING_SIZE)) {
+    if (unlikely(len >= USIZE_MAX)) {
         return_err(0, PyExc_MemoryError, "memory allocation failed");
     }
-    // hdr = (u8 *)aligned_alloc(4 * len);
     // if (unlikely(!hdr)) {
     //     return_err(0, PyExc_MemoryError, "memory allocation failed");
     // }
