@@ -109,7 +109,7 @@ PyObject *pyyjson_op_loads(pyyjson_op *op) {
     } while (0)
 
     while (1) {
-        switch (op->op & PYYJSON_OP_MASK) {
+        switch (((pyyjson_op_base *) op)->op & PYYJSON_OP_MASK) {
             case PYYJSON_OP_NULL: {
                 DEBUG_TRACE(PYYJSON_OP_NULL);
                 Py_INCREF(Py_None);
@@ -150,7 +150,7 @@ PyObject *pyyjson_op_loads(pyyjson_op *op) {
             case PYYJSON_OP_STRING: {
                 DEBUG_TRACE(PYYJSON_OP_STRING);
                 pyyjson_string_op *op_str = (pyyjson_string_op *) op;
-                PyObject *new_val = make_string(op_str->data, op_str->len, op->op);
+                PyObject *new_val = make_string(op_str->data, op_str->len, ((pyyjson_op_base *) op)->op);
                 if (new_val == NULL) goto fail;
                 PUSH_STACK(new_val);
                 op_str++;
@@ -218,6 +218,18 @@ PyObject *pyyjson_op_loads(pyyjson_op *op) {
             dict_end:
                 op_dict++;
                 op = (pyyjson_op *) op_dict;
+                break;
+            }
+            case PYYJSON_OP_NAN: {
+                DEBUG_TRACE(PYYJSON_OP_NAN);
+                PUSH_STACK(PyFloat_FromDouble(Py_NAN));
+                op++;
+                break;
+            }
+            case PYYJSON_OP_INF: {
+                DEBUG_TRACE(PYYJSON_OP_INF);
+                PUSH_STACK(PyFloat_FromDouble(Py_INFINITY));
+                op++;
                 break;
             }
             case PYYJSON_NO_OP: {
