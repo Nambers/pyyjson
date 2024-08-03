@@ -49,15 +49,14 @@ PyObject *make_string(const char *utf8_str, Py_ssize_t len, op_type flag) {
     return obj;
 }
 
-PyObject *pyyjson_op_loads(pyyjson_op *op_sequence) {
+PyObject *pyyjson_op_loads(pyyjson_op *op) {
 #define STACK_BUFFER_SIZE 1024
     PyObject *__stack_buffer[STACK_BUFFER_SIZE];
     //
     PyObject **result_stack;
     result_stack = __stack_buffer;
     PyObject **cur_write_result_addr = result_stack;
-    size_t result_stack_capacity = STACK_BUFFER_SIZE;
-    pyyjson_op *op = op_sequence;
+    PyObject **result_stack_end = result_stack + STACK_BUFFER_SIZE;
 
 #define RESULT_STACK_REALLOC_CHECK()    \
     do {                                \
@@ -65,24 +64,25 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_sequence) {
             PyErr_NoMemory();           \
             goto fail;                  \
         }                               \
-    } while (0);
+    } while (0)
 
 #define RESULT_STACK_GROW()                                                                                \
     do {                                                                                                   \
-        if (yyjson_unlikely(cur_write_result_addr - result_stack) == result_stack_capacity) {              \
-            size_t new_capacity = result_stack_capacity * 2;                                               \
+        if (yyjson_unlikely(cur_write_result_addr >= result_stack_end)) {                                  \
+            size_t old_capacity = result_stack_end - result_stack;                                         \
+            size_t new_capacity = old_capacity + old_capacity / 2;                                         \
             PyObject **new_result_stack;                                                                   \
             if (yyjson_likely(result_stack == __stack_buffer)) {                                           \
                 new_result_stack = (PyObject **) malloc(new_capacity * sizeof(PyObject *));                \
                 RESULT_STACK_REALLOC_CHECK();                                                              \
-                memcpy(new_result_stack, result_stack, result_stack_capacity * sizeof(PyObject *));        \
+                memcpy(new_result_stack, result_stack, old_capacity * sizeof(PyObject *));                 \
             } else {                                                                                       \
                 new_result_stack = (PyObject **) realloc(result_stack, new_capacity * sizeof(PyObject *)); \
                 RESULT_STACK_REALLOC_CHECK();                                                              \
             }                                                                                              \
             result_stack = new_result_stack;                                                               \
-            cur_write_result_addr = new_result_stack + result_stack_capacity;                              \
-            result_stack_capacity = new_capacity;                                                          \
+            cur_write_result_addr = new_result_stack + old_capacity;                                       \
+            result_stack_end = new_result_stack + new_capacity;                                            \
         }                                                                                                  \
     } while (0);
 
