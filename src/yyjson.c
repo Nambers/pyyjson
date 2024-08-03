@@ -21,6 +21,7 @@
  *============================================================================*/
 
 #include "yyjson.h"
+#include <Python.h>
 #include <math.h>
 
 
@@ -6723,110 +6724,109 @@ fail_garbage:
 /*==============================================================================
  * JSON Reader Entrance
  *============================================================================*/
+extern PyObject *JSONDecodeError;
 
-yyjson_doc *yyjson_read_opts(char *dat,
-                             usize len,
-                             yyjson_read_flag flg,
-                             const yyjson_alc *alc_ptr,
-                             yyjson_read_err *err) {
+PyObject *yyjson_read_opts(const char *dat,
+                           usize len
+                            //  yyjson_read_flag flg,
+                            //  const yyjson_alc *alc_ptr,
+                            //yyjson_read_err *err
+                            ) {
+
+#define return_err(_pos, _type, _msg)  do {\
+    if(_type == JSONDecodeError) {\
+        PyErr_Format(JSONDecodeError, "%s at %zu", _msg, _pos);\
+    }else {\
+        PyErr_SetString(_type, _msg);\
+    }\
+    return NULL;\
+}while(0)
+
+// #define return_err(_pos, _code, _msg) do { \
+//     err->pos = (usize)(_pos); \
+//     err->msg = _msg; \
+//     err->code = YYJSON_READ_ERROR_##_code; \
+//     if (!has_read_flag(INSITU) && hdr) alc.free(alc.ctx, (void *)hdr); \
+//     return NULL; \
+// } while (false)
     
-#define return_err(_pos, _code, _msg) do { \
-    err->pos = (usize)(_pos); \
-    err->msg = _msg; \
-    err->code = YYJSON_READ_ERROR_##_code; \
-    if (!has_read_flag(INSITU) && hdr) alc.free(alc.ctx, (void *)hdr); \
-    return NULL; \
-} while (false)
-    
-    yyjson_read_err dummy_err;
-    yyjson_alc alc;
-    yyjson_doc *doc;
-    u8 *hdr = NULL, *end, *cur;
-    
+    // yyjson_read_err dummy_err;
+    // yyjson_alc alc;
+    // yyjson_doc *doc;
+    PyObject *obj;
+    const char *end = dat + len;
+    // u8 *hdr = NULL, *end, *cur;
     /* validate input parameters */
-    if (!err) err = &dummy_err;
-    if (likely(!alc_ptr)) {
-        alc = YYJSON_DEFAULT_ALC;
-    } else {
-        alc = *alc_ptr;
-    }
+    //if (!err) err = &dummy_err;
+    // if (likely(!alc_ptr)) {
+    //     alc = YYJSON_DEFAULT_ALC;
+    // } else {
+    //     alc = *alc_ptr;
+    // }
     if (unlikely(!dat)) {
-        return_err(0, INVALID_PARAMETER, "input data is NULL");
+        return_err(0, JSONDecodeError, "input data is NULL");
     }
     if (unlikely(!len)) {
-        return_err(0, INVALID_PARAMETER, "input length is 0");
+        return_err(0, JSONDecodeError, "input length is 0");
     }
     
     /* add 4-byte zero padding for input data if necessary */
-    if (has_read_flag(INSITU)) {
-        hdr = (u8 *)dat;
-        end = (u8 *)dat + len;
-        cur = (u8 *)dat;
-    } else {
-        if (unlikely(len >= USIZE_MAX - YYJSON_PADDING_SIZE)) {
-            return_err(0, MEMORY_ALLOCATION, "memory allocation failed");
-        }
-        hdr = (u8 *)alc.malloc(alc.ctx, len + YYJSON_PADDING_SIZE);
-        if (unlikely(!hdr)) {
-            return_err(0, MEMORY_ALLOCATION, "memory allocation failed");
-        }
-        end = hdr + len;
-        cur = hdr;
-        memcpy(hdr, dat, len);
-        memset(end, 0, YYJSON_PADDING_SIZE);
+    if (unlikely(len >= USIZE_MAX - YYJSON_PADDING_SIZE)) {
+        return_err(0, PyExc_MemoryError, "memory allocation failed");
     }
+    // hdr = (u8 *)aligned_alloc(4 * len);
+    // if (unlikely(!hdr)) {
+    //     return_err(0, PyExc_MemoryError, "memory allocation failed");
+    // }
+    // end = hdr + len;
+    // cur = hdr;
+    // memcpy(hdr, dat, len);
+    // memset(end, 0, YYJSON_PADDING_SIZE);
     
     /* skip empty contents before json document */
-    if (unlikely(char_is_space_or_comment(*cur))) {
-        if (has_read_flag(ALLOW_COMMENTS)) {
-            if (!skip_spaces_and_comments(&cur)) {
-                return_err(cur - hdr, INVALID_COMMENT,
-                           "unclosed multiline comment");
+    if (unlikely(char_is_space_or_comment(*dat))) {
+        if (likely(char_is_space(*dat))) {
+                while (char_is_space(*++dat));
             }
-        } else {
-            if (likely(char_is_space(*cur))) {
-                while (char_is_space(*++cur));
-            }
-        }
-        if (unlikely(cur >= end)) {
-            return_err(0, EMPTY_CONTENT, "input data is empty");
+        if (unlikely(dat >= end)) {
+            return_err(0, JSONDecodeError, "input data is empty");
         }
     }
     
     /* read json document */
-    if (likely(char_is_container(*cur))) {
-        if (char_is_space(cur[1]) && char_is_space(cur[2])) {
-            doc = read_root_pretty(hdr, cur, end, alc, flg, err);
+    if (likely(char_is_container(*dat))) {
+        if (char_is_space(dat[1]) && char_is_space(dat[2])) {
+            obj = read_root_pretty(dat, len);
         } else {
-            doc = read_root_minify(hdr, cur, end, alc, flg, err);
+            obj = read_root_minify(dat, len);
         }
     } else {
-        doc = read_root_single(hdr, cur, end, alc, flg, err);
+        obj = read_root_single(dat, len);
     }
     
     /* check result */
-    if (likely(doc)) {
-        memset(err, 0, sizeof(yyjson_read_err));
-    } else {
-        /* RFC 8259: JSON text MUST be encoded using UTF-8 */
-        if (err->pos == 0 && err->code != YYJSON_READ_ERROR_MEMORY_ALLOCATION) {
-            if ((hdr[0] == 0xEF && hdr[1] == 0xBB && hdr[2] == 0xBF)) {
-                err->msg = "byte order mark (BOM) is not supported";
-            } else if (len >= 4 &&
-                       ((hdr[0] == 0x00 && hdr[1] == 0x00 &&
-                         hdr[2] == 0xFE && hdr[3] == 0xFF) ||
-                        (hdr[0] == 0xFF && hdr[1] == 0xFE &&
-                         hdr[2] == 0x00 && hdr[3] == 0x00))) {
-                err->msg = "UTF-32 encoding is not supported";
-            } else if (len >= 2 &&
-                       ((hdr[0] == 0xFE && hdr[1] == 0xFF) ||
-                        (hdr[0] == 0xFF && hdr[1] == 0xFE))) {
-                err->msg = "UTF-16 encoding is not supported";
-            }
-        }
-        if (!has_read_flag(INSITU)) alc.free(alc.ctx, (void *)hdr);
-    }
-    return doc;
+    // if (likely(obj)) {
+    //     memset(err, 0, sizeof(yyjson_read_err));
+    // } else {
+    //     /* RFC 8259: JSON text MUST be encoded using UTF-8 */
+    //     if (err->pos == 0 && err->code != YYJSON_READ_ERROR_MEMORY_ALLOCATION) {
+    //         if ((hdr[0] == 0xEF && hdr[1] == 0xBB && hdr[2] == 0xBF)) {
+    //             err->msg = "byte order mark (BOM) is not supported";
+    //         } else if (len >= 4 &&
+    //                    ((hdr[0] == 0x00 && hdr[1] == 0x00 &&
+    //                      hdr[2] == 0xFE && hdr[3] == 0xFF) ||
+    //                     (hdr[0] == 0xFF && hdr[1] == 0xFE &&
+    //                      hdr[2] == 0x00 && hdr[3] == 0x00))) {
+    //             err->msg = "UTF-32 encoding is not supported";
+    //         } else if (len >= 2 &&
+    //                    ((hdr[0] == 0xFE && hdr[1] == 0xFF) ||
+    //                     (hdr[0] == 0xFF && hdr[1] == 0xFE))) {
+    //             err->msg = "UTF-16 encoding is not supported";
+    //         }
+    //     }
+    //     if (!has_read_flag(INSITU)) alc.free(alc.ctx, (void *)hdr);
+    // }
+    return obj;
     
 #undef return_err
 }

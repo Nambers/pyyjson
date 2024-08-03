@@ -818,42 +818,55 @@ static const yyjson_read_code YYJSON_READ_SUCCESS                       = 0;
 
 /** Invalid parameter, such as NULL input string or 0 input length. */
 static const yyjson_read_code YYJSON_READ_ERROR_INVALID_PARAMETER       = 1;
+// TypeError
 
 /** Memory allocation failure occurs. */
 static const yyjson_read_code YYJSON_READ_ERROR_MEMORY_ALLOCATION       = 2;
+// MemoryError
 
 /** Input JSON string is empty. */
 static const yyjson_read_code YYJSON_READ_ERROR_EMPTY_CONTENT           = 3;
+// JSONDecodeError
 
 /** Unexpected content after document, such as `[123]abc`. */
 static const yyjson_read_code YYJSON_READ_ERROR_UNEXPECTED_CONTENT      = 4;
+// JSONDecodeError
 
 /** Unexpected ending, such as `[123`. */
 static const yyjson_read_code YYJSON_READ_ERROR_UNEXPECTED_END          = 5;
+// JSONDecodeError
 
 /** Unexpected character inside the document, such as `[abc]`. */
 static const yyjson_read_code YYJSON_READ_ERROR_UNEXPECTED_CHARACTER    = 6;
+// JSONDecodeError
 
 /** Invalid JSON structure, such as `[1,]`. */
 static const yyjson_read_code YYJSON_READ_ERROR_JSON_STRUCTURE          = 7;
+// JSONDecodeError
 
 /** Invalid comment, such as unclosed multi-line comment. */
 static const yyjson_read_code YYJSON_READ_ERROR_INVALID_COMMENT         = 8;
+// JSONDecodeError
 
 /** Invalid number, such as `123.e12`, `000`. */
 static const yyjson_read_code YYJSON_READ_ERROR_INVALID_NUMBER          = 9;
+// JSONDecodeError
 
 /** Invalid string, such as invalid escaped character inside a string. */
 static const yyjson_read_code YYJSON_READ_ERROR_INVALID_STRING          = 10;
+// JSONDecodeError
 
 /** Invalid JSON literal, such as `truu`. */
 static const yyjson_read_code YYJSON_READ_ERROR_LITERAL                 = 11;
+// JSONDecodeError
 
 /** Failed to open a file. */
 static const yyjson_read_code YYJSON_READ_ERROR_FILE_OPEN               = 12;
+// IOError, not used
 
 /** Failed to read a file. */
 static const yyjson_read_code YYJSON_READ_ERROR_FILE_READ               = 13;
+// IOError, not used
 
 /** Error information for JSON reader. */
 typedef struct yyjson_read_err {
