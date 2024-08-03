@@ -3,8 +3,8 @@
 #include <Python.h>
 #include <assert.h>
 #include <stdalign.h>
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #define PYYJSON_NO_OP (0)
 #define PYYJSON_OP_NULL (1 << 0)
@@ -28,10 +28,10 @@
 
 typedef uint32_t op_type;
 #define PYYJSON_OP_HEAD pyyjson_op_base op_base;
-#define PYYJSON_READ_OP(_op) (((pyyjson_op_base *) _op)->op)
-#define PYYJSON_WRITE_OP(_ptr, _code)           \
-    do {                                        \
-        ((pyyjson_op_base *) _ptr)->op = _code; \
+#define PYYJSON_READ_OP(_op) (((pyyjson_op_base *) (_op))->op)
+#define PYYJSON_WRITE_OP(_ptr, _code)               \
+    do {                                            \
+        ((pyyjson_op_base *) (_ptr))->op = (_code); \
     } while (0)
 
 // size = 4
