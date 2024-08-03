@@ -5205,7 +5205,35 @@ read_double:
 
 #endif /* FP_READER */
 
+static_inline u16 read_b2_unicode(u32 uni) {
+#if YYJSON_ENDIAN == YYJSON_BIG_ENDIAN
+    return ((uni & 0x1f000000) >> 18) | ((uni & 0x3f0000) >> 16);
+#elif YYJSON_ENDIAN == YYJSON_LITTLE_ENDIAN
+    return ((uni & 0x1f) << 6) | ((uni & 0x3f00) >> 8);
+#else
+    #error "unsupported endian"
+#endif
+}
 
+static_inline u16 read_b3_unicode(u32 uni) {
+#if YYJSON_ENDIAN == YYJSON_BIG_ENDIAN
+    return ((uni & 0x0f000000) >> 12) | ((uni & 0x3f0000) >> 10) | ((uni & 0x3f00) >> 8);
+#elif YYJSON_ENDIAN == YYJSON_LITTLE_ENDIAN
+    return ((uni & 0x0f) << 12) | ((uni & 0x3f00) >> 2) | ((uni & 0x3f0000) >> 16);
+#else
+    #error "unsupported endian"
+#endif
+}
+
+static_inline u32 read_b4_unicode(u32 uni) {
+#if YYJSON_ENDIAN == YYJSON_BIG_ENDIAN
+    return ((uni & 0x07000000) >> 6) | ((uni & 0x3f0000) >> 4) | ((uni & 0x3f00) >> 2)  | ((uni & 0x3f));
+#elif YYJSON_ENDIAN == YYJSON_LITTLE_ENDIAN
+    return ((uni & 0x07) << 18) | ((uni & 0x3f00) << 4) | ((uni & 0x3f0000) >> 10) | ((uni & 0x3f000000) >> 24);
+#else
+    #error "unsupported endian"
+#endif
+}
 
 /*==============================================================================
  * JSON String Reader
