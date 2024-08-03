@@ -11,7 +11,7 @@ int __count_trace[PYYJSON_OP_COUNT_MAX] = {0};
 #define DEBUG_TRACE(x)      \
     do {                    \
         __count_trace[x]++; \
-    } while (0);
+    } while (0)
 #else
 #define DEBUG_TRACE(x) (void) (0)
 #endif
@@ -84,15 +84,21 @@ PyObject *pyyjson_op_loads(pyyjson_op *op) {
             cur_write_result_addr = new_result_stack + old_capacity;                                       \
             result_stack_end = new_result_stack + new_capacity;                                            \
         }                                                                                                  \
-    } while (0);
+    } while (0)
 
-#define PUSH_STACK(obj)               \
+#define PUSH_STACK_NO_CHECK(obj)      \
     do {                              \
-        RESULT_STACK_GROW();          \
         *cur_write_result_addr = obj; \
         cur_write_result_addr++;      \
-    } while (0);
-#define POP_STACK_CHECK(size)                                                              \
+    } while (0)
+
+#define PUSH_STACK(obj)           \
+    do {                          \
+        RESULT_STACK_GROW();      \
+        PUSH_STACK_NO_CHECK(obj); \
+    } while (0)
+
+#define POP_STACK_PRE_CHECK(size)                                                          \
     do {                                                                                   \
         if (yyjson_unlikely(size > (Py_ssize_t) (cur_write_result_addr - result_stack))) { \
             PyErr_Format(PyExc_RuntimeError,                                               \
@@ -100,7 +106,7 @@ PyObject *pyyjson_op_loads(pyyjson_op *op) {
                          size, (Py_ssize_t) (cur_write_result_addr - result_stack));       \
             goto fail;                                                                     \
         }                                                                                  \
-    } while (0);
+    } while (0)
 
     while (1) {
         switch (op->op & PYYJSON_OP_MASK) {
@@ -161,7 +167,7 @@ PyObject *pyyjson_op_loads(pyyjson_op *op) {
                     PUSH_STACK(list);
                     goto arr_end;
                 }
-                POP_STACK_CHECK(len - 1);
+                POP_STACK_PRE_CHECK(len - 1);
                 PyObject **list_val_start = cur_write_result_addr - len;
                 for (size_t j = 0; j < len; j++) {
                     PyObject *val = list_val_start[j];
@@ -169,8 +175,7 @@ PyObject *pyyjson_op_loads(pyyjson_op *op) {
                     assert(!PyUnicode_Check(val) || Py_REFCNT(val) == 1);
                 }
                 cur_write_result_addr -= len;
-                *cur_write_result_addr = list;
-                cur_write_result_addr++;
+                PUSH_STACK_NO_CHECK(list);
             arr_end:
                 op_list++;
                 op = (pyyjson_op *) op_list;
@@ -186,7 +191,7 @@ PyObject *pyyjson_op_loads(pyyjson_op *op) {
                     PUSH_STACK(dict);
                     goto dict_end;
                 }
-                POP_STACK_CHECK(len * 2 - 1);
+                POP_STACK_PRE_CHECK(len * 2 - 1);
                 PyObject **dict_val_start = cur_write_result_addr - len * 2;
                 for (size_t j = 0; j < len; j++) {
                     PyObject *key = dict_val_start[j * 2];
@@ -209,8 +214,7 @@ PyObject *pyyjson_op_loads(pyyjson_op *op) {
                     assert(!PyUnicode_Check(val) || Py_REFCNT(val) == 1);
                 }
                 cur_write_result_addr -= len * 2;
-                *cur_write_result_addr = dict;
-                cur_write_result_addr++;
+                PUSH_STACK_NO_CHECK(dict);
             dict_end:
                 op_dict++;
                 op = (pyyjson_op *) op_dict;
