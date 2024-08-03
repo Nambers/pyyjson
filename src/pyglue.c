@@ -109,7 +109,7 @@ PyObject *pyyjson_op_loads(pyyjson_op *op) {
     } while (0)
 
     while (1) {
-        switch (((pyyjson_op_base *) op)->op & PYYJSON_OP_MASK) {
+        switch (PYYJSON_READ_OP(op) & PYYJSON_OP_MASK) {
             case PYYJSON_OP_NULL: {
                 DEBUG_TRACE(PYYJSON_OP_NULL);
                 Py_INCREF(Py_None);
@@ -150,7 +150,7 @@ PyObject *pyyjson_op_loads(pyyjson_op *op) {
             case PYYJSON_OP_STRING: {
                 DEBUG_TRACE(PYYJSON_OP_STRING);
                 pyyjson_string_op *op_str = (pyyjson_string_op *) op;
-                PyObject *new_val = make_string(op_str->data, op_str->len, ((pyyjson_op_base *) op)->op);
+                PyObject *new_val = make_string(op_str->data, op_str->len, PYYJSON_READ_OP(op));
                 if (new_val == NULL) goto fail;
                 PUSH_STACK(new_val);
                 op_str++;
