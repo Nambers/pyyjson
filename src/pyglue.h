@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <stdalign.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #define PYYJSON_NO_OP (0)
 #define PYYJSON_OP_NULL (1 << 0)
@@ -77,6 +78,18 @@ typedef struct pyyjson_dict_op {
     Py_ssize_t len;
 } pyyjson_dict_op;
 
+// size = 8
+typedef struct pyyjson_nan_op {
+    PYYJSON_OP_HEAD
+    bool sign;
+} pyyjson_nan_op;
+
+// size = 8
+typedef struct pyyjson_inf_op {
+    PYYJSON_OP_HEAD
+    bool sign;
+} pyyjson_inf_op;
+
 PyObject *pyyjson_op_loads(pyyjson_op *op_sequence);
 
 static_assert((sizeof(pyyjson_op) % sizeof(pyyjson_op)) == 0);
@@ -85,5 +98,7 @@ static_assert((sizeof(pyyjson_float_op) % sizeof(pyyjson_op)) == 0);
 static_assert((sizeof(pyyjson_string_op) % sizeof(pyyjson_op)) == 0);
 static_assert((sizeof(pyyjson_list_op) % sizeof(pyyjson_op)) == 0);
 static_assert((sizeof(pyyjson_dict_op) % sizeof(pyyjson_op)) == 0);
+static_assert((sizeof(pyyjson_nan_op) % sizeof(pyyjson_op)) == 0);
+static_assert((sizeof(pyyjson_inf_op) % sizeof(pyyjson_op)) == 0);
 
 #endif

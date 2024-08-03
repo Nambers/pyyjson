@@ -2,9 +2,9 @@
 #include "yyjson.h"
 
 #include <assert.h>
+#include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
-
 
 #ifndef NDEBUG
 int __count_trace[PYYJSON_OP_COUNT_MAX] = {0};
@@ -222,14 +222,24 @@ PyObject *pyyjson_op_loads(pyyjson_op *op) {
             }
             case PYYJSON_OP_NAN: {
                 DEBUG_TRACE(PYYJSON_OP_NAN);
-                PUSH_STACK(PyFloat_FromDouble(Py_NAN));
-                op++;
+                pyyjson_nan_op *op_nan = (pyyjson_nan_op *) op;
+                double val = op_nan->sign ? -fabs(Py_NAN) : fabs(Py_NAN);
+                PyObject *o = PyFloat_FromDouble(val);
+                assert(o);
+                PUSH_STACK(o);
+                op_nan++;
+                op = (pyyjson_op *) op_nan;
                 break;
             }
             case PYYJSON_OP_INF: {
                 DEBUG_TRACE(PYYJSON_OP_INF);
-                PUSH_STACK(PyFloat_FromDouble(Py_INFINITY));
-                op++;
+                pyyjson_inf_op *op_inf = (pyyjson_inf_op *) op;
+                double val = op_inf->sign ? -Py_HUGE_VAL : Py_HUGE_VAL;
+                PyObject *o = PyFloat_FromDouble(val);
+                assert(o);
+                PUSH_STACK(o);
+                op_inf++;
+                op = (pyyjson_op *) op_inf;
                 break;
             }
             case PYYJSON_NO_OP: {
