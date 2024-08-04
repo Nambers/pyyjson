@@ -11,19 +11,20 @@
 #define PYYJSON_OP_TRUE (1 << 1)
 #define PYYJSON_OP_FALSE (1 << 2)
 #define PYYJSON_OP_INT (1 << 3)
-#define PYYJSON_OP_FLOAT (1 << 4)
-#define PYYJSON_OP_STRING (1 << 5)
-#define PYYJSON_OP_ARRAY_END (1 << 6)
-#define PYYJSON_OP_OBJECT_END (1 << 7)
-#define PYYJSON_OP_INF (1 << 8)
-#define PYYJSON_OP_NAN (1 << 9)
-#define PYYJSON_OP_COUNT_MAX 10
+#define PYYJSON_OP_UINT (1 << 4)
+#define PYYJSON_OP_FLOAT (1 << 5)
+#define PYYJSON_OP_STRING (1 << 6)
+#define PYYJSON_OP_ARRAY_END (1 << 7)
+#define PYYJSON_OP_OBJECT_END (1 << 8)
+#define PYYJSON_OP_INF (1 << 9)
+#define PYYJSON_OP_NAN (1 << 10)
+#define PYYJSON_OP_COUNT_MAX 11
 #define PYYJSON_OP_MASK ((1 << PYYJSON_OP_COUNT_MAX) - 1)
 
 #define PYYJSON_STRING_FLAG_ASCII 0
-#define PYYJSON_STRING_FLAG_LATIN1 (1 << 10)
-#define PYYJSON_STRING_FLAG_UCS2 (1 << 11)
-#define PYYJSON_STRING_FLAG_UCS4 (1 << 12)
+#define PYYJSON_STRING_FLAG_LATIN1 (1 << 11)
+#define PYYJSON_STRING_FLAG_UCS2 (1 << 12)
+#define PYYJSON_STRING_FLAG_UCS4 (1 << 13)
 #define PYYJSON_STRING_FLAG_MASK (PYYJSON_STRING_FLAG_ASCII | PYYJSON_STRING_FLAG_LATIN1 | PYYJSON_STRING_FLAG_UCS2 | PYYJSON_STRING_FLAG_UCS4)
 
 typedef uint32_t op_type;
@@ -51,6 +52,13 @@ typedef struct pyyjson_int_op {
     char pad[4];
     int64_t data;
 } pyyjson_int_op;
+
+// size = 16
+typedef struct pyyjson_uint_op {
+    PYYJSON_OP_HEAD
+    char pad[4];
+    uint64_t data;
+} pyyjson_uint_op;
 
 // size = 16
 typedef struct pyyjson_float_op {

@@ -139,6 +139,14 @@ PyObject *pyyjson_op_loads(pyyjson_op *op) {
                 op = (pyyjson_op *) op_int;
                 break;
             }
+            case PYYJSON_OP_UINT: {
+                DEBUG_TRACE(PYYJSON_OP_UINT);
+                pyyjson_uint_op *op_uint = (pyyjson_uint_op *) op;
+                PUSH_STACK(PyLong_FromUnsignedLongLong(op_uint->data));
+                op_uint++;
+                op = (pyyjson_op *) op_uint;
+                break;
+            }
             case PYYJSON_OP_FLOAT: {
                 DEBUG_TRACE(PYYJSON_OP_FLOAT);
                 pyyjson_float_op *op_float = (pyyjson_float_op *) op;
