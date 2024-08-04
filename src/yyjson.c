@@ -3789,11 +3789,11 @@ static_inline bool read_hex_u16(const u8 *cur, u16 *val) {
  *============================================================================*/
 
 /** Read 'true' literal, '*cur' should be 't'. */
-static_inline bool read_true(u8 **ptr, yyjson_val *val) {
+static_inline bool read_true(const char **ptr) {
     u8 *cur = *ptr;
     u8 **end = ptr;
     if (likely(byte_match_4(cur, "true"))) {
-        val->tag = YYJSON_TYPE_BOOL | YYJSON_SUBTYPE_TRUE;
+        // val->tag = YYJSON_TYPE_BOOL | YYJSON_SUBTYPE_TRUE;
         *end = cur + 4;
         return true;
     }
@@ -3801,11 +3801,11 @@ static_inline bool read_true(u8 **ptr, yyjson_val *val) {
 }
 
 /** Read 'false' literal, '*cur' should be 'f'. */
-static_inline bool read_false(u8 **ptr, yyjson_val *val) {
+static_inline bool read_false(const char **ptr) {
     u8 *cur = *ptr;
     u8 **end = ptr;
     if (likely(byte_match_4(cur + 1, "alse"))) {
-        val->tag = YYJSON_TYPE_BOOL | YYJSON_SUBTYPE_FALSE;
+        // val->tag = YYJSON_TYPE_BOOL | YYJSON_SUBTYPE_FALSE;
         *end = cur + 5;
         return true;
     }
@@ -3813,11 +3813,11 @@ static_inline bool read_false(u8 **ptr, yyjson_val *val) {
 }
 
 /** Read 'null' literal, '*cur' should be 'n'. */
-static_inline bool read_null(u8 **ptr, yyjson_val *val) {
+static_inline bool read_null(const char **ptr) {
     u8 *cur = *ptr;
     u8 **end = ptr;
     if (likely(byte_match_4(cur, "null"))) {
-        val->tag = YYJSON_TYPE_NULL;
+        // val->tag = YYJSON_TYPE_NULL;
         *end = cur + 4;
         return true;
     }
