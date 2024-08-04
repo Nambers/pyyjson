@@ -6315,7 +6315,7 @@ read_finalize:
         return true;//create_py_unicode(temp_string_buf, dst_ucs2 - (u16*)temp_string_buf, false, 2);
     } else {
         pyyjson_string_op* string_op = (pyyjson_string_op*) *op;
-        PYYJSON_WRITE_OP(string_op, PYYJSON_OP_STRING | PYYJSON_STRING_FLAG_LATIN1);
+        PYYJSON_WRITE_OP(string_op, PYYJSON_OP_STRING | (is_ascii ? PYYJSON_STRING_FLAG_ASCII : PYYJSON_STRING_FLAG_LATIN1));
         string_op->data = temp_string_buf;
         string_op->len = dst - (u8*)temp_string_buf;
         *op = (pyyjson_op*)(string_op + 1);

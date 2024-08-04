@@ -206,7 +206,7 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
                 container_dict:
                     pyyjson_container_op *op_dict = (pyyjson_container_op *) op;
                     Py_ssize_t len = op_dict->len;
-                    PyObject *dict = PyDict_New();
+                    PyObject *dict = _PyDict_NewPresized(len);
                     if (dict == NULL) goto fail;
                     if (yyjson_unlikely(len == 0)) {
                         PUSH_STACK(dict);
@@ -218,7 +218,12 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
                         PyObject *key = dict_val_start[j * 2];
                         assert(PyUnicode_Check(key));
                         PyObject *val = dict_val_start[j * 2 + 1];
-                        int retcode = PyDict_SetItem(dict, key, val); // this may fail
+                        assert(((PyASCIIObject *) key)->hash == -1);
+                        ((PyASCIIObject *) key)->hash = _Py_HashBytes(PyUnicode_DATA(key), PyUnicode_GET_LENGTH(key) * PyUnicode_KIND(key));
+                        // Py_hash_t hash = PyUnicode_Type.tp_hash(key);
+                        assert(((PyASCIIObject *) key)->hash != -1);
+                        int retcode = _PyDict_SetItem_KnownHash(dict, key, val, ((PyASCIIObject *) key)->hash); // this may fail
+                        // int retcode = PyDict_SetItem(dict, key, val); // this may fail
                         if (yyjson_likely(0 == retcode)) {
                             Py_DECREF(key);
                             Py_DECREF(val);
@@ -242,7 +247,6 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
                     break;
                 }
             }
-
             case PYYJSON_OP_CONSTANTS: {
                 DEBUG_TRACE(PYYJSON_OP_CONSTANTS);
                 switch (PYYJSON_READ_OP(op) & PYYJSON_CONSTANTS_FLAG_MASK) {
