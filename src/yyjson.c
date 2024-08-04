@@ -3825,7 +3825,7 @@ static_inline bool read_null(const char **ptr) {
 }
 
 /** Read 'Inf' or 'Infinity' literal (ignoring case). */
-static_inline bool read_inf(bool sign, u8 **ptr, u8 **pre, yyjson_val *val) {
+static_inline bool read_inf(bool sign, const char **ptr, pyyjson_op **op) {
     u8 *hdr = *ptr - sign;
     u8 *cur = *ptr;
     u8 **end = ptr;
@@ -3842,23 +3842,26 @@ static_inline bool read_inf(bool sign, u8 **ptr, u8 **pre, yyjson_val *val) {
             cur += 3;
         }
         *end = cur;
-        if (pre) {
-            /* add null-terminator for previous raw string */
-            if (*pre) **pre = '\0';
-            *pre = cur;
-            val->tag = ((u64)(cur - hdr) << YYJSON_TAG_BIT) | YYJSON_TYPE_RAW;
-            val->uni.str = (const char *)hdr;
-        } else {
-            val->tag = YYJSON_TYPE_NUM | YYJSON_SUBTYPE_REAL;
-            val->uni.u64 = f64_raw_get_inf(sign);
-        }
+        // if (pre) {
+        //     /* add null-terminator for previous raw string */
+        //     if (*pre) **pre = '\0';
+        //     *pre = cur;
+        //     val->tag = ((u64)(cur - hdr) << YYJSON_TAG_BIT) | YYJSON_TYPE_RAW;
+        //     val->uni.str = (const char *)hdr;
+        // } else {
+        //     val->tag = YYJSON_TYPE_NUM | YYJSON_SUBTYPE_REAL;
+        //     val->uni.u64 = f64_raw_get_inf(sign);
+        // }
+        pyyjson_inf_op* op_inf = (pyyjson_inf_op*)*op;
+        op_inf->sign = sign;
+        *op = (pyyjson_op*)(op_inf + 1);
         return true;
     }
     return false;
 }
 
 /** Read 'NaN' literal (ignoring case). */
-static_inline bool read_nan(bool sign, u8 **ptr, u8 **pre, yyjson_val *val) {
+static_inline bool read_nan(bool sign, const char **ptr, pyyjson_op **op) {
     u8 *hdr = *ptr - sign;
     u8 *cur = *ptr;
     u8 **end = ptr;
@@ -3867,26 +3870,28 @@ static_inline bool read_nan(bool sign, u8 **ptr, u8 **pre, yyjson_val *val) {
         (cur[2] == 'N' || cur[2] == 'n')) {
         cur += 3;
         *end = cur;
-        if (pre) {
-            /* add null-terminator for previous raw string */
-            if (*pre) **pre = '\0';
-            *pre = cur;
-            val->tag = ((u64)(cur - hdr) << YYJSON_TAG_BIT) | YYJSON_TYPE_RAW;
-            val->uni.str = (const char *)hdr;
-        } else {
-            val->tag = YYJSON_TYPE_NUM | YYJSON_SUBTYPE_REAL;
-            val->uni.u64 = f64_raw_get_nan(sign);
-        }
+        // if (pre) {
+        //     /* add null-terminator for previous raw string */
+        //     if (*pre) **pre = '\0';
+        //     *pre = cur;
+        //     val->tag = ((u64)(cur - hdr) << YYJSON_TAG_BIT) | YYJSON_TYPE_RAW;
+        //     val->uni.str = (const char *)hdr;
+        // } else {
+        //     val->tag = YYJSON_TYPE_NUM | YYJSON_SUBTYPE_REAL;
+        //     val->uni.u64 = f64_raw_get_nan(sign);
+        // }
+        pyyjson_nan_op* op_nan = (pyyjson_nan_op*)*op;
+        op_nan->sign = sign;
+        *op = (pyyjson_op*)(op_nan + 1);
         return true;
     }
     return false;
 }
 
 /** Read 'Inf', 'Infinity' or 'NaN' literal (ignoring case). */
-static_inline bool read_inf_or_nan(bool sign, u8 **ptr, u8 **pre,
-                                   yyjson_val *val) {
-    if (read_inf(sign, ptr, pre, val)) return true;
-    if (read_nan(sign, ptr, pre, val)) return true;
+static_inline bool read_inf_or_nan(bool sign, const char **ptr, pyyjson_op **op) {
+    if (read_inf(sign, ptr, op)) return true;
+    if (read_nan(sign, ptr, op)) return true;
     return false;
 }
 
