@@ -3853,6 +3853,7 @@ static_inline bool read_inf(bool sign, const char **ptr, pyyjson_op **op) {
         //     val->uni.u64 = f64_raw_get_inf(sign);
         // }
         pyyjson_inf_op* op_inf = (pyyjson_inf_op*)*op;
+        PYYJSON_WRITE_OP(op_inf, PYYJSON_OP_INF);
         op_inf->sign = sign;
         *op = (pyyjson_op*)(op_inf + 1);
         return true;
@@ -3881,6 +3882,7 @@ static_inline bool read_nan(bool sign, const char **ptr, pyyjson_op **op) {
         //     val->uni.u64 = f64_raw_get_nan(sign);
         // }
         pyyjson_nan_op* op_nan = (pyyjson_nan_op*)*op;
+        PYYJSON_WRITE_OP(op_nan, PYYJSON_OP_NAN);
         op_nan->sign = sign;
         *op = (pyyjson_op*)(op_nan + 1);
         return true;
@@ -6922,12 +6924,17 @@ static_inline PyObject *read_root_pretty(const char *dat, usize len) {
 // } while (false)
 
     typedef struct container_type {
-        Py_ssize_t size : sizeof(Py_ssize_t) * 8 - 1;
-        Py_ssize_t tag : 1;
+        union {
+            struct {
+                Py_ssize_t size : sizeof(Py_ssize_t) * 8 - 1;
+                Py_ssize_t tag : 1;
+            };
+            Py_ssize_t raw;
+        };
     } container_type;
     static_assert(sizeof(container_type) == sizeof(Py_ssize_t), "container_type size must be 8 bytes");
 
-#define CONTAINER_ARR_TYPE 1
+#define CONTAINER_ARR_TYPE 1  // this cannot be used in eq test! the flag may be -1 or 1
 #define CONTAINER_OBJ_TYPE 0
 
     // stack buffer length
@@ -6967,6 +6974,7 @@ static_inline PyObject *read_root_pretty(const char *dat, usize len) {
 #define OP_BUFFER_GROW(offset)                                                                                \
     do {                                                                                                      \
         if (yyjson_unlikely(offset + (u8 *) cur_write_op > (u8 *) py_operations_end)) {                       \
+            size_t write_offset = cur_write_op - py_operations;                                                \
             size_t old_capacity = py_operations_end - py_operations;                                          \
             size_t new_capacity = old_capacity + old_capacity / 2;                                            \
             pyyjson_op *new_py_operations;                                                                    \
@@ -6979,7 +6987,7 @@ static_inline PyObject *read_root_pretty(const char *dat, usize len) {
                 OP_BUFFER_REALLOC_CHECK();                                                                    \
             }                                                                                                 \
             py_operations = new_py_operations;                                                                \
-            cur_write_op = new_py_operations + old_capacity;                                                  \
+            cur_write_op = new_py_operations + write_offset;                                                  \
             py_operations_end = new_py_operations + new_capacity;                                             \
         }                                                                                                     \
     } while (0)
@@ -7068,13 +7076,13 @@ static_inline PyObject *read_root_pretty(const char *dat, usize len) {
     if (*cur++ == '{') {
         ctn->tag = CONTAINER_OBJ_TYPE;
         ctn->size = 0;
-        ctn++;
+        // ctn++;
         if (*cur == '\n') cur++;
         goto obj_key_begin;
     } else {
         ctn->tag = CONTAINER_ARR_TYPE;
         ctn->size = 0;
-        ctn++;
+        // ctn++;
         if (*cur == '\n') cur++;
         goto arr_val_begin;
     }
@@ -7240,14 +7248,16 @@ arr_end:
     // ctn->tag = ((ctn_len) << YYJSON_TAG_BIT) | YYJSON_TYPE_ARR;
     OP_BUFFER_GROW(sizeof(pyyjson_list_op));
     pyyjson_list_op* list_op = (pyyjson_list_op*) cur_write_op;
+    PYYJSON_WRITE_OP(list_op, PYYJSON_OP_ARRAY_END);
     list_op->len = ctn->size;
     cur_write_op = (pyyjson_op*) (list_op + 1);
-    assert(ctn->tag == CONTAINER_ARR_TYPE);
+    assert(ctn->tag != CONTAINER_OBJ_TYPE);
     /* pop parent as current container */
     if (unlikely(ctn-- == ctn_start)) {
         goto doc_end;
     }
     
+    ctn->size++;
     // ctn = ctn_parent;
     // ctn_len = (usize)(ctn->tag >> YYJSON_TAG_BIT);
     if (*cur == '\n') cur++;
@@ -7262,8 +7272,9 @@ obj_begin:
     /* push container */
     CTN_BUFFER_GROW();
     ctn->tag = CONTAINER_OBJ_TYPE;
+    ctn->size = 0;
     // ctn->tag = (((u64)ctn_len + 1) << YYJSON_TAG_BIT) |
-               (ctn->tag & YYJSON_TAG_MASK);
+    //            (ctn->tag & YYJSON_TAG_MASK);
     // val_incr();
     // val->tag = YYJSON_TYPE_OBJ;
     // /* offset to the parent */
@@ -7299,7 +7310,7 @@ obj_key_begin:
         cur++;
         if (likely(ctn->size == 0)) goto obj_end;
         // if (has_read_flag(ALLOW_TRAILING_COMMAS)) goto obj_end;
-        while (*cur != ',') cur--;
+        // while (*cur != ',') cur--;
         goto fail_trailing_comma;
     }
     if (char_is_space(*cur)) {
@@ -7449,6 +7460,7 @@ obj_val_end:
 obj_end:
     OP_BUFFER_GROW(sizeof(pyyjson_dict_op));
     pyyjson_dict_op* dict_op = (pyyjson_dict_op*) cur_write_op;
+    PYYJSON_WRITE_OP(dict_op, PYYJSON_OP_OBJECT_END);
     dict_op->len = ctn->size;
     cur_write_op = (pyyjson_op*) (dict_op + 1);
     assert(ctn->tag == CONTAINER_OBJ_TYPE);
@@ -7460,6 +7472,7 @@ obj_end:
     if (unlikely(ctn-- == ctn_start)) {
         goto doc_end;
     }
+    ctn->size++;
     // ctn = ctn_parent;
     // ctn_len = (usize)(ctn->tag >> YYJSON_TAG_BIT);
     if (*cur == '\n') cur++;
@@ -7485,9 +7498,12 @@ doc_end:
 
     assert(ctn == ctn_start - 1);
     // free ctn buffer before calling pyyjson_op_loads.
-    if (ctn_start != __stack_ctn_buffer) {
+    if (unlikely(ctn_start != __stack_ctn_buffer)) {
         free(ctn_start);
     }
+    // add null terminate to op buffer
+    OP_BUFFER_GROW(sizeof(pyyjson_op_base));
+    PYYJSON_WRITE_OP(cur_write_op, PYYJSON_NO_OP);
     // if (pre && *pre) **pre = '\0';
     PyObject *obj;
     obj = pyyjson_op_loads(py_operations);

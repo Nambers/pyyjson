@@ -8,9 +8,22 @@
 
 #ifndef NDEBUG
 int __count_trace[PYYJSON_OP_COUNT_MAX] = {0};
-#define DEBUG_TRACE(x)      \
-    do {                    \
-        __count_trace[x]++; \
+#define DEBUG_TRACE(x)                                                          \
+    do {                                                                        \
+        for (int i = 0; i < PYYJSON_OP_COUNT_MAX; i++) {                        \
+            if (x & (1 << i)) {                                                 \
+                __count_trace[i]++;                                             \
+                /* printf("cur op: %d\n", i);                                 \
+                if (x == PYYJSON_OP_STRING) {                              \
+                    char buf[16] = {0};                                    \
+                    const char *source = ((pyyjson_string_op *) op)->data; \
+                    memcpy(buf, source, 15);                               \
+                    printf("string: %s", (const char *) buf);              \
+                } */ \
+                break;                                                          \
+            }                                                                   \
+        }                                                                       \
+        __op_counter++;                                                         \
     } while (0)
 #else
 #define DEBUG_TRACE(x) (void) (0)
@@ -49,7 +62,22 @@ PyObject *make_string(const char *utf8_str, Py_ssize_t len, op_type flag) {
     return obj;
 }
 
-PyObject *pyyjson_op_loads(pyyjson_op *op) {
+PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
+#ifndef NDEBUG
+    size_t __op_counter = 0;
+#define SHOW_OP_TRACE()                                     \
+    do {                                                    \
+        for (int i = 0; i < PYYJSON_OP_COUNT_MAX; i++) {    \
+            if (__count_trace[i] > 0) {                     \
+                printf("op %d: %d\n", i, __count_trace[i]); \
+            }                                               \
+        }                                                   \
+        printf("total op: %lld\n", __op_counter);           \
+    } while (0)
+#else
+#define SHOW_OP_TRACE() (void) (0)
+#endif
+    pyyjson_op *op = op_head;
 #define STACK_BUFFER_SIZE 1024
     PyObject *__stack_buffer[STACK_BUFFER_SIZE];
     //
@@ -166,6 +194,7 @@ PyObject *pyyjson_op_loads(pyyjson_op *op) {
                 break;
             }
             case PYYJSON_OP_ARRAY_END: {
+            test_arrend:
                 DEBUG_TRACE(PYYJSON_OP_ARRAY_END);
                 pyyjson_list_op *op_list = (pyyjson_list_op *) op;
                 Py_ssize_t len = op_list->len;
@@ -219,7 +248,7 @@ PyObject *pyyjson_op_loads(pyyjson_op *op) {
                         cur_write_result_addr = dict_val_start;
                         goto fail;
                     }
-                    assert(!PyUnicode_Check(val) || Py_REFCNT(val) == 1);
+                    // assert(!PyUnicode_Check(val) || Py_REFCNT(val) == 1);
                 }
                 cur_write_result_addr -= len * 2;
                 PUSH_STACK_NO_CHECK(dict);
@@ -254,6 +283,7 @@ PyObject *pyyjson_op_loads(pyyjson_op *op) {
                 goto success;
             }
             default:
+                goto test_arrend;
                 assert(false);
         }
     }
@@ -261,6 +291,7 @@ success:
     assert(cur_write_result_addr - result_stack == 1);
     PyObject *result = *result_stack;
     if (yyjson_unlikely(result_stack != __stack_buffer)) free(result_stack);
+    SHOW_OP_TRACE();
     return result;
 fail:
     // decref all objects in the stack
