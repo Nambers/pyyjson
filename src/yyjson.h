@@ -939,10 +939,10 @@ yyjson_api PyObject *yyjson_read_opts(const char *dat,
  
  @warning On 32-bit operating system, files larger than 2GB may fail to read.
  */
-yyjson_api yyjson_doc *yyjson_read_file(const char *path,
-                                        yyjson_read_flag flg,
-                                        const yyjson_alc *alc,
-                                        yyjson_read_err *err);
+// yyjson_api yyjson_doc *yyjson_read_file(const char *path,
+//                                         yyjson_read_flag flg,
+//                                         const yyjson_alc *alc,
+//                                         yyjson_read_err *err);
 
 /**
  Read JSON from a file pointer.
@@ -961,10 +961,10 @@ yyjson_api yyjson_doc *yyjson_read_file(const char *path,
  
  @warning On 32-bit operating system, files larger than 2GB may fail to read.
  */
-yyjson_api yyjson_doc *yyjson_read_fp(FILE *fp,
-                                      yyjson_read_flag flg,
-                                      const yyjson_alc *alc,
-                                      yyjson_read_err *err);
+// yyjson_api yyjson_doc *yyjson_read_fp(FILE *fp,
+//                                       yyjson_read_flag flg,
+//                                       const yyjson_alc *alc,
+//                                       yyjson_read_err *err);
 
 /**
  Read a JSON string.

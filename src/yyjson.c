@@ -7016,7 +7016,11 @@ static_inline PyObject *read_root_pretty(const char *dat, usize len) {
         }                                                                                                     \
         ctn++;                                                                                                \
     } while (0)
-
+#ifdef NDEBUG
+#define CHECK_STRING_BUFFER_OVERFLOW() ((void)0)
+#else
+#define CHECK_STRING_BUFFER_OVERFLOW() if (string_buffer > string_buffer_head + 4 * len) assert(false);
+#endif
     //
     string_buffer_head = malloc(4 * len);
     if (!string_buffer_head) goto fail_alloc;
@@ -7676,33 +7680,33 @@ PyObject *yyjson_read_opts(const char *dat,
 #undef return_err
 }
 
-yyjson_doc *yyjson_read_file(const char *path,
-                             yyjson_read_flag flg,
-                             const yyjson_alc *alc_ptr,
-                             yyjson_read_err *err) {
-#define return_err(_code, _msg) do { \
-    err->pos = 0; \
-    err->msg = _msg; \
-    err->code = YYJSON_READ_ERROR_##_code; \
-    return NULL; \
-} while (false)
+// yyjson_doc *yyjson_read_file(const char *path,
+//                              yyjson_read_flag flg,
+//                              const yyjson_alc *alc_ptr,
+//                              yyjson_read_err *err) {
+// #define return_err(_code, _msg) do { \
+//     err->pos = 0; \
+//     err->msg = _msg; \
+//     err->code = YYJSON_READ_ERROR_##_code; \
+//     return NULL; \
+// } while (false)
     
-    yyjson_read_err dummy_err;
-    yyjson_doc *doc;
-    FILE *file;
+//     yyjson_read_err dummy_err;
+//     yyjson_doc *doc;
+//     FILE *file;
     
-    if (!err) err = &dummy_err;
-    if (unlikely(!path)) return_err(INVALID_PARAMETER, "input path is NULL");
+//     if (!err) err = &dummy_err;
+//     if (unlikely(!path)) return_err(INVALID_PARAMETER, "input path is NULL");
     
-    file = fopen_readonly(path);
-    if (unlikely(!file)) return_err(FILE_OPEN, "file opening failed");
+//     file = fopen_readonly(path);
+//     if (unlikely(!file)) return_err(FILE_OPEN, "file opening failed");
     
-    doc = yyjson_read_fp(file, flg, alc_ptr, err);
-    fclose(file);
-    return doc;
+//     doc = yyjson_read_fp(file, flg, alc_ptr, err);
+//     fclose(file);
+//     return doc;
     
-#undef return_err
-}
+// #undef return_err
+// }
 
 // yyjson_doc *yyjson_read_fp(FILE *file,
 //                            yyjson_read_flag flg,
