@@ -41,7 +41,13 @@
 #include <limits.h>
 #include <string.h>
 #include <float.h>
-
+#ifdef _DEBUG
+#undef _DEBUG
+#include <Python.h>
+#define _DEBUG
+#else
+#include <Python.h>
+#endif
 
 
 /*==============================================================================
@@ -905,11 +911,13 @@ typedef struct yyjson_read_err {
  @return A new JSON document, or NULL if an error occurs.
     When it's no longer needed, it should be freed with `yyjson_doc_free()`.
  */
-yyjson_api yyjson_doc *yyjson_read_opts(char *dat,
-                                        size_t len,
-                                        yyjson_read_flag flg,
-                                        const yyjson_alc *alc,
-                                        yyjson_read_err *err);
+yyjson_api PyObject *yyjson_read_opts(const char *dat,
+                                        size_t len
+                                        // ,
+                                        // yyjson_read_flag flg,
+                                        // const yyjson_alc *alc,
+                                        // yyjson_read_err *err
+                                        );
 
 /**
  Read a JSON file.
@@ -972,13 +980,13 @@ yyjson_api yyjson_doc *yyjson_read_fp(FILE *fp,
  @return A new JSON document, or NULL if an error occurs.
     When it's no longer needed, it should be freed with `yyjson_doc_free()`.
  */
-yyjson_api_inline yyjson_doc *yyjson_read(const char *dat,
-                                          size_t len,
-                                          yyjson_read_flag flg) {
-    flg &= ~YYJSON_READ_INSITU; /* const string cannot be modified */
-    return yyjson_read_opts((char *)(void *)(size_t)(const void *)dat,
-                            len, flg, NULL, NULL);
-}
+// yyjson_api_inline yyjson_doc *yyjson_read(const char *dat,
+//                                           size_t len,
+//                                           yyjson_read_flag flg) {
+//     flg &= ~YYJSON_READ_INSITU; /* const string cannot be modified */
+//     return yyjson_read_opts((char *)(void *)(size_t)(const void *)dat,
+//                             len, flg, NULL, NULL);
+// }
 
 /**
  Returns the size of maximum memory usage to read a JSON data.

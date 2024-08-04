@@ -80,7 +80,7 @@ add_definitions(-DYYJSON_DISABLE_WRITER=1)
 
 # ------------------------------------------------------------------------------
 # Library
-add_library(pyyjson SHARED src/yyjson.h src/yyjson.c src/pyglue.c)
+add_library(pyyjson SHARED src/yyjson.h src/yyjson.c src/pyglue.c src/pyyjson.c)
 target_include_directories(pyyjson PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src> ${Python3_INCLUDE_DIRS})
 # set_target_properties(pyyjson PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PYYJSON_SOVERSION})
 target_link_libraries(pyyjson PUBLIC ${Python3_LIBRARIES})

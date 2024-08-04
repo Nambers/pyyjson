@@ -1,6 +1,12 @@
 #ifndef PYYJSON_GLUE_H
 #define PYYJSON_GLUE_H
+#ifdef _DEBUG
+#undef _DEBUG
 #include <Python.h>
+#define _DEBUG
+#else
+#include <Python.h>
+#endif
 #include <assert.h>
 #include <stdalign.h>
 #include <stdbool.h>
@@ -99,6 +105,8 @@ typedef struct pyyjson_inf_op {
 } pyyjson_inf_op;
 
 PyObject *pyyjson_op_loads(pyyjson_op *op_sequence);
+
+extern PyObject *JSONDecodeError;
 
 static_assert((sizeof(pyyjson_op) % sizeof(pyyjson_op)) == 0);
 static_assert((sizeof(pyyjson_int_op) % sizeof(pyyjson_op)) == 0);
