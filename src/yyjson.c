@@ -3852,8 +3852,8 @@ static_inline bool read_inf(bool sign, const char **ptr, pyyjson_op **op) {
         //     val->tag = YYJSON_TYPE_NUM | YYJSON_SUBTYPE_REAL;
         //     val->uni.u64 = f64_raw_get_inf(sign);
         // }
-        pyyjson_inf_op* op_inf = (pyyjson_inf_op*)*op;
-        PYYJSON_WRITE_OP(op_inf, PYYJSON_OP_INF);
+        pyyjson_nan_inf_op* op_inf = (pyyjson_nan_inf_op*)*op;
+        PYYJSON_WRITE_OP(op_inf, PYYJSON_OP_NAN_INF | PYYJSON_NAN_INF_FLAG_INF);
         op_inf->sign = sign;
         *op = (pyyjson_op*)(op_inf + 1);
         return true;
@@ -3881,8 +3881,8 @@ static_inline bool read_nan(bool sign, const char **ptr, pyyjson_op **op) {
         //     val->tag = YYJSON_TYPE_NUM | YYJSON_SUBTYPE_REAL;
         //     val->uni.u64 = f64_raw_get_nan(sign);
         // }
-        pyyjson_nan_op* op_nan = (pyyjson_nan_op*)*op;
-        PYYJSON_WRITE_OP(op_nan, PYYJSON_OP_NAN);
+        pyyjson_nan_inf_op* op_nan = (pyyjson_nan_inf_op*)*op;
+        PYYJSON_WRITE_OP(op_nan, PYYJSON_OP_NAN_INF | PYYJSON_NAN_INF_FLAG_NAN);
         op_nan->sign = sign;
         *op = (pyyjson_op*)(op_nan + 1);
         return true;
@@ -4419,33 +4419,33 @@ static_inline bool read_number(const char **ptr, pyyjson_op **op) {
     } while (0)
 
 #define return_0() do { \
-    pyyjson_int_op* op_int = (pyyjson_int_op*)*op; \
-    PYYJSON_WRITE_OP(op_int, PYYJSON_OP_INT); \
-    op_int->data = 0; \
+    pyyjson_number_op* op_int = (pyyjson_number_op*)*op; \
+    PYYJSON_WRITE_OP(op_int, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_INT); \
+    op_int->data.i = 0; \
     *op = (pyyjson_op*)(op_int + 1); \
     *end = cur; return true; \
 } while (false)
 
 #define return_i64(_v) do { \
-    pyyjson_int_op* op_int = (pyyjson_int_op*)*op; \
-    PYYJSON_WRITE_OP(op_int, PYYJSON_OP_INT); \
-    *(u64*)&(op_int->data) = (u64)(sign ? (u64)(~(_v) + 1) : (u64)(_v)); \
+    pyyjson_number_op* op_int = (pyyjson_number_op*)*op; \
+    PYYJSON_WRITE_OP(op_int, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_INT); \
+    op_int->data.u = (u64)(sign ? (u64)(~(_v) + 1) : (u64)(_v)); \
     *op = (pyyjson_op*)(op_int + 1); \
     *end = cur; return true; \
 } while (false)
     
 #define return_f64(_v) do { \
-    pyyjson_float_op* op_float = (pyyjson_float_op*)*op; \
-    PYYJSON_WRITE_OP(op_float, PYYJSON_OP_FLOAT); \
-    op_float->data = sign ? -(f64)(_v) : (f64)(_v); \
+    pyyjson_number_op* op_float = (pyyjson_number_op*)*op; \
+    PYYJSON_WRITE_OP(op_float, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_FLOAT); \
+    op_float->data.f = sign ? -(f64)(_v) : (f64)(_v); \
     *op = (pyyjson_op*)(op_float + 1); \
     *end = cur; return true; \
 } while (false)
 
 #define return_f64_bin(_v) do { \
-    pyyjson_float_op* op_float = (pyyjson_float_op*)*op; \
-    PYYJSON_WRITE_OP(op_float, PYYJSON_OP_FLOAT); \
-    *(u64*)&(op_float->data) = ((u64)sign << 63) | (u64)(_v); \
+    pyyjson_number_op* op_float = (pyyjson_number_op*)*op; \
+    PYYJSON_WRITE_OP(op_float, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_FLOAT); \
+    op_float->data.u = ((u64)sign << 63) | (u64)(_v); \
     *op = (pyyjson_op*)(op_float + 1); \
     *end = cur; return true; \
 } while (false)
@@ -5038,34 +5038,35 @@ static_inline bool read_number(const char **ptr, pyyjson_op **op) {
 //     return false; \
 // } while (false)
     
+
 #define return_0() do { \
-    pyyjson_int_op* op_int = (pyyjson_int_op*)*op; \
-    PYYJSON_WRITE_OP(op_int, PYYJSON_OP_INT); \
-    op_int->data = 0; \
+    pyyjson_number_op* op_int = (pyyjson_number_op*)*op; \
+    PYYJSON_WRITE_OP(op_int, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_INT); \
+    op_int->data.i = 0; \
     *op = (pyyjson_op*)(op_int + 1); \
     *end = cur; return true; \
 } while (false)
 
 #define return_i64(_v) do { \
-    pyyjson_int_op* op_int = (pyyjson_int_op*)*op; \
-    PYYJSON_WRITE_OP(op_int, PYYJSON_OP_INT); \
-    *(u64*)&(op_int->data) = (u64)(sign ? (u64)(~(_v) + 1) : (u64)(_v)); \
+    pyyjson_number_op* op_int = (pyyjson_number_op*)*op; \
+    PYYJSON_WRITE_OP(op_int, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_INT); \
+    op_int->data.u = (u64)(sign ? (u64)(~(_v) + 1) : (u64)(_v)); \
     *op = (pyyjson_op*)(op_int + 1); \
     *end = cur; return true; \
 } while (false)
     
 #define return_f64(_v) do { \
-    pyyjson_float_op* op_float = (pyyjson_float_op*)*op; \
-    PYYJSON_WRITE_OP(op_float, PYYJSON_OP_FLOAT); \
-    op_float->data = sign ? -(f64)(_v) : (f64)(_v); \
+    pyyjson_number_op* op_float = (pyyjson_number_op*)*op; \
+    PYYJSON_WRITE_OP(op_float, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_FLOAT); \
+    op_float->data.f = sign ? -(f64)(_v) : (f64)(_v); \
     *op = (pyyjson_op*)(op_float + 1); \
     *end = cur; return true; \
 } while (false)
 
 #define return_f64_bin(_v) do { \
-    pyyjson_float_op* op_float = (pyyjson_float_op*)*op; \
-    PYYJSON_WRITE_OP(op_float, PYYJSON_OP_FLOAT); \
-    *(u64*)&(op_float->data) = ((u64)sign << 63) | (u64)(_v); \
+    pyyjson_number_op* op_float = (pyyjson_number_op*)*op; \
+    PYYJSON_WRITE_OP(op_float, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_FLOAT); \
+    op_float->data.u = ((u64)sign << 63) | (u64)(_v); \
     *op = (pyyjson_op*)(op_float + 1); \
     *end = cur; return true; \
 } while (false)
@@ -5073,7 +5074,7 @@ static_inline bool read_number(const char **ptr, pyyjson_op **op) {
 #define return_inf() do { \
     return_f64_bin(F64_RAW_INF); \
 } while (false)
-    
+
 // #define return_raw() do { \
 //     if (*pre) **pre = '\0'; /* add null-terminator for previous raw string */ \
 //     val->tag = ((u64)(cur - hdr) << YYJSON_TAG_BIT) | YYJSON_TYPE_RAW; \
@@ -5190,14 +5191,14 @@ read_double:
      Here strtod() is called twice for different locales, but if another thread
      happens calls setlocale() between two strtod(), parsing may still fail.
      */
-    pyyjson_float_op* op_float_final = (pyyjson_float_op*)*op;
-    op_float_final->data = strtod((const char *)hdr, (char **)&f64_end);
+    pyyjson_number_op* op_float_final = (pyyjson_number_op*)*op;
+    op_float_final->data.f = strtod((const char *)hdr, (char **)&f64_end);
     if (unlikely(f64_end != cur)) {
         /* replace '.' with ',' for locale */
         bool cut = (*cur == ',');
         if (cut) *cur = ' ';
         if (dot) *dot = ',';
-        op_float_final->data = strtod((const char *)hdr, (char **)&f64_end);
+        op_float_final->data.f = strtod((const char *)hdr, (char **)&f64_end);
         /* restore ',' to '.' */
         if (cut) *cur = ',';
         if (dot) *dot = '.';
@@ -5205,10 +5206,10 @@ read_double:
             return_err(hdr, "strtod() failed to parse the number");
         }
     }
-    if (unlikely(op_float_final->data >= HUGE_VAL || op_float_final->data <= -HUGE_VAL)) {
+    if (unlikely(op_float_final->data.f >= HUGE_VAL || op_float_final->data.f <= -HUGE_VAL)) {
         return_inf();
     }
-    PYYJSON_WRITE_OP(op_float_final, PYYJSON_OP_FLOAT);
+    PYYJSON_WRITE_OP(op_float_final, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_FLOAT);
     *op = (pyyjson_op*)(op_float_final + 1);
     // val->tag = YYJSON_TYPE_NUM | YYJSON_SUBTYPE_REAL;
     *end = cur;
@@ -6939,10 +6940,11 @@ static_inline PyObject *read_root_pretty(const char *dat, usize len) {
 
     // stack buffer length
 #define STACK_BUFFER_SIZE 1024
-#define OP_BUFFER_INIT_SIZE (STACK_BUFFER_SIZE * (sizeof(pyyjson_int_op) / sizeof(pyyjson_op)))
+#define COMMON_OPSIZE_RATIO (sizeof(pyyjson_string_op) / sizeof(pyyjson_op))
+#define OP_BUFFER_INIT_SIZE (STACK_BUFFER_SIZE * COMMON_OPSIZE_RATIO)
     // stack buffer
     container_type __stack_ctn_buffer[STACK_BUFFER_SIZE];
-    pyyjson_op *__stack_buffer[OP_BUFFER_INIT_SIZE];
+    pyyjson_op __stack_buffer[OP_BUFFER_INIT_SIZE];
     // buffer start pointer
     pyyjson_op *py_operations;
     char *string_buffer_head = NULL;
@@ -6950,7 +6952,7 @@ static_inline PyObject *read_root_pretty(const char *dat, usize len) {
 
     usize required_len = yyjson_max(
             OP_BUFFER_INIT_SIZE,
-            len / YYJSON_READER_ESTIMATED_PRETTY_RATIO * (sizeof(pyyjson_int_op) / sizeof(pyyjson_op)));
+            (len / YYJSON_READER_ESTIMATED_PRETTY_RATIO) * COMMON_OPSIZE_RATIO);
 
     // py_operations ptr
     pyyjson_op *py_operations_end;
@@ -7127,7 +7129,7 @@ arr_val_begin:
     if (char_is_number(*cur)) {
         // val_incr();
         // ctn_len++;
-        OP_BUFFER_GROW(yyjson_max(sizeof(pyyjson_nan_op), yyjson_max(sizeof(pyyjson_inf_op), yyjson_max(sizeof(pyyjson_int_op), sizeof(pyyjson_float_op)))));
+        OP_BUFFER_GROW(yyjson_max(sizeof(pyyjson_nan_inf_op), sizeof(pyyjson_number_op)));
         //ctn->size++;
         pyyjson_op *now_write_op = cur_write_op;
         if(likely(read_number(&cur, &cur_write_op))) {
@@ -7152,7 +7154,7 @@ arr_val_begin:
         // ctn_len++;
         OP_BUFFER_GROW(sizeof(pyyjson_op));
         if (likely(read_true(&cur))) {
-            PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_TRUE);
+            PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_CONSTANTS | PYYJSON_CONSTANTS_FLAG_TRUE);
             cur_write_op++;
             ctn->size++;
             goto arr_val_end;
@@ -7164,7 +7166,7 @@ arr_val_begin:
         // ctn_len++;
         OP_BUFFER_GROW(sizeof(pyyjson_op));
         if (likely(read_false(&cur))) {
-            PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_FALSE);
+            PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_CONSTANTS | PYYJSON_CONSTANTS_FLAG_FALSE);
             cur_write_op++;
             ctn->size++;
             goto arr_val_end;
@@ -7174,9 +7176,9 @@ arr_val_begin:
     if (*cur == 'n') {
         // val_incr();
         // ctn_len++;
-        OP_BUFFER_GROW(sizeof(pyyjson_nan_op));
+        OP_BUFFER_GROW(sizeof(pyyjson_nan_inf_op));
         if (likely(read_null(&cur))) {
-            PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_NULL);
+            PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_CONSTANTS | PYYJSON_CONSTANTS_FLAG_NULL);
             cur_write_op++;
             ctn->size++;
             goto arr_val_end;
@@ -7203,7 +7205,7 @@ arr_val_begin:
             (*cur == 'i' || *cur == 'I' || *cur == 'N')) {
         // val_incr();
         // ctn_len++;
-        OP_BUFFER_GROW(yyjson_max(sizeof(pyyjson_inf_op), sizeof(pyyjson_nan_op)));
+        OP_BUFFER_GROW(sizeof(pyyjson_nan_inf_op));
         if (read_inf_or_nan(false, &cur, &cur_write_op)) {
             ctn->size++;
             goto arr_val_end;
@@ -7246,9 +7248,9 @@ arr_end:
     /* save the next sibling value offset */
     // ctn->uni.ofs = (usize)((u8 *)val - (u8 *)ctn) + sizeof(yyjson_val);
     // ctn->tag = ((ctn_len) << YYJSON_TAG_BIT) | YYJSON_TYPE_ARR;
-    OP_BUFFER_GROW(sizeof(pyyjson_list_op));
-    pyyjson_list_op* list_op = (pyyjson_list_op*) cur_write_op;
-    PYYJSON_WRITE_OP(list_op, PYYJSON_OP_ARRAY_END);
+    OP_BUFFER_GROW(sizeof(pyyjson_container_op));
+    pyyjson_container_op* list_op = (pyyjson_container_op*) cur_write_op;
+    PYYJSON_WRITE_OP(list_op, PYYJSON_OP_CONTAINER | PYYJSON_CONTAINER_FLAG_ARRAY);
     list_op->len = ctn->size;
     cur_write_op = (pyyjson_op*) (list_op + 1);
     assert(ctn->tag != CONTAINER_OBJ_TYPE);
@@ -7357,7 +7359,7 @@ obj_val_begin:
     if (char_is_number(*cur)) {
         // val++;
         // ctn_len++;
-        OP_BUFFER_GROW(yyjson_max(sizeof(pyyjson_nan_op), yyjson_max(sizeof(pyyjson_inf_op), yyjson_max(sizeof(pyyjson_int_op), sizeof(pyyjson_float_op)))));
+        OP_BUFFER_GROW(yyjson_max(sizeof(pyyjson_nan_inf_op), sizeof(pyyjson_number_op)));
         pyyjson_op *now_write_op = cur_write_op;
         if (likely(read_number(&cur, &cur_write_op))) {
             ctn->size++;
@@ -7378,7 +7380,7 @@ obj_val_begin:
         // ctn_len++;
         OP_BUFFER_GROW(sizeof(pyyjson_op));
         if (likely(read_true(&cur))) {
-            PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_TRUE);
+            PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_CONSTANTS | PYYJSON_CONSTANTS_FLAG_TRUE);
             cur_write_op++;
             ctn->size++;
             goto obj_val_end;
@@ -7390,7 +7392,7 @@ obj_val_begin:
         // ctn_len++;
         OP_BUFFER_GROW(sizeof(pyyjson_op));
         if (likely(read_false(&cur))) {
-            PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_FALSE);
+            PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_CONSTANTS | PYYJSON_CONSTANTS_FLAG_FALSE);
             cur_write_op++;
             ctn->size++;
             goto obj_val_end;
@@ -7400,9 +7402,9 @@ obj_val_begin:
     if (*cur == 'n') {
         // val++;
         // ctn_len++;
-        OP_BUFFER_GROW(sizeof(pyyjson_nan_op));
+        OP_BUFFER_GROW(sizeof(pyyjson_nan_inf_op));
         if (likely(read_null(&cur))) {
-            PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_NULL);
+            PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_CONSTANTS | PYYJSON_CONSTANTS_FLAG_NULL);
             cur_write_op++;
             ctn->size++;
             goto obj_val_end;
@@ -7421,7 +7423,7 @@ obj_val_begin:
         (*cur == 'i' || *cur == 'I' || *cur == 'N')) {
         // val++;
         // ctn_len++;
-        OP_BUFFER_GROW(yyjson_max(sizeof(pyyjson_inf_op), sizeof(pyyjson_nan_op)));
+        OP_BUFFER_GROW(sizeof(pyyjson_nan_inf_op));
         if (read_inf_or_nan(false, &cur, &cur_write_op)) {
             ctn->size++;
             goto obj_val_end;
@@ -7458,9 +7460,9 @@ obj_val_end:
     goto fail_character_obj_end;
     
 obj_end:
-    OP_BUFFER_GROW(sizeof(pyyjson_dict_op));
-    pyyjson_dict_op* dict_op = (pyyjson_dict_op*) cur_write_op;
-    PYYJSON_WRITE_OP(dict_op, PYYJSON_OP_OBJECT_END);
+    OP_BUFFER_GROW(sizeof(pyyjson_container_op));
+    pyyjson_container_op* dict_op = (pyyjson_container_op*) cur_write_op;
+    PYYJSON_WRITE_OP(dict_op, PYYJSON_OP_CONTAINER | PYYJSON_CONTAINER_FLAG_DICT);
     dict_op->len = ctn->size;
     cur_write_op = (pyyjson_op*) (dict_op + 1);
     assert(ctn->tag == CONTAINER_OBJ_TYPE);
@@ -7579,6 +7581,7 @@ failed_cleanup:
 #undef OP_BUFFER_GROW
 #undef OP_BUFFER_REALLOC_CHECK
 #undef OP_BUFFER_INIT_SIZE
+#undef COMMON_OPSIZE_RATIO
 #undef STACK_BUFFER_SIZE
 #undef CONTAINER_OBJ_TYPE
 #undef CONTAINER_ARR_TYPE
