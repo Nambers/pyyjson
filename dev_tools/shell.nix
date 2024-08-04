@@ -1,7 +1,9 @@
 let
   pkgs = import <nixpkgs> { };
   # define version
-  using_python = (pkgs.enableDebugging pkgs.python312);
+  using_python = (pkgs.enableDebugging pkgs.python312).override {
+    self = using_python;
+  };
   # import required python packages
   required_python_packages = import ./py_requirements.nix;
   #
@@ -10,7 +12,7 @@ let
 in
 pkgs.mkShell {
   packages = [
-    (pkgs.enableDebugging using_python)
+    pyenv #(pkgs.enableDebugging using_python)
     pkgs.cmake
     pkgs.gdb
     pkgs.valgrind
@@ -60,8 +62,9 @@ pkgs.mkShell {
     rm ${nix_pyenv_directory}/lib/typing_extensions.py > /dev/null 2>&1
 
     # add python executable to the bin directory
-    ensure_symlink ${nix_pyenv_directory}/bin/python ${using_python}/bin/python
-    export PATH=${using_python}/bin:${nix_pyenv_directory}/bin:$PATH
+    ensure_symlink ${nix_pyenv_directory}/bin/python ${pyenv}/bin/python
+    # export PATH=${using_python}/bin:${nix_pyenv_directory}/bin:$PATH
+    export PATH=${nix_pyenv_directory}/bin:$PATH
 
     nix-build shell.nix -A inputDerivation -o ${nix_pyenv_directory}/.nix-shell-inputs
 
@@ -72,13 +75,14 @@ pkgs.mkShell {
     ensure_symlink ${nix_pyenv_directory}/bin/clang $CC
     ensure_symlink ${nix_pyenv_directory}/bin/clang++ $CXX
     ensure_symlink ${nix_pyenv_directory}/bin/cmake ${pkgs.cmake}/bin/cmake
-    echo ${using_python.src}
     # unzip the source
     mkdir -p build
     cd build
-    tar xvf ${using_python.src} > /dev/null
+    if [[ ! -d ${using_python.src} ]]; then
+        tar xvf ${using_python.src} > /dev/null
+    fi
     cd ..
     # python lib
-    export PYTHONPATH=${pyenv}/${using_python.sitePackages}:$PYTHONPATH
+    # export PYTHONPATH=${pyenv}/${using_python.sitePackages}:$PYTHONPATH
   '';
 }
