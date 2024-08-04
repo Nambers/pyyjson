@@ -4403,54 +4403,56 @@ static const f64 f64_pow10_table[] = {
     number is infinite, the return value is based on flag.
  3. This function (with inline attribute) may generate a lot of instructions.
  */
-static_inline bool read_number(u8 **ptr,
-                               u8 **pre,
-                               yyjson_read_flag flg,
-                               yyjson_val *val,
-                               const char **msg) {
-    
-#define return_err(_pos, _msg) do { \
-    *msg = _msg; \
-    *end = _pos; \
-    return false; \
-} while (false)
-    
+static_inline bool read_number(const char **ptr, pyyjson_op **op) {
+
+#define return_err(_end, _msg)                                                  \
+    do {                                                                        \
+        PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, _end - hdr); \
+        return false;                                                           \
+    } while (0)
+
 #define return_0() do { \
-    val->tag = YYJSON_TYPE_NUM | (u8)((u8)sign << 3); \
-    val->uni.u64 = 0; \
+    pyyjson_int_op* op_int = (pyyjson_int_op*)*op; \
+    PYYJSON_WRITE_OP(op_int, PYYJSON_OP_INT); \
+    op_int->data = 0; \
+    *op = (pyyjson_op*)(op_int + 1); \
     *end = cur; return true; \
 } while (false)
 
 #define return_i64(_v) do { \
-    val->tag = YYJSON_TYPE_NUM | (u8)((u8)sign << 3); \
-    val->uni.u64 = (u64)(sign ? (u64)(~(_v) + 1) : (u64)(_v)); \
+    pyyjson_int_op* op_int = (pyyjson_int_op*)*op; \
+    PYYJSON_WRITE_OP(op_int, PYYJSON_OP_INT); \
+    *(u64*)&(op_int->data) = (u64)(sign ? (u64)(~(_v) + 1) : (u64)(_v)); \
+    *op = (pyyjson_op*)(op_int + 1); \
     *end = cur; return true; \
 } while (false)
     
 #define return_f64(_v) do { \
-    val->tag = YYJSON_TYPE_NUM | YYJSON_SUBTYPE_REAL; \
-    val->uni.f64 = sign ? -(f64)(_v) : (f64)(_v); \
+    pyyjson_float_op* op_float = (pyyjson_float_op*)*op; \
+    PYYJSON_WRITE_OP(op_float, PYYJSON_OP_FLOAT); \
+    op_float->data = sign ? -(f64)(_v) : (f64)(_v); \
+    *op = (pyyjson_op*)(op_float + 1); \
     *end = cur; return true; \
 } while (false)
-    
+
 #define return_f64_bin(_v) do { \
-    val->tag = YYJSON_TYPE_NUM | YYJSON_SUBTYPE_REAL; \
-    val->uni.u64 = ((u64)sign << 63) | (u64)(_v); \
+    pyyjson_float_op* op_float = (pyyjson_float_op*)*op; \
+    PYYJSON_WRITE_OP(op_float, PYYJSON_OP_FLOAT); \
+    *(u64*)&(op_float->data) = ((u64)sign << 63) | (u64)(_v); \
+    *op = (pyyjson_op*)(op_float + 1); \
     *end = cur; return true; \
 } while (false)
-    
+
 #define return_inf() do { \
-    if (has_read_flag(BIGNUM_AS_RAW)) return_raw(); \
-    if (has_read_flag(ALLOW_INF_AND_NAN)) return_f64_bin(F64_RAW_INF); \
-    else return_err(hdr, "number is infinity when parsed as double"); \
+    return_f64_bin(F64_RAW_INF); \
 } while (false)
-    
-#define return_raw() do { \
-    if (*pre) **pre = '\0'; /* add null-terminator for previous raw string */ \
-    val->tag = ((u64)(cur - hdr) << YYJSON_TAG_BIT) | YYJSON_TYPE_RAW; \
-    val->uni.str = (const char *)hdr; \
-    *pre = cur; *end = cur; return true; \
-} while (false)
+
+// #define return_raw() do { \
+//     if (*pre) **pre = '\0'; /* add null-terminator for previous raw string */ \
+//     val->tag = ((u64)(cur - hdr) << YYJSON_TAG_BIT) | YYJSON_TYPE_RAW; \
+//     val->uni.str = (const char *)hdr; \
+//     *pre = cur; *end = cur; return true; \
+// } while (false)
     
     u8 *sig_cut = NULL; /* significant part cutting position for long number */
     u8 *sig_end = NULL; /* significant part ending position */
@@ -4471,9 +4473,9 @@ static_inline bool read_number(u8 **ptr,
     bool sign;
     
     /* read number as raw string if has `YYJSON_READ_NUMBER_AS_RAW` flag */
-    if (has_read_flag(NUMBER_AS_RAW)) {
-        return read_number_raw(ptr, pre, flg, val, msg);
-    }
+    // if (has_read_flag(NUMBER_AS_RAW)) {
+    //     return read_number_raw(ptr, pre, flg, val, msg);
+    // }
     
     sign = (*hdr == '-');
     cur += sign;
@@ -4481,12 +4483,12 @@ static_inline bool read_number(u8 **ptr,
     /* begin with a leading zero or non-digit */
     if (unlikely(!digi_is_nonzero(*cur))) { /* 0 or non-digit char */
         if (unlikely(*cur != '0')) { /* non-digit char */
-            if (has_read_flag(ALLOW_INF_AND_NAN)) {
-                if (read_inf_or_nan(sign, &cur, pre, val)) {
-                    *end = cur;
-                    return true;
-                }
+            //if (has_read_flag(ALLOW_INF_AND_NAN)) {
+            if (read_inf_or_nan(sign, &cur, op)) {
+                *end = cur;
+                return true;
             }
+            //}
             return_err(cur, "no digit after minus sign");
         }
         /* begin with 0 */
@@ -4540,7 +4542,7 @@ static_inline bool read_number(u8 **ptr,
     if (!digi_is_digit_or_fp(*cur)) {
         /* this number is an integer consisting of 19 digits */
         if (sign && (sig > ((u64)1 << 63))) { /* overflow */
-            if (has_read_flag(BIGNUM_AS_RAW)) return_raw();
+            // if (has_read_flag(BIGNUM_AS_RAW)) return_raw();
             return_f64(normalized_u64_to_f64(sig));
         }
         return_i64(sig);
@@ -4594,7 +4596,7 @@ digi_intg_more:
                 cur++;
                 /* convert to double if overflow */
                 if (sign) {
-                    if (has_read_flag(BIGNUM_AS_RAW)) return_raw();
+                    // if (has_read_flag(BIGNUM_AS_RAW)) return_raw();
                     return_f64(normalized_u64_to_f64(sig));
                 }
                 return_i64(sig);
@@ -4621,9 +4623,9 @@ digi_frac_more:
     sig += (*cur >= '5'); /* round */
     while (digi_is_digit(*++cur));
     if (!dot_pos) {
-        if (!digi_is_fp(*cur) && has_read_flag(BIGNUM_AS_RAW)) {
-            return_raw(); /* it's a large integer */
-        }
+        // if (!digi_is_fp(*cur) && has_read_flag(BIGNUM_AS_RAW)) {
+        //     return_raw(); /* it's a large integer */
+        // }
         dot_pos = cur;
         if (*cur == '.') {
             if (!digi_is_digit(*++cur)) {
@@ -5015,54 +5017,62 @@ digi_finish:
  This is a fallback function if the custom number reader is disabled.
  This function use libc's strtod() to read floating-point number.
  */
-static_inline bool read_number(u8 **ptr,
-                               u8 **pre,
-                               yyjson_read_flag flg,
-                               yyjson_val *val,
-                               const char **msg) {
-    
-#define return_err(_pos, _msg) do { \
-    *msg = _msg; \
-    *end = _pos; \
-    return false; \
-} while (false)
+static_inline bool read_number(const char **ptr, pyyjson_op **op) {
+
+#define return_err(_end, _msg)                                                  \
+    do {                                                                        \
+        PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, _end - hdr); \
+        return false;                                                           \
+    } while (0)
+ 
+// #define return_err(_pos, _msg) do { \
+//     *msg = _msg; \
+//     *end = _pos; \
+//     return false; \
+// } while (false)
     
 #define return_0() do { \
-    val->tag = YYJSON_TYPE_NUM | (u64)((u8)sign << 3); \
-    val->uni.u64 = 0; \
+    pyyjson_int_op* op_int = (pyyjson_int_op*)*op; \
+    PYYJSON_WRITE_OP(op_int, PYYJSON_OP_INT); \
+    op_int->data = 0; \
+    *op = (pyyjson_op*)(op_int + 1); \
     *end = cur; return true; \
 } while (false)
 
 #define return_i64(_v) do { \
-    val->tag = YYJSON_TYPE_NUM | (u64)((u8)sign << 3); \
-    val->uni.u64 = (u64)(sign ? (u64)(~(_v) + 1) : (u64)(_v)); \
+    pyyjson_int_op* op_int = (pyyjson_int_op*)*op; \
+    PYYJSON_WRITE_OP(op_int, PYYJSON_OP_INT); \
+    *(u64*)&(op_int->data) = (u64)(sign ? (u64)(~(_v) + 1) : (u64)(_v)); \
+    *op = (pyyjson_op*)(op_int + 1); \
     *end = cur; return true; \
 } while (false)
     
 #define return_f64(_v) do { \
-    val->tag = YYJSON_TYPE_NUM | YYJSON_SUBTYPE_REAL; \
-    val->uni.f64 = sign ? -(f64)(_v) : (f64)(_v); \
+    pyyjson_float_op* op_float = (pyyjson_float_op*)*op; \
+    PYYJSON_WRITE_OP(op_float, PYYJSON_OP_FLOAT); \
+    op_float->data = sign ? -(f64)(_v) : (f64)(_v); \
+    *op = (pyyjson_op*)(op_float + 1); \
     *end = cur; return true; \
 } while (false)
-    
+
 #define return_f64_bin(_v) do { \
-    val->tag = YYJSON_TYPE_NUM | YYJSON_SUBTYPE_REAL; \
-    val->uni.u64 = ((u64)sign << 63) | (u64)(_v); \
+    pyyjson_float_op* op_float = (pyyjson_float_op*)*op; \
+    PYYJSON_WRITE_OP(op_float, PYYJSON_OP_FLOAT); \
+    *(u64*)&(op_float->data) = ((u64)sign << 63) | (u64)(_v); \
+    *op = (pyyjson_op*)(op_float + 1); \
     *end = cur; return true; \
 } while (false)
-    
+
 #define return_inf() do { \
-    if (has_read_flag(BIGNUM_AS_RAW)) return_raw(); \
-    if (has_read_flag(ALLOW_INF_AND_NAN)) return_f64_bin(F64_RAW_INF); \
-    else return_err(hdr, "number is infinity when parsed as double"); \
+    return_f64_bin(F64_RAW_INF); \
 } while (false)
     
-#define return_raw() do { \
-    if (*pre) **pre = '\0'; /* add null-terminator for previous raw string */ \
-    val->tag = ((u64)(cur - hdr) << YYJSON_TAG_BIT) | YYJSON_TYPE_RAW; \
-    val->uni.str = (const char *)hdr; \
-    *pre = cur; *end = cur; return true; \
-} while (false)
+// #define return_raw() do { \
+//     if (*pre) **pre = '\0'; /* add null-terminator for previous raw string */ \
+//     val->tag = ((u64)(cur - hdr) << YYJSON_TAG_BIT) | YYJSON_TYPE_RAW; \
+//     val->uni.str = (const char *)hdr; \
+//     *pre = cur; *end = cur; return true; \
+// } while (false)
     
     u64 sig, num;
     u8 *hdr = *ptr;
@@ -5073,9 +5083,9 @@ static_inline bool read_number(u8 **ptr,
     bool sign;
     
     /* read number as raw string if has `YYJSON_READ_NUMBER_AS_RAW` flag */
-    if (has_read_flag(NUMBER_AS_RAW)) {
-        return read_number_raw(ptr, pre, flg, val, msg);
-    }
+    // if (has_read_flag(NUMBER_AS_RAW)) {
+    //     return read_number_raw(ptr, pre, flg, val, msg);
+    // }
     
     sign = (*hdr == '-');
     cur += sign;
@@ -5083,12 +5093,12 @@ static_inline bool read_number(u8 **ptr,
     
     /* read first digit, check leading zero */
     if (unlikely(!digi_is_digit(*cur))) {
-        if (has_read_flag(ALLOW_INF_AND_NAN)) {
-            if (read_inf_or_nan(sign, &cur, pre, val)) {
-                *end = cur;
-                return true;
-            }
+        // if (has_read_flag(ALLOW_INF_AND_NAN)) {
+        if (read_inf_or_nan(sign, &cur, op)) {
+            *end = cur;
+            return true;
         }
+        // }
         return_err(cur, "no digit after minus sign");
     }
     if (*cur == '0') {
@@ -5117,7 +5127,7 @@ static_inline bool read_number(u8 **ptr,
             sig = num + sig * 10;
             cur++;
             if (sign) {
-                if (has_read_flag(BIGNUM_AS_RAW)) return_raw();
+                // if (has_read_flag(BIGNUM_AS_RAW)) return_raw();
                 return_f64(normalized_u64_to_f64(sig));
             }
             return_i64(sig);
@@ -5129,7 +5139,7 @@ intg_end:
     if (!digi_is_digit_or_fp(*cur)) {
         /* this number is an integer consisting of 1 to 19 digits */
         if (sign && (sig > ((u64)1 << 63))) {
-            if (has_read_flag(BIGNUM_AS_RAW)) return_raw();
+            // if (has_read_flag(BIGNUM_AS_RAW)) return_raw();
             return_f64(normalized_u64_to_f64(sig));
         }
         return_i64(sig);
@@ -5138,9 +5148,9 @@ intg_end:
 read_double:
     /* this number should be read as double */
     while (digi_is_digit(*cur)) cur++;
-    if (!digi_is_fp(*cur) && has_read_flag(BIGNUM_AS_RAW)) {
-        return_raw(); /* it's a large integer */
-    }
+    // if (!digi_is_fp(*cur) && has_read_flag(BIGNUM_AS_RAW)) {
+    //     return_raw(); /* it's a large integer */
+    // }
     if (*cur == '.') {
         /* skip fraction part */
         dot = cur;
@@ -5173,13 +5183,14 @@ read_double:
      Here strtod() is called twice for different locales, but if another thread
      happens calls setlocale() between two strtod(), parsing may still fail.
      */
-    val->uni.f64 = strtod((const char *)hdr, (char **)&f64_end);
+    pyyjson_float_op* op_float_final = (pyyjson_float_op*)*op;
+    op_float_final->data = strtod((const char *)hdr, (char **)&f64_end);
     if (unlikely(f64_end != cur)) {
         /* replace '.' with ',' for locale */
         bool cut = (*cur == ',');
         if (cut) *cur = ' ';
         if (dot) *dot = ',';
-        val->uni.f64 = strtod((const char *)hdr, (char **)&f64_end);
+        op_float_final->data = strtod((const char *)hdr, (char **)&f64_end);
         /* restore ',' to '.' */
         if (cut) *cur = ',';
         if (dot) *dot = '.';
@@ -5187,10 +5198,12 @@ read_double:
             return_err(hdr, "strtod() failed to parse the number");
         }
     }
-    if (unlikely(val->uni.f64 >= HUGE_VAL || val->uni.f64 <= -HUGE_VAL)) {
+    if (unlikely(op_float_final->data >= HUGE_VAL || op_float_final->data <= -HUGE_VAL)) {
         return_inf();
     }
-    val->tag = YYJSON_TYPE_NUM | YYJSON_SUBTYPE_REAL;
+    PYYJSON_WRITE_OP(op_float_final, PYYJSON_OP_FLOAT);
+    *op = (pyyjson_op*)(op_float_final + 1);
+    // val->tag = YYJSON_TYPE_NUM | YYJSON_SUBTYPE_REAL;
     *end = cur;
     return true;
     
@@ -7100,8 +7113,7 @@ arr_val_begin:
         OP_BUFFER_GROW(yyjson_max(sizeof(pyyjson_nan_op), yyjson_max(sizeof(pyyjson_inf_op), yyjson_max(sizeof(pyyjson_int_op), sizeof(pyyjson_float_op)))));
         //ctn->size++;
         pyyjson_op *now_write_op = cur_write_op;
-        read_number(&cur, &cur_write_op);
-        if(likely(PYYJSON_READ_OP(now_write_op) != PYYJSON_NO_OP)) {
+        if(likely(read_number(&cur, &cur_write_op))) {
             ctn->size++;
             goto arr_val_end;
         }
@@ -7327,8 +7339,7 @@ obj_val_begin:
         // ctn_len++;
         OP_BUFFER_GROW(yyjson_max(sizeof(pyyjson_nan_op), yyjson_max(sizeof(pyyjson_inf_op), yyjson_max(sizeof(pyyjson_int_op), sizeof(pyyjson_float_op)))));
         pyyjson_op *now_write_op = cur_write_op;
-        read_number(&cur, &cur_write_op);
-        if (likely(PYYJSON_READ_OP(now_write_op) != PYYJSON_NO_OP)) {
+        if (likely(read_number(&cur, &cur_write_op))) {
             ctn->size++;
             goto obj_val_end;
         }
