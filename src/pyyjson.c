@@ -54,6 +54,10 @@ static int module_clear(PyObject *m) {
 
 static void module_free(void *m) {
     module_clear((PyObject *) m);
+
+    for (size_t i = 0; i < PYYJSON_KEY_CACHE_SIZE; i++) {
+        Py_XDECREF(AssociativeKeyCache[i]);
+    }
 }
 
 PyMODINIT_FUNC PyInit_pyyjson(void) {
@@ -89,6 +93,9 @@ PyMODINIT_FUNC PyInit_pyyjson(void) {
         Py_DECREF(module);
         return NULL;
     }
+
+    // do pyyjson internal init.
+    memset(AssociativeKeyCache, 0, sizeof(AssociativeKeyCache));
 
     return module;
 }

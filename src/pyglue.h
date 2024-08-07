@@ -28,7 +28,9 @@
 #define PYYJSON_STRING_FLAG_LATIN1 (1 << (PYYJSON_OP_HIGHER_START))
 #define PYYJSON_STRING_FLAG_UCS2 (1 << (PYYJSON_OP_HIGHER_START + 1))
 #define PYYJSON_STRING_FLAG_UCS4 (1 << (PYYJSON_OP_HIGHER_START + 2))
-#define PYYJSON_STRING_FLAG_MASK (PYYJSON_STRING_FLAG_ASCII | PYYJSON_STRING_FLAG_LATIN1 | PYYJSON_STRING_FLAG_UCS2 | PYYJSON_STRING_FLAG_UCS4)
+#define PYYJSON_STRING_FLAG_OBJ_KEY (1 << (PYYJSON_OP_HIGHER_START + 3))
+#define PYYJSON_STRING_FLAG_UCS_TYPE_MASK (PYYJSON_STRING_FLAG_ASCII | PYYJSON_STRING_FLAG_LATIN1 | PYYJSON_STRING_FLAG_UCS2 | PYYJSON_STRING_FLAG_UCS4)
+#define PYYJSON_STRING_FLAG_MASK (PYYJSON_STRING_FLAG_ASCII | PYYJSON_STRING_FLAG_LATIN1 | PYYJSON_STRING_FLAG_UCS2 | PYYJSON_STRING_FLAG_UCS4 | PYYJSON_STRING_FLAG_OBJ_KEY)
 // num flags
 #define PYYJSON_NUM_FLAG_FLOAT 0
 #define PYYJSON_NUM_FLAG_INT (1 << (PYYJSON_OP_HIGHER_START))
@@ -46,7 +48,9 @@
 // nan inf flags
 #define PYYJSON_NAN_INF_FLAG_NAN 0
 #define PYYJSON_NAN_INF_FLAG_INF (1 << (PYYJSON_OP_HIGHER_START))
-#define PYYJSON_NAN_INF_FLAG_MASK (PYYJSON_NAN_INF_FLAG_NAN | PYYJSON_NAN_INF_FLAG_INF)
+#define PYYJSON_NAN_INF_FLAG_SIGNED (1 << (PYYJSON_OP_HIGHER_START + 1))
+#define PYYJSON_NAN_INF_FLAG_MASK_WITHOUT_SIGNED (PYYJSON_NAN_INF_FLAG_NAN | PYYJSON_NAN_INF_FLAG_INF)
+#define PYYJSON_NAN_INF_FLAG_MASK (PYYJSON_NAN_INF_FLAG_NAN | PYYJSON_NAN_INF_FLAG_INF | PYYJSON_NAN_INF_FLAG_SIGNED)
 // end flags
 typedef uint32_t op_type;
 #define PYYJSON_OP_HEAD pyyjson_op_base op_base;
@@ -56,21 +60,34 @@ typedef uint32_t op_type;
         ((pyyjson_op_base *) (_ptr))->op = (_code); \
     } while (0)
 
+#if INTPTR_MAX == INT64_MAX
+#define PYYJSON_64BIT
+#elif INTPTR_MAX == INT32_MAX
+#define PYYJSON_32BIT
+#else
+#error "Unsupported platform"
+#endif
+
+#ifdef PYYJSON_64BIT
+#define PYYJSON_OP_PADDING char pad[4];
+#else
+#define PYYJSON_OP_PADDING
+#endif
+
 // size = 4
 typedef struct pyyjson_op_base {
     op_type op;
 } pyyjson_op_base;
 
-// size = 8
+// size = 4 / 8
 typedef struct pyyjson_op {
     PYYJSON_OP_HEAD
-    char pad[4];
+    PYYJSON_OP_PADDING
 } pyyjson_op;
 
-// size = 16
+// size = 12 / 16
 typedef struct pyyjson_number_op {
     PYYJSON_OP_HEAD
-    char pad[4];
     union {
         int64_t i;
         uint64_t u;
@@ -78,9 +95,9 @@ typedef struct pyyjson_number_op {
     } data;
 } pyyjson_number_op;
 
-// size = 16 / 24
+// size = 12 / 24
 typedef struct pyyjson_string_op {
-    pyyjson_op op_base; // here we force the size of pyyjson_string_op to be 16 for 32bit platforms
+    PYYJSON_OP_HEAD
     char *data;
     Py_ssize_t len;
 } pyyjson_string_op;
@@ -91,20 +108,22 @@ typedef struct pyyjson_container_op {
     Py_ssize_t len;
 } pyyjson_container_op;
 
-// size = 8
-typedef struct pyyjson_nan_inf_op {
-    PYYJSON_OP_HEAD
-    bool sign;
-} pyyjson_nan_inf_op;
-
 PyObject *pyyjson_op_loads(pyyjson_op *op_sequence);
+
+// typedef struct key_cache {
+//     Py_hash_t hash;
+//     PyObject *unicode;
+// } key_cache;
 
 extern PyObject *JSONDecodeError;
 
+#define PYYJSON_STRING_BUFFER_SIZE (32 * 1024 * 1024)
+extern char pyyjson_string_buffer[PYYJSON_STRING_BUFFER_SIZE];
+#define PYYJSON_KEY_CACHE_SIZE (1 << 11)
+extern PyObject *AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
 static_assert((sizeof(pyyjson_op) % sizeof(pyyjson_op)) == 0);
 static_assert((sizeof(pyyjson_number_op) % sizeof(pyyjson_op)) == 0);
 static_assert((sizeof(pyyjson_string_op) % sizeof(pyyjson_op)) == 0);
 static_assert((sizeof(pyyjson_container_op) % sizeof(pyyjson_op)) == 0);
-static_assert((sizeof(pyyjson_nan_inf_op) % sizeof(pyyjson_op)) == 0);
 
 #endif
