@@ -3790,8 +3790,8 @@ static_inline bool read_hex_u16(const u8 *cur, u16 *val) {
 
 /** Read 'true' literal, '*cur' should be 't'. */
 static_inline bool read_true(const char **ptr) {
-    u8 *cur = *ptr;
-    u8 **end = ptr;
+    u8 *cur = (u8 *)*ptr;
+    u8 **end = (u8 **)ptr;
     if (likely(byte_match_4(cur, "true"))) {
         // val->tag = YYJSON_TYPE_BOOL | YYJSON_SUBTYPE_TRUE;
         *end = cur + 4;
@@ -3802,8 +3802,8 @@ static_inline bool read_true(const char **ptr) {
 
 /** Read 'false' literal, '*cur' should be 'f'. */
 static_inline bool read_false(const char **ptr) {
-    u8 *cur = *ptr;
-    u8 **end = ptr;
+    u8 *cur = (u8 *)*ptr;
+    u8 **end = (u8 **)ptr;
     if (likely(byte_match_4(cur + 1, "alse"))) {
         // val->tag = YYJSON_TYPE_BOOL | YYJSON_SUBTYPE_FALSE;
         *end = cur + 5;
@@ -3814,8 +3814,8 @@ static_inline bool read_false(const char **ptr) {
 
 /** Read 'null' literal, '*cur' should be 'n'. */
 static_inline bool read_null(const char **ptr) {
-    u8 *cur = *ptr;
-    u8 **end = ptr;
+    u8 *cur = (u8 *)*ptr;
+    u8 **end = (u8 **)ptr;
     if (likely(byte_match_4(cur, "null"))) {
         // val->tag = YYJSON_TYPE_NULL;
         *end = cur + 4;
@@ -3826,9 +3826,9 @@ static_inline bool read_null(const char **ptr) {
 
 /** Read 'Inf' or 'Infinity' literal (ignoring case). */
 static_inline bool read_inf(bool sign, const char **ptr, pyyjson_op **op) {
-    u8 *hdr = *ptr - sign;
-    u8 *cur = *ptr;
-    u8 **end = ptr;
+    u8 *hdr = (u8 *)(*ptr - sign);
+    u8 *cur = (u8 *)*ptr;
+    u8 **end = (u8 **)ptr;
     if ((cur[0] == 'I' || cur[0] == 'i') &&
         (cur[1] == 'N' || cur[1] == 'n') &&
         (cur[2] == 'F' || cur[2] == 'f')) {
@@ -3862,9 +3862,9 @@ static_inline bool read_inf(bool sign, const char **ptr, pyyjson_op **op) {
 
 /** Read 'NaN' literal (ignoring case). */
 static_inline bool read_nan(bool sign, const char **ptr, pyyjson_op **op) {
-    u8 *hdr = *ptr - sign;
-    u8 *cur = *ptr;
-    u8 **end = ptr;
+    u8 *hdr = (u8 *)(*ptr - sign);
+    u8 *cur = (u8 *)*ptr;
+    u8 **end = (u8 **)ptr;
     if ((cur[0] == 'N' || cur[0] == 'n') &&
         (cur[1] == 'A' || cur[1] == 'a') &&
         (cur[2] == 'N' || cur[2] == 'n')) {
@@ -4472,9 +4472,9 @@ static_inline bool read_number(const char **ptr, pyyjson_op **op) {
     u64 num; /* temporary number for reading */
     u8 *tmp; /* temporary cursor for reading */
     
-    u8 *hdr = *ptr;
-    u8 *cur = *ptr;
-    u8 **end = ptr;
+    u8 *hdr = (u8 *)*ptr;
+    u8 *cur = (u8 *)*ptr;
+    u8 **end = (u8 **)ptr;
     bool sign;
     
     /* read number as raw string if has `YYJSON_READ_NUMBER_AS_RAW` flag */
@@ -4489,7 +4489,7 @@ static_inline bool read_number(const char **ptr, pyyjson_op **op) {
     if (unlikely(!digi_is_nonzero(*cur))) { /* 0 or non-digit char */
         if (unlikely(*cur != '0')) { /* non-digit char */
             //if (has_read_flag(ALLOW_INF_AND_NAN)) {
-            if (read_inf_or_nan(sign, &cur, op)) {
+            if (read_inf_or_nan(sign, (const char**)&cur, op)) {
                 *end = cur;
                 return true;
             }
@@ -5267,7 +5267,7 @@ static_inline u32 read_b4_unicode(u32 uni) {
  @param msg The error message pointer.
  @return Whether success.
  */
-static_inline PyObject* read_string(const char **ptr, pyyjson_op **op, char **buffer) {
+static_inline bool read_string(const char **ptr, pyyjson_op **op, char **buffer) {
     /*
      Each unicode code point is encoded as 1 to 4 bytes in UTF-8 encoding,
      we use 4-byte mask and pattern value to validate UTF-8 byte sequence,
@@ -5406,8 +5406,8 @@ static_inline PyObject* read_string(const char **ptr, pyyjson_op **op, char **bu
 //     goto failed; \
 // } while (false)
     
-    u8 *cur = *ptr;
-    u8 **end = ptr;
+    u8 *cur = (u8 *)*ptr;
+    u8 **end = (u8 **)ptr;
     /* modified BEGIN */
     // u8 *src = ++cur, *dst, *pos;
     u8 *src = ++cur, *pos;
@@ -5478,7 +5478,7 @@ skip_ascii_end:
         PYYJSON_WRITE_OP(string_op, PYYJSON_OP_STRING | PYYJSON_STRING_FLAG_ASCII);
         string_op->data = src_start;
         string_op->len = src - src_start;
-        *op = (pyyjson_string_op*)(string_op + 1);
+        *op = (pyyjson_op*)(string_op + 1);
         // buffer unchanged
         return true;
         // val->tag = ((u64)(src - cur) << YYJSON_TAG_BIT) |
@@ -7108,7 +7108,7 @@ arr_begin:
 arr_val_begin:
 #if YYJSON_IS_REAL_GCC
     while (true) repeat16({
-        if (byte_match_2(cur, "  ")) cur += 2;
+        if (byte_match_2((void*)cur, "  ")) cur += 2;
         else break;
     })
 #else
@@ -7219,7 +7219,7 @@ arr_val_begin:
     goto fail_character_val;
     
 arr_val_end:
-    if (byte_match_2(cur, ",\n")) {
+    if (byte_match_2((void*)cur, ",\n")) {
         cur += 2;
         goto arr_val_begin;
     }
@@ -7288,7 +7288,7 @@ obj_begin:
 obj_key_begin:
 #if YYJSON_IS_REAL_GCC
     while (true) repeat16({
-        if (byte_match_2(cur, "  ")) cur += 2;
+        if (byte_match_2((void*)cur, "  ")) cur += 2;
         else break;
     })
 #else
@@ -7328,7 +7328,7 @@ obj_key_begin:
     goto fail_character_obj_key;
     
 obj_key_end:
-    if (byte_match_2(cur, ": ")) {
+    if (byte_match_2((void*)cur, ": ")) {
         cur += 2;
         goto obj_val_begin;
     }
@@ -7439,7 +7439,7 @@ obj_val_begin:
     goto fail_character_val;
     
 obj_val_end:
-    if (byte_match_2(cur, ",\n")) {
+    if (byte_match_2((void*)cur, ",\n")) {
         cur += 2;
         goto obj_key_begin;
     }
