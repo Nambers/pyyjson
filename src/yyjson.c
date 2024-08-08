@@ -5418,7 +5418,7 @@ static_inline bool read_string(const char **ptr, pyyjson_op **op, char **buffer)
     u8* const src_start = src;
     size_t len_ucs1 = 0, len_ucs2 = 0, len_ucs4 = 0;
     char* temp_string_buf = *buffer;
-    u8* dst = temp_string_buf;
+    u8* dst = (u8*)temp_string_buf;
     u8 cur_max_ucs_size = 1;
     u16* dst_ucs2;
     u32* dst_ucs4;
@@ -5473,10 +5473,10 @@ skip_ascii_end:
     if (likely(*src == '"')) {
         /* modified BEGIN */
         // this is a fast path for ascii strings. directly copy the buffer to pyobject
-        *ptr = src + 1;
+        *ptr = (const char*)(src + 1);
         pyyjson_string_op* string_op =(pyyjson_string_op*) *op;
         PYYJSON_WRITE_OP(string_op, PYYJSON_OP_STRING | PYYJSON_STRING_FLAG_ASCII);
-        string_op->data = src_start;
+        string_op->data = (char *)src_start;
         string_op->len = src - src_start;
         *op = (pyyjson_op*)(string_op + 1);
         // buffer unchanged
@@ -6277,7 +6277,7 @@ copy_utf8_inner_ucs4:
     /* modified END */
     
 read_finalize:
-    *ptr = src + 1;
+    *ptr = (const char *)(src + 1);
     if(unlikely(cur_max_ucs_size==4)) {
         u32* start = (u32*)temp_string_buf + len_ucs1 + len_ucs2 - 1;
         u16* ucs2_back = (u16*)temp_string_buf + len_ucs1 + len_ucs2 - 1;
@@ -6933,7 +6933,7 @@ static_inline PyObject *read_root_pretty(const char *dat, usize len) {
     } container_type;
     static_assert(sizeof(container_type) == sizeof(Py_ssize_t), "container_type size must be 8 bytes");
 
-#define CONTAINER_ARR_TYPE 1  // this cannot be used in eq test! the flag may be -1 or 1
+#define CONTAINER_ARR_TYPE (~0)  // this cannot be used in eq test! the flag may be -1 or 1
 #define CONTAINER_OBJ_TYPE 0
 
     // stack buffer length

@@ -162,6 +162,8 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
     result_stack = __stack_buffer;
     PyObject **cur_write_result_addr = result_stack;
     PyObject **result_stack_end = result_stack + STACK_BUFFER_SIZE;
+    //
+    pyyjson_container_op *op_container;
 
 #define RESULT_STACK_REALLOC_CHECK()    \
     do {                                \
@@ -263,8 +265,8 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
                 assert(false);
                 {
                 container_array:
-                    pyyjson_container_op *op_list = (pyyjson_container_op *) op;
-                    Py_ssize_t len = op_list->len;
+                    op_container = (pyyjson_container_op *) op;
+                    Py_ssize_t len = op_container->len;
                     PyObject *list = PyList_New(len);
                     if (list == NULL) goto fail;
                     if (yyjson_unlikely(len == 0)) {
@@ -281,14 +283,14 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
                     cur_write_result_addr -= len;
                     PUSH_STACK_NO_CHECK(list);
                 arr_end:
-                    op_list++;
-                    op = (pyyjson_op *) op_list;
+                    op_container++;
+                    op = (pyyjson_op *) op_container;
                     break;
                 }
                 {
                 container_dict:
-                    pyyjson_container_op *op_dict = (pyyjson_container_op *) op;
-                    Py_ssize_t len = op_dict->len;
+                    op_container = (pyyjson_container_op *) op;
+                    Py_ssize_t len = op_container->len;
                     PyObject *dict = _PyDict_NewPresized(len);
                     if (dict == NULL) goto fail;
                     if (yyjson_unlikely(len == 0)) {
@@ -321,8 +323,8 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
                     cur_write_result_addr -= len * 2;
                     PUSH_STACK_NO_CHECK(dict);
                 dict_end:
-                    op_dict++;
-                    op = (pyyjson_op *) op_dict;
+                    op_container++;
+                    op = (pyyjson_op *) op_container;
                     break;
                 }
             }
