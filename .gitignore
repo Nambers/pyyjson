@@ -2,6 +2,9 @@
 .vscode/
 /*.nix
 /.envrc
+/bench
+/python-test
+/test.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
