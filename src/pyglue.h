@@ -74,7 +74,7 @@ typedef uint32_t op_type;
 #define PYYJSON_OP_PADDING
 #endif
 
-// size = 4
+// size = 4. This should not be used directly
 typedef struct pyyjson_op_base {
     op_type op;
 } pyyjson_op_base;
@@ -110,17 +110,14 @@ typedef struct pyyjson_container_op {
 
 PyObject *pyyjson_op_loads(pyyjson_op *op_sequence);
 
-// typedef struct key_cache {
-//     Py_hash_t hash;
-//     PyObject *unicode;
-// } key_cache;
-
 extern PyObject *JSONDecodeError;
 
 #define PYYJSON_STRING_BUFFER_SIZE (32 * 1024 * 1024)
-extern char pyyjson_string_buffer[PYYJSON_STRING_BUFFER_SIZE];
 #define PYYJSON_KEY_CACHE_SIZE (1 << 11)
-extern PyObject *AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
+typedef PyObject *pyyjson_cache_type;
+extern pyyjson_cache_type AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
+
+// static assertions
 static_assert((sizeof(pyyjson_op) % sizeof(pyyjson_op)) == 0);
 static_assert((sizeof(pyyjson_number_op) % sizeof(pyyjson_op)) == 0);
 static_assert((sizeof(pyyjson_string_op) % sizeof(pyyjson_op)) == 0);

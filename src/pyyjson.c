@@ -58,6 +58,13 @@ static void module_free(void *m) {
     for (size_t i = 0; i < PYYJSON_KEY_CACHE_SIZE; i++) {
         Py_XDECREF(AssociativeKeyCache[i]);
     }
+#if PYYJSON_ENABLE_TRACE
+    size_t cached = 0;
+    for (size_t i = 0; i < PYYJSON_KEY_CACHE_SIZE; i++) {
+        if (AssociativeKeyCache[i]) cached++;
+    }
+    printf("key cache: %zu/%d\n", cached, PYYJSON_KEY_CACHE_SIZE);
+#endif // PYYJSON_ENABLE_TRACE
 }
 
 PyMODINIT_FUNC PyInit_pyyjson(void) {

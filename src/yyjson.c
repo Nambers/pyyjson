@@ -23,7 +23,9 @@
 #include "yyjson.h"
 #include "pyglue.h"
 #include <math.h>
+#include <threads.h>
 
+thread_local char pyyjson_string_buffer[PYYJSON_STRING_BUFFER_SIZE];
 
 
 /*==============================================================================
@@ -5405,7 +5407,7 @@ static_inline bool read_string(const char **ptr, pyyjson_op **op, char **buffer)
 //     *end = _end; \
 //     goto failed; \
 // } while (false)
-    
+
     u8 *cur = (u8 *)*ptr;
     u8 **end = (u8 **)ptr;
     /* modified BEGIN */
@@ -5634,6 +5636,7 @@ copy_escape_ucs1:
         /* modified END */
     }
     assert(false);
+    Py_UNREACHABLE();
 
     /* modified BEGIN */
 copy_ascii_ucs1:
@@ -5986,10 +5989,7 @@ copy_escape_ucs2:
         /* modified END */
     }
     assert(false);
-
-
-
-
+    Py_UNREACHABLE();
 
     /* modified BEGIN */
 copy_ascii_ucs2:
@@ -6180,7 +6180,7 @@ copy_escape_ucs4:
         /* modified END */
     }
     assert(false);
-
+    Py_UNREACHABLE();
 
     /* modified BEGIN */
 copy_ascii_ucs4:
@@ -7027,7 +7027,13 @@ static_inline PyObject *read_root_pretty(const char *dat, usize len) {
 #ifdef NDEBUG
 #define CHECK_STRING_BUFFER_OVERFLOW() ((void)0)
 #else
-#define CHECK_STRING_BUFFER_OVERFLOW() if (string_buffer > string_buffer_head + 4 * len) assert(false);
+#define CHECK_STRING_BUFFER_OVERFLOW()                      \
+    do {                                                    \
+        if (string_buffer > string_buffer_head + 4 * len) { \
+            assert(false);                                  \
+            Py_UNREACHABLE();                               \
+        }                                                   \
+    } while (0)
 #endif
     //
     if(unlikely(4 * len > PYYJSON_STRING_BUFFER_SIZE)) {

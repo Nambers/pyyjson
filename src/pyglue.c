@@ -1,49 +1,38 @@
 #include "pyglue.h"
 #include "yyjson.h"
-
+#define XXH_INLINE_ALL
+#include "xxhash.h"
 #include <assert.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
 
-#ifndef NDEBUG
+typedef XXH64_hash_t pyyjson_hash_t;
+
+
+#define REHASHER(_x, _size) (((size_t) (_x)) % (_size))
+
+#if PYYJSON_ENABLE_TRACE
 Py_ssize_t max_str_len = 0;
 int __count_trace[PYYJSON_OP_COUNT_MAX] = {0};
 int __hash_trace[PYYJSON_KEY_CACHE_SIZE] = {0};
 size_t __hash_hit_counter = 0;
 size_t __hash_add_key_call_count = 0;
-#define DEBUG_TRACE(x)                                                          \
-    do {                                                                        \
-        for (int i = 0; i < PYYJSON_OP_COUNT_MAX; i++) {                        \
-            if (x & (1 << i)) {                                                 \
-                __count_trace[i]++;                                             \
-                /* printf("cur op: %d\n", i);                                 \
-                if (x == PYYJSON_OP_STRING) {                              \
-                    char buf[16] = {0};                                    \
-                    const char *source = ((pyyjson_string_op *) op)->data; \
-                    memcpy(buf, source, 15);                               \
-                    printf("string: %s", (const char *) buf);              \
-                } */ \
-                break;                                                          \
-            }                                                                   \
-        }                                                                       \
-        __op_counter++;                                                         \
-    } while (0)
-#define TRACE_STR_LEN(_len) max_str_len = max_str_len > _len ? max_str_len : _len
-#define TRACE_HASH(_hash)        \
-    __hash_add_key_call_count++; \
-    __hash_trace[_hash & (PYYJSON_KEY_CACHE_SIZE - 1)]++
-#define TRACE_CACHE_HIT() __hash_hit_counter++
-#define TRACE_HASH_CONFLICT(_hash) printf("hash conflict: %lld, index=%lld\n", _hash, (_hash & (PYYJSON_KEY_CACHE_SIZE - 1)))
-#else
-#define DEBUG_TRACE(x) (void) (0)
-#define TRACE_STR_LEN(_len) (void) (0)
-#define TRACE_HASH(_hash) (void) (0)
-#define TRACE_CACHE_HIT() (void) (0)
-#define TRACE_HASH_CONFLICT(_hash) (void) (0)
-#endif
 
-static inline Py_ALWAYS_INLINE void Py_DECREF_NOCHECK(PyObject *op) {
+#define PYYJSON_TRACE_STR_LEN(_len) max_str_len = max_str_len > _len ? max_str_len : _len
+#define PYYJSON_TRACE_HASH(_hash) \
+    __hash_add_key_call_count++;  \
+    __hash_trace[_hash & (PYYJSON_KEY_CACHE_SIZE - 1)]++
+#define PYYJSON_TRACE_CACHE_HIT() __hash_hit_counter++
+#define PYYJSON_TRACE_HASH_CONFLICT(_hash) printf("hash conflict: %lld, index=%lld\n", (long long int) _hash, (long long int) (_hash & (PYYJSON_KEY_CACHE_SIZE - 1)))
+#else // PYYJSON_ENABLE_TRACE
+#define PYYJSON_TRACE_STR_LEN(_len) (void) (0)
+#define PYYJSON_TRACE_HASH(_hash) (void) (0)
+#define PYYJSON_TRACE_CACHE_HIT() (void) (0)
+#define PYYJSON_TRACE_HASH_CONFLICT(_hash) (void) (0)
+#endif // PYYJSON_ENABLE_TRACE
+
+static inline Py_ALWAYS_INLINE void Py_DecRef_NoCheck(PyObject *op) {
     // Non-limited C API and limited C API for Python 3.9 and older access
     // directly PyObject.ob_refcnt.
 #if PY_MINOR_VERSION >= 12
@@ -52,69 +41,94 @@ static inline Py_ALWAYS_INLINE void Py_DECREF_NOCHECK(PyObject *op) {
     }
 #endif
     _Py_DECREF_STAT_INC();
+    assert(op->ob_refcnt > 1);
     --op->ob_refcnt;
-    assert(op->ob_refcnt >= 0);
 }
 
-PyObject *AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
+static inline Py_ALWAYS_INLINE void Py_Immortal_IncRef(PyObject *op) {
+    // Non-limited C API and limited C API for Python 3.9 and older access
+    // directly PyObject.ob_refcnt.
+#if PY_MINOR_VERSION >= 12
+#if SIZEOF_VOID_P > 4
+    // Portable saturated add, branching on the carry flag and set low bits
+#ifndef NDEBUG
+    PY_UINT32_T cur_refcnt = op->ob_refcnt_split[PY_BIG_ENDIAN];
+    PY_UINT32_T new_refcnt = cur_refcnt + 1;
+    assert(new_refcnt == 0);
+#endif // NDEBUG
+#else  // SIZEOF_VOID_P > 4
+    // Explicitly check immortality against the immortal value
+    assert(_Py_IsImmortal(op));
+#endif // SIZEOF_VOID_P > 4
+#else  // PY_MINOR_VERSION >= 12
+    op->ob_refcnt++;
+    _Py_INCREF_STAT_INC();
+#endif // PY_MINOR_VERSION >= 12
+}
 
-static yyjson_inline void add_key_cache(Py_hash_t hash, PyObject *obj) {
-    TRACE_HASH(hash);
+pyyjson_cache_type AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
+
+static yyjson_inline void add_key_cache(pyyjson_hash_t hash, PyObject *obj) {
     assert(PyUnicode_GET_LENGTH(obj) * PyUnicode_KIND(obj) <= 64);
-    // TODO
-    PyObject *old = AssociativeKeyCache[hash & (PYYJSON_KEY_CACHE_SIZE - 1)];
+    size_t index = REHASHER(hash, PYYJSON_KEY_CACHE_SIZE);
+    PYYJSON_TRACE_HASH(index);
+    pyyjson_cache_type old = AssociativeKeyCache[index];
     if (old) {
-        TRACE_HASH_CONFLICT(hash);
+        PYYJSON_TRACE_HASH_CONFLICT(hash);
         Py_DECREF(old);
     }
     Py_INCREF(obj);
-    AssociativeKeyCache[hash & (PYYJSON_KEY_CACHE_SIZE - 1)] = obj;
-    assert(((PyASCIIObject *) obj)->hash == -1);
-    assert(hash != -1);
-    ((PyASCIIObject *) obj)->hash = hash;
+    AssociativeKeyCache[index] = obj;
 }
 
-static yyjson_inline PyObject *get_key_cache(const char *utf8_str, Py_hash_t hash, size_t real_len) {
+static yyjson_inline PyObject *get_key_cache(const char *utf8_str, pyyjson_hash_t hash, size_t real_len) {
     assert(real_len <= 64);
-    PyObject *cache = AssociativeKeyCache[hash & (PYYJSON_KEY_CACHE_SIZE - 1)];
-    if (!cache || ((PyASCIIObject *) cache)->hash != hash) return NULL;
+    pyyjson_cache_type cache = AssociativeKeyCache[REHASHER(hash, PYYJSON_KEY_CACHE_SIZE)];
+    if (!cache) return NULL;
     if (yyjson_likely(((real_len == PyUnicode_GET_LENGTH(cache) * PyUnicode_KIND(cache))) && (memcmp(PyUnicode_DATA(cache), utf8_str, real_len) == 0))) {
-        TRACE_CACHE_HIT();
+        PYYJSON_TRACE_CACHE_HIT();
         return cache;
     }
     return NULL;
 }
 
+#define CALC_MAX_CHAR_AND_REAL_LEN()                    \
+    switch (flag & PYYJSON_STRING_FLAG_UCS_TYPE_MASK) { \
+        case PYYJSON_STRING_FLAG_ASCII:                 \
+            max_char = 0x80;                            \
+            real_len = len;                             \
+            break;                                      \
+        case PYYJSON_STRING_FLAG_LATIN1:                \
+            max_char = 0xff;                            \
+            real_len = len;                             \
+            break;                                      \
+        case PYYJSON_STRING_FLAG_UCS2:                  \
+            max_char = 0xffff;                          \
+            real_len = len * 2;                         \
+            break;                                      \
+        case PYYJSON_STRING_FLAG_UCS4:                  \
+            max_char = 0x10ffff;                        \
+            real_len = len * 4;                         \
+            break;                                      \
+        default:                                        \
+            assert(false);                              \
+            Py_UNREACHABLE();                           \
+    }
+
+
 static yyjson_inline PyObject *make_string(const char *utf8_str, Py_ssize_t len, op_type flag) {
-    TRACE_STR_LEN(len);
+    PYYJSON_TRACE_STR_LEN(len);
     PyObject *obj;
     Py_UCS4 max_char;
     size_t real_len;
-    Py_hash_t hash;
+    XXH64_hash_t hash;
 
-    switch (flag & PYYJSON_STRING_FLAG_UCS_TYPE_MASK) {
-        case PYYJSON_STRING_FLAG_ASCII:
-            max_char = 0x80;
-            real_len = len;
-            break;
-        case PYYJSON_STRING_FLAG_LATIN1:
-            max_char = 0xff;
-            real_len = len;
-            break;
-        case PYYJSON_STRING_FLAG_UCS2:
-            max_char = 0xffff;
-            real_len = len * 2;
-            break;
-        case PYYJSON_STRING_FLAG_UCS4:
-            max_char = 0x10ffff;
-            real_len = len * 4;
-            break;
-        default:
-            assert(false);
-            break;
-    }
-    if (real_len <= 64) {
-        hash = _Py_HashBytes(utf8_str, real_len);
+    CALC_MAX_CHAR_AND_REAL_LEN();
+
+    bool should_cache = ((flag & PYYJSON_STRING_FLAG_OBJ_KEY) && yyjson_likely(real_len <= 64));
+
+    if (should_cache) {
+        hash = XXH3_64bits(utf8_str, real_len);
         obj = get_key_cache(utf8_str, hash, real_len);
         if (obj) {
             Py_INCREF(obj);
@@ -122,58 +136,69 @@ static yyjson_inline PyObject *make_string(const char *utf8_str, Py_ssize_t len,
         }
     }
 
-    obj = PyUnicode_New(real_len, max_char);
+    obj = PyUnicode_New(len, max_char);
     if (obj == NULL) return NULL;
     memcpy(PyUnicode_DATA(obj), utf8_str, real_len);
+    if (should_cache) {
+        add_key_cache(hash, obj);
+    }
+success:
     if (flag & PYYJSON_STRING_FLAG_OBJ_KEY) {
-        // TODO
-        if (yyjson_likely(real_len <= 64)) {
-            add_key_cache(hash, obj);
-        } else {
-            hash = _Py_HashBytes(utf8_str, real_len);
-            ((PyASCIIObject *) obj)->hash = hash;
-        }
+        assert(((PyASCIIObject *) obj)->hash == -1);
+        ((PyASCIIObject *) obj)->hash = _Py_HashBytes(utf8_str, real_len);
     }
     return obj;
 }
 
 PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
-#ifndef NDEBUG
+#if PYYJSON_ENABLE_TRACE
     size_t __op_counter = 0;
-#define SHOW_OP_TRACE()                                     \
-    do {                                                    \
-        for (int i = 0; i < PYYJSON_OP_COUNT_MAX; i++) {    \
-            if (__count_trace[i] > 0) {                     \
-                printf("op %d: %d\n", i, __count_trace[i]); \
-            }                                               \
-        }                                                   \
-        printf("total op: %lld\n", __op_counter);           \
+#define PYYJSON_TRACE_OP(x)                              \
+    do {                                                 \
+        for (int i = 0; i < PYYJSON_OP_COUNT_MAX; i++) { \
+            if (x & (1 << i)) {                          \
+                __count_trace[i]++;                      \
+                break;                                   \
+            }                                            \
+        }                                                \
+        __op_counter++;                                  \
     } while (0)
-#define SHOW_STR_TRACE() printf("max str len: %lld\n", max_str_len)
-#else
-#define SHOW_OP_TRACE() (void) (0)
-#define SHOW_STR_TRACE() (void) (0)
-#endif
+#define PYYJSON_SHOW_OP_TRACE()                                   \
+    do {                                                          \
+        for (int i = 0; i < PYYJSON_OP_COUNT_MAX; i++) {          \
+            if (__count_trace[i] > 0) {                           \
+                printf("op %d: %d\n", i, __count_trace[i]);       \
+            }                                                     \
+        }                                                         \
+        printf("total op: %lld\n", (long long int) __op_counter); \
+    } while (0)
+
+#define PYYJSON_SHOW_STR_TRACE() printf("max str len: %lld\n", (long long int) max_str_len)
+#else // PYYJSON_ENABLE_TRACE
+#define PYYJSON_TRACE_OP(x) (void) (0)
+#define PYYJSON_SHOW_OP_TRACE() (void) (0)
+#define PYYJSON_SHOW_STR_TRACE() (void) (0)
+#endif // PYYJSON_ENABLE_TRACE
     pyyjson_op *op = op_head;
-#define STACK_BUFFER_SIZE 1024
-    PyObject *__stack_buffer[STACK_BUFFER_SIZE];
+#define PYYJSON_STACK_BUFFER_SIZE 1024
+    PyObject *__stack_buffer[PYYJSON_STACK_BUFFER_SIZE];
     //
     PyObject **result_stack;
     result_stack = __stack_buffer;
     PyObject **cur_write_result_addr = result_stack;
-    PyObject **result_stack_end = result_stack + STACK_BUFFER_SIZE;
+    PyObject **result_stack_end = result_stack + PYYJSON_STACK_BUFFER_SIZE;
     //
     pyyjson_container_op *op_container;
 
-#define RESULT_STACK_REALLOC_CHECK()    \
-    do {                                \
-        if (new_result_stack == NULL) { \
-            PyErr_NoMemory();           \
-            goto fail;                  \
-        }                               \
+#define PYYJSON_RESULT_STACK_REALLOC_CHECK() \
+    do {                                     \
+        if (new_result_stack == NULL) {      \
+            PyErr_NoMemory();                \
+            goto fail;                       \
+        }                                    \
     } while (0)
 
-#define RESULT_STACK_GROW()                                                                                \
+#define PYYJSON_RESULT_STACK_GROW()                                                                        \
     do {                                                                                                   \
         if (yyjson_unlikely(cur_write_result_addr >= result_stack_end)) {                                  \
             size_t old_capacity = result_stack_end - result_stack;                                         \
@@ -181,11 +206,11 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
             PyObject **new_result_stack;                                                                   \
             if (yyjson_likely(result_stack == __stack_buffer)) {                                           \
                 new_result_stack = (PyObject **) malloc(new_capacity * sizeof(PyObject *));                \
-                RESULT_STACK_REALLOC_CHECK();                                                              \
+                PYYJSON_RESULT_STACK_REALLOC_CHECK();                                                      \
                 memcpy(new_result_stack, result_stack, old_capacity * sizeof(PyObject *));                 \
             } else {                                                                                       \
                 new_result_stack = (PyObject **) realloc(result_stack, new_capacity * sizeof(PyObject *)); \
-                RESULT_STACK_REALLOC_CHECK();                                                              \
+                PYYJSON_RESULT_STACK_REALLOC_CHECK();                                                      \
             }                                                                                              \
             result_stack = new_result_stack;                                                               \
             cur_write_result_addr = new_result_stack + old_capacity;                                       \
@@ -199,59 +224,62 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
         cur_write_result_addr++;      \
     } while (0)
 
-#define PUSH_STACK(obj)           \
-    do {                          \
-        RESULT_STACK_GROW();      \
-        PUSH_STACK_NO_CHECK(obj); \
+#define PYYJSON_PUSH_STACK(obj)      \
+    do {                             \
+        PYYJSON_RESULT_STACK_GROW(); \
+        PUSH_STACK_NO_CHECK(obj);    \
     } while (0)
-
-#define POP_STACK_PRE_CHECK(size)                                                          \
-    do {                                                                                   \
-        if (yyjson_unlikely(size > (Py_ssize_t) (cur_write_result_addr - result_stack))) { \
-            PyErr_Format(PyExc_RuntimeError,                                               \
-                         "Stack underflow: expected to have at least %lld, got %lld",      \
-                         size, (Py_ssize_t) (cur_write_result_addr - result_stack));       \
-            goto fail;                                                                     \
-        }                                                                                  \
+#ifndef NDEBUG
+#define PYYJSON_POP_STACK_PRE_CHECK(size)                                                    \
+    do {                                                                                     \
+        if (yyjson_unlikely((size) > (Py_ssize_t) (cur_write_result_addr - result_stack))) { \
+            PyErr_Format(PyExc_RuntimeError,                                                 \
+                         "Stack underflow: expected to have at least %lld, got %lld",        \
+                         (size), (Py_ssize_t) (cur_write_result_addr - result_stack));       \
+            goto fail;                                                                       \
+        }                                                                                    \
     } while (0)
-
+#else // NDEBUG
+#define PYYJSON_POP_STACK_PRE_CHECK(size) (void) (0)
+#endif // NDEBUG
     while (1) {
         switch (PYYJSON_READ_OP(op) & PYYJSON_OP_MASK) {
             case PYYJSON_OP_STRING: {
-                DEBUG_TRACE(PYYJSON_OP_STRING);
+                PYYJSON_TRACE_OP(PYYJSON_OP_STRING);
                 pyyjson_string_op *op_str = (pyyjson_string_op *) op;
                 PyObject *new_val = make_string(op_str->data, op_str->len, PYYJSON_READ_OP(op));
                 if (new_val == NULL) goto fail;
-                PUSH_STACK(new_val);
+                PYYJSON_PUSH_STACK(new_val);
                 op_str++;
                 op = (pyyjson_op *) op_str;
                 break;
             }
             case PYYJSON_OP_NUMBER: {
-                DEBUG_TRACE(PYYJSON_OP_NUMBER);
+                PYYJSON_TRACE_OP(PYYJSON_OP_NUMBER);
                 pyyjson_number_op *op_num = (pyyjson_number_op *) op;
                 switch (PYYJSON_READ_OP(op) & PYYJSON_NUM_FLAG_MASK) {
                     case PYYJSON_NUM_FLAG_FLOAT: {
-                        PUSH_STACK(PyFloat_FromDouble(op_num->data.f));
+                        PYYJSON_PUSH_STACK(PyFloat_FromDouble(op_num->data.f));
                         break;
                     }
                     case PYYJSON_NUM_FLAG_INT: {
-                        PUSH_STACK(PyLong_FromLongLong(op_num->data.i));
+                        PYYJSON_PUSH_STACK(PyLong_FromLongLong(op_num->data.i));
                         break;
                     }
                     case PYYJSON_NUM_FLAG_UINT: {
-                        PUSH_STACK(PyLong_FromUnsignedLongLong(op_num->data.u));
+                        PYYJSON_PUSH_STACK(PyLong_FromUnsignedLongLong(op_num->data.u));
                         break;
                     }
                     default:
                         assert(false);
+                        Py_UNREACHABLE();
                 }
                 op_num++;
                 op = (pyyjson_op *) op_num;
                 break;
             }
             case PYYJSON_OP_CONTAINER: {
-                DEBUG_TRACE(PYYJSON_OP_CONTAINER);
+                PYYJSON_TRACE_OP(PYYJSON_OP_CONTAINER);
                 switch (PYYJSON_READ_OP(op) & PYYJSON_CONTAINER_FLAG_MASK) {
                     case PYYJSON_CONTAINER_FLAG_ARRAY: {
                         goto container_array;
@@ -261,24 +289,25 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
                     }
                     default:
                         assert(false);
+                        Py_UNREACHABLE();
                 }
                 assert(false);
+                Py_UNREACHABLE();
                 {
                 container_array:
                     op_container = (pyyjson_container_op *) op;
                     Py_ssize_t len = op_container->len;
                     PyObject *list = PyList_New(len);
-                    if (list == NULL) goto fail;
+                    if (yyjson_unlikely(list == NULL)) goto fail;
                     if (yyjson_unlikely(len == 0)) {
-                        PUSH_STACK(list);
+                        PYYJSON_PUSH_STACK(list);
                         goto arr_end;
                     }
-                    POP_STACK_PRE_CHECK(len - 1);
+                    PYYJSON_POP_STACK_PRE_CHECK(len - 1);
                     PyObject **list_val_start = cur_write_result_addr - len;
                     for (size_t j = 0; j < len; j++) {
                         PyObject *val = list_val_start[j];
-                        PyList_SET_ITEM(list, j, val); // this do not fail
-                        assert(!PyUnicode_Check(val) || Py_REFCNT(val) == 1);
+                        PyList_SET_ITEM(list, j, val); // this never fails
                     }
                     cur_write_result_addr -= len;
                     PUSH_STACK_NO_CHECK(list);
@@ -292,12 +321,12 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
                     op_container = (pyyjson_container_op *) op;
                     Py_ssize_t len = op_container->len;
                     PyObject *dict = _PyDict_NewPresized(len);
-                    if (dict == NULL) goto fail;
+                    if (yyjson_unlikely(dict == NULL)) goto fail;
                     if (yyjson_unlikely(len == 0)) {
-                        PUSH_STACK(dict);
+                        PYYJSON_PUSH_STACK(dict);
                         goto dict_end;
                     }
-                    POP_STACK_PRE_CHECK(len * 2 - 1);
+                    PYYJSON_POP_STACK_PRE_CHECK(len * 2 - 1);
                     PyObject **dict_val_start = cur_write_result_addr - len * 2;
                     for (size_t j = 0; j < len; j++) {
                         PyObject *key = dict_val_start[j * 2];
@@ -306,8 +335,8 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
                         assert(((PyASCIIObject *) key)->hash != -1);
                         int retcode = _PyDict_SetItem_KnownHash(dict, key, val, ((PyASCIIObject *) key)->hash); // this may fail
                         if (yyjson_likely(0 == retcode)) {
-                            Py_DECREF_NOCHECK(key);
-                            Py_DECREF_NOCHECK(val);
+                            Py_DecRef_NoCheck(key);
+                            Py_DecRef_NoCheck(val);
                         } else {
                             Py_DECREF(dict);
                             // also need to clean up the rest k-v pairs
@@ -318,7 +347,6 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
                             cur_write_result_addr = dict_val_start;
                             goto fail;
                         }
-                        // assert(!PyUnicode_Check(val) || Py_REFCNT(val) == 1);
                     }
                     cur_write_result_addr -= len * 2;
                     PUSH_STACK_NO_CHECK(dict);
@@ -329,38 +357,39 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
                 }
             }
             case PYYJSON_OP_CONSTANTS: {
-                DEBUG_TRACE(PYYJSON_OP_CONSTANTS);
+                PYYJSON_TRACE_OP(PYYJSON_OP_CONSTANTS);
                 switch (PYYJSON_READ_OP(op) & PYYJSON_CONSTANTS_FLAG_MASK) {
                     case PYYJSON_CONSTANTS_FLAG_NULL:
-                        Py_INCREF(Py_None);
-                        PUSH_STACK(Py_None);
+                        Py_Immortal_IncRef(Py_None);
+                        PYYJSON_PUSH_STACK(Py_None);
                         op++;
                         break;
                     case PYYJSON_CONSTANTS_FLAG_FALSE:
-                        Py_INCREF(Py_False);
-                        PUSH_STACK(Py_False);
+                        Py_Immortal_IncRef(Py_False);
+                        PYYJSON_PUSH_STACK(Py_False);
                         op++;
                         break;
                     case PYYJSON_CONSTANTS_FLAG_TRUE:
-                        Py_INCREF(Py_True);
-                        PUSH_STACK(Py_True);
+                        Py_Immortal_IncRef(Py_True);
+                        PYYJSON_PUSH_STACK(Py_True);
                         op++;
                         break;
                     default:
                         assert(false);
+                        Py_UNREACHABLE();
                         break;
                 }
                 break;
             }
             case PYYJSON_OP_NAN_INF: {
-                DEBUG_TRACE(PYYJSON_OP_NAN_INF);
+                PYYJSON_TRACE_OP(PYYJSON_OP_NAN_INF);
                 switch (PYYJSON_READ_OP(op) & PYYJSON_NAN_INF_FLAG_MASK_WITHOUT_SIGNED) {
                     case PYYJSON_NAN_INF_FLAG_NAN: {
                         bool sign = (PYYJSON_READ_OP(op) & PYYJSON_NAN_INF_FLAG_SIGNED) != 0;
                         double val = sign ? -fabs(Py_NAN) : fabs(Py_NAN);
                         PyObject *o = PyFloat_FromDouble(val);
                         assert(o);
-                        PUSH_STACK(o);
+                        PYYJSON_PUSH_STACK(o);
                         op++;
                         break;
                     }
@@ -369,12 +398,13 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
                         double val = sign ? -Py_HUGE_VAL : Py_HUGE_VAL;
                         PyObject *o = PyFloat_FromDouble(val);
                         assert(o);
-                        PUSH_STACK(o);
+                        PYYJSON_PUSH_STACK(o);
                         op++;
                         break;
                     }
                     default:
                         assert(false);
+                        Py_UNREACHABLE();
                         break;
                 }
                 break;
@@ -384,14 +414,15 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
             }
             default:
                 assert(false);
+                Py_UNREACHABLE();
         }
     }
 success:
     assert(cur_write_result_addr - result_stack == 1);
     PyObject *result = *result_stack;
     if (yyjson_unlikely(result_stack != __stack_buffer)) free(result_stack);
-    SHOW_OP_TRACE();
-    SHOW_STR_TRACE();
+    PYYJSON_SHOW_OP_TRACE();
+    PYYJSON_SHOW_STR_TRACE();
     return result;
 fail:
     // decref all objects in the stack
@@ -404,5 +435,3 @@ fail:
     }
     return NULL;
 }
-
-char pyyjson_string_buffer[PYYJSON_STRING_BUFFER_SIZE];
