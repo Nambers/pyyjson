@@ -21,7 +21,7 @@ pkgs.mkShell {
     pkgs.gcc
   ];
   shellHook = ''
-    cd ${builtins.toString ./.}
+    cd ${builtins.toString ./.}/..
 
     # ensure the nix-pyenv directory exists
     if [[ ! -d ${nix_pyenv_directory} ]]; then mkdir ${nix_pyenv_directory}; fi
@@ -81,8 +81,14 @@ pkgs.mkShell {
     if [[ ! -d ${using_python.src} ]]; then
         tar xvf ${using_python.src} > /dev/null
     fi
+    if [[ ! -d orjson ]]; then
+      # this is a directory, not a tarball
+      cp -r ${pkgs.python312Packages.orjson.src} orjson
+      echo "orjson source copied"
+    fi
     cd ..
     # python lib
     # export PYTHONPATH=${pyenv}/${using_python.sitePackages}:$PYTHONPATH
+    echo ${using_python.version}
   '';
 }
