@@ -7,6 +7,25 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#if PY_MINOR_VERSION >= 13
+// these are hidden in Python 3.13
+PyAPI_FUNC(Py_hash_t) _Py_HashBytes(const void *, Py_ssize_t);
+PyAPI_FUNC(int) _PyDict_SetItem_KnownHash(PyObject *mp, PyObject *key, PyObject *item, Py_hash_t hash);
+#endif
+
+#if PY_MINOR_VERSION >= 12
+#define PYYJSON_PY_DECREF_DEBUG() (_Py_DECREF_STAT_INC())
+#define PYYJSON_PY_INCREF_DEBUG() (_Py_INCREF_STAT_INC())
+#else
+#ifdef Py_REF_DEBUG
+#define PYYJSON_PY_DECREF_DEBUG() (_Py_RefTotal--)
+#define PYYJSON_PY_INCREF_DEBUG() (_Py_RefTotal++)
+#else
+#define PYYJSON_PY_DECREF_DEBUG()
+#define PYYJSON_PY_INCREF_DEBUG()
+#endif
+#endif
+
 typedef XXH64_hash_t pyyjson_hash_t;
 
 
@@ -32,7 +51,7 @@ size_t __hash_add_key_call_count = 0;
 #define PYYJSON_TRACE_HASH_CONFLICT(_hash) (void) (0)
 #endif // PYYJSON_ENABLE_TRACE
 
-static inline Py_ALWAYS_INLINE void Py_DecRef_NoCheck(PyObject *op) {
+static yyjson_inline void Py_DecRef_NoCheck(PyObject *op) {
     // Non-limited C API and limited C API for Python 3.9 and older access
     // directly PyObject.ob_refcnt.
 #if PY_MINOR_VERSION >= 12
@@ -40,12 +59,12 @@ static inline Py_ALWAYS_INLINE void Py_DecRef_NoCheck(PyObject *op) {
         return;
     }
 #endif
-    _Py_DECREF_STAT_INC();
+    PYYJSON_PY_DECREF_DEBUG();
     assert(op->ob_refcnt > 1);
     --op->ob_refcnt;
 }
 
-static inline Py_ALWAYS_INLINE void Py_Immortal_IncRef(PyObject *op) {
+static yyjson_inline void Py_Immortal_IncRef(PyObject *op) {
     // Non-limited C API and limited C API for Python 3.9 and older access
     // directly PyObject.ob_refcnt.
 #if PY_MINOR_VERSION >= 12
@@ -62,8 +81,8 @@ static inline Py_ALWAYS_INLINE void Py_Immortal_IncRef(PyObject *op) {
 #endif // SIZEOF_VOID_P > 4
 #else  // PY_MINOR_VERSION >= 12
     op->ob_refcnt++;
-    _Py_INCREF_STAT_INC();
 #endif // PY_MINOR_VERSION >= 12
+    PYYJSON_PY_INCREF_DEBUG();
 }
 
 pyyjson_cache_type AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
