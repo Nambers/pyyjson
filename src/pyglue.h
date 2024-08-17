@@ -118,9 +118,8 @@ typedef PyObject *pyyjson_cache_type;
 extern pyyjson_cache_type AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
 
 // static assertions
-static_assert((sizeof(pyyjson_op) % sizeof(pyyjson_op)) == 0);
-static_assert((sizeof(pyyjson_number_op) % sizeof(pyyjson_op)) == 0);
-static_assert((sizeof(pyyjson_string_op) % sizeof(pyyjson_op)) == 0);
-static_assert((sizeof(pyyjson_container_op) % sizeof(pyyjson_op)) == 0);
+static_assert((sizeof(pyyjson_number_op) % sizeof(pyyjson_op)) == 0, "size of pyyjson_number_op  must be multiple of size of pyyjson_op");
+static_assert((sizeof(pyyjson_string_op) % sizeof(pyyjson_op)) == 0, "size of pyyjson_string_op  must be multiple of size of pyyjson_op");
+static_assert((sizeof(pyyjson_container_op) % sizeof(pyyjson_op)) == 0, "size of pyyjson_container_op  must be multiple of size of pyyjson_op");
 
 #endif

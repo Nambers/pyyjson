@@ -3791,7 +3791,7 @@ static_inline bool read_hex_u16(const u8 *cur, u16 *val) {
  *============================================================================*/
 
 /** Read 'true' literal, '*cur' should be 't'. */
-static_inline bool read_true(const char **ptr) {
+static_inline bool read_true(u8 **ptr) {
     u8 *cur = (u8 *)*ptr;
     u8 **end = (u8 **)ptr;
     if (likely(byte_match_4(cur, "true"))) {
@@ -3803,7 +3803,7 @@ static_inline bool read_true(const char **ptr) {
 }
 
 /** Read 'false' literal, '*cur' should be 'f'. */
-static_inline bool read_false(const char **ptr) {
+static_inline bool read_false(u8 **ptr) {
     u8 *cur = (u8 *)*ptr;
     u8 **end = (u8 **)ptr;
     if (likely(byte_match_4(cur + 1, "alse"))) {
@@ -3815,7 +3815,7 @@ static_inline bool read_false(const char **ptr) {
 }
 
 /** Read 'null' literal, '*cur' should be 'n'. */
-static_inline bool read_null(const char **ptr) {
+static_inline bool read_null(u8 **ptr) {
     u8 *cur = (u8 *)*ptr;
     u8 **end = (u8 **)ptr;
     if (likely(byte_match_4(cur, "null"))) {
@@ -3827,7 +3827,7 @@ static_inline bool read_null(const char **ptr) {
 }
 
 /** Read 'Inf' or 'Infinity' literal (ignoring case). */
-static_inline bool read_inf(bool sign, const char **ptr, pyyjson_op **op) {
+static_inline bool read_inf(bool sign, u8 **ptr, pyyjson_op **op) {
     u8 *hdr = (u8 *)(*ptr - sign);
     u8 *cur = (u8 *)*ptr;
     u8 **end = (u8 **)ptr;
@@ -3863,7 +3863,7 @@ static_inline bool read_inf(bool sign, const char **ptr, pyyjson_op **op) {
 }
 
 /** Read 'NaN' literal (ignoring case). */
-static_inline bool read_nan(bool sign, const char **ptr, pyyjson_op **op) {
+static_inline bool read_nan(bool sign, u8 **ptr, pyyjson_op **op) {
     u8 *hdr = (u8 *)(*ptr - sign);
     u8 *cur = (u8 *)*ptr;
     u8 **end = (u8 **)ptr;
@@ -3891,7 +3891,7 @@ static_inline bool read_nan(bool sign, const char **ptr, pyyjson_op **op) {
 }
 
 /** Read 'Inf', 'Infinity' or 'NaN' literal (ignoring case). */
-static_inline bool read_inf_or_nan(bool sign, const char **ptr, pyyjson_op **op) {
+static_inline bool read_inf_or_nan(bool sign, u8 **ptr, pyyjson_op **op) {
     if (read_inf(sign, ptr, op)) return true;
     if (read_nan(sign, ptr, op)) return true;
     return false;
@@ -4410,7 +4410,7 @@ static const f64 f64_pow10_table[] = {
     number is infinite, the return value is based on flag.
  3. This function (with inline attribute) may generate a lot of instructions.
  */
-static_inline bool read_number(const char **ptr, pyyjson_op **op) {
+static_inline bool read_number(u8 **ptr, pyyjson_op **op) {
 
 #define return_err(_end, _msg)                                                  \
     do {                                                                        \
@@ -4491,7 +4491,7 @@ static_inline bool read_number(const char **ptr, pyyjson_op **op) {
     if (unlikely(!digi_is_nonzero(*cur))) { /* 0 or non-digit char */
         if (unlikely(*cur != '0')) { /* non-digit char */
             //if (has_read_flag(ALLOW_INF_AND_NAN)) {
-            if (read_inf_or_nan(sign, (const char**)&cur, op)) {
+            if (read_inf_or_nan(sign, &cur, op)) {
                 *end = cur;
                 return true;
             }
@@ -5024,7 +5024,7 @@ digi_finish:
  This is a fallback function if the custom number reader is disabled.
  This function use libc's strtod() to read floating-point number.
  */
-static_inline bool read_number(const char **ptr, pyyjson_op **op) {
+static_inline bool read_number(u8 **ptr, pyyjson_op **op) {
 
 #define return_err(_end, _msg)                                                  \
     do {                                                                        \
@@ -5269,7 +5269,7 @@ static_inline u32 read_b4_unicode(u32 uni) {
  @param msg The error message pointer.
  @return Whether success.
  */
-static_inline bool read_string(const char **ptr, pyyjson_op **op, char **buffer) {
+static_inline bool read_string(u8 **ptr, pyyjson_op **op, char **buffer) {
     /*
      Each unicode code point is encoded as 1 to 4 bytes in UTF-8 encoding,
      we use 4-byte mask and pattern value to validate UTF-8 byte sequence,
@@ -5475,7 +5475,7 @@ skip_ascii_end:
     if (likely(*src == '"')) {
         /* modified BEGIN */
         // this is a fast path for ascii strings. directly copy the buffer to pyobject
-        *ptr = (const char*)(src + 1);
+        *ptr = src + 1;
         pyyjson_string_op* string_op =(pyyjson_string_op*) *op;
         PYYJSON_WRITE_OP(string_op, PYYJSON_OP_STRING | PYYJSON_STRING_FLAG_ASCII);
         string_op->data = (char *)src_start;
@@ -6277,7 +6277,7 @@ copy_utf8_inner_ucs4:
     /* modified END */
     
 read_finalize:
-    *ptr = (const char *)(src + 1);
+    *ptr = src + 1;
     if(unlikely(cur_max_ucs_size==4)) {
         u32* start = (u32*)temp_string_buf + len_ucs1 + len_ucs2 - 1;
         u16* ucs2_back = (u16*)temp_string_buf + len_ucs1 + len_ucs2 - 1;
@@ -6879,14 +6879,14 @@ read_finalize:
 
 /** Read JSON document (accept all style, but optimized for pretty). */
 static_inline PyObject *read_root_pretty(const char *dat, usize len) {
-#define return_err(_pos, _type, _msg)                                               \
-    do {                                                                            \
-        if (_type == JSONDecodeError) {                                             \
-            PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, _pos - dat); \
-        } else {                                                                    \
-            PyErr_SetString(_type, _msg);                                           \
-        }                                                                           \
-        goto failed_cleanup;                                                        \
+#define return_err(_pos, _type, _msg)                                                               \
+    do {                                                                                            \
+        if (_type == JSONDecodeError) {                                                             \
+            PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, ((u8 *) _pos) - (u8 *) dat); \
+        } else {                                                                                    \
+            PyErr_SetString(_type, _msg);                                                           \
+        }                                                                                           \
+        goto failed_cleanup;                                                                        \
     } while (0)
 
     // #define return_err(_pos, _code, _msg) do { \
@@ -7042,8 +7042,8 @@ static_inline PyObject *read_root_pretty(const char *dat, usize len) {
     }
     char *string_buffer = string_buffer_head;
     //
-    const char *cur = dat;
-    const char *end = dat + len;
+    u8 *cur = (u8 *)dat;
+    u8 *end = (u8 *)dat + len;
     // usize dat_len; /* data length in bytes, hint for allocator */
     // usize hdr_len; /* value count used by yyjson_doc */
     // usize alc_len; /* value count allocated */
@@ -7080,7 +7080,7 @@ static_inline PyObject *read_root_pretty(const char *dat, usize len) {
     // inv = has_read_flag(ALLOW_INVALID_UNICODE) != 0;
     // raw_end = NULL;
     // pre = raw ? &raw_end : NULL;
-    static_assert(STACK_BUFFER_SIZE > 0);
+    static_assert(STACK_BUFFER_SIZE > 0, "STACK_BUFFER_SIZE should be greater than 0");
     if (*cur++ == '{') {
         ctn->tag = CONTAINER_OBJ_TYPE;
         ctn->size = 0;

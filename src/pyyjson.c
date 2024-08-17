@@ -116,7 +116,7 @@ PyObject *pyyjson_Decode(PyObject *self, PyObject *args, PyObject *kwargs) {
         return NULL;
     }
 
-    PyObject *root = yyjson_read_opts((char *) string, len);
+    PyObject *root = yyjson_read_opts(string, len);
     if (yyjson_unlikely(!root)) {
         if (!PyErr_Occurred()) {
             PyErr_SetString(JSONDecodeError, "Failed to decode JSON: unknown error");
