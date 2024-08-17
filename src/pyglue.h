@@ -108,12 +108,21 @@ typedef struct pyyjson_container_op {
     Py_ssize_t len;
 } pyyjson_container_op;
 
-PyObject *pyyjson_op_loads(pyyjson_op *op_sequence);
+PyObject *pyyjson_op_loads(pyyjson_op *op_sequence, size_t obj_stack_maxsize);
 
 extern PyObject *JSONDecodeError;
-
-#define PYYJSON_STRING_BUFFER_SIZE (32 * 1024 * 1024)
+/* String buffer size for decoding. Default cost: 512 * 1024 = 512kb (per thread). */
+#ifndef PYYJSON_STRING_BUFFER_SIZE
+#define PYYJSON_STRING_BUFFER_SIZE (512 * 1024)
+#endif
+/* Buffer for key associative cache. Default cost: 2048 * sizeof(pyyjson_cache_type) = 16kb (per thread). */
+#ifndef PYYJSON_KEY_CACHE_SIZE
 #define PYYJSON_KEY_CACHE_SIZE (1 << 11)
+#endif
+/* Stack buffer for PyObject*. Default cost: 8 * 1024 = 8kb (per thread). */
+#ifndef PYYJSON_OBJSTACK_BUFFER_SIZE
+#define PYYJSON_OBJSTACK_BUFFER_SIZE (1024)
+#endif
 typedef PyObject *pyyjson_cache_type;
 extern pyyjson_cache_type AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
 

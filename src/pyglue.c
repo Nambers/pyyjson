@@ -6,6 +6,7 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <threads.h>
 
 #if PY_MINOR_VERSION >= 13
 // these are hidden in Python 3.13
@@ -25,11 +26,13 @@ PyAPI_FUNC(int) _PyDict_SetItem_KnownHash(PyObject *mp, PyObject *key, PyObject 
 #define PYYJSON_PY_INCREF_DEBUG()
 #endif
 #endif
+#define REHASHER(_x, _size) (((size_t) (_x)) % (_size))
 
 typedef XXH64_hash_t pyyjson_hash_t;
 
 
-#define REHASHER(_x, _size) (((size_t) (_x)) % (_size))
+thread_local PyObject *pyobject_stack_buffer[PYYJSON_OBJSTACK_BUFFER_SIZE];
+
 
 #if PYYJSON_ENABLE_TRACE
 Py_ssize_t max_str_len = 0;
@@ -169,7 +172,7 @@ success:
     return obj;
 }
 
-PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
+PyObject *pyyjson_op_loads(pyyjson_op *op_head, size_t obj_stack_maxsize) {
 #if PYYJSON_ENABLE_TRACE
     size_t __op_counter = 0;
 #define PYYJSON_TRACE_OP(x)                              \
@@ -199,13 +202,19 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
 #define PYYJSON_SHOW_STR_TRACE() (void) (0)
 #endif // PYYJSON_ENABLE_TRACE
     pyyjson_op *op = op_head;
-#define PYYJSON_STACK_BUFFER_SIZE 1024
-    PyObject *__stack_buffer[PYYJSON_STACK_BUFFER_SIZE];
-    //
     PyObject **result_stack;
-    result_stack = __stack_buffer;
+    result_stack = pyobject_stack_buffer;
+    if (yyjson_unlikely(obj_stack_maxsize > PYYJSON_OBJSTACK_BUFFER_SIZE)) {
+        result_stack = (PyObject **) malloc(obj_stack_maxsize * sizeof(PyObject *));
+        if (yyjson_unlikely(result_stack == NULL)) {
+            PyErr_NoMemory();
+            return NULL;
+        }
+    }
     PyObject **cur_write_result_addr = result_stack;
-    PyObject **result_stack_end = result_stack + PYYJSON_STACK_BUFFER_SIZE;
+#ifndef NDEBUG
+    PyObject **result_stack_end = result_stack + obj_stack_maxsize;
+#endif
     //
     pyyjson_container_op *op_container;
 
@@ -217,26 +226,15 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
         }                                    \
     } while (0)
 
-#define PYYJSON_RESULT_STACK_GROW()                                                                        \
-    do {                                                                                                   \
-        if (yyjson_unlikely(cur_write_result_addr >= result_stack_end)) {                                  \
-            size_t old_capacity = result_stack_end - result_stack;                                         \
-            size_t new_capacity = old_capacity + old_capacity / 2;                                         \
-            PyObject **new_result_stack;                                                                   \
-            if (yyjson_likely(result_stack == __stack_buffer)) {                                           \
-                new_result_stack = (PyObject **) malloc(new_capacity * sizeof(PyObject *));                \
-                PYYJSON_RESULT_STACK_REALLOC_CHECK();                                                      \
-                memcpy(new_result_stack, result_stack, old_capacity * sizeof(PyObject *));                 \
-            } else {                                                                                       \
-                new_result_stack = (PyObject **) realloc(result_stack, new_capacity * sizeof(PyObject *)); \
-                PYYJSON_RESULT_STACK_REALLOC_CHECK();                                                      \
-            }                                                                                              \
-            result_stack = new_result_stack;                                                               \
-            cur_write_result_addr = new_result_stack + old_capacity;                                       \
-            result_stack_end = new_result_stack + new_capacity;                                            \
-        }                                                                                                  \
-    } while (0)
-
+#ifndef NDEBUG
+#define PYYJSON_RESULT_STACK_GROW()                                   \
+    if (yyjson_unlikely(cur_write_result_addr >= result_stack_end)) { \
+        assert(false);                                                \
+        Py_UNREACHABLE();                                             \
+    }
+#else
+#define PYYJSON_RESULT_STACK_GROW() (void) (0)
+#endif
 #define PUSH_STACK_NO_CHECK(obj)      \
     do {                              \
         *cur_write_result_addr = obj; \
@@ -439,7 +437,7 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head) {
 success:
     assert(cur_write_result_addr - result_stack == 1);
     PyObject *result = *result_stack;
-    if (yyjson_unlikely(result_stack != __stack_buffer)) free(result_stack);
+    if (yyjson_unlikely(result_stack != pyobject_stack_buffer)) free(result_stack);
     PYYJSON_SHOW_OP_TRACE();
     PYYJSON_SHOW_STR_TRACE();
     return result;
@@ -448,7 +446,7 @@ fail:
     for (PyObject **p = result_stack; p < cur_write_result_addr; p++) {
         Py_DECREF(*p);
     }
-    if (yyjson_unlikely(result_stack != __stack_buffer)) free(result_stack);
+    if (yyjson_unlikely(result_stack != pyobject_stack_buffer)) free(result_stack);
     if (PyErr_Occurred() == NULL) {
         PyErr_Format(PyExc_RuntimeError, "Analyze pyyjson opcode failed at %lld", cur_write_result_addr - result_stack);
     }

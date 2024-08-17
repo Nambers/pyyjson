@@ -6931,9 +6931,9 @@ static_inline PyObject *read_root_pretty(const char *dat, usize len) {
             Py_ssize_t raw;
         };
     } container_type;
-    static_assert(sizeof(container_type) == sizeof(Py_ssize_t), "container_type size must be 8 bytes");
+    static_assert(sizeof(container_type) == sizeof(Py_ssize_t), "size of container_type must be equal to size of Py_ssize_t");
 
-#define CONTAINER_ARR_TYPE (~0)  // this cannot be used in eq test! the flag may be -1 or 1
+#define CONTAINER_ARR_TYPE (~0)
 #define CONTAINER_OBJ_TYPE 0
 
     // stack buffer length
@@ -6942,7 +6942,7 @@ static_inline PyObject *read_root_pretty(const char *dat, usize len) {
 #define OP_BUFFER_INIT_SIZE (STACK_BUFFER_SIZE * COMMON_OPSIZE_RATIO)
     // stack buffer
     container_type __stack_ctn_buffer[STACK_BUFFER_SIZE];
-    pyyjson_op __stack_buffer[OP_BUFFER_INIT_SIZE];
+    pyyjson_op pyobject_stack_buffer[OP_BUFFER_INIT_SIZE];
     // buffer start pointer
     pyyjson_op *py_operations;
     char *string_buffer_head = pyyjson_string_buffer;
@@ -6959,11 +6959,29 @@ static_inline PyObject *read_root_pretty(const char *dat, usize len) {
         if(!py_operations) goto fail_alloc;
         py_operations_end = py_operations + required_len;
     } else {
-        py_operations = __stack_buffer;
-        py_operations_end = __stack_buffer + OP_BUFFER_INIT_SIZE;
+        py_operations = pyobject_stack_buffer;
+        py_operations_end = pyobject_stack_buffer + OP_BUFFER_INIT_SIZE;
     }
     pyyjson_op *cur_write_op = py_operations;
-
+    usize object_stack_max_size = 0;
+    usize object_stack_cur_size = 0;
+#ifdef NDEBUG
+#define OBJ_STACK_MAX_SIZE_UPDATE(update_val)                                             \
+    do {                                                                                  \
+        object_stack_cur_size += (update_val);                                            \
+        object_stack_max_size = yyjson_max(object_stack_max_size, object_stack_cur_size); \
+    } while (0)
+#else
+#define OBJ_STACK_MAX_SIZE_UPDATE(update_val)                                             \
+    do {                                                                                  \
+        if ((update_val) < 0 && object_stack_cur_size < (usize) (-(update_val))) {        \
+            assert(false);                                                                \
+            Py_UNREACHABLE();                                                             \
+        }                                                                                 \
+        object_stack_cur_size += (update_val);                                            \
+        object_stack_max_size = yyjson_max(object_stack_max_size, object_stack_cur_size); \
+    } while (0)
+#endif
 #define OP_BUFFER_REALLOC_CHECK()        \
     do {                                 \
         if (new_py_operations == NULL) { \
@@ -6978,7 +6996,7 @@ static_inline PyObject *read_root_pretty(const char *dat, usize len) {
             size_t old_capacity = py_operations_end - py_operations;                                          \
             size_t new_capacity = old_capacity + old_capacity / 2;                                            \
             pyyjson_op *new_py_operations;                                                                    \
-            if (yyjson_likely(py_operations == __stack_buffer)) {                                             \
+            if (yyjson_likely(py_operations == pyobject_stack_buffer)) {                                             \
                 new_py_operations = (pyyjson_op *) malloc(new_capacity * sizeof(pyyjson_op));                 \
                 OP_BUFFER_REALLOC_CHECK();                                                                    \
                 memcpy(new_py_operations, py_operations, old_capacity * sizeof(pyyjson_op));                  \
@@ -7027,14 +7045,18 @@ static_inline PyObject *read_root_pretty(const char *dat, usize len) {
 #ifdef NDEBUG
 #define CHECK_STRING_BUFFER_OVERFLOW() ((void)0)
 #else
-#define CHECK_STRING_BUFFER_OVERFLOW()                      \
-    do {                                                    \
-        if (string_buffer > string_buffer_head + 4 * len) { \
-            assert(false);                                  \
-            Py_UNREACHABLE();                               \
-        }                                                   \
+#define CHECK_STRING_BUFFER_OVERFLOW()                                                          \
+    do {                                                                                        \
+        if ((((size_t) string_buffer) + 3) / 4 * 4 > ((size_t) string_buffer_head) + 4 * len) { \
+            assert(false);                                                                      \
+            Py_UNREACHABLE();                                                                   \
+        }                                                                                       \
     } while (0)
 #endif
+#define MOVE_STRING_BUFFER_ALIGNED_4()                                     \
+    do {                                                                   \
+        string_buffer = (char *) ((((size_t) string_buffer) + 3) / 4 * 4); \
+    } while (0)
     //
     if (unlikely(len > ((size_t)(-1)) / 4)) {
         goto fail_alloc;
@@ -7142,6 +7164,7 @@ arr_val_begin:
         //ctn->size++;
         pyyjson_op *now_write_op = cur_write_op;
         if(likely(read_number(&cur, &cur_write_op))) {
+            OBJ_STACK_MAX_SIZE_UPDATE(1);
             ctn->size++;
             goto arr_val_end;
         }
@@ -7151,8 +7174,10 @@ arr_val_begin:
         // val_incr();
         // ctn_len++;
         OP_BUFFER_GROW(sizeof(pyyjson_string_op));
+        MOVE_STRING_BUFFER_ALIGNED_4();
         if (likely(read_string(&cur, &cur_write_op, &string_buffer))) {
             CHECK_STRING_BUFFER_OVERFLOW();
+            OBJ_STACK_MAX_SIZE_UPDATE(1);
             ctn->size++;
             goto arr_val_end;
         }
@@ -7164,6 +7189,7 @@ arr_val_begin:
         OP_BUFFER_GROW(sizeof(pyyjson_op));
         if (likely(read_true(&cur))) {
             PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_CONSTANTS | PYYJSON_CONSTANTS_FLAG_TRUE);
+            OBJ_STACK_MAX_SIZE_UPDATE(1);
             cur_write_op++;
             ctn->size++;
             goto arr_val_end;
@@ -7176,6 +7202,7 @@ arr_val_begin:
         OP_BUFFER_GROW(sizeof(pyyjson_op));
         if (likely(read_false(&cur))) {
             PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_CONSTANTS | PYYJSON_CONSTANTS_FLAG_FALSE);
+            OBJ_STACK_MAX_SIZE_UPDATE(1);
             cur_write_op++;
             ctn->size++;
             goto arr_val_end;
@@ -7188,6 +7215,7 @@ arr_val_begin:
         OP_BUFFER_GROW(sizeof(pyyjson_op));
         if (likely(read_null(&cur))) {
             PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_CONSTANTS | PYYJSON_CONSTANTS_FLAG_NULL);
+            OBJ_STACK_MAX_SIZE_UPDATE(1);
             cur_write_op++;
             ctn->size++;
             goto arr_val_end;
@@ -7216,6 +7244,7 @@ arr_val_begin:
         // ctn_len++;
         OP_BUFFER_GROW(sizeof(pyyjson_op));
         if (read_inf_or_nan(false, &cur, &cur_write_op)) {
+            OBJ_STACK_MAX_SIZE_UPDATE(1);
             ctn->size++;
             goto arr_val_end;
         }
@@ -7260,6 +7289,7 @@ arr_end:
     OP_BUFFER_GROW(sizeof(pyyjson_container_op));
     pyyjson_container_op* list_op = (pyyjson_container_op*) cur_write_op;
     PYYJSON_WRITE_OP(list_op, PYYJSON_OP_CONTAINER | PYYJSON_CONTAINER_FLAG_ARRAY);
+    OBJ_STACK_MAX_SIZE_UPDATE(1-ctn->size);
     list_op->len = ctn->size;
     cur_write_op = (pyyjson_op*) (list_op + 1);
     assert(ctn->tag != CONTAINER_OBJ_TYPE);
@@ -7311,8 +7341,10 @@ obj_key_begin:
         // ctn_len++;
         OP_BUFFER_GROW(sizeof(pyyjson_string_op));
         pyyjson_op *write_key_op = cur_write_op;
+        MOVE_STRING_BUFFER_ALIGNED_4();
         if (likely(read_string(&cur, &cur_write_op, &string_buffer))) {
             CHECK_STRING_BUFFER_OVERFLOW();
+            OBJ_STACK_MAX_SIZE_UPDATE(1);
             ((pyyjson_op_base*)write_key_op)->op |= PYYJSON_STRING_FLAG_OBJ_KEY;
             //ctn->size++; // key does not need to increase dict container count
             goto obj_key_end;
@@ -7360,8 +7392,10 @@ obj_val_begin:
         // val++;
         // ctn_len++;
         OP_BUFFER_GROW(sizeof(pyyjson_string_op));
+        MOVE_STRING_BUFFER_ALIGNED_4();
         if (likely(read_string(&cur, &cur_write_op, &string_buffer))) {
             CHECK_STRING_BUFFER_OVERFLOW();
+            OBJ_STACK_MAX_SIZE_UPDATE(1);
             ctn->size++;
             goto obj_val_end;
         }
@@ -7373,6 +7407,7 @@ obj_val_begin:
         OP_BUFFER_GROW(yyjson_max(sizeof(pyyjson_op), sizeof(pyyjson_number_op)));
         pyyjson_op *now_write_op = cur_write_op;
         if (likely(read_number(&cur, &cur_write_op))) {
+            OBJ_STACK_MAX_SIZE_UPDATE(1);
             ctn->size++;
             goto obj_val_end;
         }
@@ -7393,6 +7428,7 @@ obj_val_begin:
         if (likely(read_true(&cur))) {
             PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_CONSTANTS | PYYJSON_CONSTANTS_FLAG_TRUE);
             cur_write_op++;
+            OBJ_STACK_MAX_SIZE_UPDATE(1);
             ctn->size++;
             goto obj_val_end;
         }
@@ -7405,6 +7441,7 @@ obj_val_begin:
         if (likely(read_false(&cur))) {
             PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_CONSTANTS | PYYJSON_CONSTANTS_FLAG_FALSE);
             cur_write_op++;
+            OBJ_STACK_MAX_SIZE_UPDATE(1);
             ctn->size++;
             goto obj_val_end;
         }
@@ -7417,6 +7454,7 @@ obj_val_begin:
         if (likely(read_null(&cur))) {
             PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_CONSTANTS | PYYJSON_CONSTANTS_FLAG_NULL);
             cur_write_op++;
+            OBJ_STACK_MAX_SIZE_UPDATE(1);
             ctn->size++;
             goto obj_val_end;
         }
@@ -7437,6 +7475,7 @@ obj_val_begin:
         OP_BUFFER_GROW(sizeof(pyyjson_op));
         if (read_inf_or_nan(false, &cur, &cur_write_op)) {
             ctn->size++;
+            OBJ_STACK_MAX_SIZE_UPDATE(1);
             goto obj_val_end;
         }
         goto fail_character_val;
@@ -7474,6 +7513,7 @@ obj_end:
     OP_BUFFER_GROW(sizeof(pyyjson_container_op));
     pyyjson_container_op* dict_op = (pyyjson_container_op*) cur_write_op;
     PYYJSON_WRITE_OP(dict_op, PYYJSON_OP_CONTAINER | PYYJSON_CONTAINER_FLAG_DICT);
+    OBJ_STACK_MAX_SIZE_UPDATE(1-ctn->size);
     dict_op->len = ctn->size;
     cur_write_op = (pyyjson_op*) (dict_op + 1);
     assert(ctn->tag == CONTAINER_OBJ_TYPE);
@@ -7517,11 +7557,12 @@ doc_end:
     // add null terminate to op buffer
     OP_BUFFER_GROW(sizeof(pyyjson_op_base));
     PYYJSON_WRITE_OP(cur_write_op, PYYJSON_NO_OP);
+    OBJ_STACK_MAX_SIZE_UPDATE(1);
     // if (pre && *pre) **pre = '\0';
     PyObject *obj;
-    obj = pyyjson_op_loads(py_operations);
+    obj = pyyjson_op_loads(py_operations, object_stack_max_size);
     // free py_operations
-    if (py_operations != __stack_buffer) {
+    if (py_operations != pyobject_stack_buffer) {
         free(py_operations);
     }
     // free string buffer
@@ -7582,7 +7623,7 @@ failed_cleanup:
         free(ctn_start);
     }
     // free py_operations
-    if (py_operations != __stack_buffer) {
+    if (py_operations != pyobject_stack_buffer) {
         free(py_operations);
     }
     // free string buffer. this need NULL check
@@ -7591,10 +7632,13 @@ failed_cleanup:
     }
     return NULL;
 // #undef val_incr
+#undef MOVE_STRING_BUFFER_ALIGNED_4
+#undef CHECK_STRING_BUFFER_OVERFLOW
 #undef CTN_BUFFER_GROW
 #undef CTN_REALLOC_CHECK
 #undef OP_BUFFER_GROW
 #undef OP_BUFFER_REALLOC_CHECK
+#undef OBJ_STACK_MAX_SIZE_UPDATE
 #undef OP_BUFFER_INIT_SIZE
 #undef COMMON_OPSIZE_RATIO
 #undef STACK_BUFFER_SIZE
