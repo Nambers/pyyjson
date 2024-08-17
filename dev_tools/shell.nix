@@ -1,5 +1,5 @@
+{ pkgs ? import <nixpkgs> { } }:
 let
-  pkgs = import <nixpkgs> { };
   using_pythons_map = py:
     let
       x = ((pkgs.enableDebugging py).override {
@@ -16,30 +16,32 @@ let
   ]);
   pyenvs_map = py: (py.withPackages required_python_packages);
   pyenvs = builtins.map pyenvs_map using_pythons;
-  # define version
-  # using_python = (pkgs.enableDebugging pkgs.python312).override {
-  #   self = using_python;
-  # };
   # import required python packages
   required_python_packages = import ./py_requirements.nix;
   #
   nix_pyenv_directory = ".nix-pyenv";
-  # pyenv = using_python.withPackages required_python_packages;
-  using_python = builtins.elemAt using_pythons 4;
-  pyenv = builtins.elemAt pyenvs 4;
+  # define version
+  use_minor_ver = 13;
+  using_python = builtins.elemAt using_pythons (use_minor_ver - 9);
+  pyenv = builtins.elemAt pyenvs (use_minor_ver - 9);
+  path_concate = x: builtins.toString "${x}";
+  env_concate = builtins.map path_concate pyenvs;
 in
 pkgs.mkShell {
-  packages = pyenvs ++ [
-    # pyenv #(pkgs.enableDebugging using_python)
+  packages = [
+    pyenv #(pkgs.enableDebugging using_python)
     pkgs.cmake
     pkgs.gdb
     pkgs.valgrind
-    # pkgs.gcc
     pkgs.clang
     pkgs.gcc
   ];
   shellHook = ''
-    cd ${builtins.toString ./.}/..
+    _SOURCE_ROOT=$(readlink -f ${builtins.toString ./.}/..)
+    if [[ $_SOURCE_ROOT == /nix/store* ]]; then
+        _SOURCE_ROOT=$(readlink -f .)
+    fi
+    cd $_SOURCE_ROOT
 
     # ensure the nix-pyenv directory exists
     if [[ ! -d ${nix_pyenv_directory} ]]; then mkdir ${nix_pyenv_directory}; fi
@@ -61,12 +63,12 @@ pkgs.mkShell {
         basefile=$(basename $file)
         if [ -d "$file" ]; then
             if [[ "$basefile" != *dist-info && "$basefile" != __pycache__ ]]; then
-                ensure_symlink ${nix_pyenv_directory}/lib/$basefile $file
+                ensure_symlink "${nix_pyenv_directory}/lib/$basefile" $file
             fi
         else
             # the typing_extensions.py will make the vscode type checker not working!
             if [[ $basefile == *.so ]] || ([[ $basefile == *.py ]] && [[ $basefile != typing_extensions.py ]]); then
-                ensure_symlink ${nix_pyenv_directory}/lib/$basefile $file
+                ensure_symlink "${nix_pyenv_directory}/lib/$basefile" $file
             fi
         fi
     done
@@ -80,24 +82,30 @@ pkgs.mkShell {
     rm ${nix_pyenv_directory}/lib/typing_extensions.py > /dev/null 2>&1
 
     # add python executable to the bin directory
-    ensure_symlink ${nix_pyenv_directory}/bin/python ${pyenv}/bin/python
+    ensure_symlink "${nix_pyenv_directory}/bin/python" ${pyenv}/bin/python
     # export PATH=${using_python}/bin:${nix_pyenv_directory}/bin:$PATH
     export PATH=${nix_pyenv_directory}/bin:$PATH
-
-    nix-build shell.nix -A inputDerivation -o ${nix_pyenv_directory}/.nix-shell-inputs
+    # prevent gc
+    if command -v nix-build > /dev/null 2>&1; then
+        TEMP_NIX_BUILD_COMMAND=nix-build
+    else
+        TEMP_NIX_BUILD_COMMAND=/run/current-system/sw/bin/nix-build
+    fi
+    $TEMP_NIX_BUILD_COMMAND shell.nix -A inputDerivation -o ${nix_pyenv_directory}/.nix-shell-inputs
+    unset TEMP_NIX_BUILD_COMMAND
 
     # custom
-    ensure_symlink ${nix_pyenv_directory}/bin/valgrind ${pkgs.valgrind}/bin/valgrind
+    ensure_symlink "${nix_pyenv_directory}/bin/valgrind" ${pkgs.valgrind}/bin/valgrind
     export CC=${pkgs.clang}/bin/clang
     export CXX=${pkgs.clang}/bin/clang++
-    ensure_symlink ${nix_pyenv_directory}/bin/clang $CC
-    ensure_symlink ${nix_pyenv_directory}/bin/clang++ $CXX
-    ensure_symlink ${nix_pyenv_directory}/bin/cmake ${pkgs.cmake}/bin/cmake
+    ensure_symlink "${nix_pyenv_directory}/bin/clang" $CC
+    ensure_symlink "${nix_pyenv_directory}/bin/clang++" $CXX
+    ensure_symlink "${nix_pyenv_directory}/bin/cmake" ${pkgs.cmake}/bin/cmake
     # unzip the source
-    mkdir -p build
-    cd build
+    mkdir -p debug_source
+    cd debug_source
     if [[ ! -d ${using_python.src} ]]; then
-        tar xvf ${using_python.src} > /dev/null
+        tar xvf ${using_python.src} &> /dev/null
     fi
     if [[ ! -d orjson ]]; then
       # this is a directory, not a tarball
@@ -107,6 +115,6 @@ pkgs.mkShell {
     cd ..
     # python lib
     # export PYTHONPATH=${pyenv}/${using_python.sitePackages}:$PYTHONPATH
-    echo ${using_python.version}
+    # echo ${builtins.toString env_concate}
   '';
 }
