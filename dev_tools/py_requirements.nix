@@ -1,6 +1,9 @@
-pypkgs: 
+pypkgs:
 
-let pkgs = pypkgs.pkgs; in
+let
+  pkgs = pypkgs.pkgs;
+  lib = pkgs.lib;
+in
 with pypkgs;
 [
   pip
@@ -12,7 +15,6 @@ with pypkgs;
   pytest-random-order
   pytest-xdist
   pytz
-  objgraph
   # add packages here
   (pypkgs.buildPythonPackage rec {
     pname = "orjson";
@@ -69,12 +71,12 @@ with pypkgs;
       xxhash
     ];
 
-    preBuild = 
-    let ver = pypkgs.python.version;in
-    ''
-      cp -r . ../orjson
-      cd ../orjson
-    '';
+    preBuild =
+      let ver = pypkgs.python.version; in
+      ''
+        cp -r . ../orjson
+        cd ../orjson
+      '';
 
     pythonImportsCheck = [ "orjson" ];
 
@@ -88,4 +90,9 @@ with pypkgs;
         ;
     };
   })
+] ++
+(with pypkgs;
+[
+  (lib.mkIf (pypkgs.python.sourceVersion.minor < 12) objgraph)
 ]
+)

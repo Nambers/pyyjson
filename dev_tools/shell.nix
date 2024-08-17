@@ -1,18 +1,36 @@
 let
   pkgs = import <nixpkgs> { };
+  using_pythons_map = py:
+    let
+      x = ((pkgs.enableDebugging py).override {
+        self = x;
+      });
+    in
+    x;
+  using_pythons = builtins.map using_pythons_map (with pkgs;[
+    python39
+    python310
+    python311
+    python312
+    python313
+  ]);
+  pyenvs_map = py: (py.withPackages required_python_packages);
+  pyenvs = builtins.map pyenvs_map using_pythons;
   # define version
-  using_python = (pkgs.enableDebugging pkgs.python312).override {
-    self = using_python;
-  };
+  # using_python = (pkgs.enableDebugging pkgs.python312).override {
+  #   self = using_python;
+  # };
   # import required python packages
   required_python_packages = import ./py_requirements.nix;
   #
   nix_pyenv_directory = ".nix-pyenv";
-  pyenv = using_python.withPackages required_python_packages;
+  # pyenv = using_python.withPackages required_python_packages;
+  using_python = builtins.elemAt using_pythons 4;
+  pyenv = builtins.elemAt pyenvs 4;
 in
 pkgs.mkShell {
-  packages = [
-    pyenv #(pkgs.enableDebugging using_python)
+  packages = pyenvs ++ [
+    # pyenv #(pkgs.enableDebugging using_python)
     pkgs.cmake
     pkgs.gdb
     pkgs.valgrind
