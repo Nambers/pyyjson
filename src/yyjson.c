@@ -7036,6 +7036,9 @@ static_inline PyObject *read_root_pretty(const char *dat, usize len) {
     } while (0)
 #endif
     //
+    if (unlikely(len > ((size_t)(-1)) / 4)) {
+        goto fail_alloc;
+    }
     if(unlikely(4 * len > PYYJSON_STRING_BUFFER_SIZE)) {
         string_buffer_head = malloc(4 * len);
         if (!string_buffer_head) goto fail_alloc;
