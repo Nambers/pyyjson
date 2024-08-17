@@ -5,6 +5,7 @@
 /bench
 /python-test
 /test.py
+/debug_source
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
