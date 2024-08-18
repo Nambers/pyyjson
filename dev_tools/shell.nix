@@ -28,14 +28,16 @@ let
   env_concate = builtins.map path_concate pyenvs;
 in
 pkgs.mkShell {
-  packages = [
-    pyenv #(pkgs.enableDebugging using_python)
-    pkgs.cmake
-    pkgs.gdb
-    pkgs.valgrind
-    pkgs.clang
-    pkgs.gcc
-  ];
+  # this defines the order in PATH.
+  # make sure pyenv selected by use_minor_ver is the first one
+  packages = [ pyenv ] ++ (with pkgs;[
+    cmake
+    gdb
+    valgrind
+    clang
+    gcc
+    python-launcher  # use python-launcher to use other versions
+  ]) ++ pyenvs;
   shellHook = ''
     _SOURCE_ROOT=$(readlink -f ${builtins.toString ./.}/..)
     if [[ $_SOURCE_ROOT == /nix/store* ]]; then

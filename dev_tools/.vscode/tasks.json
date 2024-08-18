@@ -1,0 +1,47 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "CMake: build",
+            "type": "shell",
+            "command": "${workspaceFolder}/.vscode/build.sh",
+            "options": {
+                "shell": {
+                    "executable": "nix-shell",
+                    "args": [
+                        "--run"
+                    ]
+                }
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "调用nix-shell执行build.sh脚本"
+        },
+        {
+            "label": "pre-pytest",
+            "type": "shell",
+            "command": "${workspaceFolder}/.vscode/pre-pytest.sh",
+            "options": {
+                "shell": {
+                    "executable": "nix-shell",
+                    "args": [
+                        "--run"
+                    ]
+                }
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "调用nix-shell执行build.sh脚本"
+        }
+    ]
+}
