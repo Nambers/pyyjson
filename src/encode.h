@@ -1,0 +1,4 @@
+#ifndef PYYJSON_ENCODE_H
+#define PYYJSON_ENCODE_H
+
+#endif // PYYJSON_ENCODE_H
