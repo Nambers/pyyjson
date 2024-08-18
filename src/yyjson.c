@@ -21,7 +21,7 @@
  *============================================================================*/
 
 #include "yyjson.h"
-#include "pyglue.h"
+#include "decode.h"
 #include <math.h>
 #include <threads.h>
 
