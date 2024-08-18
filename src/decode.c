@@ -26,7 +26,7 @@ PyAPI_FUNC(int) _PyDict_SetItem_KnownHash(PyObject *mp, PyObject *key, PyObject 
 #define PYYJSON_PY_INCREF_DEBUG()
 #endif
 #endif
-#define REHASHER(_x, _size) (((size_t) (_x)) % (_size))
+#define REHASHER(_x) (((size_t) (_x)) % (PYYJSON_KEY_CACHE_SIZE))
 
 typedef XXH64_hash_t pyyjson_hash_t;
 
@@ -92,7 +92,7 @@ pyyjson_cache_type AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
 
 static yyjson_inline void add_key_cache(pyyjson_hash_t hash, PyObject *obj) {
     assert(PyUnicode_GET_LENGTH(obj) * PyUnicode_KIND(obj) <= 64);
-    size_t index = REHASHER(hash, PYYJSON_KEY_CACHE_SIZE);
+    size_t index = REHASHER(hash);
     PYYJSON_TRACE_HASH(index);
     pyyjson_cache_type old = AssociativeKeyCache[index];
     if (old) {
@@ -105,7 +105,7 @@ static yyjson_inline void add_key_cache(pyyjson_hash_t hash, PyObject *obj) {
 
 static yyjson_inline PyObject *get_key_cache(const char *utf8_str, pyyjson_hash_t hash, size_t real_len) {
     assert(real_len <= 64);
-    pyyjson_cache_type cache = AssociativeKeyCache[REHASHER(hash, PYYJSON_KEY_CACHE_SIZE)];
+    pyyjson_cache_type cache = AssociativeKeyCache[REHASHER(hash)];
     if (!cache) return NULL;
     if (yyjson_likely(((real_len == PyUnicode_GET_LENGTH(cache) * PyUnicode_KIND(cache))) && (memcmp(PyUnicode_DATA(cache), utf8_str, real_len) == 0))) {
         PYYJSON_TRACE_CACHE_HIT();
@@ -114,30 +114,6 @@ static yyjson_inline PyObject *get_key_cache(const char *utf8_str, pyyjson_hash_
     return NULL;
 }
 
-#define CALC_MAX_CHAR_AND_REAL_LEN()                    \
-    switch (flag & PYYJSON_STRING_FLAG_UCS_TYPE_MASK) { \
-        case PYYJSON_STRING_FLAG_ASCII:                 \
-            max_char = 0x80;                            \
-            real_len = len;                             \
-            break;                                      \
-        case PYYJSON_STRING_FLAG_LATIN1:                \
-            max_char = 0xff;                            \
-            real_len = len;                             \
-            break;                                      \
-        case PYYJSON_STRING_FLAG_UCS2:                  \
-            max_char = 0xffff;                          \
-            real_len = len * 2;                         \
-            break;                                      \
-        case PYYJSON_STRING_FLAG_UCS4:                  \
-            max_char = 0x10ffff;                        \
-            real_len = len * 4;                         \
-            break;                                      \
-        default:                                        \
-            assert(false);                              \
-            Py_UNREACHABLE();                           \
-    }
-
-
 static yyjson_inline PyObject *make_string(const char *utf8_str, Py_ssize_t len, op_type flag) {
     PYYJSON_TRACE_STR_LEN(len);
     PyObject *obj;
@@ -145,7 +121,27 @@ static yyjson_inline PyObject *make_string(const char *utf8_str, Py_ssize_t len,
     size_t real_len;
     XXH64_hash_t hash;
 
-    CALC_MAX_CHAR_AND_REAL_LEN();
+    switch (flag & PYYJSON_STRING_FLAG_UCS_TYPE_MASK) {
+        case PYYJSON_STRING_FLAG_ASCII:
+            max_char = 0x80;
+            real_len = len;
+            break;
+        case PYYJSON_STRING_FLAG_LATIN1:
+            max_char = 0xff;
+            real_len = len;
+            break;
+        case PYYJSON_STRING_FLAG_UCS2:
+            max_char = 0xffff;
+            real_len = len * 2;
+            break;
+        case PYYJSON_STRING_FLAG_UCS4:
+            max_char = 0x10ffff;
+            real_len = len * 4;
+            break;
+        default:
+            assert(false);
+            Py_UNREACHABLE();
+    }
 
     bool should_cache = ((flag & PYYJSON_STRING_FLAG_OBJ_KEY) && yyjson_likely(real_len <= 64));
 

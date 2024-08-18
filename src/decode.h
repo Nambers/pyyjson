@@ -1,5 +1,5 @@
-#ifndef PYYJSON_GLUE_H
-#define PYYJSON_GLUE_H
+#ifndef PYYJSON_DECODE_H
+#define PYYJSON_DECODE_H
 #ifdef _DEBUG
 #undef _DEBUG
 #include <Python.h>
@@ -131,4 +131,4 @@ static_assert((sizeof(pyyjson_number_op) % sizeof(pyyjson_op)) == 0, "size of py
 static_assert((sizeof(pyyjson_string_op) % sizeof(pyyjson_op)) == 0, "size of pyyjson_string_op  must be multiple of size of pyyjson_op");
 static_assert((sizeof(pyyjson_container_op) % sizeof(pyyjson_op)) == 0, "size of pyyjson_container_op  must be multiple of size of pyyjson_op");
 
-#endif
+#endif // PYYJSON_DECODE_H
