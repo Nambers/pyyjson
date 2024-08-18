@@ -1,16 +1,8 @@
 #ifndef PYYJSON_DECODE_H
 #define PYYJSON_DECODE_H
-#ifdef _DEBUG
-#undef _DEBUG
-#include <Python.h>
-#define _DEBUG
-#else
-#include <Python.h>
-#endif
+#include "pyyjson_config.h"
 #include <assert.h>
-#include <stdalign.h>
-#include <stdbool.h>
-#include <stdint.h>
+
 // hot spot:
 // string -> float,int->array,dict->null,false,true. least: uint, nan, inf
 #define PYYJSON_NO_OP (0)
@@ -60,13 +52,7 @@ typedef uint32_t op_type;
         ((pyyjson_op_base *) (_ptr))->op = (_code); \
     } while (0)
 
-#if INTPTR_MAX == INT64_MAX
-#define PYYJSON_64BIT
-#elif INTPTR_MAX == INT32_MAX
-#define PYYJSON_32BIT
-#else
-#error "Unsupported platform"
-#endif
+
 
 #ifdef PYYJSON_64BIT
 #define PYYJSON_OP_PADDING char pad[4];
@@ -111,18 +97,7 @@ typedef struct pyyjson_container_op {
 PyObject *pyyjson_op_loads(pyyjson_op *op_sequence, size_t obj_stack_maxsize);
 
 extern PyObject *JSONDecodeError;
-/* String buffer size for decoding. Default cost: 512 * 1024 = 512kb (per thread). */
-#ifndef PYYJSON_STRING_BUFFER_SIZE
-#define PYYJSON_STRING_BUFFER_SIZE (512 * 1024)
-#endif
-/* Buffer for key associative cache. Default cost: 2048 * sizeof(pyyjson_cache_type) = 16kb (per thread). */
-#ifndef PYYJSON_KEY_CACHE_SIZE
-#define PYYJSON_KEY_CACHE_SIZE (1 << 11)
-#endif
-/* Stack buffer for PyObject*. Default cost: 8 * 1024 = 8kb (per thread). */
-#ifndef PYYJSON_OBJSTACK_BUFFER_SIZE
-#define PYYJSON_OBJSTACK_BUFFER_SIZE (1024)
-#endif
+
 typedef PyObject *pyyjson_cache_type;
 extern pyyjson_cache_type AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
 
@@ -130,5 +105,8 @@ extern pyyjson_cache_type AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
 static_assert((sizeof(pyyjson_number_op) % sizeof(pyyjson_op)) == 0, "size of pyyjson_number_op  must be multiple of size of pyyjson_op");
 static_assert((sizeof(pyyjson_string_op) % sizeof(pyyjson_op)) == 0, "size of pyyjson_string_op  must be multiple of size of pyyjson_op");
 static_assert((sizeof(pyyjson_container_op) % sizeof(pyyjson_op)) == 0, "size of pyyjson_container_op  must be multiple of size of pyyjson_op");
+static_assert(sizeof(long long) == 8, "size of long long must be 8 bytes");
+static_assert(sizeof(unsigned long long) == 8, "size of unsigned long long must be 8 bytes");
+static_assert(sizeof(double) == 8, "size of double must be 8 bytes");
 
 #endif // PYYJSON_DECODE_H
