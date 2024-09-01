@@ -106,13 +106,15 @@ pkgs.mkShell {
     # unzip the source
     mkdir -p debug_source
     cd debug_source
-    if [[ ! -d ${using_python.src} ]]; then
-        tar xvf ${using_python.src} &> /dev/null
+    if [[ ! -d Python-${using_python.version} ]]; then
+        tar xvf ${using_python.src}
+        chmod -R 700 Python-${using_python.version}
     fi
     if [[ ! -d orjson ]]; then
-      # this is a directory, not a tarball
-      cp -r ${pkgs.python312Packages.orjson.src} orjson
-      echo "orjson source copied"
+        # this is a directory, not a tarball
+        cp -r ${pkgs.python312Packages.orjson.src} orjson
+        chmod -R 700 orjson
+        echo "orjson source copied"
     fi
     cd ..
     # python lib

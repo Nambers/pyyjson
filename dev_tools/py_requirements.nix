@@ -10,13 +10,13 @@ with pypkgs;
   pytest
   # needed by tests
   arrow
-  faker
+  # faker
   psutil
   pytest-random-order
   pytest-xdist
   pytz
   # add packages here
-  (pypkgs.buildPythonPackage rec {
+  (lib.mkIf (pypkgs.python.sourceVersion.minor < 12) (pypkgs.buildPythonPackage rec {
     pname = "orjson";
     version = "3.10.6";
     pyproject = true;
@@ -89,7 +89,7 @@ with pypkgs;
         ufolib2
         ;
     };
-  })
+  }))
 ] ++
 (with pypkgs;
 [
