@@ -36,7 +36,7 @@ pkgs.mkShell {
     valgrind
     clang
     gcc
-    python-launcher  # use python-launcher to use other versions
+    python-launcher # use python-launcher to use other versions
   ]) ++ pyenvs;
   shellHook = ''
     _SOURCE_ROOT=$(readlink -f ${builtins.toString ./.}/..)
