@@ -6,6 +6,7 @@
 /python-test
 /test.py
 /debug_source
+/.direnv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -4,12 +4,14 @@
         {
             "label": "CMake: build",
             "type": "shell",
-            "command": "${workspaceFolder}/.vscode/build.sh",
+            "command": "${workspaceFolder}/dev_tools/build.sh",
             "options": {
                 "shell": {
-                    "executable": "nix-shell",
+                    "executable": "/run/current-system/sw/bin/nix",
                     "args": [
-                        "--run"
+                        "develop",
+                        "-c",
+                        "zsh"
                     ]
                 }
             },
@@ -20,17 +22,19 @@
                 "kind": "build",
                 "isDefault": true
             },
-            "detail": "调用nix-shell执行build.sh脚本"
+            "detail": "Call build.sh with nix develop"
         },
         {
             "label": "pre-pytest",
             "type": "shell",
-            "command": "${workspaceFolder}/.vscode/pre-pytest.sh",
+            "command": "${workspaceFolder}/dev_tools/pre-pytest.sh",
             "options": {
                 "shell": {
-                    "executable": "nix-shell",
+                    "executable": "/run/current-system/sw/bin/nix",
                     "args": [
-                        "--run"
+                        "develop",
+                        "-c",
+                        "zsh"
                     ]
                 }
             },
@@ -41,7 +45,7 @@
                 "kind": "build",
                 "isDefault": true
             },
-            "detail": "调用nix-shell执行build.sh脚本"
+            "detail": "Call pre-pytest.sh with nix develop"
         }
     ]
 }

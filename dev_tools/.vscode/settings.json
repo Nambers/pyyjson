@@ -32,5 +32,6 @@
       "decode.h": "c",
       "math.h": "c"
    },
-   "cmake.cmakePath": "${workspaceFolder}/.nix-pyenv/bin/cmake"
+   "cmake.cmakePath": "${workspaceFolder}/.nix-pyenv/bin/cmake",
+   "terminal.integrated.defaultProfile.linux": "nix-dev"
 }
