@@ -5,8 +5,9 @@
 
 
 cmake_minimum_required(VERSION 3.18)
-project(pyyjson VERSION 0.9.0 LANGUAGES C)
+project(pyyjson VERSION 0.9.0 LANGUAGES C CXX)
 set(CMAKE_C_STANDARD 17)
+set(CMAKE_CXX_STANDARD 17)
 set(PYYJSON_SOVERSION 0)
 
 # ------------------------------------------------------------------------------
@@ -80,7 +81,13 @@ add_definitions(-DYYJSON_DISABLE_UTILS=1)
 
 # ------------------------------------------------------------------------------
 # Library
-add_library(pyyjson SHARED src/yyjson.h src/yyjson.c src/decode.c src/encode.c src/pyyjson.c)
+add_library(pyyjson SHARED
+    src/yyjson.h
+    src/yyjson.c
+    src/decode.c
+    src/pyyjson.c
+    src/encode.cpp
+)
 target_include_directories(pyyjson PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src> ${Python3_INCLUDE_DIRS})
 # set_target_properties(pyyjson PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PYYJSON_SOVERSION})
 target_link_libraries(pyyjson PUBLIC ${Python3_LIBRARIES})
