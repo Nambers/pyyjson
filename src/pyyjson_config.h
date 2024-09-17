@@ -41,7 +41,7 @@
 #define PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE (4096)
 #endif
 
-/* Stack buffer size for op buffer. */
+/* Init buffer size for op buffer. */
 #ifndef PYYJSON_ENCODE_OP_BUFFER_INIT_SIZE
 #define PYYJSON_ENCODE_OP_BUFFER_INIT_SIZE (1024)
 #endif

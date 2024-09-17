@@ -446,7 +446,136 @@ typedef struct CtnType {
 } CtnType;
 
 thread_local CtnType ctn_stack[1024];
-thread_local EncodeOpBufferLinkedList op_buffer_head[128];
+
+enum class EncodeOpType : u8 {
+
+};
+
+
+typedef struct EncodeOpBufferLinkedList {
+    void **m_buffer;
+    size_t m_buffer_size;
+
+    static force_inline EncodeOpBufferLinkedList init_buffer(size_t in_size) {
+        EncodeOpBufferLinkedList ret{
+                .m_buffer = nullptr,
+                .m_buffer_size = in_size,
+        };
+        void **_buffer = (void **) malloc(in_size * sizeof(void *));
+        if (!_buffer) {
+            PyErr_NoMemory();
+        } else {
+            ret.m_buffer = _buffer;
+            ret.init_inplace();
+        }
+        return ret;
+    }
+
+    force_inline bool init_inplace() {
+        assert(this->m_buffer);
+#ifndef NDEBUG
+        memset(this->m_buffer, 0, this->m_buffer_size * sizeof(void *));
+#endif
+    }
+} EncodeOpBufferLinkedList;
+
+thread_local EncodeOpBufferLinkedList op_buffer_nodes[128];
+thread_local void *op_buffer_head[PYYJSON_ENCODE_OP_BUFFER_INIT_SIZE];
+
+typedef struct EncodeOpDescriber {
+    size_t op_buffer_node_index;
+    void **next_ptr;
+    u8 *next_op;
+
+    /* Write op without any data. */
+    force_inline bool write_simple_op(EncodeOpType op) {
+        static_assert((sizeof(void *) & (sizeof(void *) - 1)) == 0);
+        //
+        assert(this->next_op != (u8 *) this->next_ptr);
+        //
+        *this->next_op++ = static_cast<u8>(op);
+        if (((size_t) this->next_op) & (sizeof(void *) - 1)) {
+            return true;
+        }
+        // move next_op to next_ptr
+        auto &cur_op_node = op_buffer_nodes[this->op_buffer_node_index];
+        if (unlikely(this->next_ptr >= cur_op_node.m_buffer + cur_op_node.m_size)) {
+            assert(this->next_ptr == cur_op_node.m_buffer + cur_op_node.m_size);
+            if (unlikely(this->op_buffer_node_index + 1 >= 128 || (cur_op_node.m_size & (1 << (sizeof(size_t) * 8 - 1))))) {
+                PyErr_NoMemory();
+                return false;
+            }
+            auto &new_op_node = op_buffer_nodes[this->op_buffer_node_index + 1];
+            new_op_node = EncodeOpBufferLinkedList::init_buffer(cur_op_node.m_size << 1);
+            if (unlikely(new_op_node.m_buffer == nullptr)) {
+                return false;
+            }
+            this->op_buffer_node_index++;
+            this->next_ptr = new_op_node.m_buffer;
+        }
+        this->next_op = (u8 *) (this->next_ptr++);
+        return true;
+    }
+
+    template<typename T>
+    force_inline bool write_op_with_data(EncodeOpType op, T obj) {
+        static_assert((sizeof(void *) & (sizeof(void *) - 1)) == 0);
+        static_assert((sizeof(T) % sizeof(void *)) == 0);
+        constexpr size_t _SizeRatio = sizeof(T) / sizeof(void *);
+        //
+        assert(this->next_op != (u8 *) this->next_ptr);
+        *this->next_op++ = static_cast<u8>(op);
+
+        auto &cur_op_node = op_buffer_nodes[this->op_buffer_node_index];
+        if (unlikely(this->next_ptr + _SizeRatio > cur_op_node.m_buffer + cur_op_node.m_size)) {
+            if (unlikely(this->op_buffer_node_index + 1 >= 128 || (cur_op_node.m_size & (1 << (sizeof(size_t) * 8 - 1))))) {
+                PyErr_NoMemory();
+                return false;
+            }
+            auto &new_op_node = op_buffer_nodes[this->op_buffer_node_index + 1];
+            new_op_node = EncodeOpBufferLinkedList::init_buffer(cur_op_node.m_size << 1);
+            if (unlikely(new_op_node.m_buffer == nullptr)) {
+                return false;
+            }
+            assert(new_op_node.m_size > _SizeRatio);
+            this->op_buffer_node_index++;
+            this->next_ptr = new_op_node.m_buffer;
+        }
+        memcpy(this->next_ptr, &obj, sizeof(T));
+        this->next_ptr += _SizeRatio;
+        if (((size_t) this->next_op) & (sizeof(void *) - 1)) {
+            return true;
+        }
+        // move next_op to next_ptr
+        this->next_op = (u8 *) (this->next_ptr++);
+        return true;
+    }
+
+    force_inline void read_op(EncodeOpType &op) {
+        op = static_cast<EncodeOpType>(*this->next_op);
+        return true;
+    }
+
+    force_inline static EncodeOpDescriber init() {
+        static_assert(PYYJSON_ENCODE_OP_BUFFER_INIT_SIZE >= 1);
+        op_buffer_nodes[0].m_buffer = &op_buffer_head[0];
+        op_buffer_nodes[0].m_buffer_size = PYYJSON_ENCODE_OP_BUFFER_INIT_SIZE;
+        EncodeOpDescriber ret{
+                .op_buffer_node_index = 0,
+                .next_ptr = &op_buffer_head[0] + 1,
+                .next_op = (u8 *) &op_buffer_head[0],
+        };
+        return ret;
+    }
+
+    force_inline void release() {
+        for (size_t i = 1; i <= this->op_buffer_node_index; i++) {
+            free(op_buffer_nodes[i].m_buffer);
+            op_buffer_nodes[i].m_buffer = nullptr;
+        }
+    }
+} EncodeOpDescriber;
+
 
 template<IndentLevel __indent, UCSKind __kind, size_t __additional_reserve>
 force_inline bool write_line_and_indent(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeConfig &cfg) {
@@ -569,8 +698,8 @@ force_inline bool write_key(PyObject *key, UCSType_t<__kind> *&dst, BufferInfo &
 //     Py_ssize_t cur_list_size; // cache for each list, no need to check it repeatedly
 //     UCSKind cur_ucs_kind = UCSKind::UCS1;
 //     u8 *dst1 = (u8 *) buffer_info.m_buffer_start;
-//     u16 *dst2 = NULL;         // enabled if kind >= 2
-//     u32 *dst4 = NULL;         // enabled if kind == 4
+//     u16 *dst2 = nullptr;         // enabled if kind >= 2
+//     u32 *dst4 = nullptr;         // enabled if kind == 4
 //     Py_ssize_t dst1_size = 0; // valid if kind >= 2
 //     Py_ssize_t dst2_size = 0; // valid if kind == 4
 
@@ -807,7 +936,7 @@ fail:
     if (!PyErr_Occurred()) {
         PyErr_SetString(JSONEncodeError, "Unknown encode error");
     }
-    return NULL;
+    return nullptr;
 }
 
 template<IndentLevel __indent>

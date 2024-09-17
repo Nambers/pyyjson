@@ -232,59 +232,13 @@ typedef struct EncodeConfig {
     Py_ssize_t cur_list_size; // cache for each list, no need to check it repeatedly
     UCSKind cur_ucs_kind = UCSKind::UCS1;
     u8 *dst1 = (u8 *) buffer_info.m_buffer_start;
-    u16 *dst2 = NULL;         // enabled if kind >= 2
-    u32 *dst4 = NULL;         // enabled if kind == 4
+    u16 *dst2 = nullptr;         // enabled if kind >= 2
+    u32 *dst4 = nullptr;         // enabled if kind == 4
     Py_ssize_t dst1_size = 0; // valid if kind >= 2
     Py_ssize_t dst2_size = 0; // valid if kind == 4
     // temp variables storing key and value
     PyObject *key, *val;
 } EncodeConfig;
-
-typedef struct EncodeOpBufferLinkedList {
-    void **m_buffer;
-    size_t m_buffer_size;
-
-    static force_inline EncodeOpBufferLinkedList init_buffer(size_t in_size) {
-        EncodeOpBufferLinkedList ret{
-                .m_buffer = NULL,
-                .m_buffer_size = in_size,
-        };
-        void **_buffer = (void **) malloc(in_size * sizeof(void *));
-        if (!_buffer) {
-            PyErr_NoMemory();
-        } else {
-            ret.m_buffer = _buffer;
-            ret.init_inplace();
-        }
-        return ret;
-    }
-
-    force_inline bool init_inplace() {
-        assert(this->m_buffer);
-#ifdef NDEBUG
-        this->m_buffer[this->m_buffer_size - 3] = NULL;
-        this->m_buffer[this->m_buffer_size - 2] = NULL;
-        this->m_buffer[this->m_buffer_size - 1] = NULL;
-#else
-        memset(this->m_buffer, 0, this->m_buffer_size * sizeof(void *));
-#endif
-    }
-
-    template<typename T, typename... Args>
-    force_inline bool try_write(void **&where, Args &&...args) {
-        static_assert((sizeof(T) % sizeof(void *)) == 0);
-        static_assert(sizeof(T) <= 3 * sizeof(void *));
-        assert(where >= this->m_buffer && where < this->m_buffer + this->m_buffer_size);
-        constexpr size_t write_size = sizeof(T) / sizeof(void *);
-        size_t index_offset = where - this->m_buffer;
-        if (unlikely(index_offset + write_size >= this->m_buffer_size - 1)) {
-            return false;
-        }
-        new (where) T(std::forward<Args>(args)...);
-        where += write_size;
-        return true;
-    }
-} BufferLinkedList;
 
 
 /*==============================================================================
