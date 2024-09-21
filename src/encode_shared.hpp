@@ -10,6 +10,7 @@
  *============================================================================*/
 #define static_inline static yyjson_inline
 #define force_inline yyjson_inline
+#define force_noinline yyjson_noinline
 #define likely yyjson_likely
 #define unlikely yyjson_unlikely
 
@@ -166,6 +167,14 @@ typedef struct BufferInfo {
     void *m_buffer_start;
     Py_ssize_t m_size;
 
+    force_inline static BufferInfo init() {
+        BufferInfo ret{
+                .m_buffer_start = (void *) &_ThreadLocal_DstBuffer[0],
+                .m_size = PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE,
+        };
+        return ret;
+    }
+
     template<UCSKind __kind>
     force_inline bool resizer(UCSType_t<__kind> *&dst, Py_ssize_t required_len) {
         using uu = UCSType_t<__kind>;
@@ -221,24 +230,16 @@ typedef struct BufferInfo {
 
     template<UCSKind __kind>
     force_inline Py_ssize_t get_required_len_u8(UCSType_t<__kind> *dst, Py_ssize_t additional_ucs_count) {
-        return this->calc_dst_offset_u8(dst) + additional_ucs_count * sizeof(UCSType_t<__kind>);
+        return this->calc_dst_offset_u8<__kind>(dst) + additional_ucs_count * sizeof(UCSType_t<__kind>);
+    }
+
+    force_inline void release() {
+        if (unlikely(!this->is_static_buffer())) {
+            free(this->m_buffer_start);
+        }
+        this->m_buffer_start = nullptr;
     }
 } BufferInfo;
-
-typedef struct EncodeConfig {
-    Py_ssize_t last_pos_stack_index = -1;
-    PyObject *cur_obj;
-    Py_ssize_t cur_pos;
-    Py_ssize_t cur_list_size; // cache for each list, no need to check it repeatedly
-    UCSKind cur_ucs_kind = UCSKind::UCS1;
-    u8 *dst1 = (u8 *) buffer_info.m_buffer_start;
-    u16 *dst2 = nullptr;         // enabled if kind >= 2
-    u32 *dst4 = nullptr;         // enabled if kind == 4
-    Py_ssize_t dst1_size = 0; // valid if kind >= 2
-    Py_ssize_t dst2_size = 0; // valid if kind == 4
-    // temp variables storing key and value
-    PyObject *key, *val;
-} EncodeConfig;
 
 
 /*==============================================================================

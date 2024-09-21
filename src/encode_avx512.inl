@@ -134,8 +134,8 @@ force_inline void cvtepu_128_avx512(__m128i &u, UCSType_t<__from> *&src, UCSType
     _mm512_storeu_si512((__m512i *) dst, s); // vmovdqu32, AVX512F
     src += _MoveDst;
     dst += _MoveDst;
-    ptr_move_bits<__from>(src, _SrcReadBits);
-    ptr_move_bits<__to>(dst, _DstWriteBits);
+    ptr_move_bits<__from, _SrcReadBits>(src);
+    ptr_move_bits<__to, _DstWriteBits>(dst);
 }
 
 template<UCSKind __from, UCSKind __to>

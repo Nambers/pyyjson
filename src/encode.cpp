@@ -5,6 +5,7 @@
 #include "encode_sse4.inl"
 #include "pyyjson_config.h"
 #include "yyjson.h"
+#include <algorithm>
 #include <stddef.h>
 
 #define RETURN_ON_UNLIKELY_ERR(x) \
@@ -32,6 +33,18 @@ struct SrcInfo {
     UCSType_t<__kind> *src_start;
     Py_ssize_t src_size;
 };
+
+static_inline constexpr bool size_is_pow2(usize size) {
+    return (size & (size - 1)) == 0;
+}
+
+static_inline constexpr usize size_align_up(usize size, usize align) {
+    if (size_is_pow2(align)) {
+        return (size + (align - 1)) & ~(align - 1);
+    } else {
+        return size + align - (size + align - 1) % align - 1;
+    }
+}
 
 
 template<UCSKind __from, UCSKind __to, X86SIMDLevel __simd_level>
@@ -68,8 +81,8 @@ force_inline bool copy_ucs_128_elevate_sse4_1(UCSType_t<__from> *&src, UCSType_t
             cvtepu_128<UCSKind::UCS2, UCSKind::UCS4, X86SIMDLevel::SSE4>(u, src, dst); // sse4.1
         } else {
             // run a escape logic
-            bool _c = copy_escape_fixsize<UCSKind::UCS2, UCSKind::UCS4, 128>(src, dst)
-                    RETURN_ON_UNLIKELY_ERR(!_c);
+            bool _c = copy_escape_fixsize<UCSKind::UCS2, UCSKind::UCS4, 128>(src, dst);
+            RETURN_ON_UNLIKELY_ERR(!_c);
         }
     } else {
         static_assert(__from == UCSKind::UCS1);
@@ -319,8 +332,8 @@ force_inline bool copy_ucs_same_avx2_or_avx512(const SrcInfo<__kind> &src_info, 
         bool v = check_escape_256bits<__kind, __simd_level>(u);
         if (likely(v)) {
             _mm256_storeu_si256((__m256i *) dst, u); // vmovdqu, AVX
-            ptr_move_bits<__kind>(src, 256);
-            ptr_move_bits<__kind>(dst, 256);
+            ptr_move_bits<__kind, 256>(src);
+            ptr_move_bits<__kind, 256>(dst);
         } else {
             // first, check and resize
             auto additional_needed_count = (src_end - src - _ProcessCountOnce) + _ProcessCountOnce * 6;
@@ -336,8 +349,8 @@ force_inline bool copy_ucs_same_avx2_or_avx512(const SrcInfo<__kind> &src_info, 
             u1 = _mm256_extracti128_si256(u, 0); // vextracti128, AVX2
             if (check_escape_128bits<__kind, __simd_level>(u1)) {
                 _mm_storeu_si128((__m128i *) dst, u1); // vmovdqu, AVX
-                ptr_move_bits<__kind>(src, 128);
-                ptr_move_bits<__kind>(dst, 128);
+                ptr_move_bits<__kind, 128>(src);
+                ptr_move_bits<__kind, 128>(dst);
             } else {
                 bool _c = copy_escape_fixsize<__kind, __kind, 128>(src, dst);
                 RETURN_ON_UNLIKELY_ERR(!_c);
@@ -345,8 +358,8 @@ force_inline bool copy_ucs_same_avx2_or_avx512(const SrcInfo<__kind> &src_info, 
             u1 = _mm256_extracti128_si256(u, 1); // vextracti128, AVX2
             if (check_escape_128bits<__kind, __simd_level>(u1)) {
                 _mm_storeu_si128((__m128i *) dst, u1); // vmovdqu, AVX
-                ptr_move_bits<__kind>(src, 128);
-                ptr_move_bits<__kind>(dst, 128);
+                ptr_move_bits<__kind, 128>(src);
+                ptr_move_bits<__kind, 128>(dst);
             } else {
                 bool _c = copy_escape_fixsize<__kind, __kind, 128>(src, dst);
                 RETURN_ON_UNLIKELY_ERR(!_c);
@@ -380,8 +393,8 @@ force_inline bool copy_ucs_same_sse4(const SrcInfo<__kind> &src_info, UCSType_t<
         bool v = check_escape_128bits<__kind, X86SIMDLevel::SSE4>(u);
         if (likely(v)) {
             _mm_storeu_si128((__m128i *) dst, u); // vmovdqu, sse2
-            ptr_move_bits<__kind>(src, 128);
-            ptr_move_bits<__kind>(dst, 128);
+            ptr_move_bits<__kind, 128>(src);
+            ptr_move_bits<__kind, 128>(dst);
         } else {
             // first, check and resize
             auto additional_needed_count = (src_end - src - _ProcessCountOnce) + _ProcessCountOnce * 6;
@@ -448,7 +461,26 @@ typedef struct CtnType {
 thread_local CtnType ctn_stack[1024];
 
 enum class EncodeOpType : u8 {
-
+    END = 0,
+    DICT_EMPTY = 1,
+    DICT_BEGIN = 2,
+    DICT_END = 3,
+    ARRAY_EMPTY = 4,
+    ARRAY_BEGIN = 5,
+    ARRAY_END = 6,
+    STRING = 7,
+    KEY = 8,
+    U64 = 9,
+    I64 = 10,
+    FLOAT = 11,
+    TRUE_VALUE = 12,
+    FALSE_VALUE = 13,
+    NULL_VALUE = 14,
+    POS_NAN = 15,
+    NEG_NAN = 16,
+    ZERO_VALUE = 17,
+    POS_INF = 18,
+    NEG_INF = 19,
 };
 
 
@@ -471,7 +503,7 @@ typedef struct EncodeOpBufferLinkedList {
         return ret;
     }
 
-    force_inline bool init_inplace() {
+    force_inline void init_inplace() {
         assert(this->m_buffer);
 #ifndef NDEBUG
         memset(this->m_buffer, 0, this->m_buffer_size * sizeof(void *));
@@ -486,6 +518,7 @@ typedef struct EncodeOpDescriber {
     size_t op_buffer_node_index;
     void **next_ptr;
     u8 *next_op;
+    size_t read_buffer_node_index;
 
     /* Write op without any data. */
     force_inline bool write_simple_op(EncodeOpType op) {
@@ -498,15 +531,15 @@ typedef struct EncodeOpDescriber {
             return true;
         }
         // move next_op to next_ptr
-        auto &cur_op_node = op_buffer_nodes[this->op_buffer_node_index];
-        if (unlikely(this->next_ptr >= cur_op_node.m_buffer + cur_op_node.m_size)) {
-            assert(this->next_ptr == cur_op_node.m_buffer + cur_op_node.m_size);
-            if (unlikely(this->op_buffer_node_index + 1 >= 128 || (cur_op_node.m_size & (1 << (sizeof(size_t) * 8 - 1))))) {
+        const auto &cur_op_node = op_buffer_nodes[this->op_buffer_node_index];
+        if (unlikely(this->next_ptr >= cur_op_node.m_buffer + cur_op_node.m_buffer_size)) {
+            assert(this->next_ptr == cur_op_node.m_buffer + cur_op_node.m_buffer_size);
+            if (unlikely(this->op_buffer_node_index + 1 >= 128 || (cur_op_node.m_buffer_size & (1ULL << (sizeof(size_t) * 8 - 1))))) {
                 PyErr_NoMemory();
                 return false;
             }
             auto &new_op_node = op_buffer_nodes[this->op_buffer_node_index + 1];
-            new_op_node = EncodeOpBufferLinkedList::init_buffer(cur_op_node.m_size << 1);
+            new_op_node = EncodeOpBufferLinkedList::init_buffer(cur_op_node.m_buffer_size << 1);
             if (unlikely(new_op_node.m_buffer == nullptr)) {
                 return false;
             }
@@ -526,34 +559,91 @@ typedef struct EncodeOpDescriber {
         assert(this->next_op != (u8 *) this->next_ptr);
         *this->next_op++ = static_cast<u8>(op);
 
-        auto &cur_op_node = op_buffer_nodes[this->op_buffer_node_index];
-        if (unlikely(this->next_ptr + _SizeRatio > cur_op_node.m_buffer + cur_op_node.m_size)) {
-            if (unlikely(this->op_buffer_node_index + 1 >= 128 || (cur_op_node.m_size & (1 << (sizeof(size_t) * 8 - 1))))) {
-                PyErr_NoMemory();
-                return false;
+        const auto &cur_op_node = op_buffer_nodes[this->op_buffer_node_index];
+        if (unlikely(this->next_ptr + _SizeRatio >= cur_op_node.m_buffer + cur_op_node.m_buffer_size)) {
+            {
+                bool _c = this->op_buffer_node_index + 1 >= 128 || (cur_op_node.m_buffer_size & (1ULL << (sizeof(size_t) * 8 - 1)));
+                if (unlikely(_c)) {
+                    PyErr_NoMemory();
+                    return false;
+                }
             }
             auto &new_op_node = op_buffer_nodes[this->op_buffer_node_index + 1];
-            new_op_node = EncodeOpBufferLinkedList::init_buffer(cur_op_node.m_size << 1);
+            new_op_node = EncodeOpBufferLinkedList::init_buffer(cur_op_node.m_buffer_size << 1);
             if (unlikely(new_op_node.m_buffer == nullptr)) {
                 return false;
             }
-            assert(new_op_node.m_size > _SizeRatio);
+
+            assert(new_op_node.m_buffer_size > _SizeRatio);
             this->op_buffer_node_index++;
+            if (this->next_ptr + _SizeRatio == cur_op_node.m_buffer + cur_op_node.m_buffer_size) {
+                memcpy(this->next_ptr, &obj, sizeof(T));
+                this->next_ptr = new_op_node.m_buffer;
+                if (!(((size_t) this->next_op) & (sizeof(void *) - 1))) {
+                    // move next_op to next_ptr
+                    this->next_op = (u8 *) (this->next_ptr++);
+                }
+                return true;
+            }
             this->next_ptr = new_op_node.m_buffer;
         }
         memcpy(this->next_ptr, &obj, sizeof(T));
         this->next_ptr += _SizeRatio;
-        if (((size_t) this->next_op) & (sizeof(void *) - 1)) {
-            return true;
+        if (!(((size_t) this->next_op) & (sizeof(void *) - 1))) {
+            // move next_op to next_ptr
+            this->next_op = (u8 *) (this->next_ptr++);
         }
-        // move next_op to next_ptr
-        this->next_op = (u8 *) (this->next_ptr++);
         return true;
     }
 
-    force_inline void read_op(EncodeOpType &op) {
-        op = static_cast<EncodeOpType>(*this->next_op);
-        return true;
+    force_inline EncodeOpType peek_op() {
+        return static_cast<EncodeOpType>(*this->next_op);
+    }
+
+    force_inline void read_simple_op() {
+        if (((size_t)++ this->next_op) & (sizeof(void *) - 1)) {
+            return;
+        }
+        this->next_op = (u8 *) (this->next_ptr++);
+        // move next_op to next_ptr
+        const auto &cur_op_node = op_buffer_nodes[this->read_buffer_node_index];
+        if (unlikely(this->next_ptr >= cur_op_node.m_buffer + cur_op_node.m_buffer_size)) {
+            assert(this->next_ptr == cur_op_node.m_buffer + cur_op_node.m_buffer_size);
+            auto &new_op_node = op_buffer_nodes[++this->read_buffer_node_index];
+            this->next_ptr = new_op_node.m_buffer;
+            assert(this->next_ptr);
+        }
+    }
+
+    template<typename T>
+    force_inline T read_op_data() {
+        static_assert((sizeof(void *) & (sizeof(void *) - 1)) == 0);
+        static_assert((sizeof(T) % sizeof(void *)) == 0);
+        T ret;
+        constexpr size_t _SizeRatio = sizeof(T) / sizeof(void *);
+        this->next_op++;
+        const auto &cur_op_node = op_buffer_nodes[this->read_buffer_node_index];
+        if (unlikely(this->next_ptr + _SizeRatio >= cur_op_node.m_buffer + cur_op_node.m_buffer_size)) {
+            auto &new_op_node = op_buffer_nodes[++this->read_buffer_node_index];
+            assert(new_op_node.m_buffer);
+            if (this->next_ptr + _SizeRatio == cur_op_node.m_buffer + cur_op_node.m_buffer_size) {
+                ret = *(T *) this->next_ptr;
+                this->next_ptr = new_op_node.m_buffer;
+                if (!(((size_t) this->next_op) & (sizeof(void *) - 1))) {
+                    // move next_op to next_ptr
+                    this->next_op = (u8 *) (this->next_ptr++);
+                }
+                return ret;
+            }
+            this->next_ptr = new_op_node.m_buffer;
+        }
+        ret = *(T *) this->next_ptr;
+        this->next_ptr += _SizeRatio;
+        if (!(((size_t) this->next_op) & (sizeof(void *) - 1))) {
+            // move next_op to next_ptr
+            this->next_op = (u8 *) (this->next_ptr++);
+        }
+        return ret;
     }
 
     force_inline static EncodeOpDescriber init() {
@@ -564,6 +654,18 @@ typedef struct EncodeOpDescriber {
                 .op_buffer_node_index = 0,
                 .next_ptr = &op_buffer_head[0] + 1,
                 .next_op = (u8 *) &op_buffer_head[0],
+                .read_buffer_node_index = 0,
+        };
+        return ret;
+    }
+
+    force_inline static EncodeOpDescriber init_as_read(EncodeOpDescriber *old_op_desc) {
+        assert(old_op_desc->read_buffer_node_index == 0);
+        EncodeOpDescriber ret{
+                .op_buffer_node_index = old_op_desc->op_buffer_node_index,
+                .next_ptr = &op_buffer_head[0] + 1,
+                .next_op = (u8 *) &op_buffer_head[0],
+                .read_buffer_node_index = 0,
         };
         return ret;
     }
@@ -577,11 +679,57 @@ typedef struct EncodeOpDescriber {
 } EncodeOpDescriber;
 
 
-template<IndentLevel __indent, UCSKind __kind, size_t __additional_reserve>
-force_inline bool write_line_and_indent(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeConfig &cfg) {
+typedef struct EncodeWriteOpConfig {
+    Py_ssize_t last_pos_stack_index = -1;
+    PyObject *cur_obj;
+    Py_ssize_t cur_pos;
+    Py_ssize_t cur_list_size; // cache for each list, no need to check it repeatedly
+    UCSKind cur_ucs_kind = UCSKind::UCS1;
+    bool is_all_ascii;
+    // u8 *dst1 = (u8 *) buffer_info.m_buffer_start;
+    // u16 *dst2 = nullptr;      // enabled if kind >= 2
+    // u32 *dst4 = nullptr;      // enabled if kind == 4
+    // Py_ssize_t dst1_size = 0; // valid if kind >= 2
+    // Py_ssize_t dst2_size = 0; // valid if kind == 4
+    // temp variables storing key and value
+    PyObject *key, *val;
+} EncodeWriteOpConfig;
+
+typedef struct EncodeWriteUnicodeConfig {
+    Py_ssize_t indent_level;
+    const UCSKind cur_ucs_kind;
+    bool is_obj;
+    const bool is_all_ascii;
+
+    force_inline static EncodeWriteUnicodeConfig init_from_op_config(EncodeWriteOpConfig &op_cfg) {
+        EncodeWriteUnicodeConfig ret{
+                .indent_level = 0,
+                .cur_ucs_kind = op_cfg.cur_ucs_kind,
+                .is_obj = false,
+                .is_all_ascii = op_cfg.is_all_ascii,
+        };
+        return ret;
+    }
+
+    force_inline void increase_indent() {
+        this->indent_level++;
+        assert(this->indent_level);
+    }
+
+    force_inline void decrease_indent() {
+        assert(this->indent_level);
+        this->indent_level--;
+    }
+    force_inline void set_cur_ctn(bool is_obj) {
+        this->is_obj = is_obj;
+    }
+} EncodeWriteUnicodeConfig;
+
+template<IndentLevel __indent, UCSKind __kind>
+force_inline bool write_line_and_indent_impl(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg, Py_ssize_t additional_reserve) {
     static_assert(NEED_INDENT(__indent));
     using uu = UCSType_t<__kind>;
-    Py_ssize_t need_count = IDENT_WITH_NEWLINE_SIZE(__indent, cfg.indent_level) + __additional_reserve;
+    Py_ssize_t need_count = IDENT_WITH_NEWLINE_SIZE(__indent, cfg.indent_level) + additional_reserve;
     Py_ssize_t required_len_u8 = buffer_info.get_required_len_u8<__kind>(dst, need_count);
     RETURN_ON_UNLIKELY_RESIZE_FAIL(__kind, dst, buffer_info, required_len_u8);
 
@@ -599,6 +747,11 @@ force_inline bool write_line_and_indent(UCSType_t<__kind> *&dst, BufferInfo &buf
     }
 }
 
+template<IndentLevel __indent, UCSKind __kind, Py_ssize_t __additional_reserve>
+force_inline bool write_line_and_indent(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
+    return write_line_and_indent_impl<__indent, __kind>(dst, buffer_info, cfg, __additional_reserve);
+}
+
 template<UCSKind __kind>
 force_inline bool write_reserve_impl(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, size_t reserve_count) {
     using uu = UCSType_t<__kind>;
@@ -613,37 +766,37 @@ force_inline bool write_reserve(UCSType_t<__kind> *&dst, BufferInfo &buffer_info
 }
 
 template<IndentLevel __indent, UCSKind __kind, bool is_obj>
-force_inline bool write_empty_ctn(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeConfig &cfg) {
+force_inline bool write_empty_ctn(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
     using uu = UCSType_t<__kind>;
+    constexpr Py_ssize_t reserve = size_align_up(3 * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu);
     // buffer size check
     bool _c;
     if constexpr (!is_obj && NEED_INDENT(__indent)) {
-        _c = write_line_and_indent<__indent, __kind, 4>(dst, buffer_info, cfg);
+        _c = write_line_and_indent<__indent, __kind, reserve>(dst, buffer_info, cfg);
     } else {
-        _c = write_reserve<__kind, 4>(dst, buffer_info, cfg);
+        _c = write_reserve<__kind, reserve>(dst, buffer_info);
     }
     RETURN_ON_UNLIKELY_ERR(!_c);
     //
-    constexpr uu _Template[4] = {
+    constexpr uu _Template[reserve] = {
             (uu) ('[' | ((u8) is_obj << 5)),
             (uu) (']' | ((u8) is_obj << 5)),
             (uu) ',',
-            0,
     };
-    memcpy(dst, _Template, sizeof(_Template));
+    memcpy(dst, &_Template[0], sizeof(_Template));
     dst += 3;
     return true;
 }
 
 template<IndentLevel __indent, UCSKind __kind, bool is_obj>
-force_inline bool write_ctn_begin(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeConfig &cfg) {
+force_inline bool write_ctn_begin(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, EncodeWriteUnicodeConfig &cfg) {
     using uu = UCSType_t<__kind>;
     // ut *dst = (ut *) *dst_raw;
     bool _c;
     if constexpr (!is_obj && NEED_INDENT(__indent)) {
         _c = write_line_and_indent<__indent, __kind, 1>(dst, buffer_info, cfg);
     } else {
-        _c = write_reserve<__kind, 1>(dst, buffer_info, cfg);
+        _c = write_reserve<__kind, 1>(dst, buffer_info);
     }
     RETURN_ON_UNLIKELY_ERR(!_c);
     constexpr uu to_write = (uu) ('[' | ((u8) is_obj << 5));
@@ -657,26 +810,386 @@ force_inline bool write_ctn_begin(UCSType_t<__kind> *&dst, BufferInfo &buffer_in
     // *dst_raw = (void *) dst;
 }
 
-template<IndentLevel __indent, UCSKind __kind, bool is_obj, X86SIMDLevel __simd_level>
-force_inline bool write_key(PyObject *key, UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeConfig &cfg) {
+template<IndentLevel __indent, UCSKind __kind, bool is_obj>
+force_inline bool write_ctn_end(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, EncodeWriteUnicodeConfig &cfg) {
+    using uu = UCSType_t<__kind>;
+    constexpr Py_ssize_t reserve = size_align_up(2 * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu);
+    // ut *dst = (ut *) *dst_raw;
+    // DECREASE_INDENT();
+    cfg.decrease_indent();
+    // erase last ','
+    dst--;
+    bool _c;
+    if constexpr (NEED_INDENT(__indent)) {
+        if (cfg.is_obj) {
+            // WRITE_LINE();
+            // WRITE_INDENT();
+            _c = write_line_and_indent<__indent, __kind, reserve>(dst, buffer_info, cfg);
+        } else {
+            _c = write_reserve<__kind, reserve>(dst, buffer_info);
+        }
+    }
+    RETURN_ON_UNLIKELY_ERR(!_c);
+
+    constexpr uu _Template[reserve] = {
+            (uu) (']' | ((u8) is_obj << 5)),
+            (uu) ',',
+    };
+    memcpy(dst, &_Template[0], sizeof(_Template));
+    dst += 2;
+    return true;
+
+    // *(dst++) = (ut) (']' | ((u8) GET_CTN_TYPE() << 5));
+    // *(dst++) = (ut) ',';
+    // *dst_raw = (void *) dst;
+}
+
+template<UCSKind __kind, X86SIMDLevel __simd_level>
+force_inline bool write_raw_string(UCSType_t<__kind> *&dst, void *src_raw, Py_ssize_t size, unsigned int src_kind, Py_ssize_t additional_reserve, BufferInfo &buffer_info) {
+#define UCS1_DISPATCH()                                                   \
+    u8 *usrc = (u8 *) src_raw;                                            \
+    SrcInfo<UCSKind::UCS1> src_info{.src_start = usrc, .src_size = size}; \
+    _c = copy_ucs<UCSKind::UCS1, __kind, __simd_level>(src_info, dst, buffer_info)
+#define UCS2_DISPATCH()                                                   \
+    u16 *usrc = (u16 *) src_raw;                                          \
+    SrcInfo<UCSKind::UCS2> src_info{.src_start = usrc, .src_size = size}; \
+    _c = copy_ucs<UCSKind::UCS2, __kind, __simd_level>(src_info, dst, buffer_info)
+#define UCS4_DISPATCH()                                                   \
+    u32 *usrc = (u32 *) src_raw;                                          \
+    SrcInfo<UCSKind::UCS4> src_info{.src_start = usrc, .src_size = size}; \
+    _c = copy_ucs<UCSKind::UCS4, __kind, __simd_level>(src_info, dst, buffer_info)
+
+    using udst = UCSType_t<__kind>;
+
+    assert(static_cast<int>(src_kind) <= static_cast<int>(__kind));
+
+    std::ptrdiff_t required_len_u8 = buffer_info.calc_dst_offset_u8<__kind>(dst + additional_reserve + size);
+    RETURN_ON_UNLIKELY_RESIZE_FAIL(__kind, dst, buffer_info, required_len_u8);
+
+    bool _c;
+
+    if constexpr (__kind == UCSKind::UCS1) {
+        UCS1_DISPATCH();
+    } else if constexpr (__kind == UCSKind::UCS2) {
+        switch (src_kind) {
+            case PyUnicode_1BYTE_KIND: {
+                UCS1_DISPATCH();
+            }
+            case PyUnicode_2BYTE_KIND: {
+                UCS2_DISPATCH();
+            }
+            default: {
+                Py_UNREACHABLE();
+                _c = false;
+            }
+        }
+    } else {
+        switch (src_kind) {
+            case PyUnicode_1BYTE_KIND: {
+                UCS1_DISPATCH();
+            }
+            case PyUnicode_2BYTE_KIND: {
+                UCS2_DISPATCH();
+            }
+            case PyUnicode_4BYTE_KIND: {
+                UCS4_DISPATCH();
+            }
+            default: {
+                Py_UNREACHABLE();
+                _c = false;
+            }
+        }
+    }
+
+    RETURN_ON_UNLIKELY_ERR(!_c);
+
+    required_len_u8 = buffer_info.calc_dst_offset_u8<__kind>(dst + additional_reserve);
+    RETURN_ON_UNLIKELY_RESIZE_FAIL(__kind, dst, buffer_info, required_len_u8);
+
+    return true;
+}
+
+template<IndentLevel __indent, UCSKind __kind, X86SIMDLevel __simd_level>
+force_inline bool write_str(PyObject *key, UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
     using uu = UCSType_t<__kind>;
     assert(PyUnicode_Check(key));
-    ut *dst = (ut *) *dst_raw;
+    Py_ssize_t unicode_size = PyUnicode_GET_LENGTH(key);
+    unsigned int src_kind = PyUnicode_KIND(key);
+    auto data_raw = PyUnicode_DATA(key);
+    bool _c;
     if constexpr (NEED_INDENT(__indent)) {
         //     WRITE_LINE();
         // WRITE_INDENT();
-        bool _c;
-        _c = write_line_and_indent<__indent, __kind, 1>(dst, buffer_info, cfg);
-        RETURN_ON_UNLIKELY_ERR(!_c);
+        _c = write_line_and_indent_impl<__indent, __kind>(dst, buffer_info, cfg, unicode_size + 2);
+    } else {
+        _c = write_reserve_impl<__kind>(dst, buffer_info, unicode_size + 2);
+    }
+    RETURN_ON_UNLIKELY_ERR(!_c);
+
+    *(dst++) = (uu) '"';
+
+    _c = write_raw_string<__kind, __simd_level>(dst, data_raw, unicode_size, src_kind, 2, buffer_info);
+    RETURN_ON_UNLIKELY_ERR(!_c);
+
+    constexpr uu _Template[2] = {
+            (uu) '"',
+            (uu) ',',
+    };
+    memcpy(dst, &_Template[0], sizeof(_Template));
+    dst += 2;
+    return true;
+}
+template<IndentLevel __indent, UCSKind __kind, X86SIMDLevel __simd_level>
+force_inline bool write_key(PyObject *key, UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
+    using uu = UCSType_t<__kind>;
+    assert(PyUnicode_Check(key));
+    Py_ssize_t unicode_size = PyUnicode_GET_LENGTH(key);
+    unsigned int src_kind = PyUnicode_KIND(key);
+    auto data_raw = PyUnicode_DATA(key);
+    bool _c;
+    // ut *dst = (ut *) *dst_raw;
+    if constexpr (NEED_INDENT(__indent)) {
+        //     WRITE_LINE();
+        // WRITE_INDENT();
+        _c = write_line_and_indent_impl<__indent, __kind>(dst, buffer_info, cfg, unicode_size + 4);
+    } else {
+        _c = write_reserve_impl<__kind>(dst, buffer_info, unicode_size + 4);
+    }
+    RETURN_ON_UNLIKELY_ERR(!_c);
+
+    *(dst++) = (uu) '"';
+
+    _c = write_raw_string<__kind, __simd_level>(dst, data_raw, unicode_size, src_kind, 3, buffer_info);
+    RETURN_ON_UNLIKELY_ERR(!_c);
+
+    constexpr uu _Template[2] = {
+            (uu) '"',
+            (uu) ':',
+    };
+    memcpy(dst, &_Template[0], sizeof(_Template));
+    dst += 2;
+    if constexpr (NEED_INDENT(__indent)) {
+        *(dst++) = (uu) ' ';
+    }
+    return true;
+}
+
+template<IndentLevel __indent, UCSKind __kind>
+force_inline bool write_true(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
+    using uu = UCSType_t<__kind>;
+    constexpr Py_ssize_t reserve = size_align_up(5 * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu);
+
+    bool _c;
+    if constexpr (NEED_INDENT(__indent)) {
+        if (!cfg.is_obj) {
+            // WRITE_LINE();
+            // WRITE_INDENT();
+            _c = write_line_and_indent<__indent, __kind, reserve>(dst, buffer_info, cfg);
+        } else {
+            _c = write_reserve<__kind, reserve>(dst, buffer_info);
+        }
+    } else {
+        _c = write_reserve<__kind, reserve>(dst, buffer_info);
+    }
+    RETURN_ON_UNLIKELY_ERR(!_c);
+
+    constexpr uu _Template[reserve] = {
+            (uu) 't',
+            (uu) 'r',
+            (uu) 'u',
+            (uu) 'e',
+            (uu) ',',
+    };
+    memcpy(dst, _Template, sizeof(_Template));
+    dst += 5;
+    return true;
+}
+
+template<IndentLevel __indent, UCSKind __kind>
+force_inline bool write_false(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
+    using uu = UCSType_t<__kind>;
+    constexpr Py_ssize_t reserve = size_align_up(6 * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu);
+
+    bool _c;
+    if constexpr (NEED_INDENT(__indent)) {
+        if (!cfg.is_obj) {
+            // WRITE_LINE();
+            // WRITE_INDENT();
+            _c = write_line_and_indent<__indent, __kind, reserve>(dst, buffer_info, cfg);
+        } else {
+            _c = write_reserve<__kind, reserve>(dst, buffer_info);
+        }
+    } else {
+        _c = write_reserve<__kind, reserve>(dst, buffer_info);
     }
 
+    RETURN_ON_UNLIKELY_ERR(!_c);
 
-    *(dst++) = (ut) '"';
-    write_raw_string(dst_raw, data_raw, ucs_kind, len);
-    *(dst++) = (ut) '"';
-    *(dst++) = (ut) ':';
-    *(dst++) = (ut) ' ';
-    *dst_raw = (void *) dst;
+    constexpr uu _Template[reserve] = {
+            (uu) 'f',
+            (uu) 'a',
+            (uu) 'l',
+            (uu) 's',
+            (uu) 'e',
+            (uu) ',',
+    };
+    memcpy(dst, _Template, sizeof(_Template));
+    dst += 6;
+    return true;
+}
+
+template<IndentLevel __indent, UCSKind __kind>
+force_inline bool write_null(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
+    using uu = UCSType_t<__kind>;
+    constexpr Py_ssize_t reserve = size_align_up(5 * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu);
+
+    bool _c;
+    if constexpr (NEED_INDENT(__indent)) {
+        if (!cfg.is_obj) {
+            // WRITE_LINE();
+            // WRITE_INDENT();
+            _c = write_line_and_indent<__indent, __kind, reserve>(dst, buffer_info, cfg);
+        } else {
+            _c = write_reserve<__kind, reserve>(dst, buffer_info);
+        }
+    } else {
+        _c = write_reserve<__kind, reserve>(dst, buffer_info);
+    }
+    RETURN_ON_UNLIKELY_ERR(!_c);
+
+    constexpr uu _Template[reserve] = {
+            (uu) 'n',
+            (uu) 'u',
+            (uu) 'l',
+            (uu) 'l',
+            (uu) ',',
+    };
+    memcpy(dst, _Template, sizeof(_Template));
+    dst += 5;
+    return true;
+}
+
+template<typename uu, Py_ssize_t reserve, bool _is_signed = true>
+struct NaN_Template {
+    static constexpr uu value[reserve] = {
+            (uu) '-',
+            (uu) 'n',
+            (uu) 'a',
+            (uu) 'n',
+            (uu) ',',
+    };
+};
+
+template<typename uu, Py_ssize_t reserve>
+struct NaN_Template<uu, reserve, false> {
+    static constexpr uu value[reserve] = {
+            (uu) 'n',
+            (uu) 'a',
+            (uu) 'n',
+            (uu) ',',
+    };
+};
+
+template<typename uu, Py_ssize_t reserve, bool _is_signed = true>
+struct Inf_Template {
+    static constexpr uu value[reserve] = {
+            (uu) '-',
+            (uu) 'i',
+            (uu) 'n',
+            (uu) 'f',
+            (uu) ',',
+    };
+};
+
+template<typename uu, Py_ssize_t reserve>
+struct Inf_Template<uu, reserve, false> {
+    static constexpr uu value[reserve] = {
+            (uu) 'i',
+            (uu) 'n',
+            (uu) 'f',
+            (uu) ',',
+    };
+};
+
+
+template<IndentLevel __indent, UCSKind __kind, bool __is_signed>
+force_inline bool write_nan(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
+    using uu = UCSType_t<__kind>;
+    constexpr Py_ssize_t move_size = __is_signed ? 5 : 4;
+    constexpr Py_ssize_t reserve = size_align_up(move_size * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu);
+
+    bool _c;
+    if constexpr (NEED_INDENT(__indent)) {
+        if (!cfg.is_obj) {
+            // WRITE_LINE();
+            // WRITE_INDENT();
+            _c = write_line_and_indent<__indent, __kind, reserve>(dst, buffer_info, cfg);
+        } else {
+            _c = write_reserve<__kind, reserve>(dst, buffer_info);
+        }
+    } else {
+        _c = write_reserve<__kind, reserve>(dst, buffer_info);
+    }
+    RETURN_ON_UNLIKELY_ERR(!_c);
+
+    constexpr auto &_Template = NaN_Template<uu, reserve, __is_signed>::value;
+    memcpy(dst, &_Template[0], sizeof(_Template));
+    dst += move_size;
+    return true;
+}
+
+template<IndentLevel __indent, UCSKind __kind>
+force_inline bool write_zero(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
+    using uu = UCSType_t<__kind>;
+    constexpr Py_ssize_t reserve = size_align_up(2 * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu);
+
+    bool _c;
+    if constexpr (NEED_INDENT(__indent)) {
+        if (!cfg.is_obj) {
+            // WRITE_LINE();
+            // WRITE_INDENT();
+            _c = write_line_and_indent<__indent, __kind, reserve>(dst, buffer_info, cfg);
+        } else {
+            _c = write_reserve<__kind, reserve>(dst, buffer_info);
+        }
+    } else {
+        _c = write_reserve<__kind, reserve>(dst, buffer_info);
+    }
+    RETURN_ON_UNLIKELY_ERR(!_c);
+
+    constexpr uu _Template[reserve] = {
+            (uu) '0',
+            (uu) ',',
+    };
+    memcpy(dst, _Template, sizeof(_Template));
+    dst += 2;
+    return true;
+}
+
+template<IndentLevel __indent, UCSKind __kind, bool __is_signed>
+force_inline bool write_inf(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
+    using uu = UCSType_t<__kind>;
+    constexpr Py_ssize_t move_size = __is_signed ? 5 : 4;
+    constexpr Py_ssize_t reserve = size_align_up(move_size * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu);
+
+    bool _c;
+    if constexpr (NEED_INDENT(__indent)) {
+        if (!cfg.is_obj) {
+            // WRITE_LINE();
+            // WRITE_INDENT();
+            _c = write_line_and_indent<__indent, __kind, reserve>(dst, buffer_info, cfg);
+        } else {
+            _c = write_reserve<__kind, reserve>(dst, buffer_info);
+        }
+    } else {
+        _c = write_reserve<__kind, reserve>(dst, buffer_info);
+    }
+    RETURN_ON_UNLIKELY_ERR(!_c);
+
+    constexpr auto &_Template = Inf_Template<uu, reserve, __is_signed>::value;
+    memcpy(dst, &_Template[0], sizeof(_Template));
+    dst += move_size;
+    return true;
 }
 
 
@@ -703,51 +1216,460 @@ force_inline bool write_key(PyObject *key, UCSType_t<__kind> *&dst, BufferInfo &
 //     Py_ssize_t dst1_size = 0; // valid if kind >= 2
 //     Py_ssize_t dst2_size = 0; // valid if kind == 4
 
+force_inline bool write_PyLongOp(PyObject *obj, EncodeOpDescriber &desc) {
+    if (pylong_is_zero(obj)) {
+        desc.write_simple_op(EncodeOpType::ZERO_VALUE);
+        // APPEND_OP(ZERO);
+    } else if (pylong_is_unsigned(obj)) {
+        unsigned long long val = pylong_value_unsigned(obj);
+        if (unlikely(val == (unsigned long long) -1 && PyErr_Occurred())) {
+            return false;
+        }
+        desc.write_op_with_data<u64>(EncodeOpType::U64, val);
+        // APPEND_U64(val);
+    } else {
+        long long val = PyLong_AsLongLong(obj);
+        if (unlikely(val == -1 && PyErr_Occurred())) {
+            return false;
+        }
+        desc.write_op_with_data<i64>(EncodeOpType::U64, val);
+        // APPEND_I64<i64>(val);
+    }
+    return true;
+}
+
+force_inline bool write_PyFloatOp(PyObject *obj, EncodeOpDescriber &desc) {
+    assert(false);
+    // TODO
+}
+
+
+template<IndentLevel __indent, UCSKind __kind, X86SIMDLevel __simd_level>
+force_noinline PyObject *pyyjson_dumps_read_op_write_str(EncodeWriteOpConfig *op_cfg, EncodeOpDescriber *op_desc_old) {
+    EncodeOpType op;
+    BufferInfo buffer_info = BufferInfo::init();
+    EncodeWriteUnicodeConfig cfg = EncodeWriteUnicodeConfig::init_from_op_config(*op_cfg);
+    EncodeOpDescriber op_desc = EncodeOpDescriber::init_as_read(op_desc_old);
+    using udst = UCSType_t<__kind>;
+    udst *dst = (udst *) buffer_info.m_buffer_start;
+
+    bool _c;
+    // final
+    Py_ssize_t final_size;
+    Py_UCS4 max_char;
+    PyObject *ret;
+    while (1) {
+        op = op_desc.peek_op();
+        switch (op) {
+            case EncodeOpType::DICT_EMPTY: {
+                op_desc.read_simple_op();
+                _c = write_empty_ctn<__indent, __kind, true>(dst, buffer_info, cfg);
+                if (unlikely(!_c)) {
+                    goto fail;
+                }
+                break;
+            }
+            case EncodeOpType::DICT_BEGIN: {
+                op_desc.read_simple_op();
+                _c = write_ctn_begin<__indent, __kind, true>(dst, buffer_info, cfg);
+                if (unlikely(!_c)) {
+                    goto fail;
+                }
+                break;
+            }
+            case EncodeOpType::DICT_END: {
+                op_desc.read_simple_op();
+                _c = write_ctn_end<__indent, __kind, true>(dst, buffer_info, cfg);
+                if (unlikely(!_c)) {
+                    goto fail;
+                }
+                break;
+            }
+            case EncodeOpType::ARRAY_EMPTY: {
+                op_desc.read_simple_op();
+                _c = write_empty_ctn<__indent, __kind, false>(dst, buffer_info, cfg);
+                if (unlikely(!_c)) {
+                    goto fail;
+                }
+                break;
+            }
+            case EncodeOpType::ARRAY_BEGIN: {
+                op_desc.read_simple_op();
+                _c = write_ctn_begin<__indent, __kind, false>(dst, buffer_info, cfg);
+                if (unlikely(!_c)) {
+                    goto fail;
+                }
+                break;
+            }
+            case EncodeOpType::ARRAY_END: {
+                op_desc.read_simple_op();
+                _c = write_ctn_end<__indent, __kind, false>(dst, buffer_info, cfg);
+                if (unlikely(!_c)) {
+                    goto fail;
+                }
+                break;
+            }
+            case EncodeOpType::STRING: {
+                PyObject *unicode = op_desc.read_op_data<PyObject *>();
+                _c = write_str<__indent, __kind, __simd_level>(unicode, dst, buffer_info, cfg);
+                if (unlikely(!_c)) {
+                    goto fail;
+                }
+                break;
+            }
+            case EncodeOpType::KEY: {
+                PyObject *unicode = op_desc.read_op_data<PyObject *>();
+                _c = write_key<__indent, __kind, __simd_level>(unicode, dst, buffer_info, cfg);
+                if (unlikely(!_c)) {
+                    goto fail;
+                }
+                break;
+            }
+            case EncodeOpType::U64: {
+                u64 val = op_desc.read_op_data<u64>();
+                _c = write_u64<__indent, __kind>(val, dst, buffer_info, cfg);
+                if (unlikely(!_c)) {
+                    goto fail;
+                }
+                break;
+            }
+            case EncodeOpType::I64: {
+                i64 val = op_desc.read_op_data<i64>();
+                _c = write_i64<__indent, __kind>(val, dst, buffer_info, cfg);
+                if (unlikely(!_c)) {
+                    goto fail;
+                }
+                break;
+            }
+            case EncodeOpType::FLOAT: {
+                double val = op_desc.read_op_data<double>();
+                _c = write_float<__indent, __kind>(val, dst, buffer_info, cfg);
+                if (unlikely(!_c)) {
+                    goto fail;
+                }
+                break;
+            }
+            case EncodeOpType::TRUE_VALUE: {
+                op_desc.read_simple_op();
+                _c = write_true<__indent, __kind>(dst, buffer_info, cfg);
+                if (unlikely(!_c)) {
+                    goto fail;
+                }
+                break;
+            }
+            case EncodeOpType::FALSE_VALUE: {
+                op_desc.read_simple_op();
+                _c = write_false<__indent, __kind>(dst, buffer_info, cfg);
+                if (unlikely(!_c)) {
+                    goto fail;
+                }
+                break;
+            }
+            case EncodeOpType::NULL_VALUE: {
+                op_desc.read_simple_op();
+                _c = write_null<__indent, __kind>(dst, buffer_info, cfg);
+                if (unlikely(!_c)) {
+                    goto fail;
+                }
+                break;
+            }
+            case EncodeOpType::POS_NAN: {
+                op_desc.read_simple_op();
+                _c = write_nan<__indent, __kind, false>(dst, buffer_info, cfg);
+                if (unlikely(!_c)) {
+                    goto fail;
+                }
+                break;
+            }
+            case EncodeOpType::NEG_NAN: {
+                op_desc.read_simple_op();
+                _c = write_nan<__indent, __kind, true>(dst, buffer_info, cfg);
+                if (unlikely(!_c)) {
+                    goto fail;
+                }
+                break;
+            }
+            case EncodeOpType::ZERO_VALUE: {
+                op_desc.read_simple_op();
+                _c = write_zero<__indent, __kind>(dst, buffer_info, cfg);
+                if (unlikely(!_c)) {
+                    goto fail;
+                }
+                break;
+            }
+            case EncodeOpType::POS_INF: {
+                op_desc.read_simple_op();
+                _c = write_inf<__indent, __kind, false>(dst, buffer_info, cfg);
+                if (unlikely(!_c)) {
+                    goto fail;
+                }
+                break;
+            }
+            case EncodeOpType::NEG_INF: {
+                op_desc.read_simple_op();
+                _c = write_inf<__indent, __kind, true>(dst, buffer_info, cfg);
+                if (unlikely(!_c)) {
+                    goto fail;
+                }
+                break;
+            }
+            case EncodeOpType::END: {
+                goto success;
+            }
+            default: {
+                Py_UNREACHABLE();
+                assert(false);
+            }
+        }
+    }
+
+success:
+    final_size = dst - (udst *) buffer_info.m_buffer_start;
+
+    if constexpr (__kind == UCSKind::UCS1) {
+        if (cfg.is_all_ascii) {
+            max_char = 0x80;
+        } else {
+            max_char = 0xff;
+        }
+    } else if constexpr (__kind == UCSKind::UCS2) {
+        max_char = 0xffff;
+    } else {
+        max_char = 0x10ffff;
+    }
+    ret = PyUnicode_New(final_size, max_char);
+    if (unlikely(!ret)) {
+        goto fail;
+    }
+    memcpy(PyUnicode_DATA(ret), buffer_info.m_buffer_start, final_size * sizeof(udst));
+    buffer_info.release();
+    return ret;
+fail:
+    buffer_info.release();
+    return nullptr;
+}
+
+
+// TODO
+#define CTN_SIZE_GROW() assert(false)
+
+#define TODO() assert(false)
+
+
 #define ALIAS_NAMES()                                      \
     auto &last_pos_stack_index = cfg.last_pos_stack_index; \
     auto &cur_obj = cfg.cur_obj;                           \
     auto &cur_pos = cfg.cur_pos;                           \
     auto &cur_list_size = cfg.cur_list_size;               \
     auto &cur_ucs_kind = cfg.cur_ucs_kind;                 \
-    auto &dst1 = cfg.dst1;                                 \
-    auto &dst2 = cfg.dst2;                                 \
-    auto &dst4 = cfg.dst4;                                 \
-    auto &dst1_size = cfg.dst1_size;                       \
-    auto &dst2_size = cfg.dst2_size;                       \
     auto &key = cfg.key;                                   \
     auto &val = cfg.val
 
-template<IndentLevel __indent, UCSKind __kind>
-force_inline PyObject *pyyjson_dump_impl(EncodeConfig &cfg, BufferInfo &buffer_info, int jump_code = 0) {
-    ALIAS_NAMES();
-    if (jump_code) {
-        // TODO
+
+// auto &dst1 = cfg.dst1;                                 \
+    // auto &dst2 = cfg.dst2;                                 \
+    // auto &dst4 = cfg.dst4;                                 \
+    // auto &dst1_size = cfg.dst1_size;                       \
+    // auto &dst2_size = cfg.dst2_size;                       \
+
+force_inline void update_string_info(EncodeWriteOpConfig &cfg, PyObject *val) {
+    cfg.cur_ucs_kind = std::max(cfg.cur_ucs_kind, static_cast<UCSKind>(PyUnicode_KIND(val)));
+    cfg.is_all_ascii = cfg.is_all_ascii && PyUnicode_IS_ASCII(val);
+}
+
+enum class PyFastTypes : u8 {
+    T_Unicode,
+    T_Long,
+    T_False,
+    T_True,
+    T_None,
+    T_Float,
+    T_List,
+    T_Dict,
+    T_Tuple,
+    Unknown,
+};
+
+PyFastTypes fast_type_check(PyObject *val) {
+    PyTypeObject *type = Py_TYPE(val);
+    if (type == &PyUnicode_Type) {
+        return PyFastTypes::T_Unicode;
+    } else if (type == &PyLong_Type) {
+        return PyFastTypes::T_Long;
+    } else if (type == &PyBool_Type) {
+        if (val == Py_False) {
+            return PyFastTypes::T_False;
+        } else {
+            assert(val == Py_True);
+            return PyFastTypes::T_True;
+        }
+    } else if (type == &_PyNone_Type) { // TODO
+        return PyFastTypes::T_None;
+    } else if (type == &PyFloat_Type) {
+        return PyFastTypes::T_Float;
+    } else if (type == &PyList_Type) {
+        return PyFastTypes::T_List;
+    } else if (type == &PyDict_Type) {
+        return PyFastTypes::T_Dict;
+    } else if (type == &PyTuple_Type) {
+        return PyFastTypes::T_Tuple;
+    } else {
+        return PyFastTypes::Unknown;
+    }
+}
+
+
+#define PROCESS_VAL(val)                                                     \
+    PyFastTypes fast_type = fast_type_check(val);                            \
+    switch (fast_type) {                                                     \
+        case PyFastTypes::T_Unicode: {                                       \
+            update_string_info(cfg, val);                                    \
+            op_desc.write_op_with_data(EncodeOpType::STRING, val);           \
+            break;                                                           \
+        }                                                                    \
+        case PyFastTypes::T_Long: {                                          \
+            if (unlikely(!write_PyLongOp(val, op_desc))) {                   \
+                goto fail;                                                   \
+            }                                                                \
+            break;                                                           \
+        }                                                                    \
+        case PyFastTypes::T_False: {                                         \
+            op_desc.write_simple_op(EncodeOpType::FALSE_VALUE);              \
+            break;                                                           \
+        }                                                                    \
+        case PyFastTypes::T_True: {                                          \
+            op_desc.write_simple_op(EncodeOpType::TRUE_VALUE);               \
+            break;                                                           \
+        }                                                                    \
+        case PyFastTypes::T_None: {                                          \
+            op_desc.write_simple_op(EncodeOpType::NULL_VALUE);               \
+            break;                                                           \
+        }                                                                    \
+        case PyFastTypes::T_Float: {                                         \
+            if (unlikely(!write_PyFloatOp(val, op_desc))) {                  \
+                goto fail;                                                   \
+            }                                                                \
+            break;                                                           \
+        }                                                                    \
+        case PyFastTypes::T_List: {                                          \
+            Py_ssize_t this_list_size = PyList_Size(val);                    \
+            if (unlikely(cur_list_size == 0)) {                              \
+                op_desc.write_simple_op(EncodeOpType::ARRAY_EMPTY);          \
+            } else {                                                         \
+                CTN_SIZE_GROW();                                             \
+                CtnType *cur_write_ctn = ctn_stack + ++last_pos_stack_index; \
+                cur_write_ctn->ctn = cur_obj;                                \
+                cur_obj = val;                                               \
+                cur_pos = 0;                                                 \
+                op_desc.write_simple_op(EncodeOpType::ARRAY_BEGIN);          \
+                GOTO_ARR_VAL_BEGIN_WITH_SIZE(this_list_size);                \
+            }                                                                \
+            break;                                                           \
+        }                                                                    \
+        case PyFastTypes::T_Dict: {                                          \
+            if (unlikely(PyDict_Size(val) == 0)) {                           \
+                op_desc.write_simple_op(EncodeOpType::DICT_EMPTY);           \
+            } else {                                                         \
+                CTN_SIZE_GROW();                                             \
+                CtnType *cur_write_ctn = ctn_stack + ++last_pos_stack_index; \
+                cur_write_ctn->ctn = cur_obj;                                \
+                cur_obj = val;                                               \
+                cur_pos = 0;                                                 \
+                op_desc.write_simple_op(EncodeOpType::DICT_BEGIN);           \
+                goto dict_pair_begin;                                        \
+            }                                                                \
+            break;                                                           \
+        }                                                                    \
+        case PyFastTypes::T_Tuple: {                                         \
+            Py_ssize_t this_list_size = PyTuple_Size(val);                   \
+            if (unlikely(this_list_size == 0)) {                             \
+                op_desc.write_simple_op(EncodeOpType::ARRAY_EMPTY);          \
+            } else {                                                         \
+                CTN_SIZE_GROW();                                             \
+                CtnType *cur_write_ctn = ctn_stack + ++last_pos_stack_index; \
+                cur_write_ctn->ctn = cur_obj;                                \
+                cur_obj = val;                                               \
+                cur_pos = 0;                                                 \
+                op_desc.write_simple_op(EncodeOpType::ARRAY_BEGIN);          \
+                GOTO_TUPLE_VAL_BEGIN_WITH_SIZE(this_list_size);              \
+            }                                                                \
+            break;                                                           \
+        }                                                                    \
+        default: {                                                           \
+            PyErr_SetString(JSONEncodeError, "Unsupported type");            \
+            goto fail;                                                       \
+        }                                                                    \
     }
 
-    // if not ucs1, should jump to another place
-    assert(cfg.cur_ucs_kind == UCSKind::UCS1);
-    if (__kind != UCSKind::UCS1) {
-        Py_UNREACHABLE();
+struct DumpOption {
+    IndentLevel indent_level;
+};
+
+constexpr X86SIMDLevel check_simd_level() {
+    return X86SIMDLevel::SSE4;
+}
+
+#define JUMP_BY_UCS_TYPE(_indent_)                                                                            \
+    switch (op_cfg->cur_ucs_kind) {                                                                           \
+        case UCSKind::UCS1: {                                                                                 \
+            return pyyjson_dumps_read_op_write_str<_indent_, UCSKind::UCS1, simd_level>(op_cfg, op_desc_old); \
+        }                                                                                                     \
+        case UCSKind::UCS2: {                                                                                 \
+            return pyyjson_dumps_read_op_write_str<_indent_, UCSKind::UCS2, simd_level>(op_cfg, op_desc_old); \
+        }                                                                                                     \
+        case UCSKind::UCS4: {                                                                                 \
+            return pyyjson_dumps_read_op_write_str<_indent_, UCSKind::UCS4, simd_level>(op_cfg, op_desc_old); \
+        }                                                                                                     \
+        default: {                                                                                            \
+            Py_UNREACHABLE();                                                                                 \
+            break;                                                                                            \
+        }                                                                                                     \
     }
+
+PyObject *pyyjson_dumps_read_op_write_str_call_jump(DumpOption *options, EncodeWriteOpConfig *op_cfg, EncodeOpDescriber *op_desc_old) {
+    constexpr X86SIMDLevel simd_level = check_simd_level();
+    switch (options->indent_level) {
+        case IndentLevel::NONE: {
+            JUMP_BY_UCS_TYPE(IndentLevel::NONE);
+        }
+        case IndentLevel::INDENT_2: {
+            JUMP_BY_UCS_TYPE(IndentLevel::INDENT_2);
+        }
+        case IndentLevel::INDENT_4: {
+            JUMP_BY_UCS_TYPE(IndentLevel::INDENT_4);
+        }
+    }
+
+    Py_UNREACHABLE();
+    return nullptr;
+}
+
+static yyjson_inline PyObject *pyyjson_dumps_obj_op(PyObject *in_obj, DumpOption *options) {
+    EncodeWriteOpConfig cfg;
+    ALIAS_NAMES();
+    EncodeOpDescriber op_desc = EncodeOpDescriber::init();
+
+    // final
+    PyObject *result;
 
     if (PyDict_CheckExact(cur_obj)) {
         if (unlikely(PyDict_Size(cur_obj) == 0)) {
-            write_empty_ctn<__indent, UCSKind::UCS1, true>(dst1, buffer_info, cfg);
+            op_desc.write_simple_op(EncodeOpType::DICT_EMPTY);
             // APPEND_OP(DICT_EMPTY);
             goto success;
         }
-        write_ctn_begin<__indent, UCSKind::UCS1, true>(dst1, buffer_info, cfg);
+        op_desc.write_simple_op(EncodeOpType::DICT_BEGIN);
         // APPEND_OP(DICT_BEGIN);
         cur_pos = 0;
         goto dict_pair_begin;
     } else if (PyList_CheckExact(cur_obj)) {
         cur_list_size = PyList_Size(cur_obj);
         if (unlikely(cur_list_size == 0)) {
-            write_empty_ctn<__indent, UCSKind::UCS1, false>(dst1, buffer_info, cfg);
             // APPEND_OP(ARRAY_EMPTY);
+            op_desc.write_simple_op(EncodeOpType::ARRAY_EMPTY);
             goto success;
         }
-        write_ctn_begin<__indent, UCSKind::UCS1, false>(dst1, buffer_info, cfg);
+        op_desc.write_simple_op(EncodeOpType::ARRAY_BEGIN);
         // APPEND_OP(ARRAY_BEGIN);
         GOTO_ARR_VAL_BEGIN_WITH_SIZE(cur_list_size); // result in a no-op
     } else {
@@ -756,11 +1678,11 @@ force_inline PyObject *pyyjson_dump_impl(EncodeConfig &cfg, BufferInfo &buffer_i
         }
         cur_list_size = PyTuple_Size(cur_obj);
         if (unlikely(cur_list_size == 0)) {
-            write_empty_ctn<__indent, UCSKind::UCS1, false>(dst1, buffer_info, cfg);
+            op_desc.write_simple_op(EncodeOpType::ARRAY_EMPTY);
             // APPEND_OP(ARRAY_EMPTY);
             goto success;
         }
-        write_ctn_begin<__indent, UCSKind::UCS1, false>(dst1, buffer_info, cfg);
+        op_desc.write_simple_op(EncodeOpType::ARRAY_BEGIN);
         // APPEND_OP(ARRAY_BEGIN);
         GOTO_TUPLE_VAL_BEGIN_WITH_SIZE(cur_list_size); // result in a no-op
     }
@@ -769,99 +1691,27 @@ dict_pair_begin:;
     assert(PyDict_Size(cur_obj) != 0);
 
     if (PyDict_Next(cur_obj, &cur_pos, &key, &val)) {
-        if (unlikely(__kind < UCSKind::UCS4 && __kind < PyUnicode_KIND(key))) {
-
-            if (PyUnicode_KIND(key) == UCSKind::UCS4) {
-                static_assert(__kind < UCSKind::UCS4);
-                elevate_state<UCSKind::UCS4>(cfg, buffer_info);
-                return pyyjson_dump_impl<__indent, UCSKind::UCS4>(cfg, buffer_info, 1);
-            } else if (PyUnicode_KIND(key) == UCSKind::UCS2) {
-                static_assert(__kind == UCSKind::UCS1);
-                elevate_state<UCSKind::UCS2>(cfg, buffer_info);
-                return pyyjson_dump_impl<__indent, UCSKind::UCS2>(cfg, buffer_info, 1);
-            } else {
-                Py_UNREACHABLE();
-            }
-        }
-    jump_label_1:;
-        APPEND_KEY(key); // TODO
-        if (PyUnicode_CheckExact(val)) {
-        jump_label_2:;
-            APPEND_STR(val);
-        } else if (PyLong_CheckExact(val)) {
-            write_PyLong(val);
-        } else if (PyFloat_CheckExact(val)) {
-            write_PyFloat(val);
-        } else if (PyDict_CheckExact(val)) {
-            // TODO size grow
-            if (unlikely(PyDict_Size(val) == 0)) {
-                WRITE_EMPTY_DICT();
-                // APPEND_OP(DICT_EMPTY);
-            } else {
-                CtnType *cur_write_ctn = ctn_stack + ++last_pos_stack_index;
-                cur_write_ctn->ctn = cur_pos;
-                cur_obj = val;
-                cur_pos = 0;
-                WRITE_DICT_BEGIN();
-                // APPEND_OP(DICT_BEGIN);
-                goto dict_pair_begin;
-            }
-        } else if (PyList_CheckExact(val)) {
-            // TODO size grow
-            Py_ssize_t this_list_size = PyList_Size(val);
-            if (unlikely(cur_list_size == 0)) {
-                WRITE_EMPTY_ARRAY();
-                // APPEND_OP(ARRAY_EMPTY);
-            } else {
-                CtnType *cur_write_ctn = ctn_stack + ++last_pos_stack_index;
-                cur_write_ctn->ctn = cur_pos;
-                cur_obj = val;
-                cur_pos = 0;
-                WRITE_ARRAY_BEGIN();
-                // APPEND_OP(LIST_BEGIN);
-                GOTO_ARR_VAL_BEGIN_WITH_SIZE(this_list_size);
-            }
-        } else if (PyTuple_CheckExact(val)) {
-            // TODO size grow
-            Py_ssize_t this_list_size = PyTuple_Size(val);
-            if (unlikely(this_list_size == 0)) {
-                WRITE_EMPTY_ARRAY();
-                // APPEND_OP(ARRAY_EMPTY);
-            } else {
-                CtnType *cur_write_ctn = ctn_stack + ++last_pos_stack_index;
-                cur_write_ctn->ctn = cur_pos;
-                cur_obj = val;
-                cur_pos = 0;
-                WRITE_ARRAY_BEGIN();
-                // APPEND_OP(LIST_BEGIN);
-                GOTO_TUPLE_VAL_BEGIN_WITH_SIZE(this_list_size);
-            }
-        } else if ((val) == Py_True) {
-            APPEND_OP(TRUE);
-        } else if (val == Py_False) {
-            APPEND_OP(FALSE);
-        } else if (Py_IS_NAN(val)) {
-            APPEND_OP(NAN);
-        } else {
-            // TODO
-            goto fail;
-        }
+        update_string_info(cfg, key);
+        op_desc.write_op_with_data(EncodeOpType::KEY, key);
+        //
+        PROCESS_VAL(val);
+        //
         goto dict_pair_begin;
     } else {
         // dict end
-        APPEND_OP(DICT_END);
+        op_desc.write_simple_op(EncodeOpType::DICT_END);
         if (unlikely(last_pos_stack_index == -1)) {
             goto success;
         }
         CtnType *last_pos = ctn_stack + last_pos_stack_index--;
         cur_obj = last_pos->ctn;
         cur_pos = last_pos->index;
-        if (IS_DICT(cur_obj)) {
+        if (PyDict_CheckExact(cur_obj)) {
             goto dict_pair_begin;
-        } else if (IS_LIST(cur_obj)) {
+        } else if (PyList_CheckExact(cur_obj)) {
             GOTO_ARR_VAL_BEGIN_WITH_SIZE(PyList_GET_SIZE(cur_obj));
         } else {
-            assert(IS_TUPLE(cur_obj));
+            assert(PyTuple_CheckExact(cur_obj));
             GOTO_TUPLE_VAL_BEGIN_WITH_SIZE(PyTuple_GET_SIZE(cur_obj));
         }
     }
@@ -872,25 +1722,28 @@ arr_val_begin:;
 
     if (cur_pos < cur_list_size) {
         val = PyList_GET_ITEM(cur_obj, cur_pos);
-        // TODO same as above...
-        if () {
-            //...
-        } else if () {
-            //...
-        }
-        //...
-        else {
-            // TODO
-            goto fail;
-        }
+        cur_pos++;
+        //
+        PROCESS_VAL(val);
+        //
         goto arr_val_begin;
     } else {
         // list end
-        APPEND_OP(ARRAY_END);
+        op_desc.write_simple_op(EncodeOpType::ARRAY_END);
         if (unlikely(last_pos_stack_index == -1)) {
             goto success;
         }
-        // TODO same as above...
+        CtnType *last_pos = ctn_stack + last_pos_stack_index--;
+        cur_obj = last_pos->ctn;
+        cur_pos = last_pos->index;
+        if (PyDict_CheckExact(cur_obj)) {
+            goto dict_pair_begin;
+        } else if (PyList_CheckExact(cur_obj)) {
+            GOTO_ARR_VAL_BEGIN_WITH_SIZE(PyList_GET_SIZE(cur_obj));
+        } else {
+            assert(PyTuple_CheckExact(cur_obj));
+            GOTO_TUPLE_VAL_BEGIN_WITH_SIZE(PyTuple_GET_SIZE(cur_obj));
+        }
     }
     Py_UNREACHABLE();
 tuple_val_begin:;
@@ -898,60 +1751,56 @@ tuple_val_begin:;
 
     if (cur_pos < cur_list_size) {
         val = PyTuple_GET_ITEM(cur_obj, cur_pos);
-        // TODO same as above...
-        if () {
-            //...
-        } else if () {
-            //...
-        }
-        //...
-        else {
-            // TODO
-            goto fail;
-        }
+        cur_pos++;
+        //
+        PROCESS_VAL(val);
+        //
         goto tuple_val_begin;
     } else {
         // list end
-        APPEND_OP(ARRAY_END);
+        op_desc.write_simple_op(EncodeOpType::ARRAY_END);
         if (unlikely(last_pos_stack_index == -1)) {
             goto success;
         }
-        // TODO same as above...
+        CtnType *last_pos = ctn_stack + last_pos_stack_index--;
+        cur_obj = last_pos->ctn;
+        cur_pos = last_pos->index;
+        if (PyDict_CheckExact(cur_obj)) {
+            goto dict_pair_begin;
+        } else if (PyList_CheckExact(cur_obj)) {
+            GOTO_ARR_VAL_BEGIN_WITH_SIZE(PyList_GET_SIZE(cur_obj));
+        } else {
+            assert(PyTuple_CheckExact(cur_obj));
+            GOTO_TUPLE_VAL_BEGIN_WITH_SIZE(PyTuple_GET_SIZE(cur_obj));
+        }
     }
     Py_UNREACHABLE();
 success:
     assert(last_pos_stack_index == -1);
 
-    PyObject *result = pyyjson_write_str();
+    result = pyyjson_dumps_read_op_write_str_call_jump(options, &cfg, &op_desc);
 
     // cleanup. TODO
-
     if (!result && !PyErr_Occurred()) {
         PyErr_SetString(JSONEncodeError, "Unknown encode error");
     }
+    op_desc.release();
     return result;
 
 fail:
-    // cleanup. TODO
     if (!PyErr_Occurred()) {
         PyErr_SetString(JSONEncodeError, "Unknown encode error");
     }
+    op_desc.release();
     return nullptr;
+
+fail_ctntype:
+    PyErr_SetString(JSONEncodeError, "Unknown container type");
+    goto fail;
 }
-
-template<IndentLevel __indent>
-PyObject *pyyjson_dump_obj(PyObject *in_obj) {
-    EncodeConfig cfg;
-
-    cfg.cur_obj = in_obj;
-
-    BufferInfo buffer_info;
-    buffer_info.m_buffer_start = (void *) &_ThreadLocal_DstBuffer[0];
-    buffer_info.m_size = PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE;
 
 #undef GOTO_TUPLE_VAL_BEGIN_WITH_SIZE
 #undef GOTO_ARR_VAL_BEGIN_WITH_SIZE
-}
 
 extern "C" {
 PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject *kwargs) {
