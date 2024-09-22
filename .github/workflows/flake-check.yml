@@ -38,7 +38,7 @@ jobs:
         nix flake update --commit-lock-file
     - name: Nix flake check
       run: |
-        nix develop --command echo 1
+        nix develop --command echo DONE
         nix flake check
         if [ -z $(git status --porcelain) ]; then
           echo "clean, skip..."

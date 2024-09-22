@@ -9,6 +9,8 @@ fi
 echo $x > build/pyver
 cd build
 
+set -e
+
 # cmake .. -DCMAKE_BUILD_TYPE=Debug
 # cmake --build . --config Debug
 cmake .. -DCMAKE_BUILD_TYPE=Release
