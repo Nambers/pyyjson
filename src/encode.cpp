@@ -6,7 +6,15 @@
 #include "pyyjson_config.h"
 #include "yyjson.h"
 #include <algorithm>
+#include <array>
 #include <stddef.h>
+
+
+
+
+/*==============================================================================
+ * Macros
+ *============================================================================*/
 
 #define RETURN_ON_UNLIKELY_ERR(x) \
     do {                          \
@@ -25,14 +33,17 @@
     } while (0)
 
 #define NEED_INDENT(__indent) (static_cast<int>(__indent) != 0)
-#define INDENT_SIZE(__indent) (static_cast<int>(__indent))
-#define IDENT_WITH_NEWLINE_SIZE(__indent, _indent_level) ((INDENT_SIZE(__indent) != 0) ? (_indent_level * INDENT_SIZE(__indent) + 1) : 0)
+
 
 template<UCSKind __kind>
 struct SrcInfo {
     UCSType_t<__kind> *src_start;
     Py_ssize_t src_size;
 };
+
+/*==============================================================================
+ * Constexpr Utils
+ *============================================================================*/
 
 static_inline constexpr bool size_is_pow2(usize size) {
     return (size & (size - 1)) == 0;
@@ -46,6 +57,9 @@ static_inline constexpr usize size_align_up(usize size, usize align) {
     }
 }
 
+/*==============================================================================
+ * Wrappers for `cvtepu`
+ *============================================================================*/
 
 template<UCSKind __from, UCSKind __to, X86SIMDLevel __simd_level>
 force_inline void cvtepu_128(__m128i &u, UCSType_t<__from> *&src, UCSType_t<__to> *&dst) {
@@ -103,6 +117,10 @@ force_inline bool copy_ucs_128_elevate_sse4_1(UCSType_t<__from> *&src, UCSType_t
     return true;
 }
 
+/*==============================================================================
+ * Wrappers for `check_escape`
+ *============================================================================*/
+
 template<UCSKind __kind, X86SIMDLevel __simd_level>
 force_inline bool check_escape_256bits(__m256i &u) {
     if constexpr (__simd_level >= X86SIMDLevel::AVX512) {
@@ -152,6 +170,9 @@ force_inline bool check_escape_128bits(__m128i &u) {
     }
 }
 
+/*==============================================================================
+ * Copy UCS impl
+ *============================================================================*/
 
 template<UCSKind __from, UCSKind __to>
 force_inline bool copy_ucs_with_runtime_resize(const SrcInfo<__from> &src_info, UCSType_t<__to> *&dst, BufferInfo &buffer_info) {
@@ -166,11 +187,7 @@ force_inline bool copy_ucs_with_runtime_resize(const SrcInfo<__from> &src_info, 
         auto required_len_u8 = buffer_info.get_required_len_u8<__to>(dst, additional_needed_count);
 
         RETURN_ON_UNLIKELY_RESIZE_FAIL(__to, dst, buffer_info, required_len_u8);
-        // if (unlikely(required_len_u8 > buffer_info.m_size)) {
-        //     if (unlikely(!buffer_info.resizer<__to>(dst, required_len_u8))) {
-        //         return false;
-        //     }
-        // }
+
         bool _c = copy_escape_fixsize<__from, __to, 512>(src, dst);
         RETURN_ON_UNLIKELY_ERR(!_c);
     }
@@ -179,14 +196,9 @@ force_inline bool copy_ucs_with_runtime_resize(const SrcInfo<__from> &src_info, 
     auto required_len_u8 = buffer_info.get_required_len_u8<__to>(dst, left_count * 6);
 
     RETURN_ON_UNLIKELY_RESIZE_FAIL(__to, dst, buffer_info, required_len_u8);
-    // if (unlikely(required_len_u8 > buffer_info.m_size)) {
-    //     if (unlikely(!buffer_info.resizer<__to>(dst, required_len_u8))) {
-    //         return false;
-    //     }
-    // }
+
     return copy_escape_impl<__from, __to>(src, dst, left_count);
 }
-
 
 template<UCSKind __from, UCSKind __to>
 force_inline bool copy_ucs_elevate_avx512(const SrcInfo<__from> &src_info, UCSType_t<__to> *&dst, BufferInfo &buffer_info) {
@@ -458,29 +470,28 @@ typedef struct CtnType {
     Py_ssize_t index;
 } CtnType;
 
-thread_local CtnType ctn_stack[1024];
 
 enum class EncodeOpType : u8 {
-    END = 0,
-    DICT_EMPTY = 1,
-    DICT_BEGIN = 2,
-    DICT_END = 3,
-    ARRAY_EMPTY = 4,
-    ARRAY_BEGIN = 5,
-    ARRAY_END = 6,
-    STRING = 7,
-    KEY = 8,
-    U64 = 9,
-    I64 = 10,
-    FLOAT = 11,
-    TRUE_VALUE = 12,
-    FALSE_VALUE = 13,
-    NULL_VALUE = 14,
-    POS_NAN = 15,
-    NEG_NAN = 16,
-    ZERO_VALUE = 17,
-    POS_INF = 18,
-    NEG_INF = 19,
+    END,
+    STRING,
+    KEY,
+    DICT_EMPTY,
+    DICT_BEGIN,
+    DICT_END,
+    ARRAY_EMPTY,
+    ARRAY_BEGIN,
+    ARRAY_END,
+    U64,
+    I64,
+    FLOAT,
+    TRUE_VALUE,
+    FALSE_VALUE,
+    NULL_VALUE,
+    POS_NAN,
+    NEG_NAN,
+    ZERO_VALUE,
+    POS_INF,
+    NEG_INF,
 };
 
 
@@ -490,8 +501,8 @@ typedef struct EncodeOpBufferLinkedList {
 
     static force_inline EncodeOpBufferLinkedList init_buffer(size_t in_size) {
         EncodeOpBufferLinkedList ret{
-                .m_buffer = nullptr,
-                .m_buffer_size = in_size,
+                nullptr,
+                in_size,
         };
         void **_buffer = (void **) malloc(in_size * sizeof(void *));
         if (!_buffer) {
@@ -511,6 +522,7 @@ typedef struct EncodeOpBufferLinkedList {
     }
 } EncodeOpBufferLinkedList;
 
+thread_local CtnType ctn_stack[PYYJSON_ENCODE_MAX_RECURSION];
 thread_local EncodeOpBufferLinkedList op_buffer_nodes[128];
 thread_local void *op_buffer_head[PYYJSON_ENCODE_OP_BUFFER_INIT_SIZE];
 
@@ -520,11 +532,38 @@ typedef struct EncodeOpDescriber {
     u8 *next_op;
     size_t read_buffer_node_index;
 
+    force_inline static EncodeOpDescriber init() {
+        static_assert(PYYJSON_ENCODE_OP_BUFFER_INIT_SIZE >= 1);
+        op_buffer_nodes[0].m_buffer = &op_buffer_head[0];
+        op_buffer_nodes[0].m_buffer_size = PYYJSON_ENCODE_OP_BUFFER_INIT_SIZE;
+        EncodeOpDescriber ret{
+                0,
+                &op_buffer_head[0] + 1,
+                (u8 *) &op_buffer_head[0],
+                0,
+        };
+        return ret;
+    }
+
+    force_inline static EncodeOpDescriber init_as_read(EncodeOpDescriber *old_op_desc) {
+        assert(old_op_desc->read_buffer_node_index == 0);
+        EncodeOpDescriber ret{
+                old_op_desc->op_buffer_node_index,
+                &op_buffer_head[0] + 1,
+                (u8 *) &op_buffer_head[0],
+                0,
+        };
+        return ret;
+    }
+
     /* Write op without any data. */
     force_inline bool write_simple_op(EncodeOpType op) {
         static_assert((sizeof(void *) & (sizeof(void *) - 1)) == 0);
         //
         assert(this->next_op != (u8 *) this->next_ptr);
+        if (!(((size_t) this->next_op) & (sizeof(void *) - 1))) {
+            assert(this->next_op == (u8 *) (this->next_ptr - 1));
+        }
         //
         *this->next_op++ = static_cast<u8>(op);
         if (((size_t) this->next_op) & (sizeof(void *) - 1)) {
@@ -557,6 +596,10 @@ typedef struct EncodeOpDescriber {
         constexpr size_t _SizeRatio = sizeof(T) / sizeof(void *);
         //
         assert(this->next_op != (u8 *) this->next_ptr);
+        if (!(((size_t) this->next_op) & (sizeof(void *) - 1))) {
+            assert(this->next_op == (u8 *) (this->next_ptr - 1));
+        }
+        //
         *this->next_op++ = static_cast<u8>(op);
 
         const auto &cur_op_node = op_buffer_nodes[this->op_buffer_node_index];
@@ -646,30 +689,6 @@ typedef struct EncodeOpDescriber {
         return ret;
     }
 
-    force_inline static EncodeOpDescriber init() {
-        static_assert(PYYJSON_ENCODE_OP_BUFFER_INIT_SIZE >= 1);
-        op_buffer_nodes[0].m_buffer = &op_buffer_head[0];
-        op_buffer_nodes[0].m_buffer_size = PYYJSON_ENCODE_OP_BUFFER_INIT_SIZE;
-        EncodeOpDescriber ret{
-                .op_buffer_node_index = 0,
-                .next_ptr = &op_buffer_head[0] + 1,
-                .next_op = (u8 *) &op_buffer_head[0],
-                .read_buffer_node_index = 0,
-        };
-        return ret;
-    }
-
-    force_inline static EncodeOpDescriber init_as_read(EncodeOpDescriber *old_op_desc) {
-        assert(old_op_desc->read_buffer_node_index == 0);
-        EncodeOpDescriber ret{
-                .op_buffer_node_index = old_op_desc->op_buffer_node_index,
-                .next_ptr = &op_buffer_head[0] + 1,
-                .next_op = (u8 *) &op_buffer_head[0],
-                .read_buffer_node_index = 0,
-        };
-        return ret;
-    }
-
     force_inline void release() {
         for (size_t i = 1; i <= this->op_buffer_node_index; i++) {
             free(op_buffer_nodes[i].m_buffer);
@@ -682,16 +701,11 @@ typedef struct EncodeOpDescriber {
 typedef struct EncodeWriteOpConfig {
     Py_ssize_t last_pos_stack_index = -1;
     PyObject *cur_obj;
-    Py_ssize_t cur_pos;
-    Py_ssize_t cur_list_size; // cache for each list, no need to check it repeatedly
+    Py_ssize_t cur_pos = 0;
     UCSKind cur_ucs_kind = UCSKind::UCS1;
-    bool is_all_ascii;
-    // u8 *dst1 = (u8 *) buffer_info.m_buffer_start;
-    // u16 *dst2 = nullptr;      // enabled if kind >= 2
-    // u32 *dst4 = nullptr;      // enabled if kind == 4
-    // Py_ssize_t dst1_size = 0; // valid if kind >= 2
-    // Py_ssize_t dst2_size = 0; // valid if kind == 4
+    bool is_all_ascii = true;
     // temp variables storing key and value
+    Py_ssize_t cur_list_size; // cache for each list, no need to check it repeatedly
     PyObject *key, *val;
 } EncodeWriteOpConfig;
 
@@ -703,48 +717,68 @@ typedef struct EncodeWriteUnicodeConfig {
 
     force_inline static EncodeWriteUnicodeConfig init_from_op_config(EncodeWriteOpConfig &op_cfg) {
         EncodeWriteUnicodeConfig ret{
-                .indent_level = 0,
-                .cur_ucs_kind = op_cfg.cur_ucs_kind,
-                .is_obj = false,
-                .is_all_ascii = op_cfg.is_all_ascii,
+                0,
+                op_cfg.cur_ucs_kind,
+                true, // to avoid an extra \n
+                op_cfg.is_all_ascii,
         };
         return ret;
     }
 
-    force_inline void increase_indent() {
-        this->indent_level++;
+    force_inline void increase_indent(bool _is_obj) {
+        bool *const obj_stack = (bool *) &ctn_stack[0];
+        obj_stack[this->indent_level++] = this->is_obj;
+        this->is_obj = _is_obj;
         assert(this->indent_level);
     }
 
     force_inline void decrease_indent() {
+        bool *const obj_stack = (bool *) &ctn_stack[0];
         assert(this->indent_level);
         this->indent_level--;
+        this->is_obj = obj_stack[this->indent_level];
     }
-    force_inline void set_cur_ctn(bool is_obj) {
-        this->is_obj = is_obj;
-    }
+
 } EncodeWriteUnicodeConfig;
+
+template<typename T, size_t L, T _DefaultVal, size_t... Is>
+constexpr auto make_filled_array_impl(std::index_sequence<Is...>) {
+    return std::array<T, L>{((void) Is, _DefaultVal)...};
+}
+
+template<typename T, size_t L, T _DefaultVal>
+constexpr std::array<T, L> create_array() {
+    return make_filled_array_impl<T, L, _DefaultVal>(std::make_index_sequence<L>{});
+}
 
 template<IndentLevel __indent, UCSKind __kind>
 force_inline bool write_line_and_indent_impl(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg, Py_ssize_t additional_reserve) {
+#define INDENT_SIZE(__indent) (static_cast<int>(__indent))
+#define IDENT_WITH_NEWLINE_SIZE(__indent, _indent_level) ((INDENT_SIZE(__indent) != 0) ? (_indent_level * INDENT_SIZE(__indent)) : 0)
     static_assert(NEED_INDENT(__indent));
     using uu = UCSType_t<__kind>;
-    Py_ssize_t need_count = IDENT_WITH_NEWLINE_SIZE(__indent, cfg.indent_level) + additional_reserve;
-    Py_ssize_t required_len_u8 = buffer_info.get_required_len_u8<__kind>(dst, need_count);
+    Py_ssize_t need_space_count = IDENT_WITH_NEWLINE_SIZE(__indent, cfg.indent_level);
+    Py_ssize_t need_reserve_count = need_space_count + 1 + additional_reserve;
+    Py_ssize_t required_len_u8 = buffer_info.get_required_len_u8<__kind>(dst, need_reserve_count);
     RETURN_ON_UNLIKELY_RESIZE_FAIL(__kind, dst, buffer_info, required_len_u8);
 
     *dst++ = '\n';
-    need_count--;
-    while (need_count >= 4) {
-        constexpr uu _Template[4] = {' ', ' ', ' ', ' '};
+    // need_count--;
+    constexpr size_t _TemplateSize = size_align_up(sizeof(uu), SIZEOF_VOID_P) / sizeof(uu);
+    constexpr uu _FillVal = (uu) ' ';
+    constexpr std::array<uu, _TemplateSize> _Template = create_array<uu, _TemplateSize, _FillVal>();
+    while (need_space_count >= _TemplateSize) {
         memcpy((void *) dst, (void *) &_Template[0], sizeof(_Template));
-        dst += 4;
-        need_count -= 4;
+        dst += _TemplateSize;
+        need_space_count -= _TemplateSize;
     }
-    while (need_count > 0) {
-        *dst++ = ' ';
-        need_count--;
+    while (need_space_count > 0) {
+        *dst++ = _FillVal;
+        need_space_count--;
     }
+    return true;
+#undef IDENT_WITH_NEWLINE_SIZE
+#undef INDENT_SIZE
 }
 
 template<IndentLevel __indent, UCSKind __kind, Py_ssize_t __additional_reserve>
@@ -771,8 +805,12 @@ force_inline bool write_empty_ctn(UCSType_t<__kind> *&dst, BufferInfo &buffer_in
     constexpr Py_ssize_t reserve = size_align_up(3 * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu);
     // buffer size check
     bool _c;
-    if constexpr (!is_obj && NEED_INDENT(__indent)) {
-        _c = write_line_and_indent<__indent, __kind, reserve>(dst, buffer_info, cfg);
+    if constexpr (NEED_INDENT(__indent)) {
+        if (!cfg.is_obj) {
+            _c = write_line_and_indent<__indent, __kind, reserve>(dst, buffer_info, cfg);
+        } else {
+            _c = write_reserve<__kind, reserve>(dst, buffer_info);
+        }
     } else {
         _c = write_reserve<__kind, reserve>(dst, buffer_info);
     }
@@ -793,8 +831,12 @@ force_inline bool write_ctn_begin(UCSType_t<__kind> *&dst, BufferInfo &buffer_in
     using uu = UCSType_t<__kind>;
     // ut *dst = (ut *) *dst_raw;
     bool _c;
-    if constexpr (!is_obj && NEED_INDENT(__indent)) {
-        _c = write_line_and_indent<__indent, __kind, 1>(dst, buffer_info, cfg);
+    if constexpr (NEED_INDENT(__indent)) {
+        if (!cfg.is_obj) {
+            _c = write_line_and_indent<__indent, __kind, 1>(dst, buffer_info, cfg);
+        } else {
+            _c = write_reserve<__kind, 1>(dst, buffer_info);
+        }
     } else {
         _c = write_reserve<__kind, 1>(dst, buffer_info);
     }
@@ -802,12 +844,9 @@ force_inline bool write_ctn_begin(UCSType_t<__kind> *&dst, BufferInfo &buffer_in
     constexpr uu to_write = (uu) ('[' | ((u8) is_obj << 5));
     *dst++ = to_write;
     // write current ctn type
-    cfg.set_cur_ctn(is_obj);
-    // SET_CUR_CTN(is_obj);
     // new line, increase indent
-    cfg.increase_indent();
-    // INCREASE_INDENT();
-    // *dst_raw = (void *) dst;
+    cfg.increase_indent(is_obj);
+    return true;
 }
 
 template<IndentLevel __indent, UCSKind __kind, bool is_obj>
@@ -821,13 +860,11 @@ force_inline bool write_ctn_end(UCSType_t<__kind> *&dst, BufferInfo &buffer_info
     dst--;
     bool _c;
     if constexpr (NEED_INDENT(__indent)) {
-        if (cfg.is_obj) {
-            // WRITE_LINE();
-            // WRITE_INDENT();
-            _c = write_line_and_indent<__indent, __kind, reserve>(dst, buffer_info, cfg);
-        } else {
-            _c = write_reserve<__kind, reserve>(dst, buffer_info);
-        }
+        // WRITE_LINE();
+        // WRITE_INDENT();
+        _c = write_line_and_indent<__indent, __kind, reserve>(dst, buffer_info, cfg);
+    } else {
+        _c = write_reserve<__kind, reserve>(dst, buffer_info);
     }
     RETURN_ON_UNLIKELY_ERR(!_c);
 
@@ -846,17 +883,17 @@ force_inline bool write_ctn_end(UCSType_t<__kind> *&dst, BufferInfo &buffer_info
 
 template<UCSKind __kind, X86SIMDLevel __simd_level>
 force_inline bool write_raw_string(UCSType_t<__kind> *&dst, void *src_raw, Py_ssize_t size, unsigned int src_kind, Py_ssize_t additional_reserve, BufferInfo &buffer_info) {
-#define UCS1_DISPATCH()                                                   \
-    u8 *usrc = (u8 *) src_raw;                                            \
-    SrcInfo<UCSKind::UCS1> src_info{.src_start = usrc, .src_size = size}; \
+#define UCS1_DISPATCH()                          \
+    u8 *usrc = (u8 *) src_raw;                   \
+    SrcInfo<UCSKind::UCS1> src_info{usrc, size}; \
     _c = copy_ucs<UCSKind::UCS1, __kind, __simd_level>(src_info, dst, buffer_info)
-#define UCS2_DISPATCH()                                                   \
-    u16 *usrc = (u16 *) src_raw;                                          \
-    SrcInfo<UCSKind::UCS2> src_info{.src_start = usrc, .src_size = size}; \
+#define UCS2_DISPATCH()                          \
+    u16 *usrc = (u16 *) src_raw;                 \
+    SrcInfo<UCSKind::UCS2> src_info{usrc, size}; \
     _c = copy_ucs<UCSKind::UCS2, __kind, __simd_level>(src_info, dst, buffer_info)
-#define UCS4_DISPATCH()                                                   \
-    u32 *usrc = (u32 *) src_raw;                                          \
-    SrcInfo<UCSKind::UCS4> src_info{.src_start = usrc, .src_size = size}; \
+#define UCS4_DISPATCH()                          \
+    u32 *usrc = (u32 *) src_raw;                 \
+    SrcInfo<UCSKind::UCS4> src_info{usrc, size}; \
     _c = copy_ucs<UCSKind::UCS4, __kind, __simd_level>(src_info, dst, buffer_info)
 
     using udst = UCSType_t<__kind>;
@@ -874,9 +911,11 @@ force_inline bool write_raw_string(UCSType_t<__kind> *&dst, void *src_raw, Py_ss
         switch (src_kind) {
             case PyUnicode_1BYTE_KIND: {
                 UCS1_DISPATCH();
+                break;
             }
             case PyUnicode_2BYTE_KIND: {
                 UCS2_DISPATCH();
+                break;
             }
             default: {
                 Py_UNREACHABLE();
@@ -887,12 +926,15 @@ force_inline bool write_raw_string(UCSType_t<__kind> *&dst, void *src_raw, Py_ss
         switch (src_kind) {
             case PyUnicode_1BYTE_KIND: {
                 UCS1_DISPATCH();
+                break;
             }
             case PyUnicode_2BYTE_KIND: {
                 UCS2_DISPATCH();
+                break;
             }
             case PyUnicode_4BYTE_KIND: {
                 UCS4_DISPATCH();
+                break;
             }
             default: {
                 Py_UNREACHABLE();
@@ -920,7 +962,11 @@ force_inline bool write_str(PyObject *key, UCSType_t<__kind> *&dst, BufferInfo &
     if constexpr (NEED_INDENT(__indent)) {
         //     WRITE_LINE();
         // WRITE_INDENT();
-        _c = write_line_and_indent_impl<__indent, __kind>(dst, buffer_info, cfg, unicode_size + 2);
+        if (!cfg.is_obj) {
+            _c = write_line_and_indent_impl<__indent, __kind>(dst, buffer_info, cfg, unicode_size + 2);
+        } else {
+            _c = write_reserve_impl<__kind>(dst, buffer_info, unicode_size + 2);
+        }
     } else {
         _c = write_reserve_impl<__kind>(dst, buffer_info, unicode_size + 2);
     }
@@ -939,6 +985,7 @@ force_inline bool write_str(PyObject *key, UCSType_t<__kind> *&dst, BufferInfo &
     dst += 2;
     return true;
 }
+
 template<IndentLevel __indent, UCSKind __kind, X86SIMDLevel __simd_level>
 force_inline bool write_key(PyObject *key, UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
     using uu = UCSType_t<__kind>;
@@ -962,15 +1009,16 @@ force_inline bool write_key(PyObject *key, UCSType_t<__kind> *&dst, BufferInfo &
     _c = write_raw_string<__kind, __simd_level>(dst, data_raw, unicode_size, src_kind, 3, buffer_info);
     RETURN_ON_UNLIKELY_ERR(!_c);
 
-    constexpr uu _Template[2] = {
+    constexpr size_t _Reserve = size_align_up(3 * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu);
+
+    constexpr uu _Template[_Reserve] = {
             (uu) '"',
             (uu) ':',
+            (uu) ' ',
     };
     memcpy(dst, &_Template[0], sizeof(_Template));
-    dst += 2;
-    if constexpr (NEED_INDENT(__indent)) {
-        *(dst++) = (uu) ' ';
-    }
+    constexpr size_t _Move = (NEED_INDENT(__indent)) ? 3 : 2;
+    dst += _Move;
     return true;
 }
 
@@ -1193,6 +1241,24 @@ force_inline bool write_inf(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, co
 }
 
 
+template<IndentLevel __indent, UCSKind __kind>
+force_inline bool write_i64(i64 val, UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
+    assert(false);
+    return false;
+}
+
+template<IndentLevel __indent, UCSKind __kind>
+force_inline bool write_float(i64 val, UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
+    assert(false);
+    return false;
+}
+
+template<IndentLevel __indent, UCSKind __kind>
+force_inline bool write_u64(u64 val, UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
+    assert(false);
+    return false;
+}
+
 #define GOTO_ARR_VAL_BEGIN_WITH_SIZE(in_size) \
     do {                                      \
         cur_list_size = (in_size);            \
@@ -1240,9 +1306,9 @@ force_inline bool write_PyLongOp(PyObject *obj, EncodeOpDescriber &desc) {
 
 force_inline bool write_PyFloatOp(PyObject *obj, EncodeOpDescriber &desc) {
     assert(false);
+    return false;
     // TODO
 }
-
 
 template<IndentLevel __indent, UCSKind __kind, X86SIMDLevel __simd_level>
 force_noinline PyObject *pyyjson_dumps_read_op_write_str(EncodeWriteOpConfig *op_cfg, EncodeOpDescriber *op_desc_old) {
@@ -1424,7 +1490,9 @@ force_noinline PyObject *pyyjson_dumps_read_op_write_str(EncodeWriteOpConfig *op
     }
 
 success:
+    dst--;
     final_size = dst - (udst *) buffer_info.m_buffer_start;
+    assert(final_size >= 0);
 
     if constexpr (__kind == UCSKind::UCS1) {
         if (cfg.is_all_ascii) {
@@ -1451,7 +1519,13 @@ fail:
 
 
 // TODO
-#define CTN_SIZE_GROW() assert(false)
+#define CTN_SIZE_GROW()                                                           \
+    do {                                                                          \
+        if (unlikely(last_pos_stack_index == PYYJSON_ENCODE_MAX_RECURSION - 1)) { \
+            PyErr_SetString(PyExc_ValueError, "Too many nested structures");      \
+            goto fail;                                                            \
+        }                                                                         \
+    } while (0)
 
 #define TODO() assert(false)
 
@@ -1465,12 +1539,6 @@ fail:
     auto &key = cfg.key;                                   \
     auto &val = cfg.val
 
-
-// auto &dst1 = cfg.dst1;                                 \
-    // auto &dst2 = cfg.dst2;                                 \
-    // auto &dst4 = cfg.dst4;                                 \
-    // auto &dst1_size = cfg.dst1_size;                       \
-    // auto &dst2_size = cfg.dst2_size;                       \
 
 force_inline void update_string_info(EncodeWriteOpConfig &cfg, PyObject *val) {
     cfg.cur_ucs_kind = std::max(cfg.cur_ucs_kind, static_cast<UCSKind>(PyUnicode_KIND(val)));
@@ -1559,6 +1627,7 @@ PyFastTypes fast_type_check(PyObject *val) {
                 CTN_SIZE_GROW();                                             \
                 CtnType *cur_write_ctn = ctn_stack + ++last_pos_stack_index; \
                 cur_write_ctn->ctn = cur_obj;                                \
+                cur_write_ctn->index = cur_pos;                              \
                 cur_obj = val;                                               \
                 cur_pos = 0;                                                 \
                 op_desc.write_simple_op(EncodeOpType::ARRAY_BEGIN);          \
@@ -1573,6 +1642,7 @@ PyFastTypes fast_type_check(PyObject *val) {
                 CTN_SIZE_GROW();                                             \
                 CtnType *cur_write_ctn = ctn_stack + ++last_pos_stack_index; \
                 cur_write_ctn->ctn = cur_obj;                                \
+                cur_write_ctn->index = cur_pos;                              \
                 cur_obj = val;                                               \
                 cur_pos = 0;                                                 \
                 op_desc.write_simple_op(EncodeOpType::DICT_BEGIN);           \
@@ -1588,6 +1658,7 @@ PyFastTypes fast_type_check(PyObject *val) {
                 CTN_SIZE_GROW();                                             \
                 CtnType *cur_write_ctn = ctn_stack + ++last_pos_stack_index; \
                 cur_write_ctn->ctn = cur_obj;                                \
+                cur_write_ctn->index = cur_pos;                              \
                 cur_obj = val;                                               \
                 cur_pos = 0;                                                 \
                 op_desc.write_simple_op(EncodeOpType::ARRAY_BEGIN);          \
@@ -1606,7 +1677,8 @@ struct DumpOption {
 };
 
 constexpr X86SIMDLevel check_simd_level() {
-    return X86SIMDLevel::SSE4;
+    // TODO
+    return X86SIMDLevel::AVX2;
 }
 
 #define JUMP_BY_UCS_TYPE(_indent_)                                                                            \
@@ -1644,10 +1716,13 @@ PyObject *pyyjson_dumps_read_op_write_str_call_jump(DumpOption *options, EncodeW
     return nullptr;
 }
 
-static yyjson_inline PyObject *pyyjson_dumps_obj_op(PyObject *in_obj, DumpOption *options) {
+force_noinline PyObject *pyyjson_dumps_obj_op(PyObject *in_obj, DumpOption *options) {
     EncodeWriteOpConfig cfg;
     ALIAS_NAMES();
     EncodeOpDescriber op_desc = EncodeOpDescriber::init();
+
+    cur_obj = in_obj;
+    cur_pos = 0;
 
     // final
     PyObject *result;
@@ -1691,6 +1766,9 @@ dict_pair_begin:;
     assert(PyDict_Size(cur_obj) != 0);
 
     if (PyDict_Next(cur_obj, &cur_pos, &key, &val)) {
+        if (unlikely(!PyUnicode_CheckExact(key))) {
+            goto fail_keytype;
+        }
         update_string_info(cfg, key);
         op_desc.write_op_with_data(EncodeOpType::KEY, key);
         //
@@ -1777,7 +1855,7 @@ tuple_val_begin:;
     Py_UNREACHABLE();
 success:
     assert(last_pos_stack_index == -1);
-
+    op_desc.write_simple_op(EncodeOpType::END);
     result = pyyjson_dumps_read_op_write_str_call_jump(options, &cfg, &op_desc);
 
     // cleanup. TODO
@@ -1797,6 +1875,10 @@ fail:
 fail_ctntype:
     PyErr_SetString(JSONEncodeError, "Unknown container type");
     goto fail;
+
+fail_keytype:
+    PyErr_SetString(JSONEncodeError, "Key must be a string");
+    goto fail;
 }
 
 #undef GOTO_TUPLE_VAL_BEGIN_WITH_SIZE
@@ -1804,5 +1886,37 @@ fail_ctntype:
 
 extern "C" {
 PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject *kwargs) {
+    PyObject *obj;
+    int option_digit = 0;
+    static const char *kwlist[] = {"obj", "options", NULL};
+    DumpOption options = {IndentLevel::NONE};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|i", (char **) kwlist, &obj, &option_digit)) {
+        PyErr_SetString(PyExc_TypeError, "Invalid argument");
+        return NULL;
+    }
+    if (option_digit & 1) {
+        if (option_digit & 2) {
+            PyErr_SetString(PyExc_ValueError, "Cannot mix indent options");
+            return NULL;
+        }
+        options.indent_level = IndentLevel::INDENT_2;
+    } else if (option_digit & 2) {
+        options.indent_level = IndentLevel::INDENT_4;
+    }
+
+    PyObject *ret = pyyjson_dumps_obj_op(obj, &options);
+
+    if (unlikely(!ret)) {
+        if (!PyErr_Occurred()) {
+            PyErr_SetString(JSONEncodeError, "Failed to decode JSON: unknown error");
+        }
+    }
+
+    return ret;
 }
 }
+
+
+#undef NEED_INDENT
+#undef RETURN_ON_UNLIKELY_RESIZE_FAIL
+#undef RETURN_ON_UNLIKELY_ERR

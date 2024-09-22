@@ -128,12 +128,12 @@ constexpr inline static UCSType_t<__type> _ControlSeqTable[ControlMax * 6] = {
         CONTROL_SEQ_ESCAPE_PREFIX, '0', '5', // 5
         CONTROL_SEQ_ESCAPE_PREFIX, '0', '6', // 6
         CONTROL_SEQ_ESCAPE_PREFIX, '0', '7', // 7
-        CONTROL_SEQ_ESCAPE_PREFIX, '0', '8', // 8
-        CONTROL_SEQ_ESCAPE_PREFIX, '0', '9', // 9
-        CONTROL_SEQ_ESCAPE_PREFIX, '0', 'a', // 10
+        '\\', 'b', ' ', ' ', ' ', ' ',       // 8
+        '\\', 't', ' ', ' ', ' ', ' ',       // 9
+        '\\', 'n', ' ', ' ', ' ', ' ',       // 10
         CONTROL_SEQ_ESCAPE_PREFIX, '0', 'b', // 11
-        CONTROL_SEQ_ESCAPE_PREFIX, '0', 'c', // 12
-        CONTROL_SEQ_ESCAPE_PREFIX, '0', 'd', // 13
+        '\\', 'f', ' ', ' ', ' ', ' ',       // 12
+        '\\', 'r', ' ', ' ', ' ', ' ',       // 13
         CONTROL_SEQ_ESCAPE_PREFIX, '0', 'e', // 14
         CONTROL_SEQ_ESCAPE_PREFIX, '0', 'f', // 15
         CONTROL_SEQ_ESCAPE_PREFIX, '1', '0', // 16
@@ -154,14 +154,19 @@ constexpr inline static UCSType_t<__type> _ControlSeqTable[ControlMax * 6] = {
         CONTROL_SEQ_ESCAPE_PREFIX, '1', 'f', // 31
 };
 
+constexpr inline static size_t _ControlJump[ControlMax] = {
+        6, 6, 6, 6, 6, 6, 6, 6, 2, 2, 2, 6, 2, 2, 6, 6, // 0-15
+        6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, // 16-31
+};
 
 /*==============================================================================
  * Buffer
  *============================================================================*/
 
+static_assert((PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE % 64) == 0);
 
+/* use 64 align for better simd r/w */
 yyjson_align(64) inline thread_local u64 _ThreadLocal_DstBuffer[PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE / 8];
-
 
 typedef struct BufferInfo {
     void *m_buffer_start;
@@ -169,8 +174,8 @@ typedef struct BufferInfo {
 
     force_inline static BufferInfo init() {
         BufferInfo ret{
-                .m_buffer_start = (void *) &_ThreadLocal_DstBuffer[0],
-                .m_size = PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE,
+                (void *) &_ThreadLocal_DstBuffer[0],
+                PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE,
         };
         return ret;
     }
@@ -251,7 +256,8 @@ force_inline void ptr_move_bits(UCSType_t<__kind> *&ptr) {
     static_assert((__bit_size % 8) == 0);
     constexpr size_t _MoveBytes = __bit_size / 8;
     static_assert((_MoveBytes % sizeof(uu)) == 0);
-    ptr += (_MoveBytes % sizeof(uu));
+    static_assert((_MoveBytes / sizeof(uu)) != 0);
+    ptr += _MoveBytes / sizeof(uu);
 }
 
 /*
@@ -259,7 +265,7 @@ force_inline void ptr_move_bits(UCSType_t<__kind> *&ptr) {
  * Before calling this, the dst buffer should reserve enough space.
  */
 template<UCSKind __from, UCSKind __to>
-force_inline bool copy_escape_impl(UCSType_t<__from> *&src, UCSType_t<__to> *&dst, Py_ssize_t move_src_ptr) { // no simd
+force_noinline bool copy_escape_impl(UCSType_t<__from> *&src, UCSType_t<__to> *&dst, Py_ssize_t move_src_ptr) { // no simd
     COMMON_TYPE_DEF();
     for (Py_ssize_t i = 0; i < move_src_ptr; i++) {
         auto u_f = *src;
@@ -280,13 +286,14 @@ force_inline bool copy_escape_impl(UCSType_t<__from> *&src, UCSType_t<__to> *&ds
             constexpr Py_ssize_t write_size_u8 = 6 * sizeof(udst);
             memcpy((void *) dst, (void *) &_ControlSeqTable<__to>[(size_t) u_f * 6], (size_t) write_size_u8);
             src++;
-            dst += 6;
+            dst += _ControlJump[(size_t) u_f];
         } else {
             *dst = (udst) u_f;
             src++;
             dst++;
         }
     }
+    return true;
 }
 
 template<UCSKind __from, UCSKind __to, size_t __SrcBitSize>
@@ -303,7 +310,7 @@ force_inline bool copy_escape_fixsize(UCSType_t<__from> *&src, UCSType_t<__to> *
 
 static_inline bool pylong_is_unsigned(PyObject *obj) {
 #if PY_MINOR_VERSION >= 12
-    return 1 - (int) ((((PyLongObject *) obj)->long_value.lv_tag & _PyLong_NON_SIZE_BITS)) > 0;
+    return !(bool) (((PyLongObject *) obj)->long_value.lv_tag & 2);
 #else
     return ((PyVarObject *) obj)->ob_size > 0;
 #endif
@@ -311,7 +318,7 @@ static_inline bool pylong_is_unsigned(PyObject *obj) {
 
 static_inline bool pylong_is_zero(PyObject *obj) {
 #if PY_MINOR_VERSION >= 12
-    return 1 - (int) ((((PyLongObject *) obj)->long_value.lv_tag & 3)) == 1;
+    return (bool) (((PyLongObject *) obj)->long_value.lv_tag & 1);
 #else
     return ((PyVarObject *) obj)->ob_size == 0;
 #endif

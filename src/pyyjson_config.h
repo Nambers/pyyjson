@@ -9,9 +9,9 @@
 #else
 #include <Python.h>
 #endif
-#include <stdint.h>
-#include <stdbool.h>
 #include <stdalign.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 
 // feature checks
@@ -36,14 +36,28 @@
 #define PYYJSON_OBJSTACK_BUFFER_SIZE (1024)
 #endif
 
-/* Stack buffer size for dst buffer. */
+/*
+ Init buffer size for dst buffer. Must be multiple of 64.
+ Cost: PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE bytes per thread.
+ */
 #ifndef PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE
 #define PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE (4096)
 #endif
 
-/* Init buffer size for op buffer. */
+/*
+ Init buffer size for op buffer.
+ Cost: PYYJSON_ENCODE_OP_BUFFER_INIT_SIZE * sizeof(void*) bytes per thread.
+ */
 #ifndef PYYJSON_ENCODE_OP_BUFFER_INIT_SIZE
 #define PYYJSON_ENCODE_OP_BUFFER_INIT_SIZE (1024)
+#endif
+
+/*
+ Max nested structures for encoding.
+ Cost: PYYJSON_ENCODE_MAX_RECURSION * sizeof(void*) * 2 bytes per thread.
+ */
+#ifndef PYYJSON_ENCODE_MAX_RECURSION
+#define PYYJSON_ENCODE_MAX_RECURSION (1024)
 #endif
 
 #endif

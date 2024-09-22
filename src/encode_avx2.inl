@@ -29,7 +29,7 @@ force_inline bool check_escape_u8_256_avx2(__m256i &u) {
     __m256i r4 = _mm256_cmpgt_epi8(t4, u);                      // 32 > u, vpcmpgtb, AVX2
     __m256i r5 = _mm256_and_si256(r3, r4);                      // vpand, AVX2
     __m256i r = _mm256_or_si256(_mm256_or_si256(r1, r2), r5);   // vpor, AVX2
-    return likely(!_mm256_testz_si256(r, r));                   // vptest, AVX
+    return likely(_mm256_testz_si256(r, r));                   // vptest, AVX
 }
 
 
@@ -50,7 +50,7 @@ force_inline bool check_escape_u16_256_avx2(__m256i &u) {
     __m256i r4 = _mm256_cmpgt_epi16(t4, u);                      // 32 > u, vpcmpgtw, AVX2
     __m256i r5 = _mm256_and_si256(r3, r4);                       // vpand, AVX2
     __m256i r = _mm256_or_si256(_mm256_or_si256(r1, r2), r5);    // vpor, AVX2
-    return likely(!_mm256_testz_si256(r, r));                    // vptest, AVX
+    return likely(_mm256_testz_si256(r, r));                    // vptest, AVX
 }
 
 
@@ -71,7 +71,7 @@ force_inline bool check_escape_u32_256_avx2(__m256i &u) {
     __m256i r4 = _mm256_cmpgt_epi32(t4, u);                      // 32 > u, vpcmpgtd, AVX2
     __m256i r5 = _mm256_and_si256(r3, r4);                       // vpand, AVX2
     __m256i r = _mm256_or_si256(_mm256_or_si256(r1, r2), r5);    // vpor, AVX2
-    return likely(!_mm256_testz_si256(r, r));                    // vptest, AVX
+    return likely(_mm256_testz_si256(r, r));                    // vptest, AVX
 }
 
 /*==============================================================================
