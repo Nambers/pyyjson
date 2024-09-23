@@ -3,6 +3,7 @@
 
 #include "encode.hpp"
 #include "yyjson.h"
+#include <array>
 #include <stddef.h>
 
 /*==============================================================================
@@ -105,6 +106,7 @@ struct UCSType<UCSKind::UCS4_WithEscape> {
 
 
 enum class X86SIMDLevel : u8 {
+    SSE2 = 0,
     SSE4 = 1,
     AVX2 = 2,
     AVX512 = 3,
@@ -158,6 +160,24 @@ constexpr inline static size_t _ControlJump[ControlMax] = {
         6, 6, 6, 6, 6, 6, 6, 6, 2, 2, 2, 6, 2, 2, 6, 6, // 0-15
         6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, // 16-31
 };
+
+template<typename T, std::size_t n>
+constexpr auto _generate_mask_array() {
+    std::array<std::array<T, n>, n> res{};
+
+    for (int a = 0; a < n; ++a) {
+        for (int b = 0; b < n; ++b) {
+            res[a][b] = a > b ? static_cast<T>(-1) : static_cast<T>(0);
+        }
+    }
+
+    return res;
+}
+
+#define _MASK_ARRAY_SIZE (512 / 8 / sizeof(T))
+template<typename T>
+yyjson_align(64) constexpr inline std::array<std::array<T, _MASK_ARRAY_SIZE>, _MASK_ARRAY_SIZE> _MaskArray = _generate_mask_array<T, _MASK_ARRAY_SIZE>();
+#undef _MASK_ARRAY_SIZE
 
 /*==============================================================================
  * Buffer

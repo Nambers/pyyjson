@@ -10,8 +10,6 @@
 #include <stddef.h>
 
 
-
-
 /*==============================================================================
  * Macros
  *============================================================================*/
@@ -146,6 +144,31 @@ force_inline bool check_escape_256bits(__m256i &u) {
 }
 
 template<UCSKind __kind, X86SIMDLevel __simd_level>
+force_inline bool check_escape_tail_256bits(__m256i &u, size_t count) {
+    if constexpr (__simd_level >= X86SIMDLevel::AVX512) {
+        if constexpr (__kind == UCSKind::UCS1) {
+            return check_escape_tail_u8_256_avx512(u, count);
+        } else if constexpr (__kind == UCSKind::UCS2) {
+            return check_escape_tail_u16_256_avx512(u, count);
+        } else {
+            static_assert(__kind == UCSKind::UCS4);
+            return check_escape_tail_u32_256_avx512(u, count);
+        }
+    } else {
+        static_assert(__simd_level >= X86SIMDLevel::AVX2, "SSE4 and lower not supported");
+        if constexpr (__kind == UCSKind::UCS1) {
+            return check_escape_tail_u8_256_avx2(u, count);
+        } else if constexpr (__kind == UCSKind::UCS2) {
+            return check_escape_tail_u16_256_avx2(u, count);
+        } else {
+            static_assert(__kind == UCSKind::UCS4);
+            return check_escape_tail_u32_256_avx2(u, count);
+        }
+    }
+}
+
+
+template<UCSKind __kind, X86SIMDLevel __simd_level>
 force_inline bool check_escape_128bits(__m128i &u) {
     if constexpr (__simd_level >= X86SIMDLevel::AVX512) {
         if constexpr (__kind == UCSKind::UCS1) {
@@ -156,9 +179,8 @@ force_inline bool check_escape_128bits(__m128i &u) {
             static_assert(__kind == UCSKind::UCS4);
             return check_escape_u32_128_avx512(u);
         }
-    } else {
+    } else if constexpr (__simd_level >= X86SIMDLevel::SSE4) {
         // AVX2 does not have better `check_escape` than SSE4, for 128bits.
-        static_assert(__simd_level >= X86SIMDLevel::SSE4);
         if constexpr (__kind == UCSKind::UCS1) {
             return check_escape_u8_128_sse4_1(u);
         } else if constexpr (__kind == UCSKind::UCS2) {
@@ -166,6 +188,50 @@ force_inline bool check_escape_128bits(__m128i &u) {
         } else {
             static_assert(__kind == UCSKind::UCS4);
             return check_escape_u32_128_sse4_1(u);
+        }
+    } else {
+        static_assert(__simd_level == X86SIMDLevel::SSE2);
+        if constexpr (__kind == UCSKind::UCS1) {
+            return check_escape_u8_128_sse2(u);
+        } else if constexpr (__kind == UCSKind::UCS2) {
+            return check_escape_u16_128_sse2(u);
+        } else {
+            static_assert(__kind == UCSKind::UCS4);
+            return check_escape_u32_128_sse2(u);
+        }
+    }
+}
+
+template<UCSKind __kind, X86SIMDLevel __simd_level>
+force_inline bool check_escape_tail_128bits(__m128i &u, size_t count) {
+    if constexpr (__simd_level >= X86SIMDLevel::AVX512) {
+        if constexpr (__kind == UCSKind::UCS1) {
+            return check_escape_tail_u8_128_avx512(u, count);
+        } else if constexpr (__kind == UCSKind::UCS2) {
+            return check_escape_tail_u16_128_avx512(u, count);
+        } else {
+            static_assert(__kind == UCSKind::UCS4);
+            return check_escape_tail_u32_128_avx512(u, count);
+        }
+    } else if constexpr (__simd_level >= X86SIMDLevel::SSE4) {
+        // AVX2 does not have better `check_escape` than SSE4, for 128bits.
+        if constexpr (__kind == UCSKind::UCS1) {
+            return check_escape_tail_u8_128_sse4_1(u, count);
+        } else if constexpr (__kind == UCSKind::UCS2) {
+            return check_escape_tail_u16_128_sse4_1(u, count);
+        } else {
+            static_assert(__kind == UCSKind::UCS4);
+            return check_escape_tail_u32_128_sse4_1(u, count);
+        }
+    } else {
+        static_assert(__simd_level == X86SIMDLevel::SSE2);
+        if constexpr (__kind == UCSKind::UCS1) {
+            return check_escape_tail_u8_128_sse2(u, count);
+        } else if constexpr (__kind == UCSKind::UCS2) {
+            return check_escape_tail_u16_128_sse2(u, count);
+        } else {
+            static_assert(__kind == UCSKind::UCS4);
+            return check_escape_tail_u32_128_sse2(u, count);
         }
     }
 }
@@ -177,6 +243,7 @@ force_inline bool check_escape_128bits(__m128i &u) {
 template<UCSKind __from, UCSKind __to>
 force_inline bool copy_ucs_with_runtime_resize(const SrcInfo<__from> &src_info, UCSType_t<__to> *&dst, BufferInfo &buffer_info) {
     // alright, no simd support
+    // TODO fix this
     using usrc = UCSType_t<__from>;
     usrc *src = src_info.src_start;
     usrc *const src_end = src + static_cast<std::ptrdiff_t>(src_info.src_size);
@@ -207,8 +274,8 @@ force_inline bool copy_ucs_elevate_avx512(const SrcInfo<__from> &src_info, UCSTy
     usrc *const src_end = src + static_cast<std::ptrdiff_t>(src_info.src_size);
     // process 256 bits once
     constexpr std::ptrdiff_t _ProcessCountOnce = 256 / 8 / sizeof(usrc);
+    __m256i u;
     while (src_end - src >= _ProcessCountOnce) {
-        __m256i u;
         u = _mm256_lddqu_si256((__m256i *) src); // vlddqu, AVX
         bool v = check_escape_256bits<__from, X86SIMDLevel::AVX512>(u);
         if (likely(v)) {
@@ -250,15 +317,79 @@ force_inline bool copy_ucs_elevate_avx512(const SrcInfo<__from> &src_info, UCSTy
         }
     }
     const auto left_count = src_end - src;
+    if (!left_count) return true;
+
     assert(left_count < _ProcessCountOnce);
-    auto required_len_u8 = buffer_info.get_required_len_u8<__to>(dst, left_count * 6);
+    if (left_count <= _ProcessCountOnce / 2) {
+        // copy once, only check 128
+        auto required_len_u8 = std::max<Py_ssize_t>(buffer_info.get_required_len_u8<__to>(dst, left_count * 6), 128 / 8 / _SizeRatio);
+        RETURN_ON_UNLIKELY_RESIZE_FAIL(__to, dst, buffer_info, required_len_u8);
+        __m128i u1;
+        u1 = _mm_lddqu_si128((__m128i *) src); // lddqu, sse3
+        bool v = check_escape_tail_128bits<__from, X86SIMDLevel::AVX512>(u1, left_count);
+        if (likely(v)) {
+            // requires 128 / 8 * _SizeRatio bytes
+            // discard this pointer!
+            udst *_temp_d = dst;
+            cvtepu_128<__from, __to, X86SIMDLevel::AVX512>(u1, src, _temp_d);
+            dst += left_count;
+        } else {
+            bool _c = copy_escape_impl<__from, __to>(src, dst, left_count);
+            RETURN_ON_UNLIKELY_ERR(!_c);
+        }
+        return true;
+    }
+    // the first part requires _ProcessCountOnce / 2 * sizeof(dst) * 6 bytes
+    // the second part requires max((left_count - _ProcessCountOnce / 2) * sizeof(dst) * 6, 128 / 8 * _SizeRatio) bytes
+    assert(left_count > _ProcessCountOnce / 2);
+    Py_ssize_t required_len_u8 = _ProcessCountOnce / 2 * sizeof(dst) * 6 + std::max<Py_ssize_t>(buffer_info.get_required_len_u8<__to>(dst, (left_count - _ProcessCountOnce / 2) * 6), 128 / 8 / _SizeRatio);
+    Py_ssize_t required_len_u8_2 = std::max<Py_ssize_t>(
+        buffer_info.get_required_len_u8<__to>(dst, left_count * 6), 256 / 8 / _SizeRatio);
+    required_len_u8 = std::max(required_len_u8_2, required_len_u8);
     RETURN_ON_UNLIKELY_RESIZE_FAIL(__to, dst, buffer_info, required_len_u8);
-    // if (unlikely(required_len_u8 > buffer_info.m_size)) {
-    //     if (unlikely(!buffer_info.resizer<__to>(dst, required_len_u8))) {
-    //         return false;
-    //     }
-    // }
-    return copy_escape_impl<__from, __to>(src, dst, left_count);
+    u = _mm256_lddqu_si256((__m256i *) src); // vlddqu, AVX
+    bool v = check_escape_tail_256bits<__from, X86SIMDLevel::AVX512>(u, left_count);
+    if (likely(v)) {
+        // requires 256 / 8 * _SizeRatio bytes
+        // discard this pointer!
+        udst *_temp_d = dst;
+        cvtepu_256<__from, __to, X86SIMDLevel::AVX512>(u, src, _temp_d);
+        dst += left_count;
+    } else {
+        __m128i u1;
+        u1 = _mm256_extracti128_si256(u, 0); // vextracti128, AVX2
+        v = check_escape_128bits<__from, X86SIMDLevel::AVX512>(u1);
+        // requires _ProcessCountOnce / 2 * sizeof(dst) * 6 bytes
+        if (v) {
+            cvtepu_128<__from, __to, X86SIMDLevel::AVX512>(u1, src, dst);
+        } else {
+            bool _c = copy_escape_fixsize<__from, __to, 128>(src, dst);
+            RETURN_ON_UNLIKELY_ERR(!_c);
+        }
+        auto cur_left_count = left_count - _ProcessCountOnce / 2;
+        if (cur_left_count) {
+            u1 = _mm256_extracti128_si256(u, 1); // vextracti128, AVX2
+            v = check_escape_tail_128bits<__from, X86SIMDLevel::AVX512>(u1, cur_left_count);
+            if (v) {
+                udst *_temp_d = dst;
+                cvtepu_128<__from, __to, X86SIMDLevel::AVX512>(u1, src, _temp_d);
+                dst += cur_left_count;
+            } else {
+                bool _c = copy_escape_fixsize<__from, __to, 128>(src, dst);
+                RETURN_ON_UNLIKELY_ERR(!_c);
+            }
+        }
+    }
+    return true;
+
+    // auto required_len_u8 = buffer_info.get_required_len_u8<__to>(dst, left_count * 6);
+    // RETURN_ON_UNLIKELY_RESIZE_FAIL(__to, dst, buffer_info, required_len_u8);
+    // // if (unlikely(required_len_u8 > buffer_info.m_size)) {
+    // //     if (unlikely(!buffer_info.resizer<__to>(dst, required_len_u8))) {
+    // //         return false;
+    // //     }
+    // // }
+    // return copy_escape_impl<__from, __to>(src, dst, left_count);
 }
 
 template<UCSKind __from, UCSKind __to, X86SIMDLevel __simd_level>
@@ -269,8 +400,8 @@ force_inline bool copy_ucs_elevate_sse4_or_avx2(const SrcInfo<__from> &src_info,
     usrc *const src_end = src + static_cast<std::ptrdiff_t>(src_info.src_size);
     // process 128 bits once
     constexpr std::ptrdiff_t _ProcessCountOnce = 128 / 8 / sizeof(usrc);
+    __m128i u;
     while (src_end - src >= _ProcessCountOnce) {
-        __m128i u;
         u = _mm_lddqu_si128((__m128i *) src); // lddqu, sse3
         bool v = check_escape_128bits<__from, __simd_level>(u);
         if (likely(v)) {
@@ -290,15 +421,28 @@ force_inline bool copy_ucs_elevate_sse4_or_avx2(const SrcInfo<__from> &src_info,
         }
     }
     const auto left_count = src_end - src;
+    if (left_count == 0) return true;
     assert(left_count < _ProcessCountOnce);
-    auto required_len_u8 = buffer_info.get_required_len_u8<__to>(dst, left_count * 6);
+    auto required_len_u8 = std::max<Py_ssize_t>(128 / 8 / _SizeRatio, buffer_info.get_required_len_u8<__to>(dst, left_count * 6));
     RETURN_ON_UNLIKELY_RESIZE_FAIL(__to, dst, buffer_info, required_len_u8);
     // if (unlikely(required_len_u8 > buffer_info.m_size)) {
     //     if (unlikely(!buffer_info.resizer<__to>(dst, required_len_u8))) {
     //         return false;
     //     }
     // }
-    return copy_escape_impl<__from, __to>(src, dst, left_count);
+    u = _mm_lddqu_si128((__m128i *) src); // lddqu, sse3
+    bool v = check_escape_tail_128bits<__from, __simd_level>(u, left_count);
+    if (likely(v)) {
+        // requires 128 / 8 * _SizeRatio bytes
+        // discard this pointer!
+        udst *_temp_d = dst;
+        cvtepu_128<__from, __to, __simd_level>(u, src, _temp_d);
+        dst += left_count;
+        return true;
+    } else {
+        // requires left_count * 6 * sizeof(udst) bytes
+        return copy_escape_impl<__from, __to>(src, dst, left_count);
+    }
 }
 
 template<UCSKind __from, UCSKind __to, X86SIMDLevel __simd_level>
@@ -338,8 +482,8 @@ force_inline bool copy_ucs_same_avx2_or_avx512(const SrcInfo<__kind> &src_info, 
 
     constexpr std::ptrdiff_t _ProcessCountOnce = 256 / 8 / sizeof(uu);
 
+    __m256i u;
     while (src_end - src >= _ProcessCountOnce) {
-        __m256i u;
         u = _mm256_lddqu_si256((__m256i *) src); // vlddqu, AVX
         bool v = check_escape_256bits<__kind, __simd_level>(u);
         if (likely(v)) {
@@ -382,12 +526,16 @@ force_inline bool copy_ucs_same_avx2_or_avx512(const SrcInfo<__kind> &src_info, 
     assert(left_count < _ProcessCountOnce);
     auto required_len_u8 = buffer_info.get_required_len_u8<__kind>(dst, left_count * 6);
     RETURN_ON_UNLIKELY_RESIZE_FAIL(__kind, dst, buffer_info, required_len_u8);
-    // if (unlikely(required_len_u8 > buffer_info.m_size)) {
-    //     if (unlikely(!buffer_info.resizer<__kind>(dst, required_len_u8))) {
-    //         return false;
-    //     }
-    // }
-    return copy_escape_impl<__kind, __kind>(src, dst, left_count);
+    // TODO fix this
+    u = _mm256_lddqu_si256((__m256i *) src); // vlddqu, AVX
+    bool v = check_escape_tail_256bits<__kind, __simd_level>(u, left_count);
+    if(likely(v)){
+        _mm256_storeu_si256((__m256i *) dst, u); // vmovdqu, AVX
+        dst += left_count;
+    } else{
+        return copy_escape_impl<__kind, __kind>(src, dst, left_count);
+    }
+    return true;
 }
 
 template<UCSKind __kind>
@@ -726,14 +874,14 @@ typedef struct EncodeWriteUnicodeConfig {
     }
 
     force_inline void increase_indent(bool _is_obj) {
-        bool *const obj_stack = (bool *) &ctn_stack[0];
-        obj_stack[this->indent_level++] = this->is_obj;
+        int *const obj_stack = (int *) &ctn_stack[0];
+        obj_stack[this->indent_level++] = this->is_obj ? 1 : 0;
         this->is_obj = _is_obj;
         assert(this->indent_level);
     }
 
     force_inline void decrease_indent() {
-        bool *const obj_stack = (bool *) &ctn_stack[0];
+        int *const obj_stack = (int *) &ctn_stack[0];
         assert(this->indent_level);
         this->indent_level--;
         this->is_obj = obj_stack[this->indent_level];
