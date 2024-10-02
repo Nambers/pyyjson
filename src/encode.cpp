@@ -523,6 +523,7 @@ force_inline bool copy_ucs_same_avx2_or_avx512(const SrcInfo<__kind> &src_info, 
         }
     }
     const auto left_count = src_end - src;
+    if (!left_count) return true;
     assert(left_count < _ProcessCountOnce);
     auto required_len_u8 = buffer_info.get_required_len_u8<__kind>(dst, left_count * 6);
     RETURN_ON_UNLIKELY_RESIZE_FAIL(__kind, dst, buffer_info, required_len_u8);
