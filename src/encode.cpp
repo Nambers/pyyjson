@@ -32,6 +32,14 @@
 
 #define NEED_INDENT(__indent) (static_cast<int>(__indent) != 0)
 
+#define ENCODE_MOVE_SRC_DST(src, src_count, dst, dst_left, move_count) \
+    do {                                                               \
+        Py_ssize_t _temp__ = (move_count);                             \
+        src += _temp__;                                                \
+        dst += _temp__;                                                \
+        src_count -= _temp__;                                          \
+        dst_left -= _temp__;                                           \
+    } while (0)
 
 template<UCSKind __kind>
 struct SrcInfo {
@@ -344,7 +352,7 @@ force_inline bool copy_ucs_elevate_avx512(const SrcInfo<__from> &src_info, UCSTy
     assert(left_count > _ProcessCountOnce / 2);
     Py_ssize_t required_len_u8 = _ProcessCountOnce / 2 * sizeof(dst) * 6 + std::max<Py_ssize_t>(buffer_info.get_required_len_u8<__to>(dst, (left_count - _ProcessCountOnce / 2) * 6), 128 / 8 / _SizeRatio);
     Py_ssize_t required_len_u8_2 = std::max<Py_ssize_t>(
-        buffer_info.get_required_len_u8<__to>(dst, left_count * 6), 256 / 8 / _SizeRatio);
+            buffer_info.get_required_len_u8<__to>(dst, left_count * 6), 256 / 8 / _SizeRatio);
     required_len_u8 = std::max(required_len_u8_2, required_len_u8);
     RETURN_ON_UNLIKELY_RESIZE_FAIL(__to, dst, buffer_info, required_len_u8);
     u = _mm256_lddqu_si256((__m256i *) src); // vlddqu, AVX
@@ -530,10 +538,10 @@ force_inline bool copy_ucs_same_avx2_or_avx512(const SrcInfo<__kind> &src_info, 
     // TODO fix this
     u = _mm256_lddqu_si256((__m256i *) src); // vlddqu, AVX
     bool v = check_escape_tail_256bits<__kind, __simd_level>(u, left_count);
-    if(likely(v)){
+    if (likely(v)) {
         _mm256_storeu_si256((__m256i *) dst, u); // vmovdqu, AVX
         dst += left_count;
-    } else{
+    } else {
         return copy_escape_impl<__kind, __kind>(src, dst, left_count);
     }
     return true;
@@ -1408,6 +1416,177 @@ force_inline bool write_u64(u64 val, UCSType_t<__kind> *&dst, BufferInfo &buffer
     return false;
 }
 
+/*Copy Utils*/
+
+
+template<X86SIMDLevel __simd_level>
+force_inline void cpy_once_512_impl(u8 *&ddst, u8 *&ssrc) {
+    static_assert(__simd_level >= X86SIMDLevel::AVX512);
+    _mm512_storeu_si512((void *) ddst, _mm512_loadu_si512((void *) ssrc)); // vmovdqu32, AVX512F
+}
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Walign-mismatch"
+template<X86SIMDLevel __simd_level>
+force_inline void cpy_aligned_once_512_impl(u8 *&ddst, u8 *&ssrc) {
+    static_assert(__simd_level >= X86SIMDLevel::AVX512);
+    _mm512_store_si512((void *) ddst, _mm512_load_si512((void *) ssrc)); // vmovdqa32, AVX512F
+}
+#pragma GCC diagnostic pop
+
+template<X86SIMDLevel __simd_level>
+force_inline void cpy_fast_512_impl(u8 *&ddst, u8 *&ssrc, Py_ssize_t &count, Py_ssize_t &allow_write_size) {
+    static_assert(__simd_level >= X86SIMDLevel::AVX512);
+    constexpr size_t _Align = 512 / 8;
+    uintptr_t align_mod = (uintptr_t) ddst % _Align;
+    if (align_mod == ((uintptr_t) ssrc % _Align)) {
+        if (align_mod) {
+            uintptr_t align_diff = _Align - align_mod;
+            if (allow_write_size >= align_diff && count >= align_diff) {
+                memcpy((void *) ddst, (void *) ssrc, align_diff);
+                ENCODE_MOVE_SRC_DST(ssrc, count, ddst, allow_write_size, align_diff);
+            } else {
+                goto copy_unaligned;
+            }
+        }
+        while (allow_write_size >= _Align && count > 0) {
+            cpy_aligned_once_512_impl<__simd_level>(ddst, ssrc); // AVX512F
+            ENCODE_MOVE_SRC_DST(ssrc, count, ddst, allow_write_size, _Align);
+        }
+        return;
+    }
+copy_unaligned:;
+    while (allow_write_size >= _Align && count > 0) {
+        cpy_once_512_impl<__simd_level>(ddst, ssrc); // AVX512F
+        ENCODE_MOVE_SRC_DST(ssrc, count, ddst, allow_write_size, _Align);
+    }
+}
+
+template<X86SIMDLevel __simd_level>
+force_inline void cpy_once_256_impl(u8 *&ddst, u8 *&ssrc) {
+    static_assert(__simd_level >= X86SIMDLevel::AVX2);
+    _mm256_storeu_si256((__m256i *) ddst, _mm256_lddqu_si256((const __m256i_u *) ssrc)); // vmovdqu, vlddqu, AVX
+}
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Walign-mismatch"
+template<X86SIMDLevel __simd_level>
+force_inline void cpy_aligned_once_256_impl(u8 *&ddst, u8 *&ssrc) {
+    static_assert(__simd_level >= X86SIMDLevel::AVX2);
+    _mm256_store_si256((__m256i *) ddst, _mm256_load_si256((const __m256i_u *) ssrc)); // vmovdqa, AVX
+}
+#pragma GCC diagnostic pop
+
+template<X86SIMDLevel __simd_level>
+force_inline void cpy_fast_256_impl(u8 *&ddst, u8 *&ssrc, Py_ssize_t &count, Py_ssize_t &allow_write_size) {
+    static_assert(__simd_level >= X86SIMDLevel::AVX2);
+    constexpr size_t _Align = 256 / 8;
+    uintptr_t align_mod = (uintptr_t) ddst % _Align;
+    if (align_mod == ((uintptr_t) ssrc % _Align)) {
+        if (align_mod) {
+            uintptr_t align_diff = _Align - align_mod;
+            if (allow_write_size >= align_diff && count >= align_diff) {
+                memcpy((void *) ddst, (void *) ssrc, align_diff);
+                ENCODE_MOVE_SRC_DST(ssrc, count, ddst, allow_write_size, align_diff);
+            } else {
+                goto copy_unaligned;
+            }
+        }
+        while (allow_write_size >= _Align && count > 0) {
+            cpy_aligned_once_256_impl<__simd_level>(ddst, ssrc); // AVX
+            ENCODE_MOVE_SRC_DST(ssrc, count, ddst, allow_write_size, _Align);
+        }
+        return;
+    }
+copy_unaligned:;
+
+    while (allow_write_size >= _Align && count > 0) {
+        cpy_once_256_impl<__simd_level>(ddst, ssrc); // AVX
+        ENCODE_MOVE_SRC_DST(ssrc, count, ddst, allow_write_size, _Align);
+    }
+}
+
+template<X86SIMDLevel __simd_level>
+force_inline void cpy_once_128_impl(u8 *&ddst, u8 *&ssrc) {
+    if constexpr (__simd_level >= X86SIMDLevel::SSE4) {
+        _mm_storeu_si128((__m128i *) ddst, _mm_lddqu_si128((const __m128i_u *) ssrc)); // lddqu, SSE3
+    } else {
+        _mm_storeu_si128((__m128i *) ddst, _mm_loadu_si128((const __m128i_u *) ssrc)); // movdqu, SSE2
+    }
+}
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Walign-mismatch"
+template<X86SIMDLevel __simd_level>
+force_inline void cpy_aligned_once_128_impl(u8 *&ddst, u8 *&ssrc) {
+    _mm_store_si128((__m128i *) ddst, _mm_load_si128((const __m128i_u *) ssrc)); // movdqa, SSE2
+}
+#pragma GCC diagnostic pop
+
+template<X86SIMDLevel __simd_level>
+force_inline void cpy_fast_128_impl(u8 *&ddst, u8 *&ssrc, Py_ssize_t &count, Py_ssize_t &allow_write_size) {
+    constexpr size_t _Align = 128 / 8;
+    uintptr_t align_mod = (uintptr_t) ddst % _Align;
+    if (align_mod == ((uintptr_t) ssrc % _Align)) {
+        if (align_mod) {
+            uintptr_t align_diff = _Align - align_mod;
+            if (allow_write_size >= align_diff && count >= align_diff) {
+                memcpy((void *) ddst, (void *) ssrc, align_diff);
+                ENCODE_MOVE_SRC_DST(ssrc, count, ddst, allow_write_size, align_diff);
+            } else {
+                goto copy_unaligned;
+            }
+        }
+        while (allow_write_size >= _Align && count > 0) {
+            cpy_aligned_once_128_impl<__simd_level>(ddst, ssrc); // SSE
+            ENCODE_MOVE_SRC_DST(ssrc, count, ddst, allow_write_size, _Align);
+        }
+        return;
+    }
+copy_unaligned:;
+    while (allow_write_size >= _Align && count > 0) {
+        cpy_once_128_impl<__simd_level>(ddst, ssrc); // SSE2 or SSE3
+        ENCODE_MOVE_SRC_DST(ssrc, count, ddst, allow_write_size, _Align);
+    }
+}
+
+template<X86SIMDLevel __simd_level>
+force_inline void cpy_fast(void *dst, void *src, Py_ssize_t count, Py_ssize_t allow_write_size) {
+    assert(count <= allow_write_size);
+    u8 *ddst = (u8 *) dst;
+    u8 *ssrc = (u8 *) src;
+    if constexpr (__simd_level >= X86SIMDLevel::AVX512) {
+        goto copy_512;
+    } else if constexpr (__simd_level >= X86SIMDLevel::AVX2) {
+        goto copy_256;
+    } else if constexpr (__simd_level >= X86SIMDLevel::SSE2) {
+        goto copy_128;
+    }
+copy_512:
+    if constexpr (__simd_level >= X86SIMDLevel::AVX512) {
+        cpy_fast_512_impl<__simd_level>(ddst, ssrc, count, allow_write_size);
+    } else {
+        Py_UNREACHABLE();
+    }
+    if (likely(count <= 0)) return;
+    goto copy_256;
+copy_256:
+    if constexpr (__simd_level >= X86SIMDLevel::AVX2) {
+        cpy_fast_256_impl<__simd_level>(ddst, ssrc, count, allow_write_size);
+    } else {
+        Py_UNREACHABLE();
+    }
+    if (likely(count <= 0)) return;
+    goto copy_128;
+copy_128:
+    cpy_fast_128_impl<__simd_level>(ddst, ssrc, count, allow_write_size);
+    if (likely(count <= 0)) return;
+    goto copy_final;
+copy_final:
+    memcpy((void *) ddst, (void *) ssrc, (size_t) count);
+}
+
+/**/
 #define GOTO_ARR_VAL_BEGIN_WITH_SIZE(in_size) \
     do {                                      \
         cur_list_size = (in_size);            \
@@ -1658,7 +1837,8 @@ success:
     if (unlikely(!ret)) {
         goto fail;
     }
-    memcpy(PyUnicode_DATA(ret), buffer_info.m_buffer_start, final_size * sizeof(udst));
+    cpy_fast<__simd_level>(PyUnicode_DATA(ret), buffer_info.m_buffer_start, final_size * sizeof(udst), final_size * sizeof(udst));
+    // memcpy(PyUnicode_DATA(ret), buffer_info.m_buffer_start, final_size * sizeof(udst));
     buffer_info.release();
     return ret;
 fail:
