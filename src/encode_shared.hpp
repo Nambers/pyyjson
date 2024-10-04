@@ -106,10 +106,12 @@ struct UCSType<UCSKind::UCS4_WithEscape> {
 
 
 enum class X86SIMDLevel : u8 {
-    SSE2 = 0,
-    SSE4 = 1,
-    AVX2 = 2,
-    AVX512 = 3,
+    SSE2,
+    SSE3,
+    SSE4,
+    AVX,
+    AVX2,
+    AVX512,
 };
 
 
@@ -156,7 +158,7 @@ constexpr inline static UCSType_t<__type> _ControlSeqTable[ControlMax * 6] = {
         CONTROL_SEQ_ESCAPE_PREFIX, '1', 'f', // 31
 };
 
-constexpr inline static size_t _ControlJump[ControlMax] = {
+constexpr inline static Py_ssize_t _ControlJump[ControlMax] = {
         6, 6, 6, 6, 6, 6, 6, 6, 2, 2, 2, 6, 2, 2, 6, 6, // 0-15
         6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, // 16-31
 };
