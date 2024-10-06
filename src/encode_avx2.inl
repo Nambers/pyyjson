@@ -8,6 +8,15 @@
  * AVX2
  *============================================================================*/
 
+force_inline Py_ssize_t reduce_add_epi32_256(__m256i y) {
+    __m256i sum1 = _mm256_hadd_epi32(y, y);           // vphaddd, AVX2
+    __m256i sum2 = _mm256_hadd_epi32(sum1, sum1);     // vphaddd, AVX2
+    __m128i low = _mm256_extracti128_si256(sum2, 0);  // vextracti128, AVX2
+    __m128i high = _mm256_extracti128_si256(sum2, 1); // vextracti128, AVX2
+    __m128i total = _mm_add_epi32(low, high);         // paddd, SSE2
+    return _mm_cvtsi128_si32(total);                  // movd, SSE2
+}
+
 /*==============================================================================
  * AVX2 Check 256 Bits
  *============================================================================*/
@@ -121,14 +130,45 @@ force_inline Py_ssize_t count_escape_u8_256_avx2(__m256i &u) {
     }
     // expand to i32, 64 -> 256 (4 times)
     __m256i zero_256 = _mm256_setzero_si256(); // vpxor, AVX
-    for (usize i = 0; i < 4; ++i) {
-        i64 data = _mm256_extract_epi64(u, i);                                                           // Sequence, AVX
-        i64 mask64 = _mm256_extract_epi64(m3, i);                                                        // Sequence, AVX
-        __m128i x_data = _mm_cvtsi64_si128(data);                                                        // movq, SSE2
-        __m256i vidx = _mm256_cvtepu8_epi32(x_data);                                                     // vpmovzxbd, AVX2
-        __m128i x_mask = _mm_cvtsi64_si128(mask64);                                                      // movq, SSE2
-        __m256i mask = _mm256_cvtepi8_epi32(x_mask);                                                     // vpmovsxbd, AVX2
-        ret += (Py_ssize_t) _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], vidx, mask, 4); // vpgatherdd, AVX2
+    {
+        i64 data = _mm256_extract_epi64(u, 0);                                                        // Sequence, AVX
+        i64 mask64 = _mm256_extract_epi64(m3, 0);                                                     // Sequence, AVX
+        __m128i x_data = _mm_cvtsi64_si128(data);                                                     // movq, SSE2
+        __m256i vidx = _mm256_cvtepu8_epi32(x_data);                                                  // vpmovzxbd, AVX2
+        __m128i x_mask = _mm_cvtsi64_si128(mask64);                                                   // movq, SSE2
+        __m256i mask = _mm256_cvtepi8_epi32(x_mask);                                                  // vpmovsxbd, AVX2
+        __m256i to_sum = _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], vidx, mask, 4); // vpgatherdd, AVX2
+        ret += reduce_add_epi32_256(to_sum);                                                          // AVX2
+    }
+    {
+        i64 data = _mm256_extract_epi64(u, 1);                                                        // Sequence, AVX
+        i64 mask64 = _mm256_extract_epi64(m3, 1);                                                     // Sequence, AVX
+        __m128i x_data = _mm_cvtsi64_si128(data);                                                     // movq, SSE2
+        __m256i vidx = _mm256_cvtepu8_epi32(x_data);                                                  // vpmovzxbd, AVX2
+        __m128i x_mask = _mm_cvtsi64_si128(mask64);                                                   // movq, SSE2
+        __m256i mask = _mm256_cvtepi8_epi32(x_mask);                                                  // vpmovsxbd, AVX2
+        __m256i to_sum = _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], vidx, mask, 4); // vpgatherdd, AVX2
+        ret += reduce_add_epi32_256(to_sum);                                                          // AVX2
+    }
+    {
+        i64 data = _mm256_extract_epi64(u, 2);                                                        // Sequence, AVX
+        i64 mask64 = _mm256_extract_epi64(m3, 2);                                                     // Sequence, AVX
+        __m128i x_data = _mm_cvtsi64_si128(data);                                                     // movq, SSE2
+        __m256i vidx = _mm256_cvtepu8_epi32(x_data);                                                  // vpmovzxbd, AVX2
+        __m128i x_mask = _mm_cvtsi64_si128(mask64);                                                   // movq, SSE2
+        __m256i mask = _mm256_cvtepi8_epi32(x_mask);                                                  // vpmovsxbd, AVX2
+        __m256i to_sum = _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], vidx, mask, 4); // vpgatherdd, AVX2
+        ret += reduce_add_epi32_256(to_sum);                                                          // AVX2
+    }
+    {
+        i64 data = _mm256_extract_epi64(u, 3);                                                        // Sequence, AVX
+        i64 mask64 = _mm256_extract_epi64(m3, 3);                                                     // Sequence, AVX
+        __m128i x_data = _mm_cvtsi64_si128(data);                                                     // movq, SSE2
+        __m256i vidx = _mm256_cvtepu8_epi32(x_data);                                                  // vpmovzxbd, AVX2
+        __m128i x_mask = _mm_cvtsi64_si128(mask64);                                                   // movq, SSE2
+        __m256i mask = _mm256_cvtepi8_epi32(x_mask);                                                  // vpmovsxbd, AVX2
+        __m256i to_sum = _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], vidx, mask, 4); // vpgatherdd, AVX2
+        ret += reduce_add_epi32_256(to_sum);                                                          // AVX2
     }
     i32 mask32 = _mm256_movemask_epi8(m1or2); // vpmovmskb, AVX2
     return ret + _mm_popcnt_u32(mask32);      // popcnt, implies SSE4.2
@@ -149,14 +189,45 @@ force_inline Py_ssize_t count_escape_tail_u8_256_avx2(__m256i &u, usize count) {
     // expand to i32, 64 -> 256 (4 times)
     m3 = _mm256_and_si256(m3, tail_mask);      // vpand, AVX2
     __m256i zero_256 = _mm256_setzero_si256(); // vpxor, AVX
-    for (usize i = 0; i < 4; ++i) {
-        i64 data = _mm256_extract_epi64(u, i);                                                           // Sequence, AVX
-        i64 mask64 = _mm256_extract_epi64(m3, i);                                                        // Sequence, AVX
-        __m128i x_data = _mm_cvtsi64_si128(data);                                                        // movq, SSE2
-        __m256i vidx = _mm256_cvtepu8_epi32(x_data);                                                     // vpmovzxbd, AVX2
-        __m128i x_mask = _mm_cvtsi64_si128(mask64);                                                      // movq, SSE2
-        __m256i mask = _mm256_cvtepi8_epi32(x_mask);                                                     // vpmovsxbd, AVX2
-        ret += (Py_ssize_t) _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], vidx, mask, 4); // vpgatherdd, AVX2
+    {
+        i64 data = _mm256_extract_epi64(u, 0);                                                        // Sequence, AVX
+        i64 mask64 = _mm256_extract_epi64(m3, 0);                                                     // Sequence, AVX
+        __m128i x_data = _mm_cvtsi64_si128(data);                                                     // movq, SSE2
+        __m256i vidx = _mm256_cvtepu8_epi32(x_data);                                                  // vpmovzxbd, AVX2
+        __m128i x_mask = _mm_cvtsi64_si128(mask64);                                                   // movq, SSE2
+        __m256i mask = _mm256_cvtepi8_epi32(x_mask);                                                  // vpmovsxbd, AVX2
+        __m256i to_sum = _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], vidx, mask, 4); // vpgatherdd, AVX2
+        ret += reduce_add_epi32_256(to_sum);                                                          // AVX2
+    }
+    {
+        i64 data = _mm256_extract_epi64(u, 1);                                                        // Sequence, AVX
+        i64 mask64 = _mm256_extract_epi64(m3, 1);                                                     // Sequence, AVX
+        __m128i x_data = _mm_cvtsi64_si128(data);                                                     // movq, SSE2
+        __m256i vidx = _mm256_cvtepu8_epi32(x_data);                                                  // vpmovzxbd, AVX2
+        __m128i x_mask = _mm_cvtsi64_si128(mask64);                                                   // movq, SSE2
+        __m256i mask = _mm256_cvtepi8_epi32(x_mask);                                                  // vpmovsxbd, AVX2
+        __m256i to_sum = _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], vidx, mask, 4); // vpgatherdd, AVX2
+        ret += reduce_add_epi32_256(to_sum);                                                          // AVX2
+    }
+    {
+        i64 data = _mm256_extract_epi64(u, 2);                                                        // Sequence, AVX
+        i64 mask64 = _mm256_extract_epi64(m3, 2);                                                     // Sequence, AVX
+        __m128i x_data = _mm_cvtsi64_si128(data);                                                     // movq, SSE2
+        __m256i vidx = _mm256_cvtepu8_epi32(x_data);                                                  // vpmovzxbd, AVX2
+        __m128i x_mask = _mm_cvtsi64_si128(mask64);                                                   // movq, SSE2
+        __m256i mask = _mm256_cvtepi8_epi32(x_mask);                                                  // vpmovsxbd, AVX2
+        __m256i to_sum = _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], vidx, mask, 4); // vpgatherdd, AVX2
+        ret += reduce_add_epi32_256(to_sum);                                                          // AVX2
+    }
+    {
+        i64 data = _mm256_extract_epi64(u, 3);                                                        // Sequence, AVX
+        i64 mask64 = _mm256_extract_epi64(m3, 3);                                                     // Sequence, AVX
+        __m128i x_data = _mm_cvtsi64_si128(data);                                                     // movq, SSE2
+        __m256i vidx = _mm256_cvtepu8_epi32(x_data);                                                  // vpmovzxbd, AVX2
+        __m128i x_mask = _mm_cvtsi64_si128(mask64);                                                   // movq, SSE2
+        __m256i mask = _mm256_cvtepi8_epi32(x_mask);                                                  // vpmovsxbd, AVX2
+        __m256i to_sum = _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], vidx, mask, 4); // vpgatherdd, AVX2
+        ret += reduce_add_epi32_256(to_sum);                                                          // AVX2
     }
     i32 mask32 = _mm256_movemask_epi8(_mm256_and_si256(m1or2, tail_mask)); // vpmovmskb, vpand, AVX2
     return ret + _mm_popcnt_u32(mask32);                                   // popcnt, implies SSE4.2
@@ -174,12 +245,21 @@ force_inline Py_ssize_t count_escape_u16_256_avx2(__m256i &u) {
     }
     // expand to i32, 128 -> 256 (2 times)
     __m256i zero_256 = _mm256_setzero_si256(); // vpxor, AVX
-    for (usize i = 0; i < 2; ++i) {
-        __m128i data = _mm256_extracti128_si256(u, i);                                                   // vextracti128, AVX2
-        __m128i mask16 = _mm256_extracti128_si256(m3, i);                                                // vextracti128, AVX2
-        __m256i vidx = _mm256_cvtepu16_epi32(data);                                                      // vpmovzxwd, AVX2
-        __m256i mask = _mm256_cvtepi16_epi32(mask16);                                                    // vpmovsxwd, AVX2
-        ret += (Py_ssize_t) _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], vidx, mask, 4); // vpgatherdd, AVX2
+    {
+        __m128i data = _mm256_extracti128_si256(u, 0);                                                // vextracti128, AVX2
+        __m128i mask16 = _mm256_extracti128_si256(m3, 0);                                             // vextracti128, AVX2
+        __m256i vidx = _mm256_cvtepu16_epi32(data);                                                   // vpmovzxwd, AVX2
+        __m256i mask = _mm256_cvtepi16_epi32(mask16);                                                 // vpmovsxwd, AVX2
+        __m256i to_sum = _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], vidx, mask, 4); // vpgatherdd, AVX2
+        ret += reduce_add_epi32_256(to_sum);                                                          // AVX2
+    }
+    {
+        __m128i data = _mm256_extracti128_si256(u, 1);                                                // vextracti128, AVX2
+        __m128i mask16 = _mm256_extracti128_si256(m3, 1);                                             // vextracti128, AVX2
+        __m256i vidx = _mm256_cvtepu16_epi32(data);                                                   // vpmovzxwd, AVX2
+        __m256i mask = _mm256_cvtepi16_epi32(mask16);                                                 // vpmovsxwd, AVX2
+        __m256i to_sum = _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], vidx, mask, 4); // vpgatherdd, AVX2
+        ret += reduce_add_epi32_256(to_sum);                                                          // AVX2
     }
     i32 mask32 = _mm256_movemask_epi8(m1or2);   // vpmovmskb, AVX2
     return ret + (_mm_popcnt_u32(mask32) >> 1); // popcnt, implies SSE4.2
@@ -200,12 +280,21 @@ force_inline Py_ssize_t count_escape_tail_u16_256_avx2(__m256i &u, usize count) 
     // expand to i32, 128 -> 256 (2 times)
     m3 = _mm256_and_si256(m3, tail_mask);      // vpand, AVX2
     __m256i zero_256 = _mm256_setzero_si256(); // vpxor, AVX
-    for (usize i = 0; i < 2; ++i) {
-        __m128i data = _mm256_extracti128_si256(u, i);                                                   // vextracti128, AVX2
-        __m128i mask16 = _mm256_extracti128_si256(m3, i);                                                // vextracti128, AVX2
-        __m256i vidx = _mm256_cvtepu16_epi32(data);                                                      // vpmovzxwd, AVX2
-        __m256i mask = _mm256_cvtepi16_epi32(mask16);                                                    // vpmovsxwd, AVX2
-        ret += (Py_ssize_t) _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], vidx, mask, 4); // vpgatherdd, AVX2
+    {
+        __m128i data = _mm256_extracti128_si256(u, 0);                                                // vextracti128, AVX2
+        __m128i mask16 = _mm256_extracti128_si256(m3, 0);                                             // vextracti128, AVX2
+        __m256i vidx = _mm256_cvtepu16_epi32(data);                                                   // vpmovzxwd, AVX2
+        __m256i mask = _mm256_cvtepi16_epi32(mask16);                                                 // vpmovsxwd, AVX2
+        __m256i to_sum = _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], vidx, mask, 4); // vpgatherdd, AVX2
+        ret += reduce_add_epi32_256(to_sum);                                                          // AVX2
+    }
+    {
+        __m128i data = _mm256_extracti128_si256(u, 1);                                                // vextracti128, AVX2
+        __m128i mask16 = _mm256_extracti128_si256(m3, 1);                                             // vextracti128, AVX2
+        __m256i vidx = _mm256_cvtepu16_epi32(data);                                                   // vpmovzxwd, AVX2
+        __m256i mask = _mm256_cvtepi16_epi32(mask16);                                                 // vpmovsxwd, AVX2
+        __m256i to_sum = _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], vidx, mask, 4); // vpgatherdd, AVX2
+        ret += reduce_add_epi32_256(to_sum);                                                          // AVX2
     }
     i32 mask32 = _mm256_movemask_epi8(_mm256_and_si256(m1or2, tail_mask)); // vpmovmskb, vpand, AVX2
     return ret + (_mm_popcnt_u32(mask32) >> 1);                            // popcnt, implies SSE4.2
@@ -222,10 +311,11 @@ force_inline Py_ssize_t count_escape_u32_256_avx2(__m256i &u) {
         if (likely(_mm256_testz_si256(tmp, tmp))) return ret; // vptest, AVX
     }
     // it is already i32
-    __m256i zero_256 = _mm256_setzero_si256();                                                  // vpxor, AVX
-    ret += (Py_ssize_t) _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], u, m3, 4); // vpgatherdd, AVX2
-    i32 mask32 = _mm256_movemask_epi8(m1or2);                                                   // vpmovmskb, AVX2
-    return ret + (_mm_popcnt_u32(mask32) >> 2);                                                 // popcnt, implies SSE4.2
+    __m256i zero_256 = _mm256_setzero_si256();                                               // vpxor, AVX
+    __m256i to_sum = _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], u, m3, 4); // vpgatherdd, AVX2
+    ret += reduce_add_epi32_256(to_sum);                                                     // AVX2
+    i32 mask32 = _mm256_movemask_epi8(m1or2);                                                // vpmovmskb, AVX2
+    return ret + (_mm_popcnt_u32(mask32) >> 2);                                              // popcnt, implies SSE4.2
 }
 
 force_inline Py_ssize_t count_escape_tail_u32_256_avx2(__m256i &u, usize count) {
@@ -240,11 +330,12 @@ force_inline Py_ssize_t count_escape_tail_u32_256_avx2(__m256i &u, usize count) 
         if (likely(_mm256_testz_si256(tmp, tmp))) return ret;                  // vptest, AVX
     }
     // it is already i32
-    m3 = _mm256_and_si256(m3, tail_mask);                                                       // vpand, AVX2
-    __m256i zero_256 = _mm256_setzero_si256();                                                  // vpxor, AVX
-    ret += (Py_ssize_t) _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], u, m3, 4); // vpgatherdd, AVX2
-    i32 mask32 = _mm256_movemask_epi8(_mm256_and_si256(m1or2, tail_mask));                      // vpmovmskb, vpand, AVX2
-    return ret + (_mm_popcnt_u32(mask32) >> 2);                                                 // popcnt, implies SSE4.2
+    m3 = _mm256_and_si256(m3, tail_mask);                                                    // vpand, AVX2
+    __m256i zero_256 = _mm256_setzero_si256();                                               // vpxor, AVX
+    __m256i to_sum = _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], u, m3, 4); // vpgatherdd, AVX2
+    ret += reduce_add_epi32_256(to_sum);                                                     // AVX2
+    i32 mask32 = _mm256_movemask_epi8(_mm256_and_si256(m1or2, tail_mask));                   // vpmovmskb, vpand, AVX2
+    return ret + (_mm_popcnt_u32(mask32) >> 2);                                              // popcnt, implies SSE4.2
 }
 
 /*==============================================================================

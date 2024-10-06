@@ -233,9 +233,30 @@ force_inline Py_ssize_t count_escape_u8_512_avx512(__m512i &u) { // AVX512F + AV
     __m512i vidx, to_sum_512;
     __mmask16 mask;
     // 1st
-    for (usize i = 0; i < 4; ++i) {
-        tmp_128 = _mm512_extracti32x4_epi32(u, i); // vextracti32x4, AVX512F
-        mask = (r3 >> (16 * i)) & 0xFFFF;
+    {
+        tmp_128 = _mm512_extracti32x4_epi32(u, 0); // vextracti32x4, AVX512F
+        mask = (r3 >> (16 * 0)) & 0xFFFF;
+        vidx = _mm512_cvtepu8_epi32(tmp_128);                                                     // vpmovzxbd, AVX512F
+        to_sum_512 = _mm512_mask_i32gather_epi32(zero_512, mask, vidx, &_ControlLengthAdd[0], 4); // vpgatherdd, AVX512F
+        ret += (Py_ssize_t) _mm512_reduce_add_epi32(to_sum_512);                                  // Sequence, AVX512F
+    }
+    {
+        tmp_128 = _mm512_extracti32x4_epi32(u, 1); // vextracti32x4, AVX512F
+        mask = (r3 >> (16 * 1)) & 0xFFFF;
+        vidx = _mm512_cvtepu8_epi32(tmp_128);                                                     // vpmovzxbd, AVX512F
+        to_sum_512 = _mm512_mask_i32gather_epi32(zero_512, mask, vidx, &_ControlLengthAdd[0], 4); // vpgatherdd, AVX512F
+        ret += (Py_ssize_t) _mm512_reduce_add_epi32(to_sum_512);                                  // Sequence, AVX512F
+    }
+    {
+        tmp_128 = _mm512_extracti32x4_epi32(u, 2); // vextracti32x4, AVX512F
+        mask = (r3 >> (16 * 2)) & 0xFFFF;
+        vidx = _mm512_cvtepu8_epi32(tmp_128);                                                     // vpmovzxbd, AVX512F
+        to_sum_512 = _mm512_mask_i32gather_epi32(zero_512, mask, vidx, &_ControlLengthAdd[0], 4); // vpgatherdd, AVX512F
+        ret += (Py_ssize_t) _mm512_reduce_add_epi32(to_sum_512);                                  // Sequence, AVX512F
+    }
+    {
+        tmp_128 = _mm512_extracti32x4_epi32(u, 3); // vextracti32x4, AVX512F
+        mask = (r3 >> (16 * 3)) & 0xFFFF;
         vidx = _mm512_cvtepu8_epi32(tmp_128);                                                     // vpmovzxbd, AVX512F
         to_sum_512 = _mm512_mask_i32gather_epi32(zero_512, mask, vidx, &_ControlLengthAdd[0], 4); // vpgatherdd, AVX512F
         ret += (Py_ssize_t) _mm512_reduce_add_epi32(to_sum_512);                                  // Sequence, AVX512F
@@ -262,9 +283,30 @@ force_inline Py_ssize_t count_escape_tail_u8_512_avx512(__m512i &u, size_t count
     __m512i vidx, to_sum_512;
     __mmask16 mask;
     // 1st
-    for (usize i = 0; i < 4; ++i) {
-        tmp_128 = _mm512_extracti32x4_epi32(u, i); // vextracti32x4, AVX512F
-        mask = (r3 >> (16 * i)) & 0xFFFF;
+    {
+        tmp_128 = _mm512_extracti32x4_epi32(u, 0); // vextracti32x4, AVX512F
+        mask = (r3 >> (16 * 0)) & 0xFFFF;
+        vidx = _mm512_cvtepu8_epi32(tmp_128);                                                     // vpmovzxbd, AVX512F
+        to_sum_512 = _mm512_mask_i32gather_epi32(zero_512, mask, vidx, &_ControlLengthAdd[0], 4); // vpgatherdd, AVX512F
+        ret += (Py_ssize_t) _mm512_reduce_add_epi32(to_sum_512);                                  // Sequence, AVX512F
+    }
+    {
+        tmp_128 = _mm512_extracti32x4_epi32(u, 1); // vextracti32x4, AVX512F
+        mask = (r3 >> (16 * 1)) & 0xFFFF;
+        vidx = _mm512_cvtepu8_epi32(tmp_128);                                                     // vpmovzxbd, AVX512F
+        to_sum_512 = _mm512_mask_i32gather_epi32(zero_512, mask, vidx, &_ControlLengthAdd[0], 4); // vpgatherdd, AVX512F
+        ret += (Py_ssize_t) _mm512_reduce_add_epi32(to_sum_512);                                  // Sequence, AVX512F
+    }
+    {
+        tmp_128 = _mm512_extracti32x4_epi32(u, 2); // vextracti32x4, AVX512F
+        mask = (r3 >> (16 * 2)) & 0xFFFF;
+        vidx = _mm512_cvtepu8_epi32(tmp_128);                                                     // vpmovzxbd, AVX512F
+        to_sum_512 = _mm512_mask_i32gather_epi32(zero_512, mask, vidx, &_ControlLengthAdd[0], 4); // vpgatherdd, AVX512F
+        ret += (Py_ssize_t) _mm512_reduce_add_epi32(to_sum_512);                                  // Sequence, AVX512F
+    }
+    {
+        tmp_128 = _mm512_extracti32x4_epi32(u, 3); // vextracti32x4, AVX512F
+        mask = (r3 >> (16 * 3)) & 0xFFFF;
         vidx = _mm512_cvtepu8_epi32(tmp_128);                                                     // vpmovzxbd, AVX512F
         to_sum_512 = _mm512_mask_i32gather_epi32(zero_512, mask, vidx, &_ControlLengthAdd[0], 4); // vpgatherdd, AVX512F
         ret += (Py_ssize_t) _mm512_reduce_add_epi32(to_sum_512);                                  // Sequence, AVX512F
@@ -288,9 +330,16 @@ force_inline Py_ssize_t count_escape_u16_512_avx512(__m512i &u) { // AVX512F + A
     __m512i vidx, to_sum_512;
     __mmask16 mask;
     // 1st
-    for (usize i = 0; i < 2; ++i) {
-        tmp_256 = _mm512_extracti32x8_epi32(u, i); // vextracti32x8, AVX512F
-        mask = (r3 >> (16 * i)) & 0xFFFF;
+    {
+        tmp_256 = _mm512_extracti32x8_epi32(u, 0); // vextracti32x8, AVX512F
+        mask = (r3 >> (16 * 0)) & 0xFFFF;
+        vidx = _mm512_cvtepu16_epi32(tmp_256);                                                    // vpmovzxwd, AVX512F
+        to_sum_512 = _mm512_mask_i32gather_epi32(zero_512, mask, vidx, &_ControlLengthAdd[0], 4); // vpgatherdd, AVX512F
+        ret += (Py_ssize_t) _mm512_reduce_add_epi32(to_sum_512);                                  // Sequence, AVX512F
+    }
+    {
+        tmp_256 = _mm512_extracti32x8_epi32(u, 1); // vextracti32x8, AVX512F
+        mask = (r3 >> (16 * 1)) & 0xFFFF;
         vidx = _mm512_cvtepu16_epi32(tmp_256);                                                    // vpmovzxwd, AVX512F
         to_sum_512 = _mm512_mask_i32gather_epi32(zero_512, mask, vidx, &_ControlLengthAdd[0], 4); // vpgatherdd, AVX512F
         ret += (Py_ssize_t) _mm512_reduce_add_epi32(to_sum_512);                                  // Sequence, AVX512F
@@ -317,9 +366,16 @@ force_inline Py_ssize_t count_escape_tail_u16_512_avx512(__m512i &u, usize count
     __m512i vidx, to_sum_512;
     __mmask16 mask;
     // 1st
-    for (usize i = 0; i < 2; ++i) {
-        tmp_256 = _mm512_extracti32x8_epi32(u, i); // vextracti32x8, AVX512F
-        mask = (r3 >> (16 * i)) & 0xFFFF;
+    {
+        tmp_256 = _mm512_extracti32x8_epi32(u, 0); // vextracti32x8, AVX512F
+        mask = (r3 >> (16 * 0)) & 0xFFFF;
+        vidx = _mm512_cvtepu16_epi32(tmp_256);                                                    // vpmovzxwd, AVX512F
+        to_sum_512 = _mm512_mask_i32gather_epi32(zero_512, mask, vidx, &_ControlLengthAdd[0], 4); // vpgatherdd, AVX512F
+        ret += (Py_ssize_t) _mm512_reduce_add_epi32(to_sum_512);                                  // Sequence, AVX512F
+    }
+    {
+        tmp_256 = _mm512_extracti32x8_epi32(u, 1); // vextracti32x8, AVX512F
+        mask = (r3 >> (16 * 1)) & 0xFFFF;
         vidx = _mm512_cvtepu16_epi32(tmp_256);                                                    // vpmovzxwd, AVX512F
         to_sum_512 = _mm512_mask_i32gather_epi32(zero_512, mask, vidx, &_ControlLengthAdd[0], 4); // vpgatherdd, AVX512F
         ret += (Py_ssize_t) _mm512_reduce_add_epi32(to_sum_512);                                  // Sequence, AVX512F

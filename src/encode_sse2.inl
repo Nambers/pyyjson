@@ -111,7 +111,7 @@ int bit_count_32(u32 u) {
     return ((u_count + (u_count >> 3)) & 030707070707) % 63;
 }
 
-force_inline void _count_escape_u8_128_sse2_get_final_mask_impl(__m128i &m1or2, __m128i &m3, __m128i &m_final_1, __m128i &m_final_2) {
+force_inline void _count_escape_u8_128_sse2_get_final_mask_impl(__m128i &u, __m128i &m1or2, __m128i &m3, __m128i &m_final_1, __m128i &m_final_2) {
     __m128i m4;
     {
         __m128i t1 = _mm_load_si128((__m128i *) _Seven_i8);    // movdqa, SSE2
@@ -137,7 +137,7 @@ force_inline bool _count_escape_u8_128_sse2_get_mask(__m128i &u, __m128i &m_fina
     {
         if (likely(0 == _mm_movemask_epi8(r))) return true; // pmovmskb, SSE2
     }
-    _count_escape_u8_128_sse2_get_final_mask_impl(m1or2, m3, m_final_1, m_final_2); // SSE2
+    _count_escape_u8_128_sse2_get_final_mask_impl(u, m1or2, m3, m_final_1, m_final_2); // SSE2
     return false;
 }
 
@@ -149,7 +149,7 @@ force_inline bool _count_escape_tail_u8_128_sse2_get_mask(__m128i &u, __m128i &m
     {
         if (likely(0 == (tail_mask & _mm_movemask_epi8(r)))) return true; // pmovmskb, SSE2
     }
-    _count_escape_u8_128_sse2_get_final_mask_impl(m1or2, m3, m_final_1, m_final_2); // SSE2
+    _count_escape_u8_128_sse2_get_final_mask_impl(u, m1or2, m3, m_final_1, m_final_2); // SSE2
     return false;
 }
 
@@ -179,7 +179,7 @@ force_inline Py_ssize_t count_escape_tail_u8_128_sse2(__m128i &u, usize count) {
     return ret;
 }
 
-force_inline void _count_escape_u16_128_sse2_get_final_mask_impl(__m128i &m1or2, __m128i &m3, __m128i &m_final_1, __m128i &m_final_2) {
+force_inline void _count_escape_u16_128_sse2_get_final_mask_impl(__m128i &u, __m128i &m1or2, __m128i &m3, __m128i &m_final_1, __m128i &m_final_2) {
     __m128i m4;
     {
         __m128i t1 = _mm_load_si128((__m128i *) _Seven_i16);    // movdqa, SSE2
@@ -205,7 +205,7 @@ force_inline bool _count_escape_u16_128_sse2_get_mask(__m128i &u, __m128i &m_fin
     {
         if (likely(0 == _mm_movemask_epi8(r))) return true; // pmovmskb, SSE2
     }
-    _count_escape_u16_128_sse2_get_final_mask_impl(m1or2, m3, m_final_1, m_final_2); // SSE2
+    _count_escape_u16_128_sse2_get_final_mask_impl(u, m1or2, m3, m_final_1, m_final_2); // SSE2
     return false;
 }
 
@@ -217,7 +217,7 @@ force_inline bool _count_escape_tail_u16_128_sse2_get_mask(__m128i &u, __m128i &
     {
         if (likely(0 == (tail_mask & _mm_movemask_epi8(r)))) return true; // pmovmskb, SSE2
     }
-    _count_escape_u16_128_sse2_get_final_mask_impl(m1or2, m3, m_final_1, m_final_2); // SSE2
+    _count_escape_u16_128_sse2_get_final_mask_impl(u, m1or2, m3, m_final_1, m_final_2); // SSE2
     return false;
 }
 
@@ -247,7 +247,7 @@ force_inline Py_ssize_t count_escape_tail_u16_128_sse2(__m128i &u, usize count) 
     return ret;
 }
 
-force_inline void _count_escape_u32_128_sse2_get_final_mask_impl(__m128i &m1or2, __m128i &m3, __m128i &m_final_1, __m128i &m_final_2) {
+force_inline void _count_escape_u32_128_sse2_get_final_mask_impl(__m128i &u, __m128i &m1or2, __m128i &m3, __m128i &m_final_1, __m128i &m_final_2) {
     // TODO I don't think this will be faster than just loop over the 4 * 32 bits...
     __m128i m4;
     {
@@ -274,7 +274,7 @@ force_inline bool _count_escape_u32_128_sse2_get_mask(__m128i &u, __m128i &m_fin
     {
         if (likely(0 == _mm_movemask_epi8(r))) return true; // pmovmskb, SSE2
     }
-    _count_escape_u32_128_sse2_get_final_mask_impl(m1or2, m3, m_final_1, m_final_2); // SSE2
+    _count_escape_u32_128_sse2_get_final_mask_impl(u, m1or2, m3, m_final_1, m_final_2); // SSE2
     return false;
 }
 
@@ -286,7 +286,7 @@ force_inline bool _count_escape_tail_u32_128_sse2_get_mask(__m128i &u, __m128i &
     {
         if (likely(0 == (tail_mask & _mm_movemask_epi8(r)))) return true; // pmovmskb, SSE2
     }
-    _count_escape_u32_128_sse2_get_final_mask_impl(m1or2, m3, m_final_1, m_final_2); // SSE2
+    _count_escape_u32_128_sse2_get_final_mask_impl(u, m1or2, m3, m_final_1, m_final_2); // SSE2
     return false;
 }
 
@@ -302,7 +302,7 @@ force_inline Py_ssize_t count_escape_u32_128_sse2(__m128i &u) {
     return ret;
 }
 
-force_inline Py_ssize_t count_escape_tail_u32_128_sse2(__m128i &u) {
+force_inline Py_ssize_t count_escape_tail_u32_128_sse2(__m128i &u, usize count) {
     constexpr Py_ssize_t _BaseRet = 128 / 32;
     assert(count && count < _BaseRet);
     const int tail_mask = ((int) 1 << (count << 2)) - 1;
