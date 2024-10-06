@@ -1434,100 +1434,168 @@ force_inline void update_string_info2(UCSKind &cur_ucs_kind, bool &is_all_ascii,
     is_all_ascii = is_all_ascii && PyUnicode_IS_ASCII(val);
 }
 
+
+Py_ssize_t write_key_prepare(BufferWriter &writer) {
+    // return normal len, return 0 on error
+}
+
+bool write_key(PyObject *key, BufferWriter &writer) {
+    Py_ssize_t normal_len = write_key_prepare(writer);
+    RETURN_ON_UNLIKELY_ERR(!normal_len);
+    bool ret = desc.write_unicode(key);
+    RETURN_ON_UNLIKELY_ERR(!ret);
+    Py_ssize_t unicode_kind = PyUnicode_KIND(key);
+    Py_ssize_t unicode_len = PyUnicode_GET_LENGTH(key);
+    ret = writer.push_on_unicode(normal_len, unicode_len, unicode_kind);
+    RETURN_ON_UNLIKELY_ERR(!ret);
+    ret = write_key_end(writer);
+    return ret;
+}
+
+bool write_str(PyObject *val, BufferWriter &writer) {
+    Py_ssize_t normal_len = write_str_prepare(writer);
+    RETURN_ON_UNLIKELY_ERR(!normal_len);
+    bool ret = desc.write_unicode(val);
+    RETURN_ON_UNLIKELY_ERR(!ret);
+    Py_ssize_t unicode_kind = PyUnicode_KIND(val);
+    Py_ssize_t unicode_len = PyUnicode_GET_LENGTH(val);
+    ret = writer.push_on_unicode(normal_len, unicode_len, unicode_kind);
+    RETURN_ON_UNLIKELY_ERR(!ret);
+    ret = write_str_end(writer);
+    return ret;
+}
+
 /*Encode*/
 
 force_noinline PyObject *
-pyyjson_dumps_read_AB_buffers_write_unicode() {
+pyyjson_dumps_read_AB_buffers_write_unicode(BufferWriter &writer) {
+    PyObject *ret = PyUnicode_New();
+    if (!ret) return NULL;
+    u8 *dst = (u8 *) PyUnicode_DATA(ret);
+    Py_ssize_t write_left = PyUnicode_GET_LENGTH(ret);
+    while (1) {
+        BufferAddrDesc desc;
+        writer.read(&desc);
+        if (-1 == desc.normal_buffer_len()) {
+            goto success;
+        }
+
+        normal_buffer_copy_to_final(dst, write_left, writer, desc.normal_buffer_len());
+        unicode_buffer_copy_to_final(dst, write_left, writer, desc.unicode_len());
+    }
 }
 
+#define GOTO_FAIL_ON_UNLIKELY_ERR(x) \
+    do {                             \
+        if (unlikely((x))) {         \
+            goto fail;               \
+        }                            \
+    } while (0)
 
-#define PROCESS_VAL(val)                                                                   \
-    PyFastTypes fast_type = fast_type_check(val);                                          \
-    switch (fast_type) {                                                                   \
-        case PyFastTypes::T_Unicode: {                                                     \
-            update_string_info2(cur_ucs_kind, is_all_ascii, val);                          \
-            bool _c = (write_str_prepare() && desc.write_unicode(val) && write_str_end()); \
-            if (unlikely(!_c)) {                                                           \
-                goto fail;                                                                 \
-            }                                                                              \
-            break;                                                                         \
-        }                                                                                  \
-        case PyFastTypes::T_Long: {                                                        \
-            if (unlikely(!write_PyLongOp(val, op_desc))) {                                 \
-                goto fail;                                                                 \
-            }                                                                              \
-            break;                                                                         \
-        }                                                                                  \
-        case PyFastTypes::T_False: {                                                       \
-            op_desc.write_simple_op(EncodeOpType::FALSE_VALUE);                            \
-            break;                                                                         \
-        }                                                                                  \
-        case PyFastTypes::T_True: {                                                        \
-            op_desc.write_simple_op(EncodeOpType::TRUE_VALUE);                             \
-            break;                                                                         \
-        }                                                                                  \
-        case PyFastTypes::T_None: {                                                        \
-            op_desc.write_simple_op(EncodeOpType::NULL_VALUE);                             \
-            break;                                                                         \
-        }                                                                                  \
-        case PyFastTypes::T_Float: {                                                       \
-            if (unlikely(!write_PyFloatOp(val, op_desc))) {                                \
-                goto fail;                                                                 \
-            }                                                                              \
-            break;                                                                         \
-        }                                                                                  \
-        case PyFastTypes::T_List: {                                                        \
-            Py_ssize_t this_list_size = PyList_Size(val);                                  \
-            if (unlikely(cur_list_size == 0)) {                                            \
-                op_desc.write_simple_op(EncodeOpType::ARRAY_EMPTY);                        \
-            } else {                                                                       \
-                CTN_SIZE_GROW();                                                           \
-                CtnType *cur_write_ctn = ctn_stack + ++last_pos_stack_index;               \
-                cur_write_ctn->ctn = cur_obj;                                              \
-                cur_write_ctn->index = cur_pos;                                            \
-                cur_obj = val;                                                             \
-                cur_pos = 0;                                                               \
-                op_desc.write_simple_op(EncodeOpType::ARRAY_BEGIN);                        \
-                GOTO_ARR_VAL_BEGIN_WITH_SIZE(this_list_size);                              \
-            }                                                                              \
-            break;                                                                         \
-        }                                                                                  \
-        case PyFastTypes::T_Dict: {                                                        \
-            if (unlikely(PyDict_Size(val) == 0)) {                                         \
-                op_desc.write_simple_op(EncodeOpType::DICT_EMPTY);                         \
-            } else {                                                                       \
-                CTN_SIZE_GROW();                                                           \
-                CtnType *cur_write_ctn = ctn_stack + ++last_pos_stack_index;               \
-                cur_write_ctn->ctn = cur_obj;                                              \
-                cur_write_ctn->index = cur_pos;                                            \
-                cur_obj = val;                                                             \
-                cur_pos = 0;                                                               \
-                op_desc.write_simple_op(EncodeOpType::DICT_BEGIN);                         \
-                goto dict_pair_begin;                                                      \
-            }                                                                              \
-            break;                                                                         \
-        }                                                                                  \
-        case PyFastTypes::T_Tuple: {                                                       \
-            Py_ssize_t this_list_size = PyTuple_Size(val);                                 \
-            if (unlikely(this_list_size == 0)) {                                           \
-                op_desc.write_simple_op(EncodeOpType::ARRAY_EMPTY);                        \
-            } else {                                                                       \
-                CTN_SIZE_GROW();                                                           \
-                CtnType *cur_write_ctn = ctn_stack + ++last_pos_stack_index;               \
-                cur_write_ctn->ctn = cur_obj;                                              \
-                cur_write_ctn->index = cur_pos;                                            \
-                cur_obj = val;                                                             \
-                cur_pos = 0;                                                               \
-                op_desc.write_simple_op(EncodeOpType::ARRAY_BEGIN);                        \
-                GOTO_TUPLE_VAL_BEGIN_WITH_SIZE(this_list_size);                            \
-            }                                                                              \
-            break;                                                                         \
-        }                                                                                  \
-        default: {                                                                         \
-            PyErr_SetString(JSONEncodeError, "Unsupported type");                          \
-            goto fail;                                                                     \
-        }                                                                                  \
-    }
+#define CTN_SIZE_GROW()                                                           \
+    do {                                                                          \
+        if (unlikely(last_pos_stack_index == PYYJSON_ENCODE_MAX_RECURSION - 1)) { \
+            PyErr_SetString(PyExc_ValueError, "Too many nested structures");      \
+            goto fail;                                                            \
+        }                                                                         \
+    } while (0)
+
+
+#define PROCESS_VAL(val)                                                         \
+    do {                                                                         \
+        PyFastTypes fast_type = fast_type_check(val);                            \
+        switch (fast_type) {                                                     \
+            case PyFastTypes::T_Unicode: {                                       \
+                update_string_info2(cur_ucs_kind, is_all_ascii, val);            \
+                bool _c = write_str(val, writer);                                \
+                GOTO_FAIL_ON_UNLIKELY_ERR(!_c);                                  \
+                break;                                                           \
+            }                                                                    \
+            case PyFastTypes::T_Long: {                                          \
+                bool _c = write_pylong(val, writer);                             \
+                GOTO_FAIL_ON_UNLIKELY_ERR(!_c);                                  \
+                break;                                                           \
+            }                                                                    \
+            case PyFastTypes::T_False: {                                         \
+                bool _c = write_false(writer);                                   \
+                GOTO_FAIL_ON_UNLIKELY_ERR(!_c);                                  \
+                break;                                                           \
+            }                                                                    \
+            case PyFastTypes::T_True: {                                          \
+                bool _c = write_true(writer);                                    \
+                GOTO_FAIL_ON_UNLIKELY_ERR(!_c);                                  \
+                break;                                                           \
+            }                                                                    \
+            case PyFastTypes::T_None: {                                          \
+                bool _c = write_none(writer);                                    \
+                GOTO_FAIL_ON_UNLIKELY_ERR(!_c);                                  \
+                break;                                                           \
+            }                                                                    \
+            case PyFastTypes::T_Float: {                                         \
+                bool _c = write_pyfloat(val, writer);                            \
+                GOTO_FAIL_ON_UNLIKELY_ERR(!_c);                                  \
+                break;                                                           \
+            }                                                                    \
+            case PyFastTypes::T_List: {                                          \
+                Py_ssize_t this_list_size = PyList_Size(val);                    \
+                if (unlikely(cur_list_size == 0)) {                              \
+                    bool _c = write_empty_ctn<false>(writer);                    \
+                    GOTO_FAIL_ON_UNLIKELY_ERR(!_c);                              \
+                } else {                                                         \
+                    CTN_SIZE_GROW();                                             \
+                    CtnType *cur_write_ctn = ctn_stack + ++last_pos_stack_index; \
+                    cur_write_ctn->ctn = cur_obj;                                \
+                    cur_write_ctn->index = cur_pos;                              \
+                    cur_obj = val;                                               \
+                    cur_pos = 0;                                                 \
+                    bool _c = write_ctn_begin<false>(writer);                    \
+                    GOTO_FAIL_ON_UNLIKELY_ERR(!_c);                              \
+                    GOTO_ARR_VAL_BEGIN_WITH_SIZE(this_list_size);                \
+                }                                                                \
+                break;                                                           \
+            }                                                                    \
+            case PyFastTypes::T_Dict: {                                          \
+                if (unlikely(PyDict_Size(val) == 0)) {                           \
+                    bool _c = write_empty_ctn<true>(writer);                     \
+                    GOTO_FAIL_ON_UNLIKELY_ERR(!_c);                              \
+                } else {                                                         \
+                    CTN_SIZE_GROW();                                             \
+                    CtnType *cur_write_ctn = ctn_stack + ++last_pos_stack_index; \
+                    cur_write_ctn->ctn = cur_obj;                                \
+                    cur_write_ctn->index = cur_pos;                              \
+                    cur_obj = val;                                               \
+                    cur_pos = 0;                                                 \
+                    bool _c = write_ctn_begin<true>(writer);                     \
+                    GOTO_FAIL_ON_UNLIKELY_ERR(!_c);                              \
+                    goto dict_pair_begin;                                        \
+                }                                                                \
+                break;                                                           \
+            }                                                                    \
+            case PyFastTypes::T_Tuple: {                                         \
+                Py_ssize_t this_list_size = PyTuple_Size(val);                   \
+                if (unlikely(this_list_size == 0)) {                             \
+                    bool _c = write_empty_ctn<false>(writer);                    \
+                    GOTO_FAIL_ON_UNLIKELY_ERR(!_c);                              \
+                } else {                                                         \
+                    CTN_SIZE_GROW();                                             \
+                    CtnType *cur_write_ctn = ctn_stack + ++last_pos_stack_index; \
+                    cur_write_ctn->ctn = cur_obj;                                \
+                    cur_write_ctn->index = cur_pos;                              \
+                    cur_obj = val;                                               \
+                    cur_pos = 0;                                                 \
+                    bool _c = write_ctn_begin<false>(writer);                    \
+                    GOTO_FAIL_ON_UNLIKELY_ERR(!_c);                              \
+                    GOTO_TUPLE_VAL_BEGIN_WITH_SIZE(this_list_size);              \
+                }                                                                \
+                break;                                                           \
+            }                                                                    \
+            default: {                                                           \
+                PyErr_SetString(JSONEncodeError, "Unsupported type");            \
+                goto fail;                                                       \
+            }                                                                    \
+        }                                                                        \
+    } while (0)
+
 
 template<IndentLevel _IndentConfig, X86SIMDLevel __simd_level>
 force_noinline PyObject *pyyjson_dumps_obj_AB_buffers(PyObject *in_obj, DumpOption *options) {
@@ -1556,6 +1624,8 @@ force_noinline PyObject *pyyjson_dumps_obj_AB_buffers(PyObject *in_obj, DumpOpti
     cur_pos = 0;
     desc = EncodeBufferDesc::init();
     addr_desc = AddrDescRW::init();
+
+    BufferWriter writer = BufferWriter::init();
 
     // begin encoding
 
@@ -1627,10 +1697,11 @@ dict_pair_begin:;
         }
         update_string_info2(cur_ucs_kind, is_all_ascii, key);
         // update_string_info(cfg, key);
-        write_key_prepare();
-        desc.write_unicode(key);
-        write_key_end();
-        // op_desc.write_op_with_data(EncodeOpType::KEY, key);
+
+        if (unlikely(!write_key(key, writer))) {
+            goto fail;
+        }
+
         //
         PROCESS_VAL(val);
         //
