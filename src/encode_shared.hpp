@@ -163,6 +163,11 @@ constexpr inline static Py_ssize_t _ControlJump[ControlMax] = {
         6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, // 16-31
 };
 
+constexpr inline static i32 _ControlLengthAdd[ControlMax] = {
+        5, 5, 5, 5, 5, 5, 5, 5, 1, 1, 1, 5, 1, 1, 5, 5, // 0-15
+        5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, // 16-31
+};
+
 template<typename T, std::size_t n>
 constexpr auto _generate_mask_array() {
     std::array<std::array<T, n>, n> res{};
@@ -383,5 +388,15 @@ yyjson_align(64) constexpr inline const i32 _MinusOne_i32[16] = {REPEAT_16(_Minu
 yyjson_align(64) constexpr inline const i8 _ControlMax_i8[64] = {REPEAT_64(ControlMax)};
 yyjson_align(64) constexpr inline const i16 _ControlMax_i16[32] = {REPEAT_32(ControlMax)};
 yyjson_align(64) constexpr inline const i32 _ControlMax_i32[16] = {REPEAT_16(ControlMax)};
+yyjson_align(64) constexpr inline const i8 _Seven_i8[64] = {REPEAT_64(7)};
+yyjson_align(64) constexpr inline const i16 _Seven_i16[32] = {REPEAT_32(7)};
+yyjson_align(64) constexpr inline const i32 _Seven_i32[16] = {REPEAT_16(7)};
+yyjson_align(64) constexpr inline const i8 _Eleven_i8[64] = {REPEAT_64(11)};
+yyjson_align(64) constexpr inline const i16 _Eleven_i16[32] = {REPEAT_32(11)};
+yyjson_align(64) constexpr inline const i32 _Eleven_i32[16] = {REPEAT_16(11)};
+yyjson_align(64) constexpr inline const i8 _Fourteen_i8[64] = {REPEAT_64(14)};
+yyjson_align(64) constexpr inline const i16 _Fourteen_i16[32] = {REPEAT_32(14)};
+yyjson_align(64) constexpr inline const i32 _Fourteen_i32[16] = {REPEAT_16(14)};
+yyjson_align(64) constexpr inline const i32 _All_0XFF[16] = {REPEAT_16(-1)};
 
 #endif // PYYJSON_ENCODE_SHARED_H
