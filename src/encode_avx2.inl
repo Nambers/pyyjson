@@ -12,17 +12,22 @@
  * AVX2 Check 256 Bits
  *============================================================================*/
 
-force_inline __m256i _check_escape_u8_256_avx2_impl(__m256i &u) {
+force_inline void _check_escape_u8_256_avx2_get_mask(__m256i &u, __m256i &m1, __m256i &m2, __m256i &m3) {
     __m256i t1 = _mm256_load_si256((__m256i *) _Quote_i8);      // vmovdqa, AVX
-    __m256i r1 = _mm256_cmpeq_epi8(u, t1);                      // vpcmpeqb, AVX2
     __m256i t2 = _mm256_load_si256((__m256i *) _Slash_i8);      // vmovdqa, AVX
-    __m256i r2 = _mm256_cmpeq_epi8(u, t2);                      // vpcmpeqb, AVX2
     __m256i t3 = _mm256_load_si256((__m256i *) _MinusOne_i8);   // vmovdqa, AVX
     __m256i t4 = _mm256_load_si256((__m256i *) _ControlMax_i8); // vmovdqa, AVX
-    __m256i r3 = _mm256_cmpgt_epi8(u, t3);                      // u > -1, vpcmpgtb, AVX2
-    __m256i r4 = _mm256_cmpgt_epi8(t4, u);                      // 32 > u, vpcmpgtb, AVX2
-    __m256i r5 = _mm256_and_si256(r3, r4);                      // vpand, AVX2
-    return _mm256_or_si256(_mm256_or_si256(r1, r2), r5);        // vpor, AVX2
+    m1 = _mm256_cmpeq_epi8(u, t1);                              // vpcmpeqb, AVX2
+    m2 = _mm256_cmpeq_epi8(u, t2);                              // vpcmpeqb, AVX2
+    __m256i r1 = _mm256_cmpgt_epi8(u, t3);                      // u > -1, vpcmpgtb, AVX2
+    __m256i r2 = _mm256_cmpgt_epi8(t4, u);                      // 32 > u, vpcmpgtb, AVX2
+    m3 = _mm256_and_si256(r1, r2);                              // vpand, AVX2
+}
+
+force_inline __m256i _check_escape_u8_256_avx2_impl(__m256i &u) {
+    __m256i m1, m2, m3;
+    _check_escape_u8_256_avx2_get_mask(u, m1, m2, m3);   // AVX2
+    return _mm256_or_si256(_mm256_or_si256(m1, m2), m3); // vpor, AVX2
 }
 
 force_inline bool check_escape_u8_256_avx2(__m256i &u) {
@@ -38,17 +43,22 @@ force_inline bool check_escape_tail_u8_256_avx2(__m256i &u, size_t count) {
     return _mm256_testz_si256(t, t);                                      // vptest, AVX
 }
 
-force_inline __m256i _check_escape_u16_256_avx2_impl(__m256i &u) {
+force_inline __m256i _check_escape_u16_256_avx2_get_mask(__m256i &u, __m256i &m1, __m256i &m2, __m256i &m3) {
     __m256i t1 = _mm256_load_si256((__m256i *) _Quote_i16);      // vmovdqa, AVX
-    __m256i r1 = _mm256_cmpeq_epi16(u, t1);                      // vpcmpeqw, AVX2
     __m256i t2 = _mm256_load_si256((__m256i *) _Slash_i16);      // vmovdqa, AVX
-    __m256i r2 = _mm256_cmpeq_epi16(u, t2);                      // vpcmpeqw, AVX2
     __m256i t3 = _mm256_load_si256((__m256i *) _MinusOne_i16);   // vmovdqa, AVX
     __m256i t4 = _mm256_load_si256((__m256i *) _ControlMax_i16); // vmovdqa, AVX
-    __m256i r3 = _mm256_cmpgt_epi16(u, t3);                      // u > -1, vpcmpgtw, AVX2
-    __m256i r4 = _mm256_cmpgt_epi16(t4, u);                      // 32 > u, vpcmpgtw, AVX2
-    __m256i r5 = _mm256_and_si256(r3, r4);                       // vpand, AVX2
-    return _mm256_or_si256(_mm256_or_si256(r1, r2), r5);         // vpor, AVX2
+    m1 = _mm256_cmpeq_epi16(u, t1);                              // vpcmpeqw, AVX2
+    m2 = _mm256_cmpeq_epi16(u, t2);                              // vpcmpeqw, AVX2
+    __m256i r1 = _mm256_cmpgt_epi16(u, t3);                      // u > -1, vpcmpgtw, AVX2
+    __m256i r2 = _mm256_cmpgt_epi16(t4, u);                      // 32 > u, vpcmpgtw, AVX2
+    m3 = _mm256_and_si256(r1, r2);                               // vpand, AVX2
+}
+
+force_inline __m256i _check_escape_u16_256_avx2_impl(__m256i &u) {
+    __m256i m1, m2, m3;
+    _check_escape_u16_256_avx2_get_mask(u, m1, m2, m3);  // AVX2
+    return _mm256_or_si256(_mm256_or_si256(m1, m2), m3); // vpor, AVX2
 }
 
 force_inline bool check_escape_u16_256_avx2(__m256i &u) {
@@ -64,17 +74,22 @@ force_inline bool check_escape_tail_u16_256_avx2(__m256i &u, size_t count) {
     return _mm256_testz_si256(t, t);                                       // vptest, AVX
 }
 
+force_inline __m256i _check_escape_u32_256_avx2_get_mask(__m256i &u, __m256i &m1, __m256i &m2, __m256i &m3) {
+    __m256i t1 = _mm256_load_si256((__m256i *) _Quote_i16);      // vmovdqa, AVX
+    __m256i t2 = _mm256_load_si256((__m256i *) _Slash_i16);      // vmovdqa, AVX
+    __m256i t3 = _mm256_load_si256((__m256i *) _MinusOne_i16);   // vmovdqa, AVX
+    __m256i t4 = _mm256_load_si256((__m256i *) _ControlMax_i16); // vmovdqa, AVX
+    m1 = _mm256_cmpeq_epi32(u, t1);                              // vpcmpeqd, AVX2
+    m2 = _mm256_cmpeq_epi32(u, t2);                              // vpcmpeqd, AVX2
+    __m256i r1 = _mm256_cmpgt_epi32(u, t3);                      // u > -1, vpcmpgtd, AVX2
+    __m256i r2 = _mm256_cmpgt_epi32(t4, u);                      // 32 > u, vpcmpgtd, AVX2
+    m3 = _mm256_and_si256(r1, r2);                               // vpand, AVX2
+}
+
 force_inline __m256i _check_escape_u32_256_avx2_impl(__m256i &u) {
-    __m256i t1 = _mm256_load_si256((__m256i *) _Quote_i32);      // vmovdqa, AVX
-    __m256i r1 = _mm256_cmpeq_epi32(u, t1);                      // vpcmpeqd, AVX2
-    __m256i t2 = _mm256_load_si256((__m256i *) _Slash_i32);      // vmovdqa, AVX
-    __m256i r2 = _mm256_cmpeq_epi32(u, t2);                      // vpcmpeqd, AVX2
-    __m256i t3 = _mm256_load_si256((__m256i *) _MinusOne_i32);   // vmovdqa, AVX
-    __m256i t4 = _mm256_load_si256((__m256i *) _ControlMax_i32); // vmovdqa, AVX
-    __m256i r3 = _mm256_cmpgt_epi32(u, t3);                      // u > -1, vpcmpgtd, AVX2
-    __m256i r4 = _mm256_cmpgt_epi32(t4, u);                      // 32 > u, vpcmpgtd, AVX2
-    __m256i r5 = _mm256_and_si256(r3, r4);                       // vpand, AVX2
-    return _mm256_or_si256(_mm256_or_si256(r1, r2), r5);         // vpor, AVX2
+    __m256i m1, m2, m3;
+    _check_escape_u32_256_avx2_get_mask(u, m1, m2, m3);  // AVX2
+    return _mm256_or_si256(_mm256_or_si256(m1, m2), m3); // vpor, AVX2
 }
 
 force_inline bool check_escape_u32_256_avx2(__m256i &u) {
@@ -88,6 +103,148 @@ force_inline bool check_escape_tail_u32_256_avx2(__m256i &u, size_t count) {
     __m256i m = _mm256_load_si256((__m256i *) &_MaskArray<u32>[count][0]); // vmovdqa, AVX
     __m256i t = _mm256_and_si256(r, m);                                    // vpand, AVX2
     return _mm256_testz_si256(t, t);                                       // vptest, AVX
+}
+
+/*==============================================================================
+ * AVX512 Count
+ *============================================================================*/
+
+force_inline Py_ssize_t count_escape_u8_256_avx2(__m256i &u) {
+    constexpr Py_ssize_t _BaseRet = 256 / 8;
+    Py_ssize_t ret = _BaseRet;
+    __m256i m1, m2, m3;
+    _check_escape_u8_256_avx2_get_mask(u, m1, m2, m3); // AVX2
+    __m256i m1or2 = _mm256_or_si256(m1, m2);           // vpor, AVX2
+    {
+        __m256i tmp = _mm256_or_si256(m1or2, m3);             // vpor, AVX2
+        if (likely(_mm256_testz_si256(tmp, tmp))) return ret; // vptest, AVX
+    }
+    // expand to i32, 64 -> 256 (4 times)
+    __m256i zero_256 = _mm256_setzero_si256(); // vpxor, AVX
+    for (usize i = 0; i < 4; ++i) {
+        i64 data = _mm256_extract_epi64(u, i);                                                           // Sequence, AVX
+        i64 mask64 = _mm256_extract_epi64(m3, i);                                                        // Sequence, AVX
+        __m128i x_data = _mm_cvtsi64_si128(data);                                                        // movq, SSE2
+        __m256i vidx = _mm256_cvtepu8_epi32(x_data);                                                     // vpmovzxbd, AVX2
+        __m128i x_mask = _mm_cvtsi64_si128(mask64);                                                      // movq, SSE2
+        __m256i mask = _mm256_cvtepi8_epi32(x_mask);                                                     // vpmovsxbd, AVX2
+        ret += (Py_ssize_t) _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], vidx, mask, 4); // vpgatherdd, AVX2
+    }
+    i32 mask32 = _mm256_movemask_epi8(m1or2); // vpmovmskb, AVX2
+    return ret + _mm_popcnt_u32(mask32);      // popcnt, implies SSE4.2
+}
+
+force_inline Py_ssize_t count_escape_tail_u8_256_avx2(__m256i &u, usize count) {
+    constexpr Py_ssize_t _BaseRet = 256 / 8;
+    assert(count && count < _BaseRet);
+    Py_ssize_t ret = _BaseRet;
+    __m256i m1, m2, m3;
+    _check_escape_u8_256_avx2_get_mask(u, m1, m2, m3);                            // AVX2
+    __m256i m1or2 = _mm256_or_si256(m1, m2);                                      // vpor, AVX2
+    __m256i tail_mask = _mm256_load_si256((__m256i *) &_MaskArray<u8>[count][0]); // vmovdqa, AVX
+    {
+        __m256i tmp = _mm256_and_si256(_mm256_or_si256(m1or2, m3), tail_mask); // vpand, vpor, AVX2
+        if (likely(_mm256_testz_si256(tmp, tmp))) return ret;                  // vptest, AVX
+    }
+    // expand to i32, 64 -> 256 (4 times)
+    m3 = _mm256_and_si256(m3, tail_mask);      // vpand, AVX2
+    __m256i zero_256 = _mm256_setzero_si256(); // vpxor, AVX
+    for (usize i = 0; i < 4; ++i) {
+        i64 data = _mm256_extract_epi64(u, i);                                                           // Sequence, AVX
+        i64 mask64 = _mm256_extract_epi64(m3, i);                                                        // Sequence, AVX
+        __m128i x_data = _mm_cvtsi64_si128(data);                                                        // movq, SSE2
+        __m256i vidx = _mm256_cvtepu8_epi32(x_data);                                                     // vpmovzxbd, AVX2
+        __m128i x_mask = _mm_cvtsi64_si128(mask64);                                                      // movq, SSE2
+        __m256i mask = _mm256_cvtepi8_epi32(x_mask);                                                     // vpmovsxbd, AVX2
+        ret += (Py_ssize_t) _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], vidx, mask, 4); // vpgatherdd, AVX2
+    }
+    i32 mask32 = _mm256_movemask_epi8(_mm256_and_si256(m1or2, tail_mask)); // vpmovmskb, vpand, AVX2
+    return ret + _mm_popcnt_u32(mask32);                                   // popcnt, implies SSE4.2
+}
+
+force_inline Py_ssize_t count_escape_u16_256_avx2(__m256i &u) {
+    constexpr Py_ssize_t _BaseRet = 256 / 16;
+    Py_ssize_t ret = _BaseRet;
+    __m256i m1, m2, m3;
+    _check_escape_u16_256_avx2_get_mask(u, m1, m2, m3); // AVX2
+    __m256i m1or2 = _mm256_or_si256(m1, m2);            // vpor, AVX2
+    {
+        __m256i tmp = _mm256_or_si256(m1or2, m3);             // vpor, AVX2
+        if (likely(_mm256_testz_si256(tmp, tmp))) return ret; // vptest, AVX
+    }
+    // expand to i32, 128 -> 256 (2 times)
+    __m256i zero_256 = _mm256_setzero_si256(); // vpxor, AVX
+    for (usize i = 0; i < 2; ++i) {
+        __m128i data = _mm256_extracti128_si256(u, i);                                                   // vextracti128, AVX2
+        __m128i mask16 = _mm256_extracti128_si256(m3, i);                                                // vextracti128, AVX2
+        __m256i vidx = _mm256_cvtepu16_epi32(data);                                                      // vpmovzxwd, AVX2
+        __m256i mask = _mm256_cvtepi16_epi32(mask16);                                                    // vpmovsxwd, AVX2
+        ret += (Py_ssize_t) _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], vidx, mask, 4); // vpgatherdd, AVX2
+    }
+    i32 mask32 = _mm256_movemask_epi8(m1or2);   // vpmovmskb, AVX2
+    return ret + (_mm_popcnt_u32(mask32) >> 1); // popcnt, implies SSE4.2
+}
+
+force_inline Py_ssize_t count_escape_tail_u16_256_avx2(__m256i &u, usize count) {
+    constexpr Py_ssize_t _BaseRet = 256 / 16;
+    assert(count && count < _BaseRet);
+    Py_ssize_t ret = _BaseRet;
+    __m256i m1, m2, m3;
+    _check_escape_u16_256_avx2_get_mask(u, m1, m2, m3);                            // AVX2
+    __m256i m1or2 = _mm256_or_si256(m1, m2);                                       // vpor, AVX2
+    __m256i tail_mask = _mm256_load_si256((__m256i *) &_MaskArray<u16>[count][0]); // vmovdqa, AVX
+    {
+        __m256i tmp = _mm256_and_si256(_mm256_or_si256(m1or2, m3), tail_mask); // vpor, vpand, AVX2
+        if (likely(_mm256_testz_si256(tmp, tmp))) return ret;                  // vptest, AVX
+    }
+    // expand to i32, 128 -> 256 (2 times)
+    m3 = _mm256_and_si256(m3, tail_mask);      // vpand, AVX2
+    __m256i zero_256 = _mm256_setzero_si256(); // vpxor, AVX
+    for (usize i = 0; i < 2; ++i) {
+        __m128i data = _mm256_extracti128_si256(u, i);                                                   // vextracti128, AVX2
+        __m128i mask16 = _mm256_extracti128_si256(m3, i);                                                // vextracti128, AVX2
+        __m256i vidx = _mm256_cvtepu16_epi32(data);                                                      // vpmovzxwd, AVX2
+        __m256i mask = _mm256_cvtepi16_epi32(mask16);                                                    // vpmovsxwd, AVX2
+        ret += (Py_ssize_t) _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], vidx, mask, 4); // vpgatherdd, AVX2
+    }
+    i32 mask32 = _mm256_movemask_epi8(_mm256_and_si256(m1or2, tail_mask)); // vpmovmskb, vpand, AVX2
+    return ret + (_mm_popcnt_u32(mask32) >> 1);                            // popcnt, implies SSE4.2
+}
+
+force_inline Py_ssize_t count_escape_u32_256_avx2(__m256i &u) {
+    constexpr Py_ssize_t _BaseRet = 256 / 32;
+    Py_ssize_t ret = _BaseRet;
+    __m256i m1, m2, m3;
+    _check_escape_u32_256_avx2_get_mask(u, m1, m2, m3); // AVX2
+    __m256i m1or2 = _mm256_or_si256(m1, m2);            // vpor, AVX2
+    {
+        __m256i tmp = _mm256_or_si256(m1or2, m3);             // vpor, AVX2
+        if (likely(_mm256_testz_si256(tmp, tmp))) return ret; // vptest, AVX
+    }
+    // it is already i32
+    __m256i zero_256 = _mm256_setzero_si256();                                                  // vpxor, AVX
+    ret += (Py_ssize_t) _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], u, m3, 4); // vpgatherdd, AVX2
+    i32 mask32 = _mm256_movemask_epi8(m1or2);                                                   // vpmovmskb, AVX2
+    return ret + (_mm_popcnt_u32(mask32) >> 2);                                                 // popcnt, implies SSE4.2
+}
+
+force_inline Py_ssize_t count_escape_tail_u32_256_avx2(__m256i &u, usize count) {
+    constexpr Py_ssize_t _BaseRet = 256 / 32;
+    Py_ssize_t ret = _BaseRet;
+    __m256i m1, m2, m3;
+    _check_escape_u32_256_avx2_get_mask(u, m1, m2, m3);                            // AVX2
+    __m256i m1or2 = _mm256_or_si256(m1, m2);                                       // vpor, AVX2
+    __m256i tail_mask = _mm256_load_si256((__m256i *) &_MaskArray<u32>[count][0]); // vmovdqa, AVX
+    {
+        __m256i tmp = _mm256_and_si256(_mm256_or_si256(m1or2, m3), tail_mask); // vpor, vpand, AVX2
+        if (likely(_mm256_testz_si256(tmp, tmp))) return ret;                  // vptest, AVX
+    }
+    // it is already i32
+    m3 = _mm256_and_si256(m3, tail_mask);                                                       // vpand, AVX2
+    __m256i zero_256 = _mm256_setzero_si256();                                                  // vpxor, AVX
+    ret += (Py_ssize_t) _mm256_mask_i32gather_epi32(zero_256, &_ControlLengthAdd[0], u, m3, 4); // vpgatherdd, AVX2
+    i32 mask32 = _mm256_movemask_epi8(_mm256_and_si256(m1or2, tail_mask));                      // vpmovmskb, vpand, AVX2
+    return ret + (_mm_popcnt_u32(mask32) >> 2);                                                 // popcnt, implies SSE4.2
 }
 
 /*==============================================================================

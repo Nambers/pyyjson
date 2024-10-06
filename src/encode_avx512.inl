@@ -372,7 +372,8 @@ template<UCSKind __from, UCSKind __to>
 force_inline void cvtepu_128_avx512(__m128i &u, UCSType_t<__from> *&src, UCSType_t<__to> *&dst) { // AVX512
     // We can only handle UCS1 -> UCS4 in this case.
     if constexpr (__from != UCSKind::UCS1 || __to != UCSKind::UCS4) {
-        return cvtepu_128_avx2<__from, __to>(u, src, dst);
+        static_assert(false, "Can't do this, use cvtepu_256_avx512 instead.");
+        // return cvtepu_128_avx2<__from, __to>(u, src, dst);
     }
     CVTEPU_COMMON_DEF(128, 512);
     // 128 -> 512
