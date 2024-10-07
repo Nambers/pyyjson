@@ -169,7 +169,7 @@ force_inline Py_ssize_t count_escape_tail_u8_128_sse2(__m128i &u, usize count) {
     constexpr Py_ssize_t _BaseRet = 128 / 8;
     assert(count && count < _BaseRet);
     const int tail_mask = ((int) 1 << count) - 1;
-    Py_ssize_t ret = _BaseRet;
+    Py_ssize_t ret = (Py_ssize_t) count;
     __m128i m_final_1, m_final_2;
     bool _c = _count_escape_tail_u8_128_sse2_get_mask(u, m_final_1, m_final_2, tail_mask);
     if (likely(_c)) return ret;
@@ -237,7 +237,7 @@ force_inline Py_ssize_t count_escape_tail_u16_128_sse2(__m128i &u, usize count) 
     constexpr Py_ssize_t _BaseRet = 128 / 16;
     assert(count && count < _BaseRet);
     const int tail_mask = ((int) 1 << (count << 1)) - 1;
-    Py_ssize_t ret = _BaseRet;
+    Py_ssize_t ret = (Py_ssize_t) count;
     __m128i m_final_1, m_final_2;
     bool _c = _count_escape_tail_u16_128_sse2_get_mask(u, m_final_1, m_final_2, tail_mask);
     if (likely(_c)) return ret;
@@ -306,7 +306,7 @@ force_inline Py_ssize_t count_escape_tail_u32_128_sse2(__m128i &u, usize count) 
     constexpr Py_ssize_t _BaseRet = 128 / 32;
     assert(count && count < _BaseRet);
     const int tail_mask = ((int) 1 << (count << 2)) - 1;
-    Py_ssize_t ret = _BaseRet;
+    Py_ssize_t ret = (Py_ssize_t) count;
     __m128i m_final_1, m_final_2;
     bool _c = _count_escape_tail_u32_128_sse2_get_mask(u, m_final_1, m_final_2, tail_mask);
     if (likely(_c)) return ret;

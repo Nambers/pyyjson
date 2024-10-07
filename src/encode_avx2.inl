@@ -52,7 +52,7 @@ force_inline bool check_escape_tail_u8_256_avx2(__m256i &u, size_t count) {
     return _mm256_testz_si256(t, t);                                      // vptest, AVX
 }
 
-force_inline __m256i _check_escape_u16_256_avx2_get_mask(__m256i &u, __m256i &m1, __m256i &m2, __m256i &m3) {
+force_inline void _check_escape_u16_256_avx2_get_mask(__m256i &u, __m256i &m1, __m256i &m2, __m256i &m3) {
     __m256i t1 = _mm256_load_si256((__m256i *) _Quote_i16);      // vmovdqa, AVX
     __m256i t2 = _mm256_load_si256((__m256i *) _Slash_i16);      // vmovdqa, AVX
     __m256i t3 = _mm256_load_si256((__m256i *) _MinusOne_i16);   // vmovdqa, AVX
@@ -83,7 +83,7 @@ force_inline bool check_escape_tail_u16_256_avx2(__m256i &u, size_t count) {
     return _mm256_testz_si256(t, t);                                       // vptest, AVX
 }
 
-force_inline __m256i _check_escape_u32_256_avx2_get_mask(__m256i &u, __m256i &m1, __m256i &m2, __m256i &m3) {
+force_inline void _check_escape_u32_256_avx2_get_mask(__m256i &u, __m256i &m1, __m256i &m2, __m256i &m3) {
     __m256i t1 = _mm256_load_si256((__m256i *) _Quote_i16);      // vmovdqa, AVX
     __m256i t2 = _mm256_load_si256((__m256i *) _Slash_i16);      // vmovdqa, AVX
     __m256i t3 = _mm256_load_si256((__m256i *) _MinusOne_i16);   // vmovdqa, AVX
@@ -177,7 +177,7 @@ force_inline Py_ssize_t count_escape_u8_256_avx2(__m256i &u) {
 force_inline Py_ssize_t count_escape_tail_u8_256_avx2(__m256i &u, usize count) {
     constexpr Py_ssize_t _BaseRet = 256 / 8;
     assert(count && count < _BaseRet);
-    Py_ssize_t ret = _BaseRet;
+    Py_ssize_t ret = (Py_ssize_t) count;
     __m256i m1, m2, m3;
     _check_escape_u8_256_avx2_get_mask(u, m1, m2, m3);                            // AVX2
     __m256i m1or2 = _mm256_or_si256(m1, m2);                                      // vpor, AVX2
@@ -268,7 +268,7 @@ force_inline Py_ssize_t count_escape_u16_256_avx2(__m256i &u) {
 force_inline Py_ssize_t count_escape_tail_u16_256_avx2(__m256i &u, usize count) {
     constexpr Py_ssize_t _BaseRet = 256 / 16;
     assert(count && count < _BaseRet);
-    Py_ssize_t ret = _BaseRet;
+    Py_ssize_t ret = (Py_ssize_t) count;
     __m256i m1, m2, m3;
     _check_escape_u16_256_avx2_get_mask(u, m1, m2, m3);                            // AVX2
     __m256i m1or2 = _mm256_or_si256(m1, m2);                                       // vpor, AVX2
@@ -320,7 +320,8 @@ force_inline Py_ssize_t count_escape_u32_256_avx2(__m256i &u) {
 
 force_inline Py_ssize_t count_escape_tail_u32_256_avx2(__m256i &u, usize count) {
     constexpr Py_ssize_t _BaseRet = 256 / 32;
-    Py_ssize_t ret = _BaseRet;
+    assert(count && count < _BaseRet);
+    Py_ssize_t ret = (Py_ssize_t) count;
     __m256i m1, m2, m3;
     _check_escape_u32_256_avx2_get_mask(u, m1, m2, m3);                            // AVX2
     __m256i m1or2 = _mm256_or_si256(m1, m2);                                       // vpor, AVX2

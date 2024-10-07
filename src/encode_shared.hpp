@@ -292,42 +292,42 @@ force_inline void ptr_move_bits(UCSType_t<__kind> *&ptr) {
  * Before calling this, the dst buffer should reserve enough space.
  */
 template<UCSKind __from, UCSKind __to>
-force_noinline bool copy_escape_impl(UCSType_t<__from> *&src, UCSType_t<__to> *&dst, Py_ssize_t move_src_ptr) { // no simd
+force_noinline void copy_escape_impl(UCSType_t<__from> *&src, UCSType_t<__to> *&dst, usize move_src_ptr) { // no simd
     COMMON_TYPE_DEF();
     for (Py_ssize_t i = 0; i < move_src_ptr; i++) {
-        auto u_f = *src;
+        usrc u_f = *src;
         if (u_f == _Quote) {
-            // add \ before u_f. No need to check the buffer length again.
+            // add \ before u_f. No need to check the buffer length.
             constexpr udst _QuoteEscaped[2] = {_Slash, _Quote};
             *(UCS_ESCAPE_KIND(__to) *) dst = *(UCS_ESCAPE_KIND(__to) *) &_QuoteEscaped[0];
             src++;
             dst += 2;
         } else if (u_f == _Slash) {
-            // add \ before u_f. No need to check the buffer length again.
+            // add \ before u_f. No need to check the buffer length.
             constexpr udst _SlashEscaped[2] = {_Slash, _Slash};
             *(UCS_ESCAPE_KIND(__to) *) dst = *(UCS_ESCAPE_KIND(__to) *) &_SlashEscaped[0];
             src++;
             dst += 2;
         } else if (unlikely(u_f < ControlMax)) {
             // escape to \u00xx. This should be very "unlikely".
-            constexpr Py_ssize_t write_size_u8 = 6 * sizeof(udst);
-            memcpy((void *) dst, (void *) &_ControlSeqTable<__to>[(size_t) u_f * 6], (size_t) write_size_u8);
+            usize dst_move = (usize) _ControlJump[(size_t) u_f];
+            assert(dst_move == 2 || dst_move == 6);
+            memcpy((void *) dst, (void *) &_ControlSeqTable<__to>[(usize) u_f * 6], dst_move * sizeof(udst));
             src++;
-            dst += _ControlJump[(size_t) u_f];
+            dst += dst_move;
         } else {
             *dst = (udst) u_f;
             src++;
             dst++;
         }
     }
-    return true;
 }
 
 template<UCSKind __from, UCSKind __to, size_t __SrcBitSize>
-force_inline bool copy_escape_fixsize(UCSType_t<__from> *&src, UCSType_t<__to> *&dst) {
+force_inline void copy_escape_fixsize(UCSType_t<__from> *&src, UCSType_t<__to> *&dst) {
     SIMD_COMMON_DEF(__SrcBitSize);
-    // // it is assumed that the buffer is currently enough to store the dst data.
-    return copy_escape_impl<__from, __to>(src, dst, _MoveSrc);
+    // it is assumed that the buffer is currently enough to store the dst data.
+    copy_escape_impl<__from, __to>(src, dst, (usize) _MoveSrc);
 }
 
 /*==============================================================================
@@ -352,23 +352,37 @@ static_inline bool pylong_is_zero(PyObject *obj) {
 }
 
 // PyErr may occur.
-static_inline u64 pylong_value_unsigned(PyObject *obj) {
+static_inline bool pylong_value_unsigned(PyObject *obj, u64 *value) {
 #if PY_MINOR_VERSION >= 12
     if (likely(((PyLongObject *) obj)->long_value.lv_tag < (2 << _PyLong_NON_SIZE_BITS))) {
-        return (u64) ((PyLongObject *) obj)->long_value.ob_digit;
+        *value = (u64) ((PyLongObject *) obj)->long_value.ob_digit;
+        return true;
     }
 #endif
-    return PyLong_AsUnsignedLongLong(obj);
+    unsigned long long v = PyLong_AsUnsignedLongLong(obj);
+    if (unlikely(v == (unsigned long long) -1 && PyErr_Occurred())) {
+        return false;
+    }
+    *value = (u64) v;
+    static_assert(sizeof(unsigned long long) <= sizeof(u64));
+    return true;
 }
 
-static_inline i64 pylong_value_signed(PyObject *obj) {
+static_inline i64 pylong_value_signed(PyObject *obj, i64 *value) {
 #if PY_MINOR_VERSION >= 12
     if (likely(((PyLongObject *) obj)->long_value.lv_tag < (2 << _PyLong_NON_SIZE_BITS))) {
         i64 sign = 1 - (i64) ((((PyLongObject *) obj)->long_value.lv_tag & 3));
-        return sign * (i64) ((PyLongObject *) obj)->long_value.ob_digit;
+        *value = sign * (i64) ((PyLongObject *) obj)->long_value.ob_digit;
+        return true;
     }
 #endif
-    return PyLong_AsLongLong(obj);
+    long long v = PyLong_AsLongLong(obj);
+    if (unlikely(v == -1 && PyErr_Occurred())) {
+        return false;
+    }
+    *value = (i64) v;
+    static_assert(sizeof(long long) <= sizeof(i64));
+    return true;
 }
 
 

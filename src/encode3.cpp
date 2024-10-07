@@ -1,6 +1,7 @@
 #include "encode.hpp"
 #include "encode_avx2.inl"
 #include "encode_avx512.inl"
+#include "encode_float.inl"
 #include "encode_sse2.inl"
 #include "encode_sse4.inl"
 #include "pyyjson_config.h"
@@ -47,6 +48,17 @@ struct SrcInfo {
     Py_ssize_t src_size;
 };
 
+
+//
+template<X86SIMDLevel _SIMDLevel>
+__m128i load_unaligned_si128(const __m128i_u *__p) {
+    if constexpr (_SIMDLevel >= X86SIMDLevel::SSE3) {
+        return _mm_lddqu_si128(__p);
+    } else {
+        return _mm_loadu_si128(__p);
+    }
+}
+
 /*==============================================================================
  * Constexpr Utils
  *============================================================================*/
@@ -63,27 +75,73 @@ static_inline constexpr usize size_align_up(usize size, usize align) {
     }
 }
 
+force_inline constexpr bool check_support_512_copy(X86SIMDLevel _SIMDLevel) {
+    return _SIMDLevel >= X86SIMDLevel::AVX512;
+}
+
+force_inline constexpr bool check_support_256_copy(X86SIMDLevel _SIMDLevel) {
+    return _SIMDLevel >= X86SIMDLevel::AVX512;
+}
+
 /*==============================================================================
  * Wrappers for `cvtepu`
  *============================================================================*/
 
 template<UCSKind __from, UCSKind __to, X86SIMDLevel __simd_level>
-force_inline void cvtepu_128(__m128i &u, UCSType_t<__from> *&src, UCSType_t<__to> *&dst) {
+force_inline void cvtepu_128(__m128i &x, UCSType_t<__from> *&src, UCSType_t<__to> *&dst) {
     if constexpr (__simd_level >= X86SIMDLevel::AVX512) {
-        cvtepu_128_avx512<__from, __to>(u, src, dst);
+        cvtepu_128_avx512<__from, __to>(x, src, dst);
     } else if constexpr (__simd_level >= X86SIMDLevel::AVX2) {
-        cvtepu_128_avx2<__from, __to>(u, src, dst);
+        cvtepu_128_avx2<__from, __to>(x, src, dst);
     } else if constexpr (__simd_level >= X86SIMDLevel::SSE4) {
-        cvtepu_128_sse4_1<__from, __to>(u, src, dst);
+        cvtepu_128_sse4_1<__from, __to>(x, src, dst);
     } else {
-        static_assert(false, "No SIMD support");
+        static_assert(false, "No cvtepu support");
     }
 }
 
 template<UCSKind __from, UCSKind __to, X86SIMDLevel __simd_level>
-force_inline void cvtepu_256(__m256i &u, UCSType_t<__from> *&src, UCSType_t<__to> *&dst) {
-    static_assert(__simd_level >= X86SIMDLevel::AVX512, "Only AVX512 supports 256-bit cvtepu");
-    return cvtepu_256_avx512<__from, __to>(u, src, dst);
+force_inline void cvtepu_256(__m256i &y, UCSType_t<__from> *&src, UCSType_t<__to> *&dst) {
+    static_assert(__simd_level >= X86SIMDLevel::AVX2);
+    if constexpr (__simd_level >= X86SIMDLevel::AVX512) {
+        if constexpr (__from == UCSKind::UCS1 && __to == UCSKind::UCS4) {
+            __m128i x;
+            x = _mm256_castsi256_si128(y);
+            cvtepu_128_avx512<__from, __to>(x, src, dst);
+            x = _mm256_extracti128_si256(y, 1);
+            cvtepu_128_avx512<__from, __to>(x, src, dst);
+        } else {
+            return cvtepu_256_avx512<__from, __to>(y, src, dst);
+        }
+    } else {
+        __m128i x;
+        x = _mm256_castsi256_si128(y);
+        cvtepu_128_avx2<__from, __to>(x, src, dst);
+        x = _mm256_extracti128_si256(y, 1);
+        cvtepu_128_avx2<__from, __to>(x, src, dst);
+    }
+}
+
+template<UCSKind __from, UCSKind __to, X86SIMDLevel __simd_level>
+force_inline void cvtepu_512(__m512i &z, UCSType_t<__from> *&src, UCSType_t<__to> *&dst) {
+    static_assert(__simd_level >= X86SIMDLevel::AVX512);
+    if constexpr (__from == UCSKind::UCS1 && __to == UCSKind::UCS4) {
+        __m128i x;
+        x = _mm512_castsi512_si128(z);
+        cvtepu_128_avx512<__from, __to>(x, src, dst);
+        x = _mm512_extracti32x4_epi32(z, 1);
+        cvtepu_128_avx512<__from, __to>(x, src, dst);
+        x = _mm512_extracti32x4_epi32(z, 2);
+        cvtepu_128_avx512<__from, __to>(x, src, dst);
+        x = _mm512_extracti32x4_epi32(z, 3);
+        cvtepu_128_avx512<__from, __to>(x, src, dst);
+    } else {
+        __m256i y;
+        y = _mm512_castsi512_si256(z);
+        cvtepu_256_avx512<__from, __to>(y, src, dst);
+        y = _mm512_extracti64x4_epi64(z, 1);
+        cvtepu_256_avx512<__from, __to>(y, src, dst);
+    }
 }
 
 template<UCSKind __from, UCSKind __to>
@@ -126,6 +184,31 @@ force_inline bool copy_ucs_128_elevate_sse4_1(UCSType_t<__from> *&src, UCSType_t
 /*==============================================================================
  * Wrappers for `check_escape`
  *============================================================================*/
+
+template<UCSKind __kind, X86SIMDLevel __simd_level>
+force_inline bool check_escape_512bits(__m512i &u) {
+    static_assert(__simd_level >= X86SIMDLevel::AVX512);
+    if constexpr (__kind == UCSKind::UCS1) {
+        return check_escape_u8_512_avx512(u);
+    } else if constexpr (__kind == UCSKind::UCS2) {
+        return check_escape_u16_512_avx512(u);
+    } else {
+        static_assert(__kind == UCSKind::UCS4);
+        return check_escape_u32_512_avx512(u);
+    }
+}
+
+template<UCSKind __kind, X86SIMDLevel __simd_level>
+force_inline bool check_escape_tail_512bits(__m512i &z, size_t count) {
+    static_assert(__simd_level >= X86SIMDLevel::AVX512, "AVX2 and lower not supported");
+    if constexpr (__kind == UCSKind::UCS1) {
+        return check_escape_tail_u8_512_avx512(z, count);
+    } else if constexpr (__kind == UCSKind::UCS2) {
+        return check_escape_tail_u16_512_avx512(z, count);
+    } else {
+        return check_escape_tail_u32_512_avx512(z, count);
+    }
+}
 
 template<UCSKind __kind, X86SIMDLevel __simd_level>
 force_inline bool check_escape_256bits(__m256i &u) {
@@ -244,1277 +327,31 @@ force_inline bool check_escape_tail_128bits(__m128i &u, size_t count) {
     }
 }
 
-/*==============================================================================
- * Copy UCS impl
- *============================================================================*/
 
-template<UCSKind __from, UCSKind __to>
-force_inline bool copy_ucs_with_runtime_resize(const SrcInfo<__from> &src_info, UCSType_t<__to> *&dst, BufferInfo &buffer_info) {
-    // alright, no simd support
-    // TODO fix this
-    using usrc = UCSType_t<__from>;
-    usrc *src = src_info.src_start;
-    usrc *const src_end = src + static_cast<std::ptrdiff_t>(src_info.src_size);
+/*check_and_write*/
 
-    constexpr std::ptrdiff_t _ProcessCountOnce = 512 / 8 / sizeof(usrc);
-    while (src_end - src >= _ProcessCountOnce) {
-        auto additional_needed_count = (src_end - src - _ProcessCountOnce) + _ProcessCountOnce * 6;
-        auto required_len_u8 = buffer_info.get_required_len_u8<__to>(dst, additional_needed_count);
-
-        RETURN_ON_UNLIKELY_RESIZE_FAIL(__to, dst, buffer_info, required_len_u8);
-
-        bool _c = copy_escape_fixsize<__from, __to, 512>(src, dst);
-        RETURN_ON_UNLIKELY_ERR(!_c);
-    }
-    const auto left_count = src_end - src;
-    assert(left_count < _ProcessCountOnce);
-    auto required_len_u8 = buffer_info.get_required_len_u8<__to>(dst, left_count * 6);
-
-    RETURN_ON_UNLIKELY_RESIZE_FAIL(__to, dst, buffer_info, required_len_u8);
-
-    return copy_escape_impl<__from, __to>(src, dst, left_count);
-}
-
-template<UCSKind __from, UCSKind __to>
-force_inline bool copy_ucs_elevate_avx512(const SrcInfo<__from> &src_info, UCSType_t<__to> *&dst, BufferInfo &buffer_info) {
-    COMMON_TYPE_DEF();
-    UCSType_t<__from> *src = src_info.src_start;
-    usrc *const src_end = src + static_cast<std::ptrdiff_t>(src_info.src_size);
-    // process 256 bits once
-    constexpr std::ptrdiff_t _ProcessCountOnce = 256 / 8 / sizeof(usrc);
-    __m256i u;
-    while (src_end - src >= _ProcessCountOnce) {
-        u = _mm256_lddqu_si256((__m256i *) src); // vlddqu, AVX
-        bool v = check_escape_256bits<__from, X86SIMDLevel::AVX512>(u);
-        if (likely(v)) {
-            if constexpr (__from == UCSKind::UCS1 && __to == UCSKind ::UCS4) {
-                __m128i u128;
-                u128 = _mm256_extracti128_si256(u, 0); // vextracti128, AVX2
-                cvtepu_128<__from, __to, X86SIMDLevel::AVX512>(u128, src, dst);
-                u128 = _mm256_extracti128_si256(u, 1); // vextracti128, AVX2
-                cvtepu_128<__from, __to, X86SIMDLevel::AVX512>(u128, src, dst);
-            } else {
-                cvtepu_256<__from, __to, X86SIMDLevel::AVX512>(u, src, dst);
-            }
-        } else {
-            // first, check and resize
-            auto additional_needed_count = (src_end - src - _ProcessCountOnce) + _ProcessCountOnce * 6;
-            auto required_len_u8 = buffer_info.get_required_len_u8<__to>(dst, additional_needed_count);
-            RETURN_ON_UNLIKELY_RESIZE_FAIL(__to, dst, buffer_info, required_len_u8);
-            // if (unlikely(required_len_u8 > buffer_info.m_size)) {
-            //     if (unlikely(!buffer_info.resizer<__to>(dst, required_len_u8))) {
-            //         return false;
-            //     }
-            // }
-            // verify 128 bits twice
-            __m128i u1;
-            u1 = _mm256_extracti128_si256(u, 0); // vextracti128, AVX2
-            if (check_escape_128bits<__from, X86SIMDLevel::AVX512>(u1)) {
-                cvtepu_128<__from, __to, X86SIMDLevel::AVX512>(u1, src, dst);
-            } else {
-                bool _c = copy_escape_fixsize<__from, __to, 128>(src, dst);
-                RETURN_ON_UNLIKELY_ERR(!_c);
-            }
-            u1 = _mm256_extracti128_si256(u, 1); // vextracti128, AVX2
-            if (check_escape_128bits<__from, X86SIMDLevel::AVX512>(u1)) {
-                cvtepu_128<__from, __to, X86SIMDLevel::AVX512>(u1, src, dst);
-            } else {
-                bool _c = copy_escape_fixsize<__from, __to, 128>(src, dst);
-                RETURN_ON_UNLIKELY_ERR(!_c);
-            }
-        }
-    }
-    const auto left_count = src_end - src;
-    if (!left_count) return true;
-
-    assert(left_count < _ProcessCountOnce);
-    if (left_count <= _ProcessCountOnce / 2) {
-        // copy once, only check 128
-        auto required_len_u8 = std::max<Py_ssize_t>(buffer_info.get_required_len_u8<__to>(dst, left_count * 6), 128 / 8 / _SizeRatio);
-        RETURN_ON_UNLIKELY_RESIZE_FAIL(__to, dst, buffer_info, required_len_u8);
-        __m128i u1;
-        u1 = _mm_lddqu_si128((__m128i *) src); // lddqu, sse3
-        bool v = check_escape_tail_128bits<__from, X86SIMDLevel::AVX512>(u1, left_count);
-        if (likely(v)) {
-            // requires 128 / 8 * _SizeRatio bytes
-            // discard this pointer!
-            udst *_temp_d = dst;
-            cvtepu_128<__from, __to, X86SIMDLevel::AVX512>(u1, src, _temp_d);
-            dst += left_count;
-        } else {
-            bool _c = copy_escape_impl<__from, __to>(src, dst, left_count);
-            RETURN_ON_UNLIKELY_ERR(!_c);
-        }
-        return true;
-    }
-    // the first part requires _ProcessCountOnce / 2 * sizeof(dst) * 6 bytes
-    // the second part requires max((left_count - _ProcessCountOnce / 2) * sizeof(dst) * 6, 128 / 8 * _SizeRatio) bytes
-    assert(left_count > _ProcessCountOnce / 2);
-    Py_ssize_t required_len_u8 = _ProcessCountOnce / 2 * sizeof(dst) * 6 + std::max<Py_ssize_t>(buffer_info.get_required_len_u8<__to>(dst, (left_count - _ProcessCountOnce / 2) * 6), 128 / 8 / _SizeRatio);
-    Py_ssize_t required_len_u8_2 = std::max<Py_ssize_t>(
-            buffer_info.get_required_len_u8<__to>(dst, left_count * 6), 256 / 8 / _SizeRatio);
-    required_len_u8 = std::max(required_len_u8_2, required_len_u8);
-    RETURN_ON_UNLIKELY_RESIZE_FAIL(__to, dst, buffer_info, required_len_u8);
-    u = _mm256_lddqu_si256((__m256i *) src); // vlddqu, AVX
-    bool v = check_escape_tail_256bits<__from, X86SIMDLevel::AVX512>(u, left_count);
-    if (likely(v)) {
-        // requires 256 / 8 * _SizeRatio bytes
-        // discard this pointer!
-        udst *_temp_d = dst;
-        cvtepu_256<__from, __to, X86SIMDLevel::AVX512>(u, src, _temp_d);
-        dst += left_count;
-    } else {
-        __m128i u1;
-        u1 = _mm256_extracti128_si256(u, 0); // vextracti128, AVX2
-        v = check_escape_128bits<__from, X86SIMDLevel::AVX512>(u1);
-        // requires _ProcessCountOnce / 2 * sizeof(dst) * 6 bytes
-        if (v) {
-            cvtepu_128<__from, __to, X86SIMDLevel::AVX512>(u1, src, dst);
-        } else {
-            bool _c = copy_escape_fixsize<__from, __to, 128>(src, dst);
-            RETURN_ON_UNLIKELY_ERR(!_c);
-        }
-        auto cur_left_count = left_count - _ProcessCountOnce / 2;
-        if (cur_left_count) {
-            u1 = _mm256_extracti128_si256(u, 1); // vextracti128, AVX2
-            v = check_escape_tail_128bits<__from, X86SIMDLevel::AVX512>(u1, cur_left_count);
-            if (v) {
-                udst *_temp_d = dst;
-                cvtepu_128<__from, __to, X86SIMDLevel::AVX512>(u1, src, _temp_d);
-                dst += cur_left_count;
-            } else {
-                bool _c = copy_escape_fixsize<__from, __to, 128>(src, dst);
-                RETURN_ON_UNLIKELY_ERR(!_c);
-            }
-        }
-    }
-    return true;
-
-    // auto required_len_u8 = buffer_info.get_required_len_u8<__to>(dst, left_count * 6);
-    // RETURN_ON_UNLIKELY_RESIZE_FAIL(__to, dst, buffer_info, required_len_u8);
-    // // if (unlikely(required_len_u8 > buffer_info.m_size)) {
-    // //     if (unlikely(!buffer_info.resizer<__to>(dst, required_len_u8))) {
-    // //         return false;
-    // //     }
-    // // }
-    // return copy_escape_impl<__from, __to>(src, dst, left_count);
-}
-
-template<UCSKind __from, UCSKind __to, X86SIMDLevel _SIMDLevel>
-force_inline void copy_ucs_elevate_avx512_nocheck(UCSType_t<__to> *&write_ptr, UCSType_t<__from> *src, Py_ssize_t len, Py_ssize_t allow_write_count) {
-    static_assert(__from < __to);
-    static_assert(_SIMDLevel >= X86SIMDLevel::AVX512);
-    assert(allow_write_count >= 0);
-    COMMON_TYPE_DEF();
-    constexpr usize _ReadWriteOnce = 512 / 8 / sizeof(udst);
-    const usize can_write_max_times = (usize) allow_write_count / _ReadWriteOnce;
-    usize do_write_times;
-    if constexpr (__from == UCSKind::UCS1 && __to == UCSKind::UCS4) {
-        // 128 -> 512, * 4
-        const usize want_write_times = size_align_up((usize) len * sizeof(usrc), 128 / 8) / (128 / 8);
-        do_write_times = std::min(can_write_max_times, want_write_times);
-        for (Py_ssize_t i = 0; i < do_write_times; ++i) {
-            __m128i x = _mm_lddqu_si128((const __m128i_u *) src); // lddqu, SSE3
-            __m512i z = _mm512_cvtepu8_epi32(x);                  // vpmovzxbd, AVX512F
-            _mm512_storeu_si512((void *) write_ptr, z);           // vmovdqu32, AVX512F
-            src += _ReadWriteOnce;
-            write_ptr += _ReadWriteOnce;
-        }
-    } else {
-        // 256 -> 512, * 2
-        const usize want_write_times = size_align_up((usize) len * sizeof(usrc), 256 / 8) / (256 / 8);
-        do_write_times = std::min(can_write_max_times, want_write_times);
-        for (Py_ssize_t i = 0; i < do_write_times; ++i) {
-            __m256i y = _mm256_lddqu_si256((const __m256i_u *) src); // vlddqu, AVX
-            __m512i z;
-            if constexpr (__from == UCSKind::UCS1 && __to == UCSKind::UCS2) {
-                z = _mm512_cvtepu8_epi16(y); // vpmovzxbw, AVX512BW
-            } else if constexpr (__from == UCSKind::UCS2 && __to == UCSKind::UCS4) {
-                z = _mm512_cvtepu16_epi32(y); // vpmovzxwd, AVX512F
-            } else {
-                static_assert(false, "Unreachable");
-            }
-            _mm512_storeu_si512((void *) write_ptr, z); // vmovdqu32, AVX512F
-            src += _ReadWriteOnce;
-            write_ptr += _ReadWriteOnce;
-        }
-    }
-    len -= (Py_ssize_t) do_write_times * (Py_ssize_t) _ReadWriteOnce;
-    if (likely(len <= 0)) return;
-    // manual copy
-    for (Py_ssize_t i = 0; i < len; ++i) {
-        *write_ptr = (udst) *src;
-        ++write_ptr;
-        ++src;
-    }
-}
-
-template<UCSKind __from, UCSKind __to, X86SIMDLevel __simd_level>
-force_inline bool copy_ucs_elevate_sse4_or_avx2(const SrcInfo<__from> &src_info, UCSType_t<__to> *&dst, BufferInfo &buffer_info) {
-    static_assert(__simd_level == X86SIMDLevel::AVX2 || __simd_level == X86SIMDLevel::SSE4);
-    COMMON_TYPE_DEF();
-    UCSType_t<__from> *src = src_info.src_start;
-    usrc *const src_end = src + static_cast<std::ptrdiff_t>(src_info.src_size);
-    // process 128 bits once
-    constexpr std::ptrdiff_t _ProcessCountOnce = 128 / 8 / sizeof(usrc);
-    __m128i u;
-    while (src_end - src >= _ProcessCountOnce) {
-        u = _mm_lddqu_si128((__m128i *) src); // lddqu, sse3
-        bool v = check_escape_128bits<__from, __simd_level>(u);
-        if (likely(v)) {
-            cvtepu_128<__from, __to, __simd_level>(u, src, dst);
-        } else {
-            // first, check and resize
-            auto additional_needed_count = (src_end - src - _ProcessCountOnce) + _ProcessCountOnce * 6;
-            auto required_len_u8 = buffer_info.get_required_len_u8<__to>(dst, additional_needed_count);
-            RETURN_ON_UNLIKELY_RESIZE_FAIL(__to, dst, buffer_info, required_len_u8);
-            // if (unlikely(required_len_u8 > buffer_info.m_size)) {
-            //     if (unlikely(!buffer_info.resizer<__to>(dst, required_len_u8))) {
-            //         return false;
-            //     }
-            // }
-            bool _c = copy_escape_fixsize<__from, __to, 128>(src, dst);
-            RETURN_ON_UNLIKELY_ERR(!_c);
-        }
-    }
-    const auto left_count = src_end - src;
-    if (left_count == 0) return true;
-    assert(left_count < _ProcessCountOnce);
-    auto required_len_u8 = std::max<Py_ssize_t>(128 / 8 / _SizeRatio, buffer_info.get_required_len_u8<__to>(dst, left_count * 6));
-    RETURN_ON_UNLIKELY_RESIZE_FAIL(__to, dst, buffer_info, required_len_u8);
-    // if (unlikely(required_len_u8 > buffer_info.m_size)) {
-    //     if (unlikely(!buffer_info.resizer<__to>(dst, required_len_u8))) {
-    //         return false;
-    //     }
-    // }
-    u = _mm_lddqu_si128((__m128i *) src); // lddqu, sse3
-    bool v = check_escape_tail_128bits<__from, __simd_level>(u, left_count);
-    if (likely(v)) {
-        // requires 128 / 8 * _SizeRatio bytes
-        // discard this pointer!
-        udst *_temp_d = dst;
-        cvtepu_128<__from, __to, __simd_level>(u, src, _temp_d);
-        dst += left_count;
-        return true;
-    } else {
-        // requires left_count * 6 * sizeof(udst) bytes
-        return copy_escape_impl<__from, __to>(src, dst, left_count);
-    }
-}
-
-template<UCSKind __from, UCSKind __to, X86SIMDLevel _SIMDLevel>
-force_inline void copy_ucs_elevate_sse4_or_avx2_nocheck(UCSType_t<__to> *&write_ptr, UCSType_t<__from> *src, Py_ssize_t len, Py_ssize_t allow_write_count) {
-    static_assert(__from < __to);
-    static_assert(_SIMDLevel >= X86SIMDLevel::SSE4);
-    assert(allow_write_count >= 0);
-    COMMON_TYPE_DEF();
-    constexpr usize _ReadWriteOnce = 128 / 8 / sizeof(usrc);
-    const usize can_write_max_times = (usize) allow_write_count / _ReadWriteOnce;
-    const usize want_write_times = size_align_up((usize) len * sizeof(usrc), 128 / 8) / (128 / 8);
-    usize do_write_times = std::min(can_write_max_times, want_write_times);
-    for (usize i = 0; i < do_write_times; ++i) {
-        __m128i x = _mm_lddqu_si128((const __m128i_u *) src); // lddqu, SSE3
-        cvtepu_128<__from, __to, _SIMDLevel>(x, src, write_ptr);
-    }
-    len -= (Py_ssize_t) do_write_times * (Py_ssize_t) _ReadWriteOnce;
-    if (likely(len <= 0)) return;
-    for (Py_ssize_t i = 0; i < len; ++i) {
-        *write_ptr = (udst) *src;
-        ++write_ptr;
-        ++src;
-    }
-}
-
-template<UCSKind __from, UCSKind __to, X86SIMDLevel _SIMDLevel>
-force_inline void copy_ucs_general_nocheck(UCSType_t<__to> *&write_ptr, UCSType_t<__from> *src, Py_ssize_t len, Py_ssize_t allow_write_count) {
-    using udst = UCSType_t<__to>;
-    assert(len >= 0);
-    for (Py_ssize_t i = 0; i < len; ++i) {
-        *write_ptr = (udst) *src;
-        ++write_ptr;
-        ++src;
-    }
-}
-
-template<UCSKind __from, UCSKind __to, X86SIMDLevel _SIMDLevel>
-force_inline void copy_elevate_nocheck(UCSType_t<__to> *&write_ptr, UCSType_t<__from> *src, Py_ssize_t len, Py_ssize_t allow_write_count) {
-    static_assert(__from < __to);
-    if constexpr (_SIMDLevel >= X86SIMDLevel::AVX512) {
-        return copy_ucs_elevate_avx512_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len, allow_write_count);
-    } else if constexpr (_SIMDLevel >= X86SIMDLevel::AVX2) {
-        return copy_ucs_elevate_sse4_or_avx2_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len, allow_write_count);
-    } else if constexpr (_SIMDLevel >= X86SIMDLevel::SSE4) {
-        return copy_ucs_elevate_sse4_or_avx2_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len, allow_write_count);
-    } else {
-        return copy_ucs_general_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len, allow_write_count);
-    }
-}
-
-template<UCSKind __from, UCSKind __to, X86SIMDLevel __simd_level>
-force_inline bool copy_ucs_elevate(const SrcInfo<__from> &src_info, UCSType_t<__to> *&dst, BufferInfo &buffer_info) {
-    COMMON_TYPE_DEF();
-    static_assert(__from < __to);
-    // check if dst is enough to store. If not, resize it
-
-    auto requires_additional_count = src_info.src_size;
-    auto required_len_u8 = buffer_info.get_required_len_u8<__to>(dst, requires_additional_count);
-
-    RETURN_ON_UNLIKELY_RESIZE_FAIL(__to, dst, buffer_info, required_len_u8);
-    // if (unlikely(required_len_u8 > buffer_info.m_size)) {
-    //     if (unlikely(!buffer_info.resizer<__to>(dst, required_len_u8))) {
-    //         return false;
-    //     }
-    // }
-
-    if constexpr (__simd_level >= X86SIMDLevel::AVX512) {
-        return copy_ucs_elevate_avx512<__from, __to>(src_info, dst, buffer_info);
-    } else if constexpr (__simd_level >= X86SIMDLevel::AVX2) {
-        return copy_ucs_elevate_sse4_or_avx2<__from, __to, X86SIMDLevel::AVX2>(src_info, dst, buffer_info);
-    } else if constexpr (__simd_level >= X86SIMDLevel::SSE4) {
-        return copy_ucs_elevate_sse4_or_avx2<__from, __to, X86SIMDLevel::SSE4>(src_info, dst, buffer_info);
-    } else {
-        return copy_ucs_with_runtime_resize<__from, __to>(src_info, dst, buffer_info);
-    }
+template<UCSKind __kind, X86SIMDLevel __simd_level>
+force_inline bool check_and_write_128(void *dst, __m128i x) {
+    _mm_storeu_si128((__m128i_u *) dst, x); // movdqu, SSE2
+    return check_escape_128bits<__kind, __simd_level>(x);
 }
 
 template<UCSKind __kind, X86SIMDLevel __simd_level>
-force_inline bool copy_ucs_same_avx2_or_avx512(const SrcInfo<__kind> &src_info, UCSType_t<__kind> *&dst, BufferInfo &buffer_info) {
-    static_assert(__simd_level >= X86SIMDLevel::AVX2, "Only AVX2 or above support this");
-    using uu = UCSType_t<__kind>;
-
-    UCSType_t<__kind> *src = src_info.src_start;
-    uu *const src_end = src + static_cast<std::ptrdiff_t>(src_info.src_size);
-
-    constexpr std::ptrdiff_t _ProcessCountOnce = 256 / 8 / sizeof(uu);
-
-    __m256i u;
-    while (src_end - src >= _ProcessCountOnce) {
-        u = _mm256_lddqu_si256((__m256i *) src); // vlddqu, AVX
-        bool v = check_escape_256bits<__kind, __simd_level>(u);
-        if (likely(v)) {
-            _mm256_storeu_si256((__m256i *) dst, u); // vmovdqu, AVX
-            ptr_move_bits<__kind, 256>(src);
-            ptr_move_bits<__kind, 256>(dst);
-        } else {
-            // first, check and resize
-            auto additional_needed_count = (src_end - src - _ProcessCountOnce) + _ProcessCountOnce * 6;
-            auto required_len_u8 = buffer_info.get_required_len_u8<__kind>(dst, additional_needed_count);
-            RETURN_ON_UNLIKELY_RESIZE_FAIL(__kind, dst, buffer_info, required_len_u8);
-            // if (unlikely(required_len_u8 > buffer_info.m_size)) {
-            //     if (unlikely(!buffer_info.resizer<__kind>(dst, required_len_u8))) {
-            //         return false;
-            //     }
-            // }
-            // verify 128 bits twice
-            __m128i u1;
-            u1 = _mm256_extracti128_si256(u, 0); // vextracti128, AVX2
-            if (check_escape_128bits<__kind, __simd_level>(u1)) {
-                _mm_storeu_si128((__m128i *) dst, u1); // vmovdqu, AVX
-                ptr_move_bits<__kind, 128>(src);
-                ptr_move_bits<__kind, 128>(dst);
-            } else {
-                bool _c = copy_escape_fixsize<__kind, __kind, 128>(src, dst);
-                RETURN_ON_UNLIKELY_ERR(!_c);
-            }
-            u1 = _mm256_extracti128_si256(u, 1); // vextracti128, AVX2
-            if (check_escape_128bits<__kind, __simd_level>(u1)) {
-                _mm_storeu_si128((__m128i *) dst, u1); // vmovdqu, AVX
-                ptr_move_bits<__kind, 128>(src);
-                ptr_move_bits<__kind, 128>(dst);
-            } else {
-                bool _c = copy_escape_fixsize<__kind, __kind, 128>(src, dst);
-                RETURN_ON_UNLIKELY_ERR(!_c);
-            }
-        }
-    }
-    const auto left_count = src_end - src;
-    if (!left_count) return true;
-    assert(left_count < _ProcessCountOnce);
-    auto required_len_u8 = buffer_info.get_required_len_u8<__kind>(dst, left_count * 6);
-    RETURN_ON_UNLIKELY_RESIZE_FAIL(__kind, dst, buffer_info, required_len_u8);
-    // TODO fix this
-    u = _mm256_lddqu_si256((__m256i *) src); // vlddqu, AVX
-    bool v = check_escape_tail_256bits<__kind, __simd_level>(u, left_count);
-    if (likely(v)) {
-        _mm256_storeu_si256((__m256i *) dst, u); // vmovdqu, AVX
-        dst += left_count;
-    } else {
-        return copy_escape_impl<__kind, __kind>(src, dst, left_count);
-    }
-    return true;
-}
-
-template<UCSKind __kind>
-force_inline bool copy_ucs_same_sse4(const SrcInfo<__kind> &src_info, UCSType_t<__kind> *&dst, BufferInfo &buffer_info) {
-    using uu = UCSType_t<__kind>;
-
-    UCSType_t<__kind> *src = src_info.src_start;
-    uu *const src_end = src + static_cast<std::ptrdiff_t>(src_info.src_size);
-
-    constexpr std::ptrdiff_t _ProcessCountOnce = 128 / 8 / sizeof(uu);
-
-    while (src_end - src >= _ProcessCountOnce) {
-        __m128i u;
-        u = _mm_lddqu_si128((__m128i *) src); // lddqu, sse3
-        bool v = check_escape_128bits<__kind, X86SIMDLevel::SSE4>(u);
-        if (likely(v)) {
-            _mm_storeu_si128((__m128i *) dst, u); // vmovdqu, sse2
-            ptr_move_bits<__kind, 128>(src);
-            ptr_move_bits<__kind, 128>(dst);
-        } else {
-            // first, check and resize
-            auto additional_needed_count = (src_end - src - _ProcessCountOnce) + _ProcessCountOnce * 6;
-            auto required_len_u8 = buffer_info.get_required_len_u8<__kind>(dst, additional_needed_count);
-            RETURN_ON_UNLIKELY_RESIZE_FAIL(__kind, dst, buffer_info, required_len_u8);
-            // if (unlikely(required_len_u8 > buffer_info.m_size)) {
-            //     if (unlikely(!buffer_info.resizer<__kind>(dst, required_len_u8))) {
-            //         return false;
-            //     }
-            // }
-            bool _c = copy_escape_fixsize<__kind, __kind, 128>(src, dst);
-            RETURN_ON_UNLIKELY_ERR(!_c);
-        }
-    }
-    const auto left_count = src_end - src;
-    assert(left_count < _ProcessCountOnce);
-    auto required_len_u8 = buffer_info.get_required_len_u8<__kind>(dst, left_count * 6);
-    RETURN_ON_UNLIKELY_RESIZE_FAIL(__kind, dst, buffer_info, required_len_u8);
-    // if (unlikely(required_len_u8 > buffer_info.m_size)) {
-    //     if (unlikely(!buffer_info.resizer<__kind>(dst, required_len_u8))) {
-    //         return false;
-    //     }
-    // }
-    return copy_escape_impl<__kind, __kind>(src, dst, left_count);
+force_inline bool check_and_write_256(void *dst, __m256i y) {
+    static_assert(__simd_level >= X86SIMDLevel::AVX);
+    _mm256_storeu_si256((__m256i_u *) dst, y); // vmovdqu, AVX
+    return check_escape_256bits<__kind, __simd_level>(y);
 }
 
 template<UCSKind __kind, X86SIMDLevel __simd_level>
-force_inline bool copy_ucs_same(const SrcInfo<__kind> &src_info, UCSType_t<__kind> *&dst, BufferInfo &buffer_info) {
-    auto requires_additional_count = src_info.src_size;
-    auto required_len_u8 = buffer_info.get_required_len_u8<__kind>(dst, requires_additional_count);
-
-    RETURN_ON_UNLIKELY_RESIZE_FAIL(__kind, dst, buffer_info, required_len_u8);
-    // if (unlikely(required_len_u8 > buffer_info.m_size)) {
-    //     if (unlikely(!buffer_info.resizer<__kind>(dst, required_len_u8))) {
-    //         return false;
-    //     }
-    // }
-
-    if constexpr (__simd_level >= X86SIMDLevel::AVX512) {
-        return copy_ucs_same_avx2_or_avx512<__kind, X86SIMDLevel::AVX512>(src_info, dst, buffer_info);
-    } else if constexpr (__simd_level >= X86SIMDLevel::AVX2) {
-        return copy_ucs_same_avx2_or_avx512<__kind, X86SIMDLevel::AVX2>(src_info, dst, buffer_info);
-    } else if constexpr (__simd_level >= X86SIMDLevel::SSE4) {
-        return copy_ucs_same_sse4<__kind>(src_info, dst, buffer_info);
-    } else {
-        return copy_ucs_with_runtime_resize<__kind, __kind>(src_info, dst, buffer_info);
-    }
+force_inline bool check_and_write_512(void *dst, __m512i z) {
+    static_assert(__simd_level >= X86SIMDLevel::AVX512);
+    _mm512_storeu_si512((void *) dst, z); // vmovdqu32, AVX512F
+    return check_escape_512bits<__kind, __simd_level>(z);
 }
 
-template<UCSKind __from, UCSKind __to, X86SIMDLevel __simd_level>
-force_inline bool copy_ucs(const SrcInfo<__from> &src_info, UCSType_t<__to> *&dst, BufferInfo &buffer_info) {
-    if constexpr (__from != __to) {
-        return copy_ucs_elevate<__from, __to, __simd_level>(src_info, dst, buffer_info);
-    } else {
-        return copy_ucs_same<__from, __simd_level>(src_info, dst, buffer_info);
-    }
-}
-
-typedef struct CtnType {
-    PyObject *ctn;
-    Py_ssize_t index;
-} CtnType;
-
-
-// enum class EncodeOpType : u8 {
-//     END,
-//     STRING,
-//     KEY,
-//     DICT_EMPTY,
-//     DICT_BEGIN,
-//     DICT_END,
-//     ARRAY_EMPTY,
-//     ARRAY_BEGIN,
-//     ARRAY_END,
-//     U64,
-//     I64,
-//     FLOAT,
-//     TRUE_VALUE,
-//     FALSE_VALUE,
-//     NULL_VALUE,
-//     POS_NAN,
-//     NEG_NAN,
-//     ZERO_VALUE,
-//     POS_INF,
-//     NEG_INF,
-// };
-
-
-// typedef struct EncodeOpBufferLinkedList {
-//     void **m_buffer;
-//     size_t m_buffer_size;
-
-//     static force_inline EncodeOpBufferLinkedList init_buffer(size_t in_size) {
-//         EncodeOpBufferLinkedList ret{
-//                 nullptr,
-//                 in_size,
-//         };
-//         void **_buffer = (void **) malloc(in_size * sizeof(void *));
-//         if (!_buffer) {
-//             PyErr_NoMemory();
-//         } else {
-//             ret.m_buffer = _buffer;
-//             ret.init_inplace();
-//         }
-//         return ret;
-//     }
-
-//     force_inline void init_inplace() {
-//         assert(this->m_buffer);
-// #ifndef NDEBUG
-//         memset(this->m_buffer, 0, this->m_buffer_size * sizeof(void *));
-// #endif
-//     }
-// } EncodeOpBufferLinkedList;
-
-thread_local CtnType _CtnStack[PYYJSON_ENCODE_MAX_RECURSION];
-// thread_local EncodeOpBufferLinkedList op_buffer_nodes[128];
-// thread_local void *op_buffer_head[PYYJSON_ENCODE_OP_BUFFER_INIT_SIZE];
-
-// typedef struct EncodeOpDescriber {
-//     size_t op_buffer_node_index;
-//     void **next_ptr;
-//     u8 *next_op;
-//     size_t read_buffer_node_index;
-
-//     force_inline static EncodeOpDescriber init() {
-//         static_assert(PYYJSON_ENCODE_OP_BUFFER_INIT_SIZE >= 1);
-//         op_buffer_nodes[0].m_buffer = &op_buffer_head[0];
-//         op_buffer_nodes[0].m_buffer_size = PYYJSON_ENCODE_OP_BUFFER_INIT_SIZE;
-//         EncodeOpDescriber ret{
-//                 0,
-//                 &op_buffer_head[0] + 1,
-//                 (u8 *) &op_buffer_head[0],
-//                 0,
-//         };
-//         return ret;
-//     }
-
-//     force_inline static EncodeOpDescriber init_as_read(EncodeOpDescriber *old_op_desc) {
-//         assert(old_op_desc->read_buffer_node_index == 0);
-//         EncodeOpDescriber ret{
-//                 old_op_desc->op_buffer_node_index,
-//                 &op_buffer_head[0] + 1,
-//                 (u8 *) &op_buffer_head[0],
-//                 0,
-//         };
-//         return ret;
-//     }
-
-//     /* Write op without any data. */
-//     force_inline bool write_simple_op(EncodeOpType op) {
-//         static_assert((sizeof(void *) & (sizeof(void *) - 1)) == 0);
-//         //
-//         assert(this->next_op != (u8 *) this->next_ptr);
-//         if (!(((size_t) this->next_op) & (sizeof(void *) - 1))) {
-//             assert(this->next_op == (u8 *) (this->next_ptr - 1));
-//         }
-//         //
-//         *this->next_op++ = static_cast<u8>(op);
-//         if (((size_t) this->next_op) & (sizeof(void *) - 1)) {
-//             return true;
-//         }
-//         // move next_op to next_ptr
-//         const auto &cur_op_node = op_buffer_nodes[this->op_buffer_node_index];
-//         if (unlikely(this->next_ptr >= cur_op_node.m_buffer + cur_op_node.m_buffer_size)) {
-//             assert(this->next_ptr == cur_op_node.m_buffer + cur_op_node.m_buffer_size);
-//             if (unlikely(this->op_buffer_node_index + 1 >= 128 || (cur_op_node.m_buffer_size & (1ULL << (sizeof(size_t) * 8 - 1))))) {
-//                 PyErr_NoMemory();
-//                 return false;
-//             }
-//             auto &new_op_node = op_buffer_nodes[this->op_buffer_node_index + 1];
-//             new_op_node = EncodeOpBufferLinkedList::init_buffer(cur_op_node.m_buffer_size << 1);
-//             if (unlikely(new_op_node.m_buffer == nullptr)) {
-//                 return false;
-//             }
-//             this->op_buffer_node_index++;
-//             this->next_ptr = new_op_node.m_buffer;
-//         }
-//         this->next_op = (u8 *) (this->next_ptr++);
-//         return true;
-//     }
-
-//     template<typename T>
-//     force_inline bool write_op_with_data(EncodeOpType op, T obj) {
-//         static_assert((sizeof(void *) & (sizeof(void *) - 1)) == 0);
-//         static_assert((sizeof(T) % sizeof(void *)) == 0);
-//         constexpr size_t _SizeRatio = sizeof(T) / sizeof(void *);
-//         //
-//         assert(this->next_op != (u8 *) this->next_ptr);
-//         if (!(((size_t) this->next_op) & (sizeof(void *) - 1))) {
-//             assert(this->next_op == (u8 *) (this->next_ptr - 1));
-//         }
-//         //
-//         *this->next_op++ = static_cast<u8>(op);
-
-//         const auto &cur_op_node = op_buffer_nodes[this->op_buffer_node_index];
-//         if (unlikely(this->next_ptr + _SizeRatio >= cur_op_node.m_buffer + cur_op_node.m_buffer_size)) {
-//             {
-//                 bool _c = this->op_buffer_node_index + 1 >= 128 || (cur_op_node.m_buffer_size & (1ULL << (sizeof(size_t) * 8 - 1)));
-//                 if (unlikely(_c)) {
-//                     PyErr_NoMemory();
-//                     return false;
-//                 }
-//             }
-//             auto &new_op_node = op_buffer_nodes[this->op_buffer_node_index + 1];
-//             new_op_node = EncodeOpBufferLinkedList::init_buffer(cur_op_node.m_buffer_size << 1);
-//             if (unlikely(new_op_node.m_buffer == nullptr)) {
-//                 return false;
-//             }
-
-//             assert(new_op_node.m_buffer_size > _SizeRatio);
-//             this->op_buffer_node_index++;
-//             if (this->next_ptr + _SizeRatio == cur_op_node.m_buffer + cur_op_node.m_buffer_size) {
-//                 memcpy(this->next_ptr, &obj, sizeof(T));
-//                 this->next_ptr = new_op_node.m_buffer;
-//                 if (!(((size_t) this->next_op) & (sizeof(void *) - 1))) {
-//                     // move next_op to next_ptr
-//                     this->next_op = (u8 *) (this->next_ptr++);
-//                 }
-//                 return true;
-//             }
-//             this->next_ptr = new_op_node.m_buffer;
-//         }
-//         memcpy(this->next_ptr, &obj, sizeof(T));
-//         this->next_ptr += _SizeRatio;
-//         if (!(((size_t) this->next_op) & (sizeof(void *) - 1))) {
-//             // move next_op to next_ptr
-//             this->next_op = (u8 *) (this->next_ptr++);
-//         }
-//         return true;
-//     }
-
-//     force_inline EncodeOpType peek_op() {
-//         return static_cast<EncodeOpType>(*this->next_op);
-//     }
-
-//     force_inline void read_simple_op() {
-//         if (((size_t)++ this->next_op) & (sizeof(void *) - 1)) {
-//             return;
-//         }
-//         this->next_op = (u8 *) (this->next_ptr++);
-//         // move next_op to next_ptr
-//         const auto &cur_op_node = op_buffer_nodes[this->read_buffer_node_index];
-//         if (unlikely(this->next_ptr >= cur_op_node.m_buffer + cur_op_node.m_buffer_size)) {
-//             assert(this->next_ptr == cur_op_node.m_buffer + cur_op_node.m_buffer_size);
-//             auto &new_op_node = op_buffer_nodes[++this->read_buffer_node_index];
-//             this->next_ptr = new_op_node.m_buffer;
-//             assert(this->next_ptr);
-//         }
-//     }
-
-//     template<typename T>
-//     force_inline T read_op_data() {
-//         static_assert((sizeof(void *) & (sizeof(void *) - 1)) == 0);
-//         static_assert((sizeof(T) % sizeof(void *)) == 0);
-//         T ret;
-//         constexpr size_t _SizeRatio = sizeof(T) / sizeof(void *);
-//         this->next_op++;
-//         const auto &cur_op_node = op_buffer_nodes[this->read_buffer_node_index];
-//         if (unlikely(this->next_ptr + _SizeRatio >= cur_op_node.m_buffer + cur_op_node.m_buffer_size)) {
-//             auto &new_op_node = op_buffer_nodes[++this->read_buffer_node_index];
-//             assert(new_op_node.m_buffer);
-//             if (this->next_ptr + _SizeRatio == cur_op_node.m_buffer + cur_op_node.m_buffer_size) {
-//                 ret = *(T *) this->next_ptr;
-//                 this->next_ptr = new_op_node.m_buffer;
-//                 if (!(((size_t) this->next_op) & (sizeof(void *) - 1))) {
-//                     // move next_op to next_ptr
-//                     this->next_op = (u8 *) (this->next_ptr++);
-//                 }
-//                 return ret;
-//             }
-//             this->next_ptr = new_op_node.m_buffer;
-//         }
-//         ret = *(T *) this->next_ptr;
-//         this->next_ptr += _SizeRatio;
-//         if (!(((size_t) this->next_op) & (sizeof(void *) - 1))) {
-//             // move next_op to next_ptr
-//             this->next_op = (u8 *) (this->next_ptr++);
-//         }
-//         return ret;
-//     }
-
-//     force_inline void release() {
-//         for (size_t i = 1; i <= this->op_buffer_node_index; i++) {
-//             free(op_buffer_nodes[i].m_buffer);
-//             op_buffer_nodes[i].m_buffer = nullptr;
-//         }
-//     }
-// } EncodeOpDescriber;
-
-
-// typedef struct EncodeWriteOpConfig {
-//     Py_ssize_t cur_nested_depth = -1;
-//     PyObject *cur_obj;
-//     Py_ssize_t cur_pos = 0;
-//     UCSKind cur_ucs_kind = UCSKind::UCS1;
-//     bool is_all_ascii = true;
-//     // temp variables storing key and value
-//     Py_ssize_t cur_list_size; // cache for each list, no need to check it repeatedly
-//     PyObject *key, *val;
-// } EncodeWriteOpConfig;
-
-// typedef struct EncodeWriteUnicodeConfig {
-//     Py_ssize_t indent_level;
-//     const UCSKind cur_ucs_kind;
-//     bool is_obj;
-//     const bool is_all_ascii;
-
-//     force_inline static EncodeWriteUnicodeConfig init_from_op_config(EncodeWriteOpConfig &op_cfg) {
-//         EncodeWriteUnicodeConfig ret{
-//                 0,
-//                 op_cfg.cur_ucs_kind,
-//                 true, // to avoid an extra \n
-//                 op_cfg.is_all_ascii,
-//         };
-//         return ret;
-//     }
-
-//     force_inline void increase_indent(bool _is_obj) {
-//         int *const obj_stack = (int *) &_CtnStack[0];
-//         obj_stack[this->indent_level++] = this->is_obj ? 1 : 0;
-//         this->is_obj = _is_obj;
-//         assert(this->indent_level);
-//     }
-
-//     force_inline void decrease_indent() {
-//         int *const obj_stack = (int *) &_CtnStack[0];
-//         assert(this->indent_level);
-//         this->indent_level--;
-//         this->is_obj = obj_stack[this->indent_level];
-//     }
-
-// } EncodeWriteUnicodeConfig;
-
-template<typename T, size_t L, T _DefaultVal, size_t... Is>
-constexpr auto make_filled_array_impl(std::index_sequence<Is...>) {
-    return std::array<T, L>{((void) Is, _DefaultVal)...};
-}
-
-template<typename T, size_t L, T _DefaultVal>
-constexpr std::array<T, L> create_array() {
-    return make_filled_array_impl<T, L, _DefaultVal>(std::make_index_sequence<L>{});
-}
-
-// template<IndentLevel __indent, UCSKind __kind>
-// force_inline bool write_line_and_indent_impl(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg, Py_ssize_t additional_reserve) {
-// #define INDENT_SIZE(__indent) (static_cast<int>(__indent))
-// #define IDENT_WITH_NEWLINE_SIZE(__indent, _indent_level) ((INDENT_SIZE(__indent) != 0) ? (_indent_level * INDENT_SIZE(__indent)) : 0)
-//     static_assert(NEED_INDENT(__indent));
-//     using uu = UCSType_t<__kind>;
-//     Py_ssize_t need_space_count = IDENT_WITH_NEWLINE_SIZE(__indent, cfg.indent_level);
-//     Py_ssize_t need_reserve_count = need_space_count + 1 + additional_reserve;
-//     Py_ssize_t required_len_u8 = buffer_info.get_required_len_u8<__kind>(dst, need_reserve_count);
-//     RETURN_ON_UNLIKELY_RESIZE_FAIL(__kind, dst, buffer_info, required_len_u8);
-
-//     *dst++ = '\n';
-//     // need_count--;
-//     constexpr size_t _TemplateSize = size_align_up(sizeof(uu), SIZEOF_VOID_P) / sizeof(uu);
-//     constexpr uu _FillVal = (uu) ' ';
-//     constexpr std::array<uu, _TemplateSize> _Template = create_array<uu, _TemplateSize, _FillVal>();
-//     while (need_space_count >= _TemplateSize) {
-//         memcpy((void *) dst, (void *) &_Template[0], sizeof(_Template));
-//         dst += _TemplateSize;
-//         need_space_count -= _TemplateSize;
-//     }
-//     while (need_space_count > 0) {
-//         *dst++ = _FillVal;
-//         need_space_count--;
-//     }
-//     return true;
-// #undef IDENT_WITH_NEWLINE_SIZE
-// #undef INDENT_SIZE
-// }
-
-// template<IndentLevel __indent, UCSKind __kind, Py_ssize_t __additional_reserve>
-// force_inline bool write_line_and_indent(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
-//     return write_line_and_indent_impl<__indent, __kind>(dst, buffer_info, cfg, __additional_reserve);
-// }
-
-// template<UCSKind __kind>
-// force_inline bool write_reserve_impl(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, size_t reserve_count) {
-//     using uu = UCSType_t<__kind>;
-//     auto required_len_u8 = buffer_info.get_required_len_u8<__kind>(dst, reserve_count);
-//     RETURN_ON_UNLIKELY_RESIZE_FAIL(__kind, dst, buffer_info, required_len_u8);
-//     return true;
-// }
-
-// template<UCSKind __kind, size_t __reserve>
-// force_inline bool write_reserve(UCSType_t<__kind> *&dst, BufferInfo &buffer_info) {
-//     return write_reserve_impl<__kind>(dst, buffer_info, __reserve);
-// }
-
-// template<IndentLevel __indent, UCSKind __kind, bool is_obj>
-// force_inline bool write_empty_ctn(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
-//     using uu = UCSType_t<__kind>;
-//     constexpr Py_ssize_t reserve = size_align_up(3 * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu);
-//     // buffer size check
-//     bool _c;
-//     if constexpr (NEED_INDENT(__indent)) {
-//         if (!cfg.is_obj) {
-//             _c = write_line_and_indent<__indent, __kind, reserve>(dst, buffer_info, cfg);
-//         } else {
-//             _c = write_reserve<__kind, reserve>(dst, buffer_info);
-//         }
-//     } else {
-//         _c = write_reserve<__kind, reserve>(dst, buffer_info);
-//     }
-//     RETURN_ON_UNLIKELY_ERR(!_c);
-//     //
-//     constexpr uu _Template[reserve] = {
-//             (uu) ('[' | ((u8) is_obj << 5)),
-//             (uu) (']' | ((u8) is_obj << 5)),
-//             (uu) ',',
-//     };
-//     memcpy(dst, &_Template[0], sizeof(_Template));
-//     dst += 3;
-//     return true;
-// }
-
-// template<IndentLevel __indent, UCSKind __kind, bool is_obj>
-// force_inline bool write_ctn_begin(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, EncodeWriteUnicodeConfig &cfg) {
-//     using uu = UCSType_t<__kind>;
-//     // ut *dst = (ut *) *dst_raw;
-//     bool _c;
-//     if constexpr (NEED_INDENT(__indent)) {
-//         if (!cfg.is_obj) {
-//             _c = write_line_and_indent<__indent, __kind, 1>(dst, buffer_info, cfg);
-//         } else {
-//             _c = write_reserve<__kind, 1>(dst, buffer_info);
-//         }
-//     } else {
-//         _c = write_reserve<__kind, 1>(dst, buffer_info);
-//     }
-//     RETURN_ON_UNLIKELY_ERR(!_c);
-//     constexpr uu to_write = (uu) ('[' | ((u8) is_obj << 5));
-//     *dst++ = to_write;
-//     // write current ctn type
-//     // new line, increase indent
-//     cfg.increase_indent(is_obj);
-//     return true;
-// }
-
-// template<IndentLevel __indent, UCSKind __kind, bool is_obj>
-// force_inline bool write_ctn_end(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, EncodeWriteUnicodeConfig &cfg) {
-//     using uu = UCSType_t<__kind>;
-//     constexpr Py_ssize_t reserve = size_align_up(2 * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu);
-//     // ut *dst = (ut *) *dst_raw;
-//     // DECREASE_INDENT();
-//     cfg.decrease_indent();
-//     // erase last ','
-//     dst--;
-//     bool _c;
-//     if constexpr (NEED_INDENT(__indent)) {
-//         // WRITE_LINE();
-//         // WRITE_INDENT();
-//         _c = write_line_and_indent<__indent, __kind, reserve>(dst, buffer_info, cfg);
-//     } else {
-//         _c = write_reserve<__kind, reserve>(dst, buffer_info);
-//     }
-//     RETURN_ON_UNLIKELY_ERR(!_c);
-
-//     constexpr uu _Template[reserve] = {
-//             (uu) (']' | ((u8) is_obj << 5)),
-//             (uu) ',',
-//     };
-//     memcpy(dst, &_Template[0], sizeof(_Template));
-//     dst += 2;
-//     return true;
-
-//     // *(dst++) = (ut) (']' | ((u8) GET_CTN_TYPE() << 5));
-//     // *(dst++) = (ut) ',';
-//     // *dst_raw = (void *) dst;
-// }
-
-template<UCSKind __kind, X86SIMDLevel __simd_level>
-force_inline bool write_raw_string(UCSType_t<__kind> *&dst, void *src_raw, Py_ssize_t size, unsigned int src_kind, Py_ssize_t additional_reserve, BufferInfo &buffer_info) {
-#define UCS1_DISPATCH()                          \
-    u8 *usrc = (u8 *) src_raw;                   \
-    SrcInfo<UCSKind::UCS1> src_info{usrc, size}; \
-    _c = copy_ucs<UCSKind::UCS1, __kind, __simd_level>(src_info, dst, buffer_info)
-#define UCS2_DISPATCH()                          \
-    u16 *usrc = (u16 *) src_raw;                 \
-    SrcInfo<UCSKind::UCS2> src_info{usrc, size}; \
-    _c = copy_ucs<UCSKind::UCS2, __kind, __simd_level>(src_info, dst, buffer_info)
-#define UCS4_DISPATCH()                          \
-    u32 *usrc = (u32 *) src_raw;                 \
-    SrcInfo<UCSKind::UCS4> src_info{usrc, size}; \
-    _c = copy_ucs<UCSKind::UCS4, __kind, __simd_level>(src_info, dst, buffer_info)
-
-    using udst = UCSType_t<__kind>;
-
-    assert(static_cast<int>(src_kind) <= static_cast<int>(__kind));
-
-    std::ptrdiff_t required_len_u8 = buffer_info.calc_dst_offset_u8<__kind>(dst + additional_reserve + size);
-    RETURN_ON_UNLIKELY_RESIZE_FAIL(__kind, dst, buffer_info, required_len_u8);
-
-    bool _c;
-
-    if constexpr (__kind == UCSKind::UCS1) {
-        UCS1_DISPATCH();
-    } else if constexpr (__kind == UCSKind::UCS2) {
-        switch (src_kind) {
-            case PyUnicode_1BYTE_KIND: {
-                UCS1_DISPATCH();
-                break;
-            }
-            case PyUnicode_2BYTE_KIND: {
-                UCS2_DISPATCH();
-                break;
-            }
-            default: {
-                Py_UNREACHABLE();
-                _c = false;
-            }
-        }
-    } else {
-        switch (src_kind) {
-            case PyUnicode_1BYTE_KIND: {
-                UCS1_DISPATCH();
-                break;
-            }
-            case PyUnicode_2BYTE_KIND: {
-                UCS2_DISPATCH();
-                break;
-            }
-            case PyUnicode_4BYTE_KIND: {
-                UCS4_DISPATCH();
-                break;
-            }
-            default: {
-                Py_UNREACHABLE();
-                _c = false;
-            }
-        }
-    }
-
-    RETURN_ON_UNLIKELY_ERR(!_c);
-
-    required_len_u8 = buffer_info.calc_dst_offset_u8<__kind>(dst + additional_reserve);
-    RETURN_ON_UNLIKELY_RESIZE_FAIL(__kind, dst, buffer_info, required_len_u8);
-
-    return true;
-}
-
-// template<IndentLevel __indent, UCSKind __kind, X86SIMDLevel __simd_level>
-// force_inline bool write_str(PyObject *key, UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
-//     using uu = UCSType_t<__kind>;
-//     assert(PyUnicode_Check(key));
-//     Py_ssize_t unicode_size = PyUnicode_GET_LENGTH(key);
-//     unsigned int src_kind = PyUnicode_KIND(key);
-//     auto data_raw = PyUnicode_DATA(key);
-//     bool _c;
-//     if constexpr (NEED_INDENT(__indent)) {
-//         //     WRITE_LINE();
-//         // WRITE_INDENT();
-//         if (!cfg.is_obj) {
-//             _c = write_line_and_indent_impl<__indent, __kind>(dst, buffer_info, cfg, unicode_size + 2);
-//         } else {
-//             _c = write_reserve_impl<__kind>(dst, buffer_info, unicode_size + 2);
-//         }
-//     } else {
-//         _c = write_reserve_impl<__kind>(dst, buffer_info, unicode_size + 2);
-//     }
-//     RETURN_ON_UNLIKELY_ERR(!_c);
-
-//     *(dst++) = (uu) '"';
-
-//     _c = write_raw_string<__kind, __simd_level>(dst, data_raw, unicode_size, src_kind, 2, buffer_info);
-//     RETURN_ON_UNLIKELY_ERR(!_c);
-
-//     constexpr uu _Template[2] = {
-//             (uu) '"',
-//             (uu) ',',
-//     };
-//     memcpy(dst, &_Template[0], sizeof(_Template));
-//     dst += 2;
-//     return true;
-// }
-
-// template<IndentLevel __indent, UCSKind __kind, X86SIMDLevel __simd_level>
-// force_inline bool write_key(PyObject *key, UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
-//     using uu = UCSType_t<__kind>;
-//     assert(PyUnicode_Check(key));
-//     Py_ssize_t unicode_size = PyUnicode_GET_LENGTH(key);
-//     unsigned int src_kind = PyUnicode_KIND(key);
-//     auto data_raw = PyUnicode_DATA(key);
-//     bool _c;
-//     // ut *dst = (ut *) *dst_raw;
-//     if constexpr (NEED_INDENT(__indent)) {
-//         //     WRITE_LINE();
-//         // WRITE_INDENT();
-//         _c = write_line_and_indent_impl<__indent, __kind>(dst, buffer_info, cfg, unicode_size + 4);
-//     } else {
-//         _c = write_reserve_impl<__kind>(dst, buffer_info, unicode_size + 4);
-//     }
-//     RETURN_ON_UNLIKELY_ERR(!_c);
-
-//     *(dst++) = (uu) '"';
-
-//     _c = write_raw_string<__kind, __simd_level>(dst, data_raw, unicode_size, src_kind, 3, buffer_info);
-//     RETURN_ON_UNLIKELY_ERR(!_c);
-
-//     constexpr size_t _Reserve = size_align_up(3 * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu);
-
-//     constexpr uu _Template[_Reserve] = {
-//             (uu) '"',
-//             (uu) ':',
-//             (uu) ' ',
-//     };
-//     memcpy(dst, &_Template[0], sizeof(_Template));
-//     constexpr size_t _Move = (NEED_INDENT(__indent)) ? 3 : 2;
-//     dst += _Move;
-//     return true;
-// }
-
-// template<IndentLevel __indent, UCSKind __kind>
-// force_inline bool write_true(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
-//     using uu = UCSType_t<__kind>;
-//     constexpr Py_ssize_t reserve = size_align_up(5 * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu);
-
-//     bool _c;
-//     if constexpr (NEED_INDENT(__indent)) {
-//         if (!cfg.is_obj) {
-//             // WRITE_LINE();
-//             // WRITE_INDENT();
-//             _c = write_line_and_indent<__indent, __kind, reserve>(dst, buffer_info, cfg);
-//         } else {
-//             _c = write_reserve<__kind, reserve>(dst, buffer_info);
-//         }
-//     } else {
-//         _c = write_reserve<__kind, reserve>(dst, buffer_info);
-//     }
-//     RETURN_ON_UNLIKELY_ERR(!_c);
-
-//     constexpr uu _Template[reserve] = {
-//             (uu) 't',
-//             (uu) 'r',
-//             (uu) 'u',
-//             (uu) 'e',
-//             (uu) ',',
-//     };
-//     memcpy(dst, _Template, sizeof(_Template));
-//     dst += 5;
-//     return true;
-// }
-
-// template<IndentLevel __indent, UCSKind __kind>
-// force_inline bool write_false(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
-//     using uu = UCSType_t<__kind>;
-//     constexpr Py_ssize_t reserve = size_align_up(6 * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu);
-
-//     bool _c;
-//     if constexpr (NEED_INDENT(__indent)) {
-//         if (!cfg.is_obj) {
-//             // WRITE_LINE();
-//             // WRITE_INDENT();
-//             _c = write_line_and_indent<__indent, __kind, reserve>(dst, buffer_info, cfg);
-//         } else {
-//             _c = write_reserve<__kind, reserve>(dst, buffer_info);
-//         }
-//     } else {
-//         _c = write_reserve<__kind, reserve>(dst, buffer_info);
-//     }
-
-//     RETURN_ON_UNLIKELY_ERR(!_c);
-
-//     constexpr uu _Template[reserve] = {
-//             (uu) 'f',
-//             (uu) 'a',
-//             (uu) 'l',
-//             (uu) 's',
-//             (uu) 'e',
-//             (uu) ',',
-//     };
-//     memcpy(dst, _Template, sizeof(_Template));
-//     dst += 6;
-//     return true;
-// }
-
-// template<IndentLevel __indent, UCSKind __kind>
-// force_inline bool write_null(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
-//     using uu = UCSType_t<__kind>;
-//     constexpr Py_ssize_t reserve = size_align_up(5 * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu);
-
-//     bool _c;
-//     if constexpr (NEED_INDENT(__indent)) {
-//         if (!cfg.is_obj) {
-//             // WRITE_LINE();
-//             // WRITE_INDENT();
-//             _c = write_line_and_indent<__indent, __kind, reserve>(dst, buffer_info, cfg);
-//         } else {
-//             _c = write_reserve<__kind, reserve>(dst, buffer_info);
-//         }
-//     } else {
-//         _c = write_reserve<__kind, reserve>(dst, buffer_info);
-//     }
-//     RETURN_ON_UNLIKELY_ERR(!_c);
-
-//     constexpr uu _Template[reserve] = {
-//             (uu) 'n',
-//             (uu) 'u',
-//             (uu) 'l',
-//             (uu) 'l',
-//             (uu) ',',
-//     };
-//     memcpy(dst, _Template, sizeof(_Template));
-//     dst += 5;
-//     return true;
-// }
-
-template<typename uu, Py_ssize_t reserve, bool _is_signed = true>
-struct NaN_Template {
-    static constexpr uu value[reserve] = {
-            (uu) '-',
-            (uu) 'n',
-            (uu) 'a',
-            (uu) 'n',
-            (uu) ',',
-    };
-};
-
-template<typename uu, Py_ssize_t reserve>
-struct NaN_Template<uu, reserve, false> {
-    static constexpr uu value[reserve] = {
-            (uu) 'n',
-            (uu) 'a',
-            (uu) 'n',
-            (uu) ',',
-    };
-};
-
-template<typename uu, Py_ssize_t reserve, bool _is_signed = true>
-struct Inf_Template {
-    static constexpr uu value[reserve] = {
-            (uu) '-',
-            (uu) 'i',
-            (uu) 'n',
-            (uu) 'f',
-            (uu) ',',
-    };
-};
-
-template<typename uu, Py_ssize_t reserve>
-struct Inf_Template<uu, reserve, false> {
-    static constexpr uu value[reserve] = {
-            (uu) 'i',
-            (uu) 'n',
-            (uu) 'f',
-            (uu) ',',
-    };
-};
-
-
-// template<IndentLevel __indent, UCSKind __kind, bool __is_signed>
-// force_inline bool write_nan(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
-//     using uu = UCSType_t<__kind>;
-//     constexpr Py_ssize_t move_size = __is_signed ? 5 : 4;
-//     constexpr Py_ssize_t reserve = size_align_up(move_size * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu);
-
-//     bool _c;
-//     if constexpr (NEED_INDENT(__indent)) {
-//         if (!cfg.is_obj) {
-//             // WRITE_LINE();
-//             // WRITE_INDENT();
-//             _c = write_line_and_indent<__indent, __kind, reserve>(dst, buffer_info, cfg);
-//         } else {
-//             _c = write_reserve<__kind, reserve>(dst, buffer_info);
-//         }
-//     } else {
-//         _c = write_reserve<__kind, reserve>(dst, buffer_info);
-//     }
-//     RETURN_ON_UNLIKELY_ERR(!_c);
-
-//     constexpr auto &_Template = NaN_Template<uu, reserve, __is_signed>::value;
-//     memcpy(dst, &_Template[0], sizeof(_Template));
-//     dst += move_size;
-//     return true;
-// }
-
-// template<IndentLevel __indent, UCSKind __kind>
-// force_inline bool write_zero(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
-//     using uu = UCSType_t<__kind>;
-//     constexpr Py_ssize_t reserve = size_align_up(2 * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu);
-
-//     bool _c;
-//     if constexpr (NEED_INDENT(__indent)) {
-//         if (!cfg.is_obj) {
-//             // WRITE_LINE();
-//             // WRITE_INDENT();
-//             _c = write_line_and_indent<__indent, __kind, reserve>(dst, buffer_info, cfg);
-//         } else {
-//             _c = write_reserve<__kind, reserve>(dst, buffer_info);
-//         }
-//     } else {
-//         _c = write_reserve<__kind, reserve>(dst, buffer_info);
-//     }
-//     RETURN_ON_UNLIKELY_ERR(!_c);
-
-//     constexpr uu _Template[reserve] = {
-//             (uu) '0',
-//             (uu) ',',
-//     };
-//     memcpy(dst, _Template, sizeof(_Template));
-//     dst += 2;
-//     return true;
-// }
-
-// template<IndentLevel __indent, UCSKind __kind, bool __is_signed>
-// force_inline bool write_inf(UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
-//     using uu = UCSType_t<__kind>;
-//     constexpr Py_ssize_t move_size = __is_signed ? 5 : 4;
-//     constexpr Py_ssize_t reserve = size_align_up(move_size * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu);
-
-//     bool _c;
-//     if constexpr (NEED_INDENT(__indent)) {
-//         if (!cfg.is_obj) {
-//             // WRITE_LINE();
-//             // WRITE_INDENT();
-//             _c = write_line_and_indent<__indent, __kind, reserve>(dst, buffer_info, cfg);
-//         } else {
-//             _c = write_reserve<__kind, reserve>(dst, buffer_info);
-//         }
-//     } else {
-//         _c = write_reserve<__kind, reserve>(dst, buffer_info);
-//     }
-//     RETURN_ON_UNLIKELY_ERR(!_c);
-
-//     constexpr auto &_Template = Inf_Template<uu, reserve, __is_signed>::value;
-//     memcpy(dst, &_Template[0], sizeof(_Template));
-//     dst += move_size;
-//     return true;
-// }
-
-
-// template<IndentLevel __indent, UCSKind __kind>
-// force_inline bool write_i64(i64 val, UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
-//     assert(false);
-//     return false;
-// }
-
-// template<IndentLevel __indent, UCSKind __kind>
-// force_inline bool write_float(i64 val, UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
-//     assert(false);
-//     return false;
-// }
-
-// template<IndentLevel __indent, UCSKind __kind>
-// force_inline bool write_u64(u64 val, UCSType_t<__kind> *&dst, BufferInfo &buffer_info, const EncodeWriteUnicodeConfig &cfg) {
-//     assert(false);
-//     return false;
-// }
 
 /*Copy Utils*/
-
 
 template<X86SIMDLevel __simd_level>
 force_inline void cpy_once_512_impl(u8 *&ddst, u8 *&ssrc) {
@@ -1683,293 +520,720 @@ copy_final:
     memcpy((void *) ddst, (void *) ssrc, (size_t) count);
 }
 
-/**/
-// #define GOTO_ARR_VAL_BEGIN_WITH_SIZE(in_size) \
-//     do {                                      \
-//         cur_list_size = (in_size);            \
-//         goto arr_val_begin;                   \
-//     } while (0)
-// #define GOTO_TUPLE_VAL_BEGIN_WITH_SIZE(in_size) \
-//     do {                                        \
-//         cur_list_size = (in_size);              \
-//         goto tuple_val_begin;                   \
-//     } while (0)
 
+/*==============================================================================
+ * Copy UCS impl
+ *============================================================================*/
 
-// Py_ssize_t cur_nested_depth = -1;
-//     PyObject *cur_obj;
-//     Py_ssize_t cur_pos;
-//     Py_ssize_t cur_list_size; // cache for each list, no need to check it repeatedly
-//     UCSKind cur_ucs_kind = UCSKind::UCS1;
-//     u8 *dst1 = (u8 *) buffer_info.m_buffer_start;
-//     u16 *dst2 = nullptr;         // enabled if kind >= 2
-//     u32 *dst4 = nullptr;         // enabled if kind == 4
-//     Py_ssize_t dst1_size = 0; // valid if kind >= 2
-//     Py_ssize_t dst2_size = 0; // valid if kind == 4
-
-force_inline bool write_PyLongOp(PyObject *obj, EncodeOpDescriber &desc) {
-    if (pylong_is_zero(obj)) {
-        desc.write_simple_op(EncodeOpType::ZERO_VALUE);
-        // APPEND_OP(ZERO);
-    } else if (pylong_is_unsigned(obj)) {
-        unsigned long long val = pylong_value_unsigned(obj);
-        if (unlikely(val == (unsigned long long) -1 && PyErr_Occurred())) {
-            return false;
+template<UCSKind __from, UCSKind __to, X86SIMDLevel _SIMDLevel>
+force_inline void copy_ucs_elevate_avx512_nocheck(UCSType_t<__to> *&write_ptr, UCSType_t<__from> *src, Py_ssize_t len, Py_ssize_t write_count_left) {
+    static_assert(__from < __to);
+    static_assert(_SIMDLevel >= X86SIMDLevel::AVX512);
+    assert(write_count_left >= 0);
+    COMMON_TYPE_DEF();
+    constexpr usize _ReadWriteOnce = 512 / 8 / sizeof(udst);
+    const usize can_write_max_times = (usize) write_count_left / _ReadWriteOnce;
+    usize do_write_times;
+    if constexpr (__from == UCSKind::UCS1 && __to == UCSKind::UCS4) {
+        // 128 -> 512, * 4
+        const usize want_write_times = size_align_up((usize) len * sizeof(usrc), 128 / 8) / (128 / 8);
+        do_write_times = std::min(can_write_max_times, want_write_times);
+        for (Py_ssize_t i = 0; i < do_write_times; ++i) {
+            __m128i x = _mm_lddqu_si128((const __m128i_u *) src); // lddqu, SSE3
+            __m512i z = _mm512_cvtepu8_epi32(x);                  // vpmovzxbd, AVX512F
+            _mm512_storeu_si512((void *) write_ptr, z);           // vmovdqu32, AVX512F
+            src += _ReadWriteOnce;
+            write_ptr += _ReadWriteOnce;
         }
-        desc.write_op_with_data<u64>(EncodeOpType::U64, val);
-        // APPEND_U64(val);
     } else {
-        long long val = PyLong_AsLongLong(obj);
-        if (unlikely(val == -1 && PyErr_Occurred())) {
-            return false;
+        // 256 -> 512, * 2
+        const usize want_write_times = size_align_up((usize) len * sizeof(usrc), 256 / 8) / (256 / 8);
+        do_write_times = std::min(can_write_max_times, want_write_times);
+        for (Py_ssize_t i = 0; i < do_write_times; ++i) {
+            __m256i y = _mm256_lddqu_si256((const __m256i_u *) src); // vlddqu, AVX
+            __m512i z;
+            if constexpr (__from == UCSKind::UCS1 && __to == UCSKind::UCS2) {
+                z = _mm512_cvtepu8_epi16(y); // vpmovzxbw, AVX512BW
+            } else if constexpr (__from == UCSKind::UCS2 && __to == UCSKind::UCS4) {
+                z = _mm512_cvtepu16_epi32(y); // vpmovzxwd, AVX512F
+            } else {
+                static_assert(false, "Unreachable");
+            }
+            _mm512_storeu_si512((void *) write_ptr, z); // vmovdqu32, AVX512F
+            src += _ReadWriteOnce;
+            write_ptr += _ReadWriteOnce;
         }
-        desc.write_op_with_data<i64>(EncodeOpType::U64, val);
-        // APPEND_I64<i64>(val);
     }
-    return true;
+    len -= (Py_ssize_t) do_write_times * (Py_ssize_t) _ReadWriteOnce;
+    if (likely(len <= 0)) return;
+    // manual copy
+    for (Py_ssize_t i = 0; i < len; ++i) {
+        *write_ptr = (udst) *src;
+        ++write_ptr;
+        ++src;
+    }
 }
 
-// force_inline bool write_PyFloatOp(PyObject *obj, EncodeOpDescriber &desc) {
-//     assert(false);
-//     return false;
-//     // TODO
-// }
+template<UCSKind __from, UCSKind __to, X86SIMDLevel _SIMDLevel>
+force_inline void copy_ucs_elevate_sse4_or_avx2_nocheck(UCSType_t<__to> *&write_ptr, UCSType_t<__from> *src, Py_ssize_t len, Py_ssize_t write_count_left) {
+    static_assert(__from < __to);
+    static_assert(_SIMDLevel >= X86SIMDLevel::SSE4);
+    assert(write_count_left >= 0);
+    COMMON_TYPE_DEF();
+    constexpr usize _ReadWriteOnce = 128 / 8 / sizeof(usrc);
+    const usize can_write_max_times = (usize) write_count_left / _ReadWriteOnce;
+    const usize want_write_times = size_align_up((usize) len * sizeof(usrc), 128 / 8) / (128 / 8);
+    usize do_write_times = std::min(can_write_max_times, want_write_times);
+    for (usize i = 0; i < do_write_times; ++i) {
+        __m128i x = _mm_lddqu_si128((const __m128i_u *) src); // lddqu, SSE3
+        cvtepu_128<__from, __to, _SIMDLevel>(x, src, write_ptr);
+    }
+    len -= (Py_ssize_t) do_write_times * (Py_ssize_t) _ReadWriteOnce;
+    if (likely(len <= 0)) return;
+    for (Py_ssize_t i = 0; i < len; ++i) {
+        *write_ptr = (udst) *src;
+        ++write_ptr;
+        ++src;
+    }
+}
 
-// template<IndentLevel __indent, UCSKind __kind, X86SIMDLevel __simd_level>
-// force_noinline PyObject *pyyjson_dumps_read_op_write_str(EncodeWriteOpConfig *op_cfg, EncodeOpDescriber *op_desc_old) {
-//     EncodeOpType op;
-//     BufferInfo buffer_info = BufferInfo::init();
-//     EncodeWriteUnicodeConfig cfg = EncodeWriteUnicodeConfig::init_from_op_config(*op_cfg);
-//     EncodeOpDescriber op_desc = EncodeOpDescriber::init_as_read(op_desc_old);
-//     using udst = UCSType_t<__kind>;
-//     udst *dst = (udst *) buffer_info.m_buffer_start;
+template<UCSKind __from, UCSKind __to, X86SIMDLevel _SIMDLevel>
+force_inline void copy_ucs_elevate_general_nocheck(UCSType_t<__to> *&write_ptr, UCSType_t<__from> *src, Py_ssize_t len, Py_ssize_t write_count_left) {
+    using udst = UCSType_t<__to>;
+    assert(len >= 0);
+    for (Py_ssize_t i = 0; i < len; ++i) {
+        *write_ptr = (udst) *src;
+        ++write_ptr;
+        ++src;
+    }
+}
 
-//     bool _c;
-//     // final
-//     Py_ssize_t final_size;
-//     Py_UCS4 max_char;
-//     PyObject *ret;
-//     while (1) {
-//         op = op_desc.peek_op();
-//         switch (op) {
-//             case EncodeOpType::DICT_EMPTY: {
-//                 op_desc.read_simple_op();
-//                 _c = write_empty_ctn<__indent, __kind, true>(dst, buffer_info, cfg);
-//                 if (unlikely(!_c)) {
-//                     goto fail;
-//                 }
-//                 break;
-//             }
-//             case EncodeOpType::DICT_BEGIN: {
-//                 op_desc.read_simple_op();
-//                 _c = write_ctn_begin<__indent, __kind, true>(dst, buffer_info, cfg);
-//                 if (unlikely(!_c)) {
-//                     goto fail;
-//                 }
-//                 break;
-//             }
-//             case EncodeOpType::DICT_END: {
-//                 op_desc.read_simple_op();
-//                 _c = write_ctn_end<__indent, __kind, true>(dst, buffer_info, cfg);
-//                 if (unlikely(!_c)) {
-//                     goto fail;
-//                 }
-//                 break;
-//             }
-//             case EncodeOpType::ARRAY_EMPTY: {
-//                 op_desc.read_simple_op();
-//                 _c = write_empty_ctn<__indent, __kind, false>(dst, buffer_info, cfg);
-//                 if (unlikely(!_c)) {
-//                     goto fail;
-//                 }
-//                 break;
-//             }
-//             case EncodeOpType::ARRAY_BEGIN: {
-//                 op_desc.read_simple_op();
-//                 _c = write_ctn_begin<__indent, __kind, false>(dst, buffer_info, cfg);
-//                 if (unlikely(!_c)) {
-//                     goto fail;
-//                 }
-//                 break;
-//             }
-//             case EncodeOpType::ARRAY_END: {
-//                 op_desc.read_simple_op();
-//                 _c = write_ctn_end<__indent, __kind, false>(dst, buffer_info, cfg);
-//                 if (unlikely(!_c)) {
-//                     goto fail;
-//                 }
-//                 break;
-//             }
-//             case EncodeOpType::STRING: {
-//                 PyObject *unicode = op_desc.read_op_data<PyObject *>();
-//                 _c = write_str<__indent, __kind, __simd_level>(unicode, dst, buffer_info, cfg);
-//                 if (unlikely(!_c)) {
-//                     goto fail;
-//                 }
-//                 break;
-//             }
-//             case EncodeOpType::KEY: {
-//                 PyObject *unicode = op_desc.read_op_data<PyObject *>();
-//                 _c = write_key<__indent, __kind, __simd_level>(unicode, dst, buffer_info, cfg);
-//                 if (unlikely(!_c)) {
-//                     goto fail;
-//                 }
-//                 break;
-//             }
-//             case EncodeOpType::U64: {
-//                 u64 val = op_desc.read_op_data<u64>();
-//                 _c = write_u64<__indent, __kind>(val, dst, buffer_info, cfg);
-//                 if (unlikely(!_c)) {
-//                     goto fail;
-//                 }
-//                 break;
-//             }
-//             case EncodeOpType::I64: {
-//                 i64 val = op_desc.read_op_data<i64>();
-//                 _c = write_i64<__indent, __kind>(val, dst, buffer_info, cfg);
-//                 if (unlikely(!_c)) {
-//                     goto fail;
-//                 }
-//                 break;
-//             }
-//             case EncodeOpType::FLOAT: {
-//                 double val = op_desc.read_op_data<double>();
-//                 _c = write_float<__indent, __kind>(val, dst, buffer_info, cfg);
-//                 if (unlikely(!_c)) {
-//                     goto fail;
-//                 }
-//                 break;
-//             }
-//             case EncodeOpType::TRUE_VALUE: {
-//                 op_desc.read_simple_op();
-//                 _c = write_true<__indent, __kind>(dst, buffer_info, cfg);
-//                 if (unlikely(!_c)) {
-//                     goto fail;
-//                 }
-//                 break;
-//             }
-//             case EncodeOpType::FALSE_VALUE: {
-//                 op_desc.read_simple_op();
-//                 _c = write_false<__indent, __kind>(dst, buffer_info, cfg);
-//                 if (unlikely(!_c)) {
-//                     goto fail;
-//                 }
-//                 break;
-//             }
-//             case EncodeOpType::NULL_VALUE: {
-//                 op_desc.read_simple_op();
-//                 _c = write_null<__indent, __kind>(dst, buffer_info, cfg);
-//                 if (unlikely(!_c)) {
-//                     goto fail;
-//                 }
-//                 break;
-//             }
-//             case EncodeOpType::POS_NAN: {
-//                 op_desc.read_simple_op();
-//                 _c = write_nan<__indent, __kind, false>(dst, buffer_info, cfg);
-//                 if (unlikely(!_c)) {
-//                     goto fail;
-//                 }
-//                 break;
-//             }
-//             case EncodeOpType::NEG_NAN: {
-//                 op_desc.read_simple_op();
-//                 _c = write_nan<__indent, __kind, true>(dst, buffer_info, cfg);
-//                 if (unlikely(!_c)) {
-//                     goto fail;
-//                 }
-//                 break;
-//             }
-//             case EncodeOpType::ZERO_VALUE: {
-//                 op_desc.read_simple_op();
-//                 _c = write_zero<__indent, __kind>(dst, buffer_info, cfg);
-//                 if (unlikely(!_c)) {
-//                     goto fail;
-//                 }
-//                 break;
-//             }
-//             case EncodeOpType::POS_INF: {
-//                 op_desc.read_simple_op();
-//                 _c = write_inf<__indent, __kind, false>(dst, buffer_info, cfg);
-//                 if (unlikely(!_c)) {
-//                     goto fail;
-//                 }
-//                 break;
-//             }
-//             case EncodeOpType::NEG_INF: {
-//                 op_desc.read_simple_op();
-//                 _c = write_inf<__indent, __kind, true>(dst, buffer_info, cfg);
-//                 if (unlikely(!_c)) {
-//                     goto fail;
-//                 }
-//                 break;
-//             }
-//             case EncodeOpType::END: {
-//                 goto success;
-//             }
-//             default: {
-//                 Py_UNREACHABLE();
-//                 assert(false);
-//             }
-//         }
-//     }
+template<UCSKind __from, UCSKind __to, X86SIMDLevel _SIMDLevel>
+force_inline void copy_elevate_nocheck(UCSType_t<__to> *&write_ptr, UCSType_t<__from> *src, Py_ssize_t len, Py_ssize_t write_count_left) {
+    static_assert(__from < __to);
+    if constexpr (_SIMDLevel >= X86SIMDLevel::AVX512) {
+        return copy_ucs_elevate_avx512_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len, write_count_left);
+    } else if constexpr (_SIMDLevel >= X86SIMDLevel::AVX2) {
+        return copy_ucs_elevate_sse4_or_avx2_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len, write_count_left);
+    } else if constexpr (_SIMDLevel >= X86SIMDLevel::SSE4) {
+        return copy_ucs_elevate_sse4_or_avx2_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len, write_count_left);
+    } else {
+        return copy_ucs_elevate_general_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len, write_count_left);
+    }
+}
 
-// success:
-//     dst--;
-//     final_size = dst - (udst *) buffer_info.m_buffer_start;
-//     assert(final_size >= 0);
+template<UCSKind __from, UCSKind __to, X86SIMDLevel _SIMDLevel>
+force_inline void copy_ucs_elevate_128bits(UCSType_t<__from> *src, Py_ssize_t len, UCSType_t<__to> *&write_ptr, Py_ssize_t escape_len, Py_ssize_t write_count_left) {
+    static_assert(__from < __to);
+    static_assert(_SIMDLevel >= X86SIMDLevel::SSE4);
+    COMMON_TYPE_DEF();
+    // check 256 bits once
+    constexpr usize _Check128Once = 128 / 8 / sizeof(usrc);
 
-//     if constexpr (__kind == UCSKind::UCS1) {
-//         if (cfg.is_all_ascii) {
-//             max_char = 0x80;
-//         } else {
-//             max_char = 0xff;
-//         }
-//     } else if constexpr (__kind == UCSKind::UCS2) {
-//         max_char = 0xffff;
-//     } else {
-//         max_char = 0x10ffff;
-//     }
-//     ret = PyUnicode_New(final_size, max_char);
-//     if (unlikely(!ret)) {
-//         goto fail;
-//     }
-//     cpy_fast<__simd_level>(PyUnicode_DATA(ret), buffer_info.m_buffer_start, final_size * sizeof(udst), final_size * sizeof(udst));
-//     // memcpy(PyUnicode_DATA(ret), buffer_info.m_buffer_start, final_size * sizeof(udst));
-//     buffer_info.release();
-//     return ret;
-// fail:
-//     buffer_info.release();
-//     return nullptr;
-// }
+    assert(len < escape_len);
+    assert(escape_len <= write_count_left);
+
+    std::ptrdiff_t temp;
+    udst *write_old;
+    __m128i x;
+    bool v;
+
+    while (len >= (Py_ssize_t) _Check128Once) {
+        x = load_unaligned_si128<_SIMDLevel>((const __m128i_u *) src); // SSE2
+        v = check_escape_128bits<__from, _SIMDLevel>(x);
+        if (likely(v)) {
+            cvtepu_128<__from, __to, _SIMDLevel>(x, src, write_ptr);
+            len -= _Check128Once;
+            write_count_left -= _Check128Once;
+            escape_len -= _Check128Once;
+        } else {
+            write_old = write_ptr;
+            copy_escape_fixsize<__from, __to, 128>(src, write_ptr);
+            temp = write_ptr - write_old;
+            len -= _Check128Once;
+            write_count_left -= temp;
+            escape_len -= temp;
+            if (escape_len == len) {
+                goto no_escape;
+            }
+            continue;
+        }
+    }
+    assert(len < (Py_ssize_t) _Check128Once);
+    if (len == 0) return;
+    if (likely(write_count_left >= _Check128Once)) {
+        x = load_unaligned_si128<_SIMDLevel>((const __m128i_u *) src); // SSE2
+        v = check_escape_tail_128bits<__from, _SIMDLevel>(x, len);
+        if (likely(v)) {
+            write_old = write_ptr;
+            cvtepu_128<__from, __to, _SIMDLevel>(x, src, write_ptr);
+            write_ptr = write_old + len;
+            return;
+        }
+    }
+    copy_escape_impl<__from, __to>(src, write_ptr, len);
+    return;
+
+no_escape:;
+    copy_elevate_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len, write_count_left);
+    return;
+}
+
+template<UCSKind __from, UCSKind __to, X86SIMDLevel _SIMDLevel>
+force_inline void copy_ucs_elevate_256bits(UCSType_t<__from> *src, Py_ssize_t len, UCSType_t<__to> *&write_ptr, Py_ssize_t escape_len, Py_ssize_t write_count_left) {
+    static_assert(__from < __to);
+    static_assert(_SIMDLevel >= X86SIMDLevel::AVX2);
+    COMMON_TYPE_DEF();
+    // check 256 bits once
+    constexpr usize _Check256Once = 256 / 8 / sizeof(usrc);
+    constexpr usize _Check128Once = 128 / 8 / sizeof(usrc);
+
+    assert(len < escape_len);
+    assert(escape_len <= write_count_left);
+
+    std::ptrdiff_t temp;
+    udst *write_old;
+    __m256i y;
+    __m128i x;
+    bool v;
+
+    while (len >= (Py_ssize_t) _Check256Once) {
+        y = _mm256_lddqu_si256((const __m256i_u *) src); // vlddqu, AVX
+        v = check_escape_256bits<__from, _SIMDLevel>(y);
+        if (likely(v)) {
+            cvtepu_256<__from, __to, _SIMDLevel>(y, src, write_ptr);
+            len -= _Check256Once;
+            write_count_left -= _Check256Once;
+            escape_len -= _Check256Once;
+        } else {
+            x = _mm256_castsi256_si128(y);
+            v = check_escape_128bits<__from, _SIMDLevel>(x);
+            if (v) {
+                // .x
+                cvtepu_128<__from, __to, _SIMDLevel>(x, src, write_ptr);
+                len -= _Check128Once;
+                write_count_left -= _Check128Once;
+                escape_len -= _Check128Once;
+            }
+            // x
+            write_old = write_ptr;
+            copy_escape_fixsize<__from, __to, 128>(src, write_ptr);
+            temp = write_ptr - write_old;
+            len -= _Check128Once;
+            write_count_left -= temp;
+            escape_len -= temp;
+            if (escape_len == len) {
+                goto no_escape;
+            }
+            continue;
+        }
+    }
+    //
+    assert(len < (Py_ssize_t) _Check256Once);
+    if (len == 0) return;
+    if (likely(write_count_left >= _Check256Once)) {
+        y = _mm256_loadu_si256((const __m256i_u *) src); // vmovdqu32, AVX512F
+        v = check_escape_tail_256bits<__from, _SIMDLevel>(y, len);
+        if (likely(v)) {
+            write_old = write_ptr;
+            cvtepu_256<__from, __to, _SIMDLevel>(y, src, write_ptr);
+            write_ptr = write_old + len;
+            return;
+        }
+    }
+    copy_ucs_elevate_128bits<__from, __to, _SIMDLevel>(src, len, write_ptr, escape_len, write_count_left);
+    return;
+
+no_escape:;
+    copy_elevate_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len, write_count_left);
+    return;
+}
+
+template<UCSKind __from, UCSKind __to, X86SIMDLevel _SIMDLevel>
+force_inline void copy_ucs_elevate_512bits(UCSType_t<__from> *src, Py_ssize_t len, UCSType_t<__to> *&write_ptr, Py_ssize_t escape_len, Py_ssize_t write_count_left) {
+    static_assert(__from < __to);
+    static_assert(_SIMDLevel >= X86SIMDLevel::AVX512);
+    COMMON_TYPE_DEF();
+    // check 512 bits once
+    constexpr usize _Check512Once = 512 / 8 / sizeof(usrc);
+    constexpr usize _Check256Once = 256 / 8 / sizeof(usrc);
+    constexpr usize _Check128Once = 128 / 8 / sizeof(usrc);
+
+    assert(len < escape_len);
+    assert(escape_len <= write_count_left);
+
+    std::ptrdiff_t temp;
+    udst *write_old;
+    __m512i z;
+    __m256i y;
+    __m128i x;
+    bool v;
+
+    while (len >= (Py_ssize_t) _Check512Once) {
+        z = _mm512_loadu_si512((const void *) src); // vmovdqu32, AVX512F
+        v = check_escape_512bits<__from, _SIMDLevel>(z);
+        if (likely(v)) {
+            cvtepu_512<__from, __to, _SIMDLevel>(z, src, write_ptr);
+            len -= _Check512Once;
+            write_count_left -= _Check512Once;
+            escape_len -= _Check512Once;
+        } else {
+            y = _mm512_castsi512_si256(z);
+            v = check_escape_256bits<__from, _SIMDLevel>(y);
+            if (v) {
+                // ..??
+                cvtepu_256<__from, __to, _SIMDLevel>(y, src, write_ptr);
+                len -= _Check256Once;
+                write_count_left -= _Check256Once;
+                escape_len -= _Check256Once;
+                // moved: ??
+                x = _mm512_extracti32x4_epi32(z, 2); // vextracti32x4, AVX512F
+                v = check_escape_128bits<__from, _SIMDLevel>(x);
+                if (v) {
+                    // .x
+                    cvtepu_128<__from, __to, _SIMDLevel>(x, src, write_ptr);
+                    len -= _Check128Once;
+                    write_count_left -= _Check128Once;
+                    escape_len -= _Check128Once;
+                }
+                // x
+                write_old = write_ptr;
+                copy_escape_fixsize<__from, __to, 128>(src, write_ptr);
+                temp = write_ptr - write_old;
+                len -= _Check128Once;
+                write_count_left -= temp;
+                escape_len -= temp;
+                if (escape_len == len) {
+                    goto no_escape;
+                }
+                continue;
+            }
+            // ??
+            x = _mm256_castsi256_si128(y);
+            v = check_escape_128bits<__from, _SIMDLevel>(x);
+            if (v) {
+                // .x
+                cvtepu_128<__from, __to, _SIMDLevel>(x, src, write_ptr);
+                len -= _Check128Once;
+                write_count_left -= _Check128Once;
+                escape_len -= _Check128Once;
+            }
+            // x
+            write_old = write_ptr;
+            copy_escape_fixsize<__from, __to, 128>(src, write_ptr);
+            temp = write_ptr - write_old;
+            len -= _Check128Once;
+            write_count_left -= temp;
+            escape_len -= temp;
+            if (escape_len == len) {
+                goto no_escape;
+            }
+            continue;
+        }
+    }
+    //
+    assert(len < (Py_ssize_t) _Check512Once);
+    if (len == 0) return;
+    if (likely(write_count_left >= _Check512Once)) {
+        z = _mm512_loadu_si512((const void *) src); // vmovdqu32, AVX512F
+        v = check_escape_tail_512bits<__from, _SIMDLevel>(z, len);
+        if (likely(v)) {
+            write_old = write_ptr;
+            cvtepu_512<__from, __to, _SIMDLevel>(z, src, write_ptr);
+            write_ptr = write_old + len;
+            return;
+        }
+    }
+    copy_ucs_elevate_256bits<__from, __to, _SIMDLevel>(write_ptr, src, len, write_count_left, escape_len);
+    return;
+
+no_escape:;
+    copy_elevate_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len, write_count_left);
+    return;
+}
+
+template<UCSKind __from, UCSKind __to, X86SIMDLevel _SIMDLevel>
+force_inline void copy_ucs_elevate_general(UCSType_t<__from> *src, Py_ssize_t len, UCSType_t<__to> *&write_ptr, Py_ssize_t escape_len, Py_ssize_t write_count_left) {
+    COMMON_TYPE_DEF();
+    assert(len >= 0);
+    while (escape_len > len) {
+        assert(len >= 0);
+        if (len >= 4) {
+            udst *old_dst = write_ptr;
+            copy_escape_fixsize<__from, __to, 4 * sizeof(usrc) * 8>(src, write_ptr);
+            Py_ssize_t temp = write_ptr - old_dst;
+            len -= 4;
+            write_count_left -= temp;
+            escape_len -= temp;
+        } else {
+            copy_escape_impl<__from, __to>(src, write_ptr, len);
+            return;
+        }
+    }
+    if (len) {
+        copy_ucs_elevate_general_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len, write_count_left);
+    }
+}
+
+template<UCSKind __from, UCSKind __to, X86SIMDLevel __simd_level>
+force_inline void copy_ucs_elevate(UCSType_t<__from> *src, Py_ssize_t src_count, UCSType_t<__to> *&dst, UCSType_t<__to> *const end_ptr, Py_ssize_t escape_len) {
+    COMMON_TYPE_DEF();
+    static_assert(__from < __to);
+    Py_ssize_t write_count_left = end_ptr - dst;
+
+    if constexpr (__simd_level >= X86SIMDLevel::AVX512) {
+        copy_ucs_elevate_512bits<__from, __to, __simd_level>(src, src_count, dst, escape_len, write_count_left);
+    } else if constexpr (__simd_level >= X86SIMDLevel::AVX2) {
+        copy_ucs_elevate_256bits<__from, __to, __simd_level>(src, src_count, dst, escape_len, write_count_left);
+    } else if constexpr (__simd_level >= X86SIMDLevel::SSE4) {
+        copy_ucs_elevate_128bits<__from, __to, __simd_level>(src, src_count, dst, escape_len, write_count_left);
+    } else {
+        copy_ucs_elevate_general<__from, __to>(src, src_count, dst, escape_len, write_count_left);
+    }
+}
+
+/*copy_ucs_same*/
 
 
-// TODO
-#define CTN_SIZE_GROW()                                                      \
-    do {                                                                     \
-        if (unlikely(cur_nested_depth == PYYJSON_ENCODE_MAX_RECURSION)) {    \
-            PyErr_SetString(PyExc_ValueError, "Too many nested structures"); \
-            return JumpFlag_Fail;                                            \
-        }                                                                    \
-    } while (0)
+template<UCSKind __kind, X86SIMDLevel __simd_level>
+force_inline void copy_ucs_same_128bits(UCSType_t<__kind> *src, Py_ssize_t count, UCSType_t<__kind> *&dst, Py_ssize_t escape_count, Py_ssize_t write_count_left) {
+    using uu = UCSType_t<__kind>;
+
+    constexpr std::ptrdiff_t _Process128OnceCount = 128 / 8 / sizeof(uu);
+
+    assert(count <= escape_count);
+    assert(escape_count <= write_count_left);
+
+    Py_ssize_t temp;
+    uu *old_dst;
+    __m128i x;
+    bool v;
+
+    if (escape_count == count) {
+        goto no_escape;
+    }
+
+    while (count >= _Process128OnceCount) {
+        x = load_unaligned_si128<__simd_level>((const __m128i_u *) src); // SSE2
+        v = check_and_write_128<__kind, __simd_level>((void *) dst, x);
+        if (likely(v)) {
+            src += _Process128OnceCount;
+            count -= _Process128OnceCount;
+            dst += _Process128OnceCount;
+            write_count_left -= _Process128OnceCount;
+            escape_count -= _Process128OnceCount;
+        } else {
+            old_dst = dst;
+            copy_escape_fixsize<__kind, __kind, 128>(src, dst);
+            // src, dst moved, update count and write_count_left
+            temp = dst - old_dst;
+            count -= _Process128OnceCount;
+            write_count_left -= temp;
+            escape_count -= temp;
+            assert(write_count_left >= 0 && escape_count >= 0);
+            if (escape_count == count) {
+                goto no_escape;
+            }
+            continue;
+        }
+    }
+    //
+    assert(count < _Process128OnceCount);
+    if (!count) return;
+    if (likely(write_count_left >= _Process128OnceCount)) {
+        // try a tail check
+        x = load_unaligned_si128<__simd_level>((const __m128i_u *) src); // SSE2
+        _mm_storeu_si128((__m128i_u *) dst, x);                          // movdqu, SSE2
+        v = check_escape_tail_128bits<__kind, __simd_level>(x, count);
+        if (likely(v)) {
+            dst += count;
+            return;
+        }
+    }
+    copy_escape_impl<__kind, __kind>(src, dst, count);
+    return;
+
+no_escape:;
+    cpy_fast<__simd_level>((void *) dst, (void *) src, count * sizeof(uu), write_count_left * sizeof(uu));
+    dst += count;
+    return;
+}
+
+template<UCSKind __kind, X86SIMDLevel __simd_level>
+force_inline void copy_ucs_same_256bits(UCSType_t<__kind> *src, Py_ssize_t count, UCSType_t<__kind> *&dst, Py_ssize_t escape_count, Py_ssize_t write_count_left) {
+    static_assert(__simd_level >= X86SIMDLevel::AVX2, "Only AVX2 or above can use this");
+
+    using uu = UCSType_t<__kind>;
+
+    constexpr std::ptrdiff_t _Process256OnceCount = 256 / 8 / sizeof(uu);
+    constexpr std::ptrdiff_t _Process128OnceCount = 128 / 8 / sizeof(uu);
+
+    assert(count <= escape_count);
+    assert(escape_count <= write_count_left);
+
+    Py_ssize_t temp;
+    uu *old_dst;
+    __m256i y;
+    __m128i x;
+    bool v;
+
+    if (escape_count == count) {
+        goto no_escape;
+    }
+
+    while (count >= _Process256OnceCount) {
+        y = _mm256_lddqu_si256((const __m256i_u *) src); // vlddqu, AVX
+        v = check_and_write_256<__kind, __simd_level>((void *) dst, y);
+        if (likely(v)) {
+            src += _Process256OnceCount;
+            count -= _Process256OnceCount;
+            dst += _Process256OnceCount;
+            write_count_left -= _Process256OnceCount;
+            escape_count -= _Process256OnceCount;
+        } else {
+            x = _mm256_castsi256_si128(y); // no-op, AVX
+            v = check_and_write_128<__kind, __simd_level>((void *) dst, x);
+            if (v) {
+                // .x
+                src += _Process128OnceCount;
+                count -= _Process128OnceCount;
+                dst += _Process128OnceCount;
+                write_count_left -= _Process128OnceCount;
+                escape_count -= _Process128OnceCount;
+                // moved: x
+            }
+
+            old_dst = dst;
+            copy_escape_fixsize<__kind, __kind, 128>(src, dst);
+            temp = dst - old_dst;
+            count -= _Process128OnceCount;
+            write_count_left -= temp;
+            escape_count -= temp;
+            if (escape_count == count) {
+                goto no_escape;
+            }
+            continue;
+        }
+    }
+    //
+    assert(count < _Process256OnceCount);
+    if (!count) return;
+    if (likely(write_count_left >= _Process256OnceCount)) {
+        // try a tail check
+        y = _mm256_lddqu_si256((const __m256i_u *) src); // vlddqu, AVX
+        _mm256_storeu_si256((__m256i_u *) dst, y);       // vmovdqu, AVX
+        v = check_escape_tail_256bits<__kind, __simd_level>(y, count);
+        if (likely(v)) {
+            dst += count;
+            return;
+        }
+    }
+    copy_ucs_same_128bits<__kind, __simd_level>(src, count, dst, escape_count, write_count_left);
+    return;
+
+no_escape:;
+    cpy_fast<__simd_level>((void *) dst, (void *) src, count * sizeof(uu), write_count_left * sizeof(uu));
+    dst += count;
+    return;
+}
+
+template<UCSKind __kind, X86SIMDLevel __simd_level>
+force_inline void copy_ucs_same_512bits(UCSType_t<__kind> *src, Py_ssize_t count, UCSType_t<__kind> *&dst, Py_ssize_t escape_count, Py_ssize_t write_count_left) {
+    static_assert(__simd_level >= X86SIMDLevel::AVX512, "Only AVX512 or above can use this");
+    using uu = UCSType_t<__kind>;
+
+    constexpr std::ptrdiff_t _Process512OnceCount = 512 / 8 / sizeof(uu);
+    constexpr std::ptrdiff_t _Process256OnceCount = 256 / 8 / sizeof(uu);
+    constexpr std::ptrdiff_t _Process128OnceCount = 128 / 8 / sizeof(uu);
+
+    assert(count <= escape_count);
+    assert(escape_count <= write_count_left);
+
+    Py_ssize_t temp;
+    uu *old_dst;
+    __m512i z;
+    __m256i y;
+    __m128i x;
+    bool v;
+
+    if (escape_count == count) {
+        goto no_escape;
+    }
+
+    while (count >= _Process512OnceCount) {
+        z = _mm512_loadu_si512((void *) src); // vmovdqu32, AVX512F
+        v = check_and_write_512<__kind, __simd_level>((void *) dst, z);
+        if (likely(v)) {
+            src += _Process512OnceCount;
+            count -= _Process512OnceCount;
+            dst += _Process512OnceCount;
+            write_count_left -= _Process512OnceCount;
+            escape_count -= _Process512OnceCount;
+        } else {
+            y = _mm512_castsi512_si256(z); // no-op, AVX512F
+            v = check_and_write_256<__kind, __simd_level>((void *) dst, y);
+            if (v) {
+                // ..??
+                src += _Process256OnceCount;
+                count -= _Process256OnceCount;
+                dst += _Process256OnceCount;
+                write_count_left -= _Process256OnceCount;
+                escape_count -= _Process256OnceCount;
+                // moved: ??
+                x = _mm512_extracti32x4_epi32(z, 2); // vextracti32x4, AVX512F
+                v = check_and_write_128<__kind, __simd_level>((void *) dst, x);
+                if (v) {
+                    // .x
+                    src += _Process128OnceCount;
+                    count -= _Process128OnceCount;
+                    dst += _Process128OnceCount;
+                    write_count_left -= _Process128OnceCount;
+                    escape_count -= _Process128OnceCount;
+                    // moved: x
+                }
+                old_dst = dst;
+                copy_escape_fixsize<__kind, __kind, 128>(src, dst);
+                temp = dst - old_dst;
+                count -= _Process128OnceCount;
+                write_count_left -= temp;
+                escape_count -= temp;
+                if (escape_count == count) {
+                    goto no_escape;
+                }
+                continue;
+            } else {
+                // ??
+                x = _mm512_castsi512_si128(z); // no-op, AVX512F
+                v = check_and_write_128<__kind, __simd_level>((void *) dst, x);
+                if (v) {
+                    // .x
+                    src += _Process128OnceCount;
+                    count -= _Process128OnceCount;
+                    dst += _Process128OnceCount;
+                    write_count_left -= _Process128OnceCount;
+                    escape_count -= _Process128OnceCount;
+                    // moved: x
+                }
+                // x
+                old_dst = dst;
+                copy_escape_fixsize<__kind, __kind, 128>(src, dst);
+                temp = dst - old_dst;
+                count -= _Process128OnceCount;
+                write_count_left -= temp;
+                escape_count -= temp;
+                if (escape_count == count) {
+                    goto no_escape;
+                }
+                continue;
+            }
+        }
+    }
+    //
+    assert(count < _Process512OnceCount);
+    if (!count) return;
+    if (likely(write_count_left >= _Process512OnceCount)) {
+        // try a tail check
+        z = _mm512_loadu_si512((void *) src); // vmovdqu32, AVX512F
+        _mm512_storeu_si512((void *) dst, z); // vmovdqu32, AVX512F
+        v = check_escape_tail_512bits<__kind, __simd_level>(z, count);
+        if (likely(v)) {
+            dst += count;
+            return;
+        }
+    }
+    copy_ucs_same_256bits<__kind, __simd_level>(src, count, dst, write_count_left);
+    return;
+no_escape:;
+    cpy_fast<__simd_level>((void *) dst, (void *) src, count * sizeof(uu), write_count_left * sizeof(uu));
+    dst += count;
+    return;
+}
+
+
+template<UCSKind __kind, X86SIMDLevel __simd_level>
+force_inline void copy_ucs_same(UCSType_t<__kind> *src, Py_ssize_t src_count, UCSType_t<__kind> *&dst, UCSType_t<__kind> *const end_ptr, Py_ssize_t escape_len) {
+    Py_ssize_t write_count_left = (Py_ssize_t) (end_ptr - dst);
+    if constexpr (__simd_level >= X86SIMDLevel::AVX512) {
+        copy_ucs_same_512bits<__kind, __simd_level>(src, src_count, dst, escape_len, write_count_left);
+    } else if constexpr (__simd_level >= X86SIMDLevel::AVX2) {
+        copy_ucs_same_256bits<__kind, __simd_level>(src, src_count, dst, escape_len, write_count_left);
+    } else {
+        copy_ucs_same_128bits<__kind, __simd_level>(src, src_count, dst, escape_len, write_count_left);
+    }
+}
+
+template<UCSKind __from, UCSKind __to, X86SIMDLevel __simd_level>
+force_inline void copy_ucs(UCSType_t<__from> *src, Py_ssize_t src_count, UCSType_t<__to> *&dst, UCSType_t<__to> *const end_ptr, Py_ssize_t escape_len) {
+    if constexpr (__from != __to) {
+        copy_ucs_elevate<__from, __to, __simd_level>(src, src_count, dst, end_ptr, escape_len);
+    } else {
+        copy_ucs_same<__from, __simd_level>(src, src_count, dst, end_ptr, escape_len);
+    }
+}
+
+typedef struct CtnType {
+    PyObject *ctn;
+    Py_ssize_t index;
+} CtnType;
+
+
+thread_local CtnType _CtnStack[PYYJSON_ENCODE_MAX_RECURSION];
+
+template<typename T, size_t L, T _DefaultVal, size_t... Is>
+constexpr auto make_filled_array_impl(std::index_sequence<Is...>) {
+    return std::array<T, L>{((void) Is, _DefaultVal)...};
+}
+
+template<typename T, size_t L, T _DefaultVal>
+constexpr std::array<T, L> create_array() {
+    return make_filled_array_impl<T, L, _DefaultVal>(std::make_index_sequence<L>{});
+}
+
+template<typename uu, Py_ssize_t reserve, bool _is_signed = true>
+struct NaN_Template {
+    static constexpr uu value[reserve] = {
+            (uu) '-',
+            (uu) 'n',
+            (uu) 'a',
+            (uu) 'n',
+            (uu) ',',
+    };
+};
+
+template<typename uu, Py_ssize_t reserve>
+struct NaN_Template<uu, reserve, false> {
+    static constexpr uu value[reserve] = {
+            (uu) 'n',
+            (uu) 'a',
+            (uu) 'n',
+            (uu) ',',
+    };
+};
+
+template<typename uu, Py_ssize_t reserve, bool _is_signed = true>
+struct Inf_Template {
+    static constexpr uu value[reserve] = {
+            (uu) '-',
+            (uu) 'i',
+            (uu) 'n',
+            (uu) 'f',
+            (uu) ',',
+    };
+};
+
+template<typename uu, Py_ssize_t reserve>
+struct Inf_Template<uu, reserve, false> {
+    static constexpr uu value[reserve] = {
+            (uu) 'i',
+            (uu) 'n',
+            (uu) 'f',
+            (uu) ',',
+    };
+};
+
 
 #define TODO() assert(false)
 
-
-#define ALIAS_NAMES()                              \
-    auto &cur_nested_depth = cfg.cur_nested_depth; \
-    auto &cur_obj = cfg.cur_obj;                   \
-    auto &cur_pos = cfg.cur_pos;                   \
-    auto &cur_list_size = cfg.cur_list_size;       \
-    auto &cur_ucs_kind = cfg.cur_ucs_kind;         \
-    auto &key = cfg.key;                           \
-    auto &val = cfg.val
-
-
-force_inline void update_string_info(EncodeWriteOpConfig &cfg, PyObject *val) {
-    cfg.cur_ucs_kind = std::max(cfg.cur_ucs_kind, static_cast<UCSKind>(PyUnicode_KIND(val)));
-    cfg.is_all_ascii = cfg.is_all_ascii && PyUnicode_IS_ASCII(val);
-}
 
 enum class PyFastTypes : u8 {
     T_Unicode,
@@ -2013,91 +1277,6 @@ PyFastTypes fast_type_check(PyObject *val) {
 }
 
 
-// #define PROCESS_VAL(val)                                                 \
-//     PyFastTypes fast_type = fast_type_check(val);                        \
-//     switch (fast_type) {                                                 \
-//         case PyFastTypes::T_Unicode: {                                   \
-//             update_string_info(cfg, val);                                \
-//             op_desc.write_op_with_data(EncodeOpType::STRING, val);       \
-//             break;                                                       \
-//         }                                                                \
-//         case PyFastTypes::T_Long: {                                      \
-//             if (unlikely(!write_PyLongOp(val, op_desc))) {               \
-//                 goto fail;                                               \
-//             }                                                            \
-//             break;                                                       \
-//         }                                                                \
-//         case PyFastTypes::T_False: {                                     \
-//             op_desc.write_simple_op(EncodeOpType::FALSE_VALUE);          \
-//             break;                                                       \
-//         }                                                                \
-//         case PyFastTypes::T_True: {                                      \
-//             op_desc.write_simple_op(EncodeOpType::TRUE_VALUE);           \
-//             break;                                                       \
-//         }                                                                \
-//         case PyFastTypes::T_None: {                                      \
-//             op_desc.write_simple_op(EncodeOpType::NULL_VALUE);           \
-//             break;                                                       \
-//         }                                                                \
-//         case PyFastTypes::T_Float: {                                     \
-//             if (unlikely(!write_PyFloatOp(val, op_desc))) {              \
-//                 goto fail;                                               \
-//             }                                                            \
-//             break;                                                       \
-//         }                                                                \
-//         case PyFastTypes::T_List: {                                      \
-//             Py_ssize_t this_list_size = PyList_Size(val);                \
-//             if (unlikely(cur_list_size == 0)) {                          \
-//                 op_desc.write_simple_op(EncodeOpType::ARRAY_EMPTY);      \
-//             } else {                                                     \
-//                 CTN_SIZE_GROW();                                         \
-//                 CtnType *cur_write_ctn = _CtnStack + ++cur_nested_depth; \
-//                 cur_write_ctn->ctn = cur_obj;                            \
-//                 cur_write_ctn->index = cur_pos;                          \
-//                 cur_obj = val;                                           \
-//                 cur_pos = 0;                                             \
-//                 op_desc.write_simple_op(EncodeOpType::ARRAY_BEGIN);      \
-//                 GOTO_ARR_VAL_BEGIN_WITH_SIZE(this_list_size);            \
-//             }                                                            \
-//             break;                                                       \
-//         }                                                                \
-//         case PyFastTypes::T_Dict: {                                      \
-//             if (unlikely(PyDict_Size(val) == 0)) {                       \
-//                 op_desc.write_simple_op(EncodeOpType::DICT_EMPTY);       \
-//             } else {                                                     \
-//                 CTN_SIZE_GROW();                                         \
-//                 CtnType *cur_write_ctn = _CtnStack + ++cur_nested_depth; \
-//                 cur_write_ctn->ctn = cur_obj;                            \
-//                 cur_write_ctn->index = cur_pos;                          \
-//                 cur_obj = val;                                           \
-//                 cur_pos = 0;                                             \
-//                 op_desc.write_simple_op(EncodeOpType::DICT_BEGIN);       \
-//                 goto dict_pair_begin;                                    \
-//             }                                                            \
-//             break;                                                       \
-//         }                                                                \
-//         case PyFastTypes::T_Tuple: {                                     \
-//             Py_ssize_t this_list_size = PyTuple_Size(val);               \
-//             if (unlikely(this_list_size == 0)) {                         \
-//                 op_desc.write_simple_op(EncodeOpType::ARRAY_EMPTY);      \
-//             } else {                                                     \
-//                 CTN_SIZE_GROW();                                         \
-//                 CtnType *cur_write_ctn = _CtnStack + ++cur_nested_depth; \
-//                 cur_write_ctn->ctn = cur_obj;                            \
-//                 cur_write_ctn->index = cur_pos;                          \
-//                 cur_obj = val;                                           \
-//                 cur_pos = 0;                                             \
-//                 op_desc.write_simple_op(EncodeOpType::ARRAY_BEGIN);      \
-//                 GOTO_TUPLE_VAL_BEGIN_WITH_SIZE(this_list_size);          \
-//             }                                                            \
-//             break;                                                       \
-//         }                                                                \
-//         default: {                                                       \
-//             PyErr_SetString(JSONEncodeError, "Unsupported type");        \
-//             goto fail;                                                   \
-//         }                                                                \
-//     }
-
 struct DumpOption {
     IndentLevel indent_level;
 };
@@ -2106,41 +1285,6 @@ constexpr X86SIMDLevel check_simd_level() {
     // TODO
     return X86SIMDLevel::AVX2;
 }
-
-// #define JUMP_BY_UCS_TYPE(_indent_)                                                                            \
-//     switch (op_cfg->cur_ucs_kind) {                                                                           \
-//         case UCSKind::UCS1: {                                                                                 \
-//             return pyyjson_dumps_read_op_write_str<_indent_, UCSKind::UCS1, simd_level>(op_cfg, op_desc_old); \
-//         }                                                                                                     \
-//         case UCSKind::UCS2: {                                                                                 \
-//             return pyyjson_dumps_read_op_write_str<_indent_, UCSKind::UCS2, simd_level>(op_cfg, op_desc_old); \
-//         }                                                                                                     \
-//         case UCSKind::UCS4: {                                                                                 \
-//             return pyyjson_dumps_read_op_write_str<_indent_, UCSKind::UCS4, simd_level>(op_cfg, op_desc_old); \
-//         }                                                                                                     \
-//         default: {                                                                                            \
-//             Py_UNREACHABLE();                                                                                 \
-//             break;                                                                                            \
-//         }                                                                                                     \
-//     }
-
-// PyObject *pyyjson_dumps_read_op_write_str_call_jump(DumpOption *options, EncodeWriteOpConfig *op_cfg, EncodeOpDescriber *op_desc_old) {
-//     constexpr X86SIMDLevel simd_level = check_simd_level();
-//     switch (options->indent_level) {
-//         case IndentLevel::NONE: {
-//             JUMP_BY_UCS_TYPE(IndentLevel::NONE);
-//         }
-//         case IndentLevel::INDENT_2: {
-//             JUMP_BY_UCS_TYPE(IndentLevel::INDENT_2);
-//         }
-//         case IndentLevel::INDENT_4: {
-//             JUMP_BY_UCS_TYPE(IndentLevel::INDENT_4);
-//         }
-//     }
-
-//     Py_UNREACHABLE();
-//     return nullptr;
-// }
 
 thread_local u32 _ObjViewFirstBuffer[(usize) PYYJSON_ENCODE_OBJ_VIEW_BUFFER_INIT_SIZE];
 thread_local void *_ViewDataFirstBuffer[(usize) PYYJSON_ENCODE_VIEW_DATA_BUFFER_INIT_SIZE];
@@ -2173,10 +1317,11 @@ struct ObjViewer {
     void **m_data_buffers[SIZEOF_UINTPTR_T * 8];
 };
 
-#define INIT_FROM_THREAD_LOCAL_BUFFER(viewer, rw_ptr, end_ptr, tls_buffer, offset) \
-    do {                                                                           \
-        viewer->rw_ptr = (decltype(viewer->rw_ptr)) &tls_buffer[0];                \
-        viewer->end_ptr = viewer->rw_ptr + (offset);                               \
+#define INIT_FROM_THREAD_LOCAL_BUFFER(viewer, rw_ptr, end_ptr, buffers, tls_buffer, offset) \
+    do {                                                                                    \
+        viewer->rw_ptr = (decltype(viewer->rw_ptr)) &tls_buffer[0];                         \
+        viewer->end_ptr = viewer->rw_ptr + (offset);                                        \
+        viewer->buffers[0] = viewer->rw_ptr;                                                \
     } while (0)
 
 force_inline void init_viewer(ObjViewer *viewer) {
@@ -2184,14 +1329,24 @@ force_inline void init_viewer(ObjViewer *viewer) {
     viewer->m_unicode_kind = UCSKind::UCS1;
     viewer->m_is_all_ascii = true;
     viewer->m_cur_depth = 0;
+    viewer->m_is_in_obj = true;
     //
     viewer->m_obj_view_buffer_count = 1;
     viewer->m_obj_view_cur_rw_index = 0;
-    INIT_FROM_THREAD_LOCAL_BUFFER(viewer, m_cur_obj_view_rw_ptr, m_cur_obj_view_end_ptr, _ObjViewFirstBuffer, PYYJSON_ENCODE_OBJ_VIEW_BUFFER_INIT_SIZE);
+    INIT_FROM_THREAD_LOCAL_BUFFER(viewer, m_cur_obj_view_rw_ptr, m_cur_obj_view_end_ptr, m_obj_view_buffers, _ObjViewFirstBuffer, PYYJSON_ENCODE_OBJ_VIEW_BUFFER_INIT_SIZE);
     //
     viewer->m_data_buffer_count = 1;
     viewer->m_data_cur_rw_index = 0;
-    INIT_FROM_THREAD_LOCAL_BUFFER(viewer, m_cur_data_rw_ptr, m_cur_data_end_ptr, _ViewDataFirstBuffer, PYYJSON_ENCODE_VIEW_DATA_BUFFER_INIT_SIZE);
+    INIT_FROM_THREAD_LOCAL_BUFFER(viewer, m_cur_data_rw_ptr, m_cur_data_end_ptr, m_data_buffers, _ViewDataFirstBuffer, PYYJSON_ENCODE_VIEW_DATA_BUFFER_INIT_SIZE);
+}
+
+force_inline void clear_viewer(ObjViewer *viewer) {
+    for (Py_ssize_t i = 1; i < viewer->m_obj_view_buffer_count; i++) {
+        free(viewer->m_obj_view_buffers[i]);
+    }
+    for (Py_ssize_t i = 1; i < viewer->m_data_buffer_count; i++) {
+        free(viewer->m_data_buffers[i]);
+    }
 }
 
 force_inline Py_ssize_t get_view_buffer_length(usize index) {
@@ -2200,6 +1355,15 @@ force_inline Py_ssize_t get_view_buffer_length(usize index) {
 
 force_inline Py_ssize_t get_data_buffer_length(usize index) {
     return PYYJSON_ENCODE_VIEW_DATA_BUFFER_INIT_SIZE << index;
+}
+
+force_inline void reset_view_for_read(ObjViewer *viewer) {
+    viewer->m_obj_view_cur_rw_index = 0;
+    viewer->m_cur_obj_view_rw_ptr = viewer->m_obj_view_buffers[0];
+    viewer->m_cur_obj_view_end_ptr = viewer->m_cur_obj_view_rw_ptr + get_view_buffer_length(0);
+    viewer->m_data_cur_rw_index = 0;
+    viewer->m_cur_data_rw_ptr = viewer->m_data_buffers[0];
+    viewer->m_cur_data_end_ptr = viewer->m_cur_data_rw_ptr + get_data_buffer_length(0);
 }
 
 force_inline bool write_obj_view(ObjViewer *viewer, u32 view) {
@@ -2261,6 +1425,30 @@ fail_mem:;
 }
 
 template<typename T>
+force_inline T *reserve_view_data_buffer(ObjViewer *viewer) {
+    static_assert((sizeof(T) % sizeof(void *)) == 0);
+    T *ret;
+    if (unlikely((uintptr_t) viewer->m_cur_data_rw_ptr + sizeof(T) > (uintptr_t) viewer->m_cur_data_end_ptr)) {
+        usize next_index = (usize) viewer->m_data_buffer_count;
+        Py_ssize_t next_buffer_length = get_data_buffer_length(next_index);
+        void *new_buffer = aligned_alloc(512 / 8, (usize) next_buffer_length * sizeof(void *));
+        if (unlikely(!new_buffer)) goto fail_mem;
+        viewer->m_data_buffers[next_index] = (void **) new_buffer;
+        viewer->m_data_buffer_count++;
+        viewer->m_cur_data_rw_ptr = (void **) new_buffer;
+        viewer->m_cur_data_end_ptr = viewer->m_cur_data_rw_ptr + next_buffer_length;
+        // DONT modify m_data_cur_rw_index
+    }
+    assert((uintptr_t) viewer->m_cur_data_rw_ptr + sizeof(T) <= (uintptr_t) viewer->m_cur_data_end_ptr);
+    ret = (T *) viewer->m_cur_data_rw_ptr;
+    viewer->m_cur_data_rw_ptr += sizeof(T) / sizeof(void *);
+    return ret;
+fail_mem:;
+    PyErr_NoMemory();
+    return NULL;
+}
+
+template<typename T>
 force_inline T read_view_data(ObjViewer *viewer) {
     static_assert((sizeof(T) % sizeof(void *)) == 0);
     if (unlikely((uintptr_t) viewer->m_cur_data_rw_ptr + sizeof(T) > (uintptr_t) viewer->m_cur_data_end_ptr)) {
@@ -2273,6 +1461,23 @@ force_inline T read_view_data(ObjViewer *viewer) {
     }
     assert((uintptr_t) viewer->m_cur_data_rw_ptr + sizeof(T) <= (uintptr_t) viewer->m_cur_data_end_ptr);
     T ret = *(T *) viewer->m_cur_data_rw_ptr;
+    viewer->m_cur_data_rw_ptr += sizeof(T) / sizeof(void *);
+    return ret;
+}
+
+template<typename T>
+force_inline T *read_view_data_buffer(ObjViewer *viewer) {
+    static_assert((sizeof(T) % sizeof(void *)) == 0);
+    if (unlikely((uintptr_t) viewer->m_cur_data_rw_ptr + sizeof(T) > (uintptr_t) viewer->m_cur_data_end_ptr)) {
+        Py_ssize_t cur_rw_index = ++viewer->m_data_cur_rw_index;
+        assert(cur_rw_index < viewer->m_data_buffer_count);
+        viewer->m_cur_data_rw_ptr = viewer->m_data_buffers[cur_rw_index];
+        Py_ssize_t length = get_data_buffer_length(cur_rw_index);
+        viewer->m_cur_data_end_ptr = viewer->m_cur_data_rw_ptr + length;
+        // DONT modify m_data_buffer_count
+    }
+    assert((uintptr_t) viewer->m_cur_data_rw_ptr + sizeof(T) <= (uintptr_t) viewer->m_cur_data_end_ptr);
+    T *ret = (T *) viewer->m_cur_data_rw_ptr;
     viewer->m_cur_data_rw_ptr += sizeof(T) / sizeof(void *);
     return ret;
 }
@@ -2324,12 +1529,12 @@ force_inline Py_UCS4 get_max_char_from_ucs_kind(UCSKind kind, bool is_all_ascii)
     }
 }
 
-force_inline bool read_is_dict_from_view(ObjViewer *viewer) {
+force_inline bool read_is_unicode_escaped(ObjViewer *viewer) {
     return (bool) viewer->m_view_payload;
 }
 
-force_inline bool read_is_unicode_escaped(ObjViewer *viewer) {
-    return (bool) viewer->m_view_payload;
+force_inline usize read_number_written_size(ObjViewer *viewer) {
+    return (usize) viewer->m_view_payload;
 }
 
 template<UCSKind _Kind, usize _BitSize>
@@ -2364,7 +1569,10 @@ force_inline void _do_simd_repeat_copy(UCSType_t<_Kind> *dst, UCSType_t<_Kind> *
             } else if constexpr (_BitSize == 256) {
                 _mm256_store_si256((__m256i_u *) dst, _mm256_load_si256((const __m256i *) aligned_src));
             } else {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Walign-mismatch"
                 _mm_store_si128((__m128i_u *) dst, _mm_load_si128((const __m128i *) aligned_src));
+#pragma GCC diagnostic pop
             }
             dst += _CopyOnce;
         }
@@ -2377,13 +1585,15 @@ force_inline void _do_simd_repeat_copy(UCSType_t<_Kind> *dst, UCSType_t<_Kind> *
     }
 }
 
-
-template<IndentSetting _IndentSetting, UCSKind _Kind>
+template<IndentSetting _IndentSetting, UCSKind _Kind, X86SIMDLevel _SIMDLevel, bool _IsForceIndent = false>
 void write_newline_and_indent_from_view(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
     using uu = UCSType_t<_Kind>;
 
     if constexpr (!need_indent(_IndentSetting)) {
         return;
+    }
+    if constexpr (!_IsForceIndent) {
+        if (viewer->m_is_in_obj) return;
     }
 
     Py_ssize_t indent_space_count = get_indent_space_count(viewer, _IndentSetting);
@@ -2446,19 +1656,70 @@ force_inline void write_ctn_begin(ObjViewer *viewer, UCSType_t<_Kind> *&write_pt
     assert(write_ptr <= end_ptr);
 }
 
-template<UCSKind _Kind>
+template<bool _IsWriteObj, UCSKind _Kind>
 force_inline void write_ctn_end(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
     using uu = UCSType_t<_Kind>;
 
-    // need to erase last comma
-    *(write_ptr - 1) = (uu) ']' | ((uu) viewer->m_is_in_obj << 5);
+    *write_ptr++ = (uu) ']' | ((uu) _IsWriteObj << 5);
     if (unlikely(write_ptr >= end_ptr)) return;
     *write_ptr++ = (uu) ',';
 }
 
-template<UCSKind _Kind>
-void copy_raw_unicode_with_escape(ObjViewer *viewer, PyObject *unicode, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
-    // TODO
+template<UCSKind _Kind, X86SIMDLevel _SIMDLevel>
+void copy_raw_unicode_with_escape(ObjViewer *viewer, PyObject *unicode, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr, Py_ssize_t escape_len) {
+    using udst = UCSType_t<_Kind>;
+    udst *const start_write_ptr = write_ptr;
+
+    UCSKind src_kind = (UCSKind) PyUnicode_KIND(unicode);
+    Py_ssize_t len = PyUnicode_GET_LENGTH(unicode);
+
+    assert(_Kind >= src_kind);
+    assert(len <= escape_len);
+    assert(len >= 0);
+
+    if constexpr (_Kind == UCSKind::UCS1) {
+        assert(src_kind == UCSKind::UCS1);
+        copy_ucs<UCSKind::UCS1, _Kind, _SIMDLevel>((u8 *) PyUnicode_DATA(unicode), len, write_ptr, end_ptr, escape_len);
+        return;
+    } else if constexpr (_Kind == UCSKind::UCS2) {
+        switch (src_kind) {
+            case UCSKind::UCS1: {
+                copy_ucs<UCSKind::UCS1, _Kind, _SIMDLevel>((u8 *) PyUnicode_DATA(unicode), len, write_ptr, end_ptr, escape_len);
+                break;
+            }
+            case UCSKind::UCS2: {
+                copy_ucs<UCSKind::UCS2, _Kind, _SIMDLevel>((u16 *) PyUnicode_DATA(unicode), len, write_ptr, end_ptr, escape_len);
+                break;
+            }
+            default: {
+                Py_UNREACHABLE();
+                assert(false);
+            }
+        }
+    } else {
+        switch (src_kind) {
+            case UCSKind::UCS1: {
+                copy_ucs<UCSKind::UCS1, _Kind, _SIMDLevel>((u8 *) PyUnicode_DATA(unicode), len, write_ptr, end_ptr, escape_len);
+                break;
+            }
+            case UCSKind::UCS2: {
+                copy_ucs<UCSKind::UCS2, _Kind, _SIMDLevel>((u16 *) PyUnicode_DATA(unicode), len, write_ptr, end_ptr, escape_len);
+                break;
+            }
+            case UCSKind::UCS4: {
+                copy_ucs<UCSKind::UCS4, _Kind, _SIMDLevel>((u32 *) PyUnicode_DATA(unicode), len, write_ptr, end_ptr, escape_len);
+                break;
+            }
+            default: {
+                Py_UNREACHABLE();
+                assert(false);
+            }
+        }
+    }
+
+
+    assert(write_ptr - start_write_ptr > len);
+    assert(write_ptr <= end_ptr);
 }
 
 template<UCSKind _Kind, X86SIMDLevel _SIMDLevel>
@@ -2471,7 +1732,7 @@ void copy_raw_unicode(ObjViewer *viewer, PyObject *unicode, UCSType_t<_Kind> *&w
         write_ptr += len;
     } else if constexpr (_Kind == UCSKind::UCS2) {
         if (src_kind == UCSKind::UCS1) {
-            copy_elevate_nocheck<UCSKind::UCS1, UCSKind::UCS2>(write_ptr, (u8 *) PyUnicode_DATA(unicode), len, end_ptr - write_ptr);
+            copy_elevate_nocheck<UCSKind::UCS1, UCSKind::UCS2, _SIMDLevel>(write_ptr, (u8 *) PyUnicode_DATA(unicode), len, end_ptr - write_ptr);
         } else {
             assert(src_kind == UCSKind::UCS2);
             cpy_fast<_SIMDLevel>((void *) write_ptr, (void *) PyUnicode_DATA(unicode), len * 2, (Py_ssize_t) end_ptr - (Py_ssize_t) write_ptr);
@@ -2480,9 +1741,9 @@ void copy_raw_unicode(ObjViewer *viewer, PyObject *unicode, UCSType_t<_Kind> *&w
     } else {
         static_assert(_Kind == UCSKind::UCS4);
         if (src_kind == UCSKind::UCS1) {
-            copy_elevate_nocheck<UCSKind::UCS1, UCSKind::UCS4>(write_ptr, (u8 *) PyUnicode_DATA(unicode), len, end_ptr - write_ptr);
+            copy_elevate_nocheck<UCSKind::UCS1, UCSKind::UCS4, _SIMDLevel>(write_ptr, (u8 *) PyUnicode_DATA(unicode), len, end_ptr - write_ptr);
         } else if (src_kind == UCSKind::UCS2) {
-            copy_elevate_nocheck<UCSKind::UCS2, UCSKind::UCS4>(write_ptr, (u16 *) PyUnicode_DATA(unicode), len, end_ptr - write_ptr);
+            copy_elevate_nocheck<UCSKind::UCS2, UCSKind::UCS4, _SIMDLevel>(write_ptr, (u16 *) PyUnicode_DATA(unicode), len, end_ptr - write_ptr);
         } else {
             assert(src_kind == UCSKind::UCS4);
             cpy_fast<_SIMDLevel>((void *) write_ptr, (void *) PyUnicode_DATA(unicode), len * 4, (Py_ssize_t) end_ptr - (Py_ssize_t) write_ptr);
@@ -2602,7 +1863,7 @@ Py_ssize_t scan_unicode_escaped_len_impl(UCSType_t<_Kind> *unicode_data, Py_ssiz
         }
     }
 
-    return len;
+    return escaped_len;
 }
 
 template<X86SIMDLevel _SIMDLevel>
@@ -2628,16 +1889,20 @@ Py_ssize_t scan_unicode_escaped_len(PyObject *str) {
     return 0;
 }
 
-template<IndentSetting _IndentSetting, UCSKind _Kind>
+template<IndentSetting _IndentSetting, UCSKind _Kind, X86SIMDLevel _SIMDLevel>
 force_inline void write_key(ObjViewer *viewer, PyObject *key, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
     using uu = UCSType_t<_Kind>;
     assert(PyUnicode_CheckExact(key));
     *write_ptr++ = (uu) '"';
     bool has_escape = read_is_unicode_escaped(viewer);
+    uu *old_write_ptr = write_ptr;
     if (unlikely(has_escape)) {
-        copy_raw_unicode_with_escape(viewer, key, write_ptr, end_ptr);
+        // additional escape data is written in the view data buffer
+        Py_ssize_t escape_len = read_view_data<Py_ssize_t>(viewer);
+        copy_raw_unicode_with_escape<_Kind, _SIMDLevel>(viewer, key, write_ptr, end_ptr, escape_len);
+        assert(write_ptr - old_write_ptr == escape_len);
     } else {
-        copy_raw_unicode(viewer, key, write_ptr, end_ptr);
+        copy_raw_unicode<_Kind, _SIMDLevel>(viewer, key, write_ptr, end_ptr);
     }
     constexpr uu _Template[3] = {
             (uu) '"',
@@ -2649,6 +1914,115 @@ force_inline void write_key(ObjViewer *viewer, PyObject *key, UCSType_t<_Kind> *
     write_ptr += copy_count;
     assert(write_ptr <= end_ptr);
 }
+
+template<IndentSetting _IndentSetting, UCSKind _Kind, X86SIMDLevel _SIMDLevel>
+force_inline void write_str(ObjViewer *viewer, PyObject *str, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
+    using uu = UCSType_t<_Kind>;
+    assert(PyUnicode_CheckExact(str));
+    *write_ptr++ = (uu) '"';
+    bool has_escape = read_is_unicode_escaped(viewer);
+    uu *old_write_ptr = write_ptr;
+    if (unlikely(has_escape)) {
+        // additional escape data is written in the view data buffer
+        Py_ssize_t escape_len = read_view_data<Py_ssize_t>(viewer);
+        copy_raw_unicode_with_escape<_Kind, _SIMDLevel>(viewer, str, write_ptr, end_ptr, escape_len);
+        assert(write_ptr - old_write_ptr == escape_len);
+    } else {
+        copy_raw_unicode<_Kind, _SIMDLevel>(viewer, str, write_ptr, end_ptr);
+    }
+    constexpr uu _Template[2] = {
+            (uu) '"',
+            (uu) ',',
+    };
+    if (unlikely(end_ptr - write_ptr < 2)) {
+        *write_ptr++ = (uu) '"';
+        assert(write_ptr == end_ptr);
+        return;
+    }
+    memcpy((void *) write_ptr, (const void *) &_Template[0], 2 * sizeof(uu));
+    write_ptr += 2;
+    assert(write_ptr <= end_ptr);
+}
+
+template<UCSKind _Kind>
+force_inline void write_zero(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
+    using uu = UCSType_t<_Kind>;
+    *write_ptr++ = (uu) '0';
+    if (unlikely(write_ptr >= end_ptr)) {
+        assert(write_ptr == end_ptr);
+        return;
+    }
+    *write_ptr++ = (uu) ',';
+}
+
+template<UCSKind _Kind>
+force_inline void write_true(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
+    using uu = UCSType_t<_Kind>;
+    constexpr uu _Template[6] = {
+            (uu) 't',
+            (uu) 'r',
+            (uu) 'u',
+            (uu) 'e',
+            (uu) ',',
+    };
+    assert(end_ptr >= write_ptr + 5);
+    if (unlikely(write_ptr + 5 >= end_ptr)) {
+        memcpy((void *) write_ptr, (const void *) &_Template[0], 5 * sizeof(uu));
+        write_ptr = end_ptr;
+        return;
+    }
+    memcpy((void *) write_ptr, (const void *) &_Template[0], sizeof(_Template));
+    write_ptr += 5;
+}
+
+template<UCSKind _Kind>
+force_inline void write_false(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
+    using uu = UCSType_t<_Kind>;
+    constexpr uu _Template[6] = {
+            (uu) 'f',
+            (uu) 'a',
+            (uu) 'l',
+            (uu) 's',
+            (uu) 'e',
+            (uu) ',',
+    };
+    assert(end_ptr >= write_ptr + 6);
+    memcpy((void *) write_ptr, (const void *) &_Template[0], sizeof(_Template));
+    write_ptr += 6;
+}
+
+template<UCSKind _Kind>
+force_inline void write_null(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
+    using uu = UCSType_t<_Kind>;
+    constexpr uu _Template[6] = {
+            (uu) 'n',
+            (uu) 'u',
+            (uu) 'l',
+            (uu) 'l',
+            (uu) ',',
+    };
+    assert(end_ptr >= write_ptr + 5);
+    if (unlikely(write_ptr + 5 >= end_ptr)) {
+        memcpy((void *) write_ptr, (const void *) &_Template[0], 5 * sizeof(uu));
+        write_ptr = end_ptr;
+        return;
+    }
+    memcpy((void *) write_ptr, (const void *) &_Template[0], sizeof(_Template));
+    write_ptr += 5;
+}
+
+template<UCSKind _Kind, X86SIMDLevel _SIMDLevel>
+force_inline void write_number(ObjViewer *viewer, u8 *buffer, usize buffer_len, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
+    if constexpr (_Kind > UCSKind ::UCS1) {
+        copy_elevate_nocheck<UCSKind::UCS1, _Kind, _SIMDLevel>(write_ptr, buffer, buffer_len, end_ptr - write_ptr);
+    } else {
+        // copy
+        cpy_fast<_SIMDLevel>((void *) write_ptr, (void *) buffer, buffer_len, (Py_ssize_t) end_ptr - (Py_ssize_t) write_ptr);
+        write_ptr += buffer_len;
+    }
+    *write_ptr++ = ',';
+}
+
 
 enum EncodeValJumpFlag {
     JumpFlag_Default,
@@ -2670,12 +2044,10 @@ enum ViewObjType {
     ViewObjType_Key,
     ViewObjType_Str,
     ViewObjType_Zero,
-    ViewObjType_I64,
-    ViewObjType_U64,
+    ViewObjType_Number,
     ViewObjType_True,
     ViewObjType_False,
-    ViewObjType_PyNull,
-    ViewObjType_Double,
+    ViewObjType_Null,
     ViewObjType_PosNaN,
     ViewObjType_NegNaN,
     ViewObjType_PosInf,
@@ -2710,27 +2082,25 @@ enum ViewObjType {
 #define VIEW_PAYLOAD_BIT 16
 
 
-template<IndentSetting _IndentSetting, bool _IsWriteObj>
-force_inline bool view_add_empty_ctn(ObjViewer *viewer, Py_ssize_t cur_nested_depth, bool is_inside_obj) {
+template<IndentSetting _IndentSetting, bool _IsWriteObj, bool _IsInsideObj>
+force_inline bool view_add_empty_ctn(ObjViewer *viewer, Py_ssize_t cur_nested_depth) {
     bool _c = write_obj_view(viewer, (u32) (_IsWriteObj ? ViewObjType_EmptyObj : ViewObjType_EmptyArr));
-    if constexpr (need_indent(_IndentSetting)) {
-        if (!is_inside_obj) {
-            viewer->m_unicode_count += 1 + _get_indent_space_count(cur_nested_depth, _IndentSetting);
-        }
+    if constexpr (need_indent(_IndentSetting) && !_IsInsideObj) {
+        viewer->m_unicode_count += 1 + _get_indent_space_count(cur_nested_depth, _IndentSetting) + 3;
+    } else {
+        viewer->m_unicode_count += 3;
     }
-    viewer->m_unicode_count += 3;
     return _c;
 }
 
-template<IndentSetting _IndentSetting, bool _IsWriteObj>
-force_inline bool view_add_ctn_begin(ObjViewer *viewer, Py_ssize_t cur_nested_depth, bool is_inside_obj) {
+template<IndentSetting _IndentSetting, bool _IsWriteObj, bool _IsInsideObj>
+force_inline bool view_add_ctn_begin(ObjViewer *viewer, Py_ssize_t cur_nested_depth) {
     bool _c = write_obj_view(viewer, (u32) (_IsWriteObj ? ViewObjType_ObjBegin : ViewObjType_ArrBegin));
-    if constexpr (need_indent(_IndentSetting)) {
-        if (!is_inside_obj) {
-            viewer->m_unicode_count += 1 + _get_indent_space_count(cur_nested_depth, _IndentSetting);
-        }
+    if constexpr (need_indent(_IndentSetting) && !_IsInsideObj) {
+        viewer->m_unicode_count += 1 + _get_indent_space_count(cur_nested_depth, _IndentSetting) + 1;
+    } else {
+        viewer->m_unicode_count += 1;
     }
-    viewer->m_unicode_count += 1;
     return _c;
 }
 
@@ -2741,10 +2111,10 @@ force_inline void view_update_str_info(ObjViewer *viewer, PyObject *str) {
     viewer->m_is_all_ascii = viewer->m_is_all_ascii && PyUnicode_IS_ASCII(str);
 }
 
-template<IndentSetting _IndentSetting>
+template<IndentSetting _IndentSetting, X86SIMDLevel _SIMDLevel>
 force_inline bool view_add_key(ObjViewer *viewer, PyObject *str, Py_ssize_t cur_nested_depth) {
     assert(PyUnicode_CheckExact(str));
-    Py_ssize_t escaped_len = scan_unicode_escaped_len(str);
+    Py_ssize_t escaped_len = scan_unicode_escaped_len<_SIMDLevel>(str);
     bool has_escape = escaped_len > PyUnicode_GET_LENGTH(str);
     u32 view = (u32) ViewObjType_Key | ((u32) has_escape << VIEW_PAYLOAD_BIT);
     bool _c = write_obj_view(viewer, view) && write_view_data<PyObject *>(viewer, str);
@@ -2761,8 +2131,8 @@ force_inline bool view_add_key(ObjViewer *viewer, PyObject *str, Py_ssize_t cur_
     return _c;
 }
 
-template<IndentSetting _IndentSetting, X86SIMDLevel _SIMDLevel>
-force_inline bool view_add_str(ObjViewer *viewer, PyObject *str, Py_ssize_t cur_nested_depth, bool is_inside_obj) {
+template<IndentSetting _IndentSetting, X86SIMDLevel _SIMDLevel, bool _IsInsideObj>
+force_inline bool view_add_str(ObjViewer *viewer, PyObject *str, Py_ssize_t cur_nested_depth) {
     assert(PyUnicode_CheckExact(str));
     Py_ssize_t escaped_len = scan_unicode_escaped_len<_SIMDLevel>(str);
     bool has_escape = escaped_len > PyUnicode_GET_LENGTH(str);
@@ -2771,14 +2141,8 @@ force_inline bool view_add_str(ObjViewer *viewer, PyObject *str, Py_ssize_t cur_
     if (unlikely(has_escape)) {
         _c = _c && write_view_data<Py_ssize_t>(viewer, escaped_len);
     }
-    if constexpr (need_indent(_IndentSetting)) {
-        if (!is_inside_obj) {
-            // indent and spaces, two quotes, unicode, and one comma
-            viewer->m_unicode_count += 1 + _get_indent_space_count(cur_nested_depth, _IndentSetting) + 3 + escaped_len;
-        } else {
-            // two quotes, unicode, and one comma
-            viewer->m_unicode_count += 3 + escaped_len;
-        }
+    if constexpr (need_indent(_IndentSetting) && !_IsInsideObj) {
+        viewer->m_unicode_count += 1 + _get_indent_space_count(cur_nested_depth, _IndentSetting) + 3 + escaped_len;
     } else {
         // two quotes, unicode, and one comma
         viewer->m_unicode_count += 3 + escaped_len;
@@ -2796,7 +2160,131 @@ force_inline bool view_add_ctn_end(ObjViewer *viewer, Py_ssize_t cur_nested_dept
     return _c;
 }
 
-template<IndentSetting _IndentSetting, X86SIMDLevel _SIMDLevel>
+template<IndentSetting _IndentSetting, bool _IsInsideObj>
+force_inline bool view_add_pylong(ObjViewer *viewer, PyObject *val, Py_ssize_t cur_nested_depth) {
+    assert(PyLong_CheckExact(val));
+    if (pylong_is_zero(val)) {
+        if (unlikely(!write_obj_view(viewer, (u32) ViewObjType_Zero))) {
+            return false;
+        }
+        if constexpr (need_indent(_IndentSetting) && !_IsInsideObj) {
+            // indent and spaces, '0', and one comma
+            viewer->m_unicode_count += 1 + _get_indent_space_count(cur_nested_depth, _IndentSetting) + 2;
+        } else {
+            // '0', and one comma
+            viewer->m_unicode_count += 2;
+        }
+    } else {
+        u8 *const buffer = (u8 *) reserve_view_data_buffer<u8[32]>(viewer);
+        u64 v;
+        usize sign;
+        if (pylong_is_unsigned(val)) {
+            bool _c = pylong_value_unsigned(val, &v);
+            if (unlikely(!buffer || !_c)) {
+                return false;
+            }
+            sign = 0;
+        } else {
+            i64 v2;
+            bool _c = pylong_value_signed(val, &v2);
+            if (unlikely(!buffer || !_c)) {
+                return false;
+            }
+            assert(v2 <= 0);
+            v = -v2;
+            sign = 1;
+            *buffer = '-';
+        }
+        u8 *const write_end = write_u64(v, buffer + sign);
+        usize written_len = (usize) (write_end - buffer);
+        assert(written_len <= 32);
+        u32 view = ViewObjType_Number | (written_len << VIEW_PAYLOAD_BIT);
+        if (unlikely(!write_obj_view(viewer, view))) {
+            return false;
+        }
+        usize view_ptr_retreat = (32 - written_len) / SIZEOF_VOID_P;
+        viewer->m_cur_data_rw_ptr -= view_ptr_retreat;
+        if constexpr (need_indent(_IndentSetting) && !_IsInsideObj) {
+            // indent and spaces, number written, and one comma
+            viewer->m_unicode_count += 1 + _get_indent_space_count(cur_nested_depth, _IndentSetting) + written_len + 1;
+        } else {
+            // number written, and one comma
+            viewer->m_unicode_count += written_len + 1;
+        }
+    }
+    return true;
+}
+
+template<IndentSetting _IndentSetting, bool _IsInsideObj>
+force_inline bool view_add_pyfloat(ObjViewer *viewer, PyObject *val, Py_ssize_t cur_nested_depth) {
+    double v = PyFloat_AS_DOUBLE(val);
+    u8 *const buffer = (u8 *) reserve_view_data_buffer<u8[32]>(viewer);
+    u64 *raw = (u64 *) &v;
+    u8 *const write_end = write_f64_raw(buffer, *raw);
+    usize written_len = (usize) (write_end - buffer);
+    assert(written_len <= 32);
+    u32 view = ViewObjType_Number | (written_len << VIEW_PAYLOAD_BIT);
+    if (unlikely(!write_obj_view(viewer, view))) {
+        return false;
+    }
+    usize view_ptr_retreat = (32 - written_len) / SIZEOF_VOID_P;
+    viewer->m_cur_data_rw_ptr -= view_ptr_retreat;
+    if constexpr (need_indent(_IndentSetting) && !_IsInsideObj) {
+        // indent and spaces, number written, and one comma
+        viewer->m_unicode_count += 1 + _get_indent_space_count(cur_nested_depth, _IndentSetting) + written_len + 1;
+    } else {
+        // number written, and one comma
+        viewer->m_unicode_count += written_len + 1;
+    }
+    return true;
+}
+
+template<IndentSetting _IndentSetting, bool _IsInsideObj>
+force_inline bool view_add_false(ObjViewer *viewer, Py_ssize_t cur_nested_depth) {
+    if (unlikely(!write_obj_view(viewer, (u32) ViewObjType_False))) {
+        return false;
+    }
+    if constexpr (need_indent(_IndentSetting) && !_IsInsideObj) {
+        // indent and spaces, 'false', and one comma
+        viewer->m_unicode_count += 1 + _get_indent_space_count(cur_nested_depth, _IndentSetting) + 6;
+    } else {
+        // 'false', and one comma
+        viewer->m_unicode_count += 6;
+    }
+    return true;
+}
+
+template<IndentSetting _IndentSetting, bool _IsInsideObj>
+force_inline bool view_add_true(ObjViewer *viewer, Py_ssize_t cur_nested_depth) {
+    if (unlikely(!write_obj_view(viewer, (u32) ViewObjType_True))) {
+        return false;
+    }
+    if constexpr (need_indent(_IndentSetting) && !_IsInsideObj) {
+        // indent and spaces, 'true', and one comma
+        viewer->m_unicode_count += 1 + _get_indent_space_count(cur_nested_depth, _IndentSetting) + 5;
+    } else {
+        // 'true', and one comma
+        viewer->m_unicode_count += 5;
+    }
+    return true;
+}
+
+template<IndentSetting _IndentSetting, bool _IsInsideObj>
+force_inline bool view_add_null(ObjViewer *viewer, Py_ssize_t cur_nested_depth) {
+    if (unlikely(!write_obj_view(viewer, (u32) ViewObjType_Null))) {
+        return false;
+    }
+    if constexpr (need_indent(_IndentSetting) && !_IsInsideObj) {
+        // indent and spaces, 'null', and one comma
+        viewer->m_unicode_count += 1 + _get_indent_space_count(cur_nested_depth, _IndentSetting) + 5;
+    } else {
+        // 'null', and one comma
+        viewer->m_unicode_count += 5;
+    }
+    return true;
+}
+
+template<IndentSetting _IndentSetting, X86SIMDLevel _SIMDLevel, bool _IsInsideObj>
 force_inline EncodeValJumpFlag view_process_val(
         PyObject *val,
         ObjViewer *obj_viewer,
@@ -2804,40 +2292,62 @@ force_inline EncodeValJumpFlag view_process_val(
         Py_ssize_t &cur_nested_depth,
         PyObject *&cur_obj,
         Py_ssize_t &cur_pos,
-        Py_ssize_t &cur_list_size, bool is_inside_obj) {
+        Py_ssize_t &cur_list_size) {
+#define CTN_SIZE_GROW()                                                      \
+    do {                                                                     \
+        if (unlikely(cur_nested_depth == PYYJSON_ENCODE_MAX_RECURSION)) {    \
+            PyErr_SetString(PyExc_ValueError, "Too many nested structures"); \
+            return JumpFlag_Fail;                                            \
+        }                                                                    \
+    } while (0)
+#define RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(_condition)    \
+    do {                                                \
+        if (unlikely(_condition)) return JumpFlag_Fail; \
+    } while (0)
+
     PyFastTypes fast_type = fast_type_check(val);
+
     switch (fast_type) {
         case PyFastTypes::T_Unicode: {
             view_update_str_info(obj_viewer, val);
-            view_add_str<_IndentSetting, _SIMDLevel>(obj_viewer, val, is_inside_obj);
+            bool _c = view_add_str<_IndentSetting, _SIMDLevel, _IsInsideObj>(obj_viewer, val, cur_nested_depth);
+            RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
             break;
         }
         case PyFastTypes::T_Long: {
-            view_add_pylong<_IndentSetting>(obj_viewer, val);
+            bool _c = view_add_pylong<_IndentSetting, _IsInsideObj>(obj_viewer, val, cur_nested_depth);
+            RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
             break;
         }
         case PyFastTypes::T_False: {
-            view_add_false<_IndentSetting>(obj_viewer);
+            bool _c = view_add_false<_IndentSetting, _IsInsideObj>(obj_viewer, cur_nested_depth);
+            RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
             break;
         }
         case PyFastTypes::T_True: {
-            view_add_true<_IndentSetting>(obj_viewer);
+            bool _c = view_add_true<_IndentSetting, _IsInsideObj>(obj_viewer, cur_nested_depth);
+            RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
             break;
         }
         case PyFastTypes::T_None: {
-            view_add_null<_IndentSetting>(obj_viewer);
+            bool _c = view_add_null<_IndentSetting, _IsInsideObj>(obj_viewer, cur_nested_depth);
+            RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
             break;
         }
         case PyFastTypes::T_Float: {
-            view_add_pyfloat<_IndentSetting>(obj_viewer);
+            bool _c = view_add_pyfloat<_IndentSetting, _IsInsideObj>(obj_viewer, val, cur_nested_depth);
+            RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
             break;
         }
         case PyFastTypes::T_List: {
-            Py_ssize_t this_list_size = PyList_Size(val);
+            Py_ssize_t this_list_size = PyList_GET_SIZE(val);
+            bool _c;
             if (unlikely(this_list_size == 0)) {
-                view_add_empty_ctn<_IndentSetting, false>(obj_viewer);
+                _c = view_add_empty_ctn<_IndentSetting, false, _IsInsideObj>(obj_viewer, cur_nested_depth);
+                RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
             } else {
-                view_add_ctn_begin<_IndentSetting, false>(obj_viewer);
+                _c = view_add_ctn_begin<_IndentSetting, false, _IsInsideObj>(obj_viewer, cur_nested_depth);
+                RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
                 CTN_SIZE_GROW();
                 CtnType *cur_write_ctn = ctn_stack + (cur_nested_depth++);
                 cur_write_ctn->ctn = cur_obj;
@@ -2850,10 +2360,13 @@ force_inline EncodeValJumpFlag view_process_val(
             break;
         }
         case PyFastTypes::T_Dict: {
-            if (unlikely(PyDict_Size(val) == 0)) {
-                view_add_empty_ctn<_IndentSetting, true>(obj_viewer);
+            bool _c;
+            if (unlikely(PyDict_GET_SIZE(val) == 0)) {
+                _c = view_add_empty_ctn<_IndentSetting, true, _IsInsideObj>(obj_viewer, cur_nested_depth);
+                RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
             } else {
-                view_add_ctn_begin<_IndentSetting, true>(obj_viewer);
+                _c = view_add_ctn_begin<_IndentSetting, true, _IsInsideObj>(obj_viewer, cur_nested_depth);
+                RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
                 CTN_SIZE_GROW();
                 CtnType *cur_write_ctn = _CtnStack + (cur_nested_depth++);
                 cur_write_ctn->ctn = cur_obj;
@@ -2867,9 +2380,11 @@ force_inline EncodeValJumpFlag view_process_val(
         case PyFastTypes::T_Tuple: {
             Py_ssize_t this_list_size = PyTuple_Size(val);
             if (unlikely(this_list_size == 0)) {
-                view_add_empty_ctn<_IndentSetting, false>(obj_viewer);
+                bool _c = view_add_empty_ctn<_IndentSetting, false, _IsInsideObj>(obj_viewer, cur_nested_depth);
+                RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
             } else {
-                view_add_ctn_begin<_IndentSetting, false>(obj_viewer);
+                bool _c = view_add_ctn_begin<_IndentSetting, false, _IsInsideObj>(obj_viewer, cur_nested_depth);
+                RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
                 CTN_SIZE_GROW();
                 CtnType *cur_write_ctn = _CtnStack + (cur_nested_depth++);
                 cur_write_ctn->ctn = cur_obj;
@@ -2888,11 +2403,17 @@ force_inline EncodeValJumpFlag view_process_val(
     }
 
     return JumpFlag_Default;
+#undef RETURN_JUMP_FAIL_ON_UNLIKELY_ERR
+#undef CTN_SIZE_GROW
 }
 
 template<IndentSetting _IndentSetting, X86SIMDLevel _SIMDLevel>
 force_inline bool
 pyyjson_dumps_obj_to_view(PyObject *in_obj, ObjViewer *obj_viewer) {
+#define GOTO_FAIL_ON_UNLIKELY_ERR(_condition) \
+    do {                                      \
+        if (unlikely(_condition)) goto fail;  \
+    } while (0)
     // cache
     Py_ssize_t cur_list_size;
     PyObject *key, *val;
@@ -2903,11 +2424,13 @@ pyyjson_dumps_obj_to_view(PyObject *in_obj, ObjViewer *obj_viewer) {
     CtnType *const ctn_stack = _CtnStack;
 
     if (PyDict_CheckExact(cur_obj)) {
-        if (unlikely(PyDict_Size(cur_obj) == 0)) {
-            view_add_empty_ctn<_IndentSetting, true>(obj_viewer);
+        if (unlikely(PyDict_GET_SIZE(cur_obj) == 0)) {
+            bool _c = view_add_empty_ctn<_IndentSetting, true, true>(obj_viewer, 0);
+            assert(_c);
             goto success;
         }
-        view_add_ctn_begin<_IndentSetting, true>(obj_viewer);
+        bool _c = view_add_ctn_begin<_IndentSetting, true, true>(obj_viewer, 0);
+        assert(_c);
         assert(!cur_nested_depth);
         cur_nested_depth = 1;
         // NOTE: ctn_stack[0] is always invalid
@@ -2915,10 +2438,12 @@ pyyjson_dumps_obj_to_view(PyObject *in_obj, ObjViewer *obj_viewer) {
     } else if (PyList_CheckExact(cur_obj)) {
         cur_list_size = PyList_GET_SIZE(cur_obj);
         if (unlikely(cur_list_size == 0)) {
-            view_add_empty_ctn<_IndentSetting, false>(obj_viewer);
+            bool _c = view_add_empty_ctn<_IndentSetting, false, true>(obj_viewer, 0);
+            assert(_c);
             goto success;
         }
-        view_add_ctn_begin<_IndentSetting, false>(obj_viewer);
+        bool _c = view_add_ctn_begin<_IndentSetting, false, true>(obj_viewer, 0);
+        assert(_c);
         assert(!cur_nested_depth);
         cur_nested_depth = 1;
         // NOTE: ctn_stack[0] is always invalid
@@ -2929,10 +2454,12 @@ pyyjson_dumps_obj_to_view(PyObject *in_obj, ObjViewer *obj_viewer) {
         }
         cur_list_size = PyTuple_GET_SIZE(cur_obj);
         if (unlikely(cur_list_size == 0)) {
-            view_add_empty_ctn<_IndentSetting, false>(obj_viewer);
+            bool _c = view_add_empty_ctn<_IndentSetting, false, true>(obj_viewer, 0);
+            assert(_c);
             goto success;
         }
-        view_add_ctn_begin<_IndentSetting, false>(obj_viewer);
+        bool _c = view_add_ctn_begin<_IndentSetting, false, true>(obj_viewer, 0);
+        assert(_c);
         assert(!cur_nested_depth);
         cur_nested_depth = 1;
         goto tuple_val_begin;
@@ -2941,23 +2468,23 @@ pyyjson_dumps_obj_to_view(PyObject *in_obj, ObjViewer *obj_viewer) {
     Py_UNREACHABLE();
 
 dict_pair_begin:;
-    assert(PyDict_Size(cur_obj) != 0);
+    assert(PyDict_GET_SIZE(cur_obj) != 0);
 
     if (PyDict_Next(cur_obj, &cur_pos, &key, &val)) {
         if (unlikely(!PyUnicode_CheckExact(key))) {
             goto fail_keytype;
         }
         view_update_str_info(obj_viewer, key);
-        view_add_key(obj_viewer, key);
+        bool _c = view_add_key<_IndentSetting, _SIMDLevel>(obj_viewer, key, cur_nested_depth);
+        GOTO_FAIL_ON_UNLIKELY_ERR(!_c);
         //
-        auto jump_flag = view_process_val<_IndentSetting, X86SIMDLevel>(val,
-                                                                        obj_viewer,
-                                                                        ctn_stack,
-                                                                        cur_nested_depth,
-                                                                        cur_obj,
-                                                                        cur_pos,
-                                                                        cur_list_size,
-                                                                        true);
+        auto jump_flag = view_process_val<_IndentSetting, _SIMDLevel, true>(val,
+                                                                            obj_viewer,
+                                                                            ctn_stack,
+                                                                            cur_nested_depth,
+                                                                            cur_obj,
+                                                                            cur_pos,
+                                                                            cur_list_size);
         JUMP_BY_FLAG(jump_flag);
         goto dict_pair_begin;
     } else {
@@ -2965,7 +2492,8 @@ dict_pair_begin:;
         assert(cur_nested_depth);
         CtnType *last_pos = ctn_stack + (--cur_nested_depth);
 
-        view_add_ctn_end<true>(obj_viewer);
+        bool _c = view_add_ctn_end<_IndentSetting, true>(obj_viewer, cur_nested_depth);
+        GOTO_FAIL_ON_UNLIKELY_ERR(!_c);
         if (unlikely(cur_nested_depth == 0)) {
             goto success;
         }
@@ -2995,14 +2523,13 @@ arr_val_begin:;
         val = PyList_GET_ITEM(cur_obj, cur_pos);
         cur_pos++;
         //
-        auto jump_flag = view_process_val<_IndentSetting, _SIMDLevel>(val,
-                                                                      obj_viewer,
-                                                                      ctn_stack,
-                                                                      cur_nested_depth,
-                                                                      cur_obj,
-                                                                      cur_pos,
-                                                                      cur_list_size,
-                                                                      false);
+        auto jump_flag = view_process_val<_IndentSetting, _SIMDLevel, false>(val,
+                                                                             obj_viewer,
+                                                                             ctn_stack,
+                                                                             cur_nested_depth,
+                                                                             cur_obj,
+                                                                             cur_pos,
+                                                                             cur_list_size);
         JUMP_BY_FLAG(jump_flag);
         //
         goto arr_val_begin;
@@ -3011,7 +2538,8 @@ arr_val_begin:;
         assert(cur_nested_depth);
         CtnType *last_pos = ctn_stack + (--cur_nested_depth);
 
-        view_add_ctn_end<false>(obj_viewer);
+        bool _c = view_add_ctn_end<_IndentSetting, false>(obj_viewer, cur_nested_depth);
+        GOTO_FAIL_ON_UNLIKELY_ERR(!_c);
         if (unlikely(cur_nested_depth == 0)) {
             goto success;
         }
@@ -3040,14 +2568,13 @@ tuple_val_begin:;
         val = PyTuple_GET_ITEM(cur_obj, cur_pos);
         cur_pos++;
         //
-        auto jump_flag = view_process_val<_IndentSetting, _SIMDLevel>(val,
-                                                                      obj_viewer,
-                                                                      ctn_stack,
-                                                                      cur_nested_depth,
-                                                                      cur_obj,
-                                                                      cur_pos,
-                                                                      cur_list_size,
-                                                                      false);
+        auto jump_flag = view_process_val<_IndentSetting, _SIMDLevel, false>(val,
+                                                                             obj_viewer,
+                                                                             ctn_stack,
+                                                                             cur_nested_depth,
+                                                                             cur_obj,
+                                                                             cur_pos,
+                                                                             cur_list_size);
         JUMP_BY_FLAG(jump_flag);
         //
         goto tuple_val_begin;
@@ -3056,7 +2583,8 @@ tuple_val_begin:;
         assert(cur_nested_depth);
         CtnType *last_pos = ctn_stack + (--cur_nested_depth);
 
-        view_add_ctn_end<_IndentSetting, false>(obj_viewer);
+        bool _c = view_add_ctn_end<_IndentSetting, false>(obj_viewer, cur_nested_depth);
+        GOTO_FAIL_ON_UNLIKELY_ERR(!_c);
         if (unlikely(cur_nested_depth == 0)) {
             goto success;
         }
@@ -3120,109 +2648,117 @@ force_inline PyObject *pyyjson_dumps_view(ObjViewer *obj_viewer) {
     uu *write_ptr = (uu *) PyUnicode_DATA(ret);
     uu *const end_ptr = write_ptr + ucs_len;
     while (1) {
-        switch (view_obj(obj_viewer)) {
+        ViewObjType view = view_obj(obj_viewer);
+        switch (view) {
             case ViewObjType_Done: {
                 goto success;
             }
-            case ViewObjType_EmptyCtn: {
-                bool is_dict = read_is_dict_from_view(obj_viewer);
-                write_newline_and_indent_from_view<_IndentSetting, _Kind>(obj_viewer, write_ptr, end_ptr);
-                if (is_dict) {
-                    write_empty_ctn<true>(obj_viewer, write_ptr, end_ptr);
-                } else {
-                    write_empty_ctn<false>(obj_viewer, write_ptr, end_ptr);
-                }
+            case ViewObjType_EmptyObj: {
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
+                write_empty_ctn<true, _Kind>(obj_viewer, write_ptr, end_ptr);
                 break;
             }
-            case ViewObjType_CtnBegin: {
-                bool is_dict = read_is_dict_from_view(obj_viewer);
-                write_newline_and_indent_from_view(obj_viewer, write_ptr, end_ptr);
-                if (is_dict) {
-                    write_ctn_begin<true>(obj_viewer, write_ptr, end_ptr);
-                } else {
-                    write_ctn_begin<false>(obj_viewer, write_ptr, end_ptr);
-                }
+            case ViewObjType_EmptyArr: {
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
+                write_empty_ctn<false, _Kind>(obj_viewer, write_ptr, end_ptr);
+                break;
+            }
+            case ViewObjType_ObjBegin: {
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
+                write_ctn_begin<true, _Kind>(obj_viewer, write_ptr, end_ptr);
                 // then increase indent
-                view_increase_indent(obj_viewer, is_dict);
+                view_increase_indent(obj_viewer, true);
                 break;
             }
-            case ViewObjType_CtnEnd: {
+            case ViewObjType_ArrBegin: {
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
+                write_ctn_begin<false, _Kind>(obj_viewer, write_ptr, end_ptr);
+                // then increase indent
+                view_increase_indent(obj_viewer, false);
+                break;
+            }
+            case ViewObjType_ObjEnd: {
+                // need to erase last comma
+                write_ptr--;
+                assert(*write_ptr == ',');
+                // decrease indent
+                view_decrease_indent(obj_viewer);
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel, true>(obj_viewer, write_ptr, end_ptr);
+                write_ctn_end<true, _Kind>(obj_viewer, write_ptr, end_ptr);
+                break;
+            }
+            case ViewObjType_ArrEnd: {
+                // need to erase last comma
+                write_ptr--;
+                assert(*write_ptr == ',');
                 // decrease indent first
                 view_decrease_indent(obj_viewer);
-                write_newline_and_indent_from_view(obj_viewer, write_ptr, end_ptr);
-                write_ctn_end(obj_viewer, write_ptr, end_ptr);
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel, true>(obj_viewer, write_ptr, end_ptr);
+                write_ctn_end<false, _Kind>(obj_viewer, write_ptr, end_ptr);
                 break;
             }
             case ViewObjType_Key: {
-                write_newline_and_indent_from_view(obj_viewer, write_ptr, end_ptr);
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel, true>(obj_viewer, write_ptr, end_ptr);
                 PyObject *key = read_view_data<PyObject *>(obj_viewer);
-                write_key(obj_viewer, key, write_ptr, end_ptr);
+                write_key<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, key, write_ptr, end_ptr);
                 break;
             }
             case ViewObjType_Str: {
-                write_newline_and_indent_from_view(obj_viewer, write_ptr, end_ptr);
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
                 PyObject *str = read_view_data<PyObject *>(obj_viewer);
-                write_str(obj_viewer, str, write_ptr, end_ptr);
+                write_str<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, str, write_ptr, end_ptr);
                 break;
             }
             case ViewObjType_Zero: {
-                write_newline_and_indent_from_view(obj_viewer, write_ptr, end_ptr);
-                write_zero(obj_viewer, write_ptr, end_ptr);
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
+                write_zero<_Kind>(obj_viewer, write_ptr, end_ptr);
                 break;
             }
-            case ViewObjType_I64: {
-                write_newline_and_indent_from_view(obj_viewer, write_ptr, end_ptr);
-                i64 val = read_view_data<i64>(obj_viewer);
-                write_i64(obj_viewer, val, write_ptr, end_ptr);
-                break;
-            }
-            case ViewObjType_U64: {
-                write_newline_and_indent_from_view(obj_viewer, write_ptr, end_ptr);
-                u64 val = read_view_data<u64>(obj_viewer);
-                write_u64(obj_viewer, val, write_ptr, end_ptr);
+            case ViewObjType_Number: {
+                usize payload_number_size = read_number_written_size(obj_viewer);
+                assert(payload_number_size <= 32);
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
+                u8 *buffer = (u8 *) read_view_data_buffer<u8[32]>(obj_viewer);
+                usize view_ptr_retreat = (32 - payload_number_size) / SIZEOF_VOID_P;
+                obj_viewer->m_cur_data_rw_ptr -= view_ptr_retreat;
+                write_number<_Kind, _SIMDLevel>(obj_viewer, buffer, payload_number_size, write_ptr, end_ptr);
                 break;
             }
             case ViewObjType_True: {
-                write_newline_and_indent_from_view(obj_viewer, write_ptr, end_ptr);
-                write_true(obj_viewer, write_ptr, end_ptr);
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
+                write_true<_Kind>(obj_viewer, write_ptr, end_ptr);
                 break;
             }
             case ViewObjType_False: {
-                write_newline_and_indent_from_view(obj_viewer, write_ptr, end_ptr);
-                write_false(obj_viewer, write_ptr, end_ptr);
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
+                write_false<_Kind>(obj_viewer, write_ptr, end_ptr);
                 break;
             }
-            case ViewObjType_PyNull: {
-                write_newline_and_indent_from_view(obj_viewer, write_ptr, end_ptr);
-                write_null(obj_viewer, write_ptr, end_ptr);
+            case ViewObjType_Null: {
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
+                write_null<_Kind>(obj_viewer, write_ptr, end_ptr);
                 break;
             }
-            case ViewObjType_Double: {
-                write_newline_and_indent_from_view(obj_viewer, write_ptr, end_ptr);
-                double val = read_view_data<double>(obj_viewer);
-                write_double(obj_viewer, val, write_ptr, end_ptr);
-                break;
-            }
-            case ViewObjType_PosNaN: {
-                write_newline_and_indent_from_view(obj_viewer, write_ptr, end_ptr);
-                write_pos_nan(obj_viewer, write_ptr, end_ptr);
-                break;
-            }
-            case ViewObjType_NegNaN: {
-                write_newline_and_indent_from_view(obj_viewer, write_ptr, end_ptr);
-                write_neg_nan(obj_viewer, write_ptr, end_ptr);
-                break;
-            }
-            case ViewObjType_PosInf: {
-                write_newline_and_indent_from_view(obj_viewer, write_ptr, end_ptr);
-                write_pos_inf(obj_viewer, write_ptr, end_ptr);
-                break;
-            }
-            case ViewObjType_NegInf: {
-                write_newline_and_indent_from_view(obj_viewer, write_ptr, end_ptr);
-                write_neg_inf(obj_viewer, write_ptr, end_ptr);
-                break;
-            }
+            // case ViewObjType_PosNaN: {
+            //     write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
+            //     write_pos_nan(obj_viewer, write_ptr, end_ptr);
+            //     break;
+            // }
+            // case ViewObjType_NegNaN: {
+            //     write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
+            //     write_neg_nan(obj_viewer, write_ptr, end_ptr);
+            //     break;
+            // }
+            // case ViewObjType_PosInf: {
+            //     write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
+            //     write_pos_inf(obj_viewer, write_ptr, end_ptr);
+            //     break;
+            // }
+            // case ViewObjType_NegInf: {
+            //     write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
+            //     write_neg_inf(obj_viewer, write_ptr, end_ptr);
+            //     break;
+            // }
             //... TODO
             default: {
                 Py_UNREACHABLE();
@@ -3236,7 +2772,7 @@ success:;
     return ret;
 }
 
-force_noinline PyObject *pyyjson_dumps_obj(PyObject *in_obj) {
+force_noinline PyObject *pyyjson_dumps_obj(PyObject *in_obj, DumpOption *option) {
     ObjViewer obj_viewer;
     init_viewer(&obj_viewer);
     PyObject *ret = NULL;
@@ -3245,6 +2781,8 @@ force_noinline PyObject *pyyjson_dumps_obj(PyObject *in_obj) {
     UCSKind kind;
 
     if (unlikely(!success)) goto finalize;
+
+    reset_view_for_read(&obj_viewer);
 
     kind = read_ucs_kind_from_view(&obj_viewer);
     switch (kind) {
@@ -3267,175 +2805,10 @@ force_noinline PyObject *pyyjson_dumps_obj(PyObject *in_obj) {
     }
 
 finalize:;
-    clear_view(obj_viewer);
+    clear_viewer(&obj_viewer);
 
     return ret;
 }
-
-// force_noinline PyObject *pyyjson_dumps_obj_op(PyObject *in_obj, DumpOption *options) {
-//     EncodeWriteOpConfig cfg;
-//     ALIAS_NAMES();
-//     EncodeOpDescriber op_desc = EncodeOpDescriber::init();
-
-//     cur_obj = in_obj;
-//     cur_pos = 0;
-
-//     // final
-//     PyObject *result;
-
-//     if (PyDict_CheckExact(cur_obj)) {
-//         if (unlikely(PyDict_Size(cur_obj) == 0)) {
-//             op_desc.write_simple_op(EncodeOpType::DICT_EMPTY);
-//             // APPEND_OP(DICT_EMPTY);
-//             goto success;
-//         }
-//         op_desc.write_simple_op(EncodeOpType::DICT_BEGIN);
-//         // APPEND_OP(DICT_BEGIN);
-//         cur_pos = 0;
-//         goto dict_pair_begin;
-//     } else if (PyList_CheckExact(cur_obj)) {
-//         cur_list_size = PyList_Size(cur_obj);
-//         if (unlikely(cur_list_size == 0)) {
-//             // APPEND_OP(ARRAY_EMPTY);
-//             op_desc.write_simple_op(EncodeOpType::ARRAY_EMPTY);
-//             goto success;
-//         }
-//         op_desc.write_simple_op(EncodeOpType::ARRAY_BEGIN);
-//         // APPEND_OP(ARRAY_BEGIN);
-//         GOTO_ARR_VAL_BEGIN_WITH_SIZE(cur_list_size); // result in a no-op
-//     } else {
-//         if (unlikely(!PyTuple_CheckExact(cur_obj))) {
-//             goto fail_ctntype;
-//         }
-//         cur_list_size = PyTuple_Size(cur_obj);
-//         if (unlikely(cur_list_size == 0)) {
-//             op_desc.write_simple_op(EncodeOpType::ARRAY_EMPTY);
-//             // APPEND_OP(ARRAY_EMPTY);
-//             goto success;
-//         }
-//         op_desc.write_simple_op(EncodeOpType::ARRAY_BEGIN);
-//         // APPEND_OP(ARRAY_BEGIN);
-//         GOTO_TUPLE_VAL_BEGIN_WITH_SIZE(cur_list_size); // result in a no-op
-//     }
-
-// dict_pair_begin:;
-//     assert(PyDict_Size(cur_obj) != 0);
-
-//     if (PyDict_Next(cur_obj, &cur_pos, &key, &val)) {
-//         if (unlikely(!PyUnicode_CheckExact(key))) {
-//             goto fail_keytype;
-//         }
-//         update_string_info(cfg, key);
-//         op_desc.write_op_with_data(EncodeOpType::KEY, key);
-//         //
-//         PROCESS_VAL(val);
-//         //
-//         goto dict_pair_begin;
-//     } else {
-//         // dict end
-//         op_desc.write_simple_op(EncodeOpType::DICT_END);
-//         if (unlikely(cur_nested_depth == -1)) {
-//             goto success;
-//         }
-//         CtnType *last_pos = _CtnStack + cur_nested_depth--;
-//         cur_obj = last_pos->ctn;
-//         cur_pos = last_pos->index;
-//         if (PyDict_CheckExact(cur_obj)) {
-//             goto dict_pair_begin;
-//         } else if (PyList_CheckExact(cur_obj)) {
-//             GOTO_ARR_VAL_BEGIN_WITH_SIZE(PyList_GET_SIZE(cur_obj));
-//         } else {
-//             assert(PyTuple_CheckExact(cur_obj));
-//             GOTO_TUPLE_VAL_BEGIN_WITH_SIZE(PyTuple_GET_SIZE(cur_obj));
-//         }
-//     }
-
-//     Py_UNREACHABLE();
-// arr_val_begin:;
-//     assert(cur_list_size != 0);
-
-//     if (cur_pos < cur_list_size) {
-//         val = PyList_GET_ITEM(cur_obj, cur_pos);
-//         cur_pos++;
-//         //
-//         PROCESS_VAL(val);
-//         //
-//         goto arr_val_begin;
-//     } else {
-//         // list end
-//         op_desc.write_simple_op(EncodeOpType::ARRAY_END);
-//         if (unlikely(cur_nested_depth == -1)) {
-//             goto success;
-//         }
-//         CtnType *last_pos = _CtnStack + cur_nested_depth--;
-//         cur_obj = last_pos->ctn;
-//         cur_pos = last_pos->index;
-//         if (PyDict_CheckExact(cur_obj)) {
-//             goto dict_pair_begin;
-//         } else if (PyList_CheckExact(cur_obj)) {
-//             GOTO_ARR_VAL_BEGIN_WITH_SIZE(PyList_GET_SIZE(cur_obj));
-//         } else {
-//             assert(PyTuple_CheckExact(cur_obj));
-//             GOTO_TUPLE_VAL_BEGIN_WITH_SIZE(PyTuple_GET_SIZE(cur_obj));
-//         }
-//     }
-//     Py_UNREACHABLE();
-// tuple_val_begin:;
-//     assert(cur_list_size != 0);
-
-//     if (cur_pos < cur_list_size) {
-//         val = PyTuple_GET_ITEM(cur_obj, cur_pos);
-//         cur_pos++;
-//         //
-//         PROCESS_VAL(val);
-//         //
-//         goto tuple_val_begin;
-//     } else {
-//         // list end
-//         op_desc.write_simple_op(EncodeOpType::ARRAY_END);
-//         if (unlikely(cur_nested_depth == -1)) {
-//             goto success;
-//         }
-//         CtnType *last_pos = _CtnStack + cur_nested_depth--;
-//         cur_obj = last_pos->ctn;
-//         cur_pos = last_pos->index;
-//         if (PyDict_CheckExact(cur_obj)) {
-//             goto dict_pair_begin;
-//         } else if (PyList_CheckExact(cur_obj)) {
-//             GOTO_ARR_VAL_BEGIN_WITH_SIZE(PyList_GET_SIZE(cur_obj));
-//         } else {
-//             assert(PyTuple_CheckExact(cur_obj));
-//             GOTO_TUPLE_VAL_BEGIN_WITH_SIZE(PyTuple_GET_SIZE(cur_obj));
-//         }
-//     }
-//     Py_UNREACHABLE();
-// success:
-//     assert(cur_nested_depth == -1);
-//     op_desc.write_simple_op(EncodeOpType::END);
-//     result = pyyjson_dumps_read_op_write_str_call_jump(options, &cfg, &op_desc);
-
-//     // cleanup. TODO
-//     if (!result && !PyErr_Occurred()) {
-//         PyErr_SetString(JSONEncodeError, "Unknown encode error");
-//     }
-//     op_desc.release();
-//     return result;
-
-// fail:
-//     if (!PyErr_Occurred()) {
-//         PyErr_SetString(JSONEncodeError, "Unknown encode error");
-//     }
-//     op_desc.release();
-//     return nullptr;
-
-// fail_ctntype:
-//     PyErr_SetString(JSONEncodeError, "Unknown container type");
-//     goto fail;
-
-// fail_keytype:
-//     PyErr_SetString(JSONEncodeError, "Key must be a string");
-//     goto fail;
-// }
 
 #undef GOTO_TUPLE_VAL_BEGIN_WITH_SIZE
 #undef GOTO_ARR_VAL_BEGIN_WITH_SIZE

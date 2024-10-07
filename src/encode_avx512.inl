@@ -267,7 +267,7 @@ force_inline Py_ssize_t count_escape_u8_512_avx512(__m512i &u) { // AVX512F + AV
 force_inline Py_ssize_t count_escape_tail_u8_512_avx512(__m512i &u, size_t count) { // AVX512F + AVX512BW
     constexpr Py_ssize_t _BaseRet = 512 / 8;
     assert(count && count < _BaseRet);
-    Py_ssize_t ret = _BaseRet;
+    Py_ssize_t ret = (Py_ssize_t) count;
     __m512i t1 = _mm512_load_si512((__m512i *) _Quote_i8);      // vmovdqa32, AVX512F
     __mmask64 r1 = _mm512_cmpeq_epi8_mask(u, t1);               // vpcmpb, AVX512BW
     __m512i t2 = _mm512_load_si512((__m512i *) _Slash_i8);      // vmovdqa32, AVX512F
@@ -350,7 +350,7 @@ force_inline Py_ssize_t count_escape_u16_512_avx512(__m512i &u) { // AVX512F + A
 force_inline Py_ssize_t count_escape_tail_u16_512_avx512(__m512i &u, usize count) { // AVX512F + AVX512BW
     constexpr Py_ssize_t _BaseRet = 512 / 16;
     assert(count && count < _BaseRet);
-    Py_ssize_t ret = _BaseRet;
+    Py_ssize_t ret = (Py_ssize_t) count;
     __m512i t1 = _mm512_load_si512((__m512i *) _Quote_i8);      // vmovdqa32, AVX512F
     __mmask32 r1 = _mm512_cmpeq_epi16_mask(u, t1);              // vpcmpw, AVX512BW
     __m512i t2 = _mm512_load_si512((__m512i *) _Slash_i8);      // vmovdqa32, AVX512F
@@ -403,7 +403,7 @@ force_inline Py_ssize_t count_escape_u32_512_avx512(__m512i &u) { // AVX512F + A
 force_inline Py_ssize_t count_escape_tail_u32_512_avx512(__m512i &u, usize count) { // AVX512F
     constexpr Py_ssize_t _BaseRet = 512 / 32;
     assert(count && count < _BaseRet);
-    Py_ssize_t ret = _BaseRet;
+    Py_ssize_t ret = (Py_ssize_t) count;
     __m512i t1 = _mm512_load_si512((__m512i *) _Quote_i8);      // vmovdqa32, AVX512F
     __mmask16 r1 = _mm512_cmpeq_epi32_mask(u, t1);              // vpcmpeqd, AVX512F
     __m512i t2 = _mm512_load_si512((__m512i *) _Slash_i8);      // vmovdqa32, AVX512F
