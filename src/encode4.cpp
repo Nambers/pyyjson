@@ -566,7 +566,10 @@ force_inline void copy_ucs_elevate_avx512_nocheck(UCSType_t<__to> *&write_ptr, U
         }
     }
     len -= (Py_ssize_t) do_write_times * (Py_ssize_t) _ReadWriteOnce;
-    if (likely(len <= 0)) return;
+    if (likely(len <= 0)) {
+        write_ptr += len;
+        return;
+    }
     // manual copy
     for (Py_ssize_t i = 0; i < len; ++i) {
         *write_ptr = (udst) *src;
@@ -590,7 +593,10 @@ force_inline void copy_ucs_elevate_sse4_or_avx2_nocheck(UCSType_t<__to> *&write_
         cvtepu_128<__from, __to, _SIMDLevel>(x, src, write_ptr);
     }
     len -= (Py_ssize_t) do_write_times * (Py_ssize_t) _ReadWriteOnce;
-    if (likely(len <= 0)) return;
+    if (likely(len <= 0)) {
+        write_ptr += len;
+        return;
+    }
     for (Py_ssize_t i = 0; i < len; ++i) {
         *write_ptr = (udst) *src;
         ++write_ptr;
@@ -2769,8 +2775,8 @@ force_inline PyObject *pyyjson_dumps_view(ObjViewer *obj_viewer) {
 
 success:;
     assert(write_ptr == end_ptr);
-    PyObject* true_ret = My_Realloc_Unicode(ret, unicode_real_u8_size<_Kind>(ucs_len, obj_viewer->m_is_all_ascii));
-    if(unlikely(!true_ret)){
+    PyObject *true_ret = My_Realloc_Unicode(ret, unicode_real_u8_size<_Kind>(ucs_len, obj_viewer->m_is_all_ascii));
+    if (unlikely(!true_ret)) {
         Py_DECREF(ret);
         return NULL;
     }

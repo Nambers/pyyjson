@@ -12,7 +12,7 @@ My_PyUnicode_New(Py_ssize_t size, Py_UCS4 maxchar) {
     }
     PyObject* ret = PyUnicode_New(size + add_size, maxchar);
     if(unlikely(!ret)) return NULL;
-    _PyASCIIObject_CAST(ret)->length = size;
+    ((PyASCIIObject*)ret)->length = size;
     return ret;
 }
 
