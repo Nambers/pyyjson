@@ -355,7 +355,7 @@ static_inline bool pylong_is_zero(PyObject *obj) {
 static_inline bool pylong_value_unsigned(PyObject *obj, u64 *value) {
 #if PY_MINOR_VERSION >= 12
     if (likely(((PyLongObject *) obj)->long_value.lv_tag < (2 << _PyLong_NON_SIZE_BITS))) {
-        *value = (u64) ((PyLongObject *) obj)->long_value.ob_digit;
+        *value = (u64) *((PyLongObject *) obj)->long_value.ob_digit;
         return true;
     }
 #endif
@@ -372,7 +372,7 @@ static_inline i64 pylong_value_signed(PyObject *obj, i64 *value) {
 #if PY_MINOR_VERSION >= 12
     if (likely(((PyLongObject *) obj)->long_value.lv_tag < (2 << _PyLong_NON_SIZE_BITS))) {
         i64 sign = 1 - (i64) ((((PyLongObject *) obj)->long_value.lv_tag & 3));
-        *value = sign * (i64) ((PyLongObject *) obj)->long_value.ob_digit;
+        *value = sign * (i64) *((PyLongObject *) obj)->long_value.ob_digit;
         return true;
     }
 #endif
