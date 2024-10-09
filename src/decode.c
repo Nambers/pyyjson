@@ -123,7 +123,7 @@ static yyjson_inline PyObject *make_string(const char *utf8_str, Py_ssize_t len,
 
     switch (flag & PYYJSON_STRING_FLAG_UCS_TYPE_MASK) {
         case PYYJSON_STRING_FLAG_ASCII:
-            max_char = 0x80;
+            max_char = 0x7f;
             real_len = len;
             break;
         case PYYJSON_STRING_FLAG_LATIN1:
