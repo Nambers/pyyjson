@@ -48,6 +48,35 @@ struct SrcInfo {
     Py_ssize_t src_size;
 };
 
+template<X86SIMDLevel _SIMDLevel>
+struct StrBlock;
+
+template<>
+struct StrBlock<X86SIMDLevel::AVX512> {
+    static constexpr usize _Size = 64;
+    union {
+        u8 m_buffer[_Size];
+        __m512i m_data;
+    };
+};
+
+template<>
+struct StrBlock<X86SIMDLevel::AVX2> {
+    static constexpr usize _Size = 32;
+    union {
+        u8 m_buffer[_Size];
+        __m256i m_data;
+    };
+};
+
+template<X86SIMDLevel _SIMDLevel>
+struct StrBlock {
+    static constexpr usize _Size = 16;
+    union {
+        u8 m_buffer[_Size];
+        __m128i m_data;
+    };
+};
 
 //
 template<X86SIMDLevel _SIMDLevel>
@@ -1422,6 +1451,41 @@ fail_mem:;
     return NULL;
 }
 
+template<X86SIMDLevel _SIMDLevel, UCSKind _Kind>
+force_inline StrBlock<_SIMDLevel> *realloc_str_data_buffer(ObjViewer *viewer, StrBlock<_SIMDLevel> *const old_buffer, Py_ssize_t cur_block_count, UCSType_t<_Kind> *&write_ptr) {
+    using StrType = StrBlock<_SIMDLevel>;
+    using uu = UCSType_t<_Kind>;
+    Py_ssize_t new_block_count = cur_block_count + 1;
+    assert((void **) old_buffer + cur_block_count * sizeof(StrType) / sizeof(void *) == viewer->m_cur_data_rw_ptr);
+    if (unlikely(viewer->m_cur_data_rw_ptr + sizeof(StrType) / sizeof(void *) > viewer->m_cur_data_end_ptr)) {
+        Py_ssize_t total_size_u8 = new_block_count * sizeof(StrType);
+        Py_ssize_t next_index = viewer->m_data_buffer_count;
+        Py_ssize_t length = get_data_buffer_length(next_index);
+        assert(length * sizeof(void *) >= total_size_u8);
+        void *new_buffer = aligned_alloc(512 / 8, (usize) length * sizeof(void *));
+        if (unlikely(!new_buffer)) goto fail_mem;
+        // copy buffer data
+        memcpy(new_buffer, (void *) old_buffer, cur_block_count * sizeof(StrType));
+        viewer->m_data_buffers[next_index] = (void **) new_buffer;
+        viewer->m_data_buffer_count++;
+        viewer->m_cur_data_rw_ptr = ((void **) new_buffer) + total_size_u8 / sizeof(void *);
+        viewer->m_cur_data_end_ptr = ((void **) new_buffer) + length;
+        assert(viewer->m_cur_data_rw_ptr <= viewer->m_cur_data_end_ptr);
+        // DONT modify m_data_cur_rw_index
+        Py_ssize_t u8_ptr_diff = (uintptr_t) write_ptr - (uintptr_t) old_buffer;
+        write_ptr = (uu *) (((uintptr_t) new_buffer) + u8_ptr_diff);
+        return (StrType *) new_buffer;
+    } else {
+        viewer->m_cur_data_rw_ptr += sizeof(StrType) / sizeof(void *);
+        return old_buffer;
+    }
+
+fail_mem:;
+    PyErr_NoMemory();
+    return NULL;
+}
+
+
 template<typename T>
 force_inline T read_view_data(ObjViewer *viewer) {
     static_assert((sizeof(T) % sizeof(void *)) == 0);
@@ -1453,6 +1517,27 @@ force_inline T *read_view_data_buffer(ObjViewer *viewer) {
     assert((uintptr_t) viewer->m_cur_data_rw_ptr + sizeof(T) <= (uintptr_t) viewer->m_cur_data_end_ptr);
     T *ret = (T *) viewer->m_cur_data_rw_ptr;
     viewer->m_cur_data_rw_ptr += sizeof(T) / sizeof(void *);
+    return ret;
+}
+
+template<X86SIMDLevel _SIMDLevel>
+force_inline StrBlock<_SIMDLevel> *retrive_str_data_buffer(ObjViewer *viewer, Py_ssize_t block_count) {
+    using StrType = StrBlock<_SIMDLevel>;
+    StrType *ret = (StrType *) viewer->m_cur_data_rw_ptr;
+    if (unlikely((uintptr_t) viewer->m_cur_data_rw_ptr + sizeof(StrType) * block_count > (uintptr_t) viewer->m_cur_data_end_ptr)) {
+        Py_ssize_t new_rw_index = viewer->m_data_cur_rw_index + 1;
+        Py_ssize_t new_length = get_data_buffer_length(new_rw_index);
+        while (new_length * sizeof(void *) < sizeof(StrType) * block_count) {
+            new_rw_index++;
+            new_length = get_data_buffer_length(new_rw_index);
+        }
+        viewer->m_data_cur_rw_index = new_rw_index;
+        viewer->m_cur_data_rw_ptr = viewer->m_data_buffers[new_rw_index];
+        viewer->m_cur_data_end_ptr = viewer->m_cur_data_rw_ptr + new_length;
+        // DONT modify m_data_buffer_count
+        ret = (StrType *) viewer->m_cur_data_rw_ptr;
+    }
+    viewer->m_cur_data_rw_ptr += sizeof(StrType) * block_count / sizeof(void *);
     return ret;
 }
 
@@ -1725,6 +1810,47 @@ force_inline void copy_raw_unicode(ObjViewer *viewer, PyObject *unicode, UCSType
     }
 }
 
+template<UCSKind _From, UCSKind _To, X86SIMDLevel _SIMDLevel>
+force_inline void copy_raw_unicode_new(ObjViewer *viewer, UCSType_t<_From> *src, UCSType_t<_To> *&dst, Py_ssize_t count) {
+    using usrc = UCSType_t<_From>;
+    using udst = UCSType_t<_To>;
+    // UCSKind src_kind;
+    // Py_ssize_t len;
+    // get_src_kind_and_len(unicode, src_kind, len);
+    if constexpr (_From == _To) {
+        // memcpy(dst, src, count * sizeof(usrc));
+        cpy_fast<_SIMDLevel>((void *) dst, src, count * sizeof(usrc));
+        dst += count;
+    } else {
+        static_assert(_From < _To);
+        copy_elevate_nocheck<_From, _To, _SIMDLevel>(dst, src, count);
+    }
+    // if constexpr (_Kind == UCSKind::UCS1) {
+    //     assert(src_kind == UCSKind::UCS1);
+    //     cpy_fast<_SIMDLevel>((void *) write_ptr, get_unicode_data(unicode), len);
+    //     write_ptr += len;
+    // } else if constexpr (_Kind == UCSKind::UCS2) {
+    //     if (src_kind == UCSKind::UCS1) {
+    //         copy_elevate_nocheck<UCSKind::UCS1, UCSKind::UCS2, _SIMDLevel>(write_ptr, (u8 *) get_unicode_data(unicode), len);
+    //     } else {
+    //         assert(src_kind == UCSKind::UCS2);
+    //         cpy_fast<_SIMDLevel>((void *) write_ptr, get_unicode_data(unicode), len * 2);
+    //         write_ptr += len;
+    //     }
+    // } else {
+    //     static_assert(_Kind == UCSKind::UCS4);
+    //     if (src_kind == UCSKind::UCS1) {
+    //         copy_elevate_nocheck<UCSKind::UCS1, UCSKind::UCS4, _SIMDLevel>(write_ptr, (u8 *) get_unicode_data(unicode), len);
+    //     } else if (src_kind == UCSKind::UCS2) {
+    //         copy_elevate_nocheck<UCSKind::UCS2, UCSKind::UCS4, _SIMDLevel>(write_ptr, (u16 *) get_unicode_data(unicode), len);
+    //     } else {
+    //         assert(src_kind == UCSKind::UCS4);
+    //         cpy_fast<_SIMDLevel>((void *) write_ptr, get_unicode_data(unicode), len * 4);
+    //         write_ptr += len;
+    //     }
+    // }
+}
+
 template<UCSKind _Kind, X86SIMDLevel _SIMDLevel>
 force_inline Py_ssize_t scan_unicode_escaped_len_impl(UCSType_t<_Kind> *unicode_data, Py_ssize_t unicode_len) {
     using uu = UCSType_t<_Kind>;
@@ -1863,19 +1989,33 @@ force_inline Py_ssize_t scan_unicode_escaped_len(PyObject *str) {
 }
 
 template<IndentSetting _IndentSetting, UCSKind _Kind, X86SIMDLevel _SIMDLevel>
-force_inline void write_key(ObjViewer *viewer, PyObject *key, UCSType_t<_Kind> *&write_ptr) {
+force_inline void write_key(ObjViewer *viewer, void *buffer, Py_ssize_t total_len, UCSKind this_kind, UCSType_t<_Kind> *&write_ptr) {
     using uu = UCSType_t<_Kind>;
-    assert(PyUnicode_CheckExact(key));
     *write_ptr++ = (uu) '"';
-    bool has_escape = read_is_unicode_escaped(viewer);
-    uu *old_write_ptr = write_ptr;
-    if (unlikely(has_escape)) {
-        // additional escape data is written in the view data buffer
-        Py_ssize_t escape_len = read_view_data<Py_ssize_t>(viewer);
-        copy_raw_unicode_with_escape<_Kind, _SIMDLevel>(viewer, key, write_ptr, escape_len);
-        assert(write_ptr - old_write_ptr == escape_len);
-    } else {
-        copy_raw_unicode<_Kind, _SIMDLevel>(viewer, key, write_ptr);
+    switch (this_kind) {
+        case UCSKind::UCS1: {
+            copy_raw_unicode_new<UCSKind::UCS1, _Kind, _SIMDLevel>(viewer, (u8 *) buffer, write_ptr, total_len);
+            break;
+        }
+        case UCSKind::UCS2: {
+            if constexpr (_Kind >= UCSKind::UCS2) {
+                copy_raw_unicode_new<UCSKind::UCS2, _Kind, _SIMDLevel>(viewer, (u16 *) buffer, write_ptr, total_len);
+            } else {
+                Py_UNREACHABLE();
+            }
+            break;
+        }
+        case UCSKind::UCS4: {
+            if constexpr (_Kind >= UCSKind::UCS4) {
+                copy_raw_unicode_new<UCSKind::UCS4, _Kind, _SIMDLevel>(viewer, (u32 *) buffer, write_ptr, total_len);
+            } else {
+                Py_UNREACHABLE();
+            }
+            break;
+        }
+        default: {
+            Py_UNREACHABLE();
+        }
     }
     constexpr uu _Template[4] = {
             (uu) '"',
@@ -1888,19 +2028,33 @@ force_inline void write_key(ObjViewer *viewer, PyObject *key, UCSType_t<_Kind> *
 }
 
 template<IndentSetting _IndentSetting, UCSKind _Kind, X86SIMDLevel _SIMDLevel>
-force_inline void write_str(ObjViewer *viewer, PyObject *str, UCSType_t<_Kind> *&write_ptr) {
+force_inline void write_str(ObjViewer *viewer, void *buffer, Py_ssize_t total_len, UCSKind this_kind, UCSType_t<_Kind> *&write_ptr) {
     using uu = UCSType_t<_Kind>;
-    assert(PyUnicode_CheckExact(str));
     *write_ptr++ = (uu) '"';
-    bool has_escape = read_is_unicode_escaped(viewer);
-    uu *old_write_ptr = write_ptr;
-    if (unlikely(has_escape)) {
-        // additional escape data is written in the view data buffer
-        Py_ssize_t escape_len = read_view_data<Py_ssize_t>(viewer);
-        copy_raw_unicode_with_escape<_Kind, _SIMDLevel>(viewer, str, write_ptr, escape_len);
-        assert(write_ptr - old_write_ptr == escape_len);
-    } else {
-        copy_raw_unicode<_Kind, _SIMDLevel>(viewer, str, write_ptr);
+    switch (this_kind) {
+        case UCSKind::UCS1: {
+            copy_raw_unicode_new<UCSKind::UCS1, _Kind, _SIMDLevel>(viewer, (u8 *) buffer, write_ptr, total_len);
+            break;
+        }
+        case UCSKind::UCS2: {
+            if constexpr (_Kind >= UCSKind::UCS2) {
+                copy_raw_unicode_new<UCSKind::UCS2, _Kind, _SIMDLevel>(viewer, (u16 *) buffer, write_ptr, total_len);
+            } else {
+                Py_UNREACHABLE();
+            }
+            break;
+        }
+        case UCSKind::UCS4: {
+            if constexpr (_Kind >= UCSKind::UCS4) {
+                copy_raw_unicode_new<UCSKind::UCS4, _Kind, _SIMDLevel>(viewer, (u32 *) buffer, write_ptr, total_len);
+            } else {
+                Py_UNREACHABLE();
+            }
+            break;
+        }
+        default: {
+            Py_UNREACHABLE();
+        }
     }
     constexpr uu _Template[2] = {
             (uu) '"',
@@ -2061,18 +2215,244 @@ force_inline void view_update_str_info(ObjViewer *viewer, PyObject *str) {
     viewer->m_is_all_ascii = viewer->m_is_all_ascii && PyUnicode_IS_ASCII(str);
 }
 
+template<X86SIMDLevel _SIMDLevel, UCSKind _Kind>
+force_inline bool scan_and_write_unicode_impl(ObjViewer *viewer, UCSType_t<_Kind> *data_ptr, Py_ssize_t len, Py_ssize_t &write_len, Py_ssize_t &block_count) {
+
+#define DO_REALLOC()                                                                                     \
+    do {                                                                                                 \
+        buffer = realloc_str_data_buffer<_SIMDLevel, _Kind>(viewer, buffer, block_count, cur_write_ptr); \
+        RETURN_ON_UNLIKELY_ERR(!buffer);                                                                 \
+        left_write_count += _PerBlockWriteCount;                                                         \
+        block_count += 1;                                                                                \
+    } while (0)
+    using uu = UCSType_t<_Kind>;
+    using StrType = StrBlock<_SIMDLevel>;
+    constexpr Py_ssize_t _PerBlockWriteCount = StrType::_Size / sizeof(uu);
+    constexpr Py_ssize_t _UU512Count = 512 / 8 / sizeof(uu);
+    constexpr Py_ssize_t _UU256Count = 256 / 8 / sizeof(uu);
+    constexpr Py_ssize_t _UU128Count = 128 / 8 / sizeof(uu);
+    bool _c;
+    StrType *buffer = reserve_view_data_buffer<StrType>(viewer);
+    RETURN_ON_UNLIKELY_ERR(!buffer);
+    uu *cur_write_ptr = (uu *) buffer->m_buffer; //
+    Py_ssize_t left_write_count = _PerBlockWriteCount;
+    Py_ssize_t escape_counter;
+    write_len = 0;
+    block_count = 1;
+    __m512i z;
+    __m256i y;
+    __m128i x;
+    uu xbuf[_UU128Count];
+
+    goto start;
+loop:;
+    if (left_write_count < _PerBlockWriteCount) {
+    loop_inner:;
+        assert(left_write_count < _PerBlockWriteCount);
+        // update `cur_write_ptr` and `left_write_count`
+        DO_REALLOC();
+    }
+start:;
+    // left_write_count should never be too large.
+    assert(left_write_count < 2 * _PerBlockWriteCount);
+    // process. `len` and `left_write_count` must be no less than `_UU{xxx}Count` before goto `copy_{xxx}`.
+    // `left_write_count` is not less than `_PerBlockWriteCount`. before goto, we only need to ensure `_PerBlockWriteCount >= _UU{xxx}Count`.
+    assert(left_write_count >= _PerBlockWriteCount);
+    if constexpr (_SIMDLevel >= X86SIMDLevel::AVX512) {
+        if (len >= _UU512Count) {
+            static_assert(_PerBlockWriteCount >= _UU512Count);
+            goto copy_512;
+        } else if (len >= _UU256Count) {
+            static_assert(_PerBlockWriteCount > _UU256Count);
+            goto copy_256;
+        } else if (len >= _UU128Count) {
+            static_assert(_PerBlockWriteCount > _UU128Count);
+            goto copy_128;
+        } else {
+            goto final;
+        }
+    } else if constexpr (_SIMDLevel >= X86SIMDLevel::AVX2) {
+        if (len >= _UU256Count) {
+            static_assert(_PerBlockWriteCount >= _UU256Count);
+            goto copy_256;
+        } else if (len >= _UU128Count) {
+            static_assert(_PerBlockWriteCount > _UU128Count);
+            goto copy_128;
+        } else {
+            goto final;
+        }
+    } else {
+        if (len >= _UU128Count) {
+            static_assert(_PerBlockWriteCount >= _UU128Count);
+            goto copy_128;
+        } else {
+            goto final;
+        }
+    }
+    Py_UNREACHABLE();
+
+copy_512:;
+    if constexpr (_SIMDLevel >= X86SIMDLevel::AVX512) {
+        assert(len >= _UU512Count);
+        assert(left_write_count >= _UU512Count);
+        z = _mm512_loadu_si512((const void *) data_ptr);
+        _c = check_and_write_512<_Kind, _SIMDLevel>((void *) cur_write_ptr, z);
+        if (likely(_c)) {
+            cur_write_ptr += _UU512Count;
+            len -= _UU512Count;
+            data_ptr += _UU512Count;
+            left_write_count -= _UU512Count;
+            write_len += _UU512Count;
+            // we can assure one block is comsumed.
+            goto loop_inner;
+        } else {
+            goto do_escape_512;
+        }
+    }
+    Py_UNREACHABLE();
+
+copy_256:;
+    if constexpr (_SIMDLevel >= X86SIMDLevel::AVX2) {
+        y = _mm256_loadu_si256((const __m256i_u *) data_ptr);
+        _c = check_and_write_256<_Kind, _SIMDLevel>((void *) cur_write_ptr, y);
+        if (likely(_c)) {
+            cur_write_ptr += _UU256Count;
+            len -= _UU256Count;
+            data_ptr += _UU256Count;
+            left_write_count -= _UU256Count;
+            write_len += _UU256Count;
+            if constexpr (_SIMDLevel >= X86SIMDLevel::AVX512) {
+                goto loop;
+            } else {
+                // we can assure one block is comsumed.
+                goto loop_inner;
+            }
+        } else {
+            goto do_escape_256;
+        }
+    }
+    Py_UNREACHABLE();
+
+copy_128:;
+    x = load_unaligned_si128<_SIMDLevel>((const __m128i_u *) data_ptr);
+    _c = check_and_write_128<_Kind, _SIMDLevel>((void *) cur_write_ptr, x);
+    if (likely(_c)) {
+        cur_write_ptr += _UU128Count;
+        len -= _UU128Count;
+        data_ptr += _UU128Count;
+        left_write_count -= _UU128Count;
+        write_len += _UU128Count;
+        if constexpr (_SIMDLevel >= X86SIMDLevel::AVX2) {
+            goto loop;
+        } else {
+            goto loop_inner;
+        }
+    } else {
+        goto do_escape_128;
+    }
+    Py_UNREACHABLE();
+
+final:;
+    assert(left_write_count >= _PerBlockWriteCount);
+    assert(len < _UU128Count);
+    if (!len) return true;
+    memcpy((void *) xbuf, (const void *) data_ptr, len * sizeof(uu));
+    memset((void *) (xbuf + len), ControlMax, (_UU128Count - len) * sizeof(uu));
+    x = load_unaligned_si128<_SIMDLevel>((const __m128i_u *) xbuf);
+    _c = check_and_write_128<_Kind, _SIMDLevel>((void *) cur_write_ptr, x);
+    if (likely(_c)) {
+        write_len += len;
+        return true;
+    }
+    escape_counter = len;
+    goto do_escape;
+
+do_escape_512:;
+    escape_counter = _UU512Count;
+    goto do_escape;
+do_escape_256:;
+    escape_counter = _UU256Count;
+    goto do_escape;
+do_escape_128:;
+    escape_counter = _UU128Count;
+    goto do_escape;
+do_escape:;
+    len -= escape_counter;
+    assert(len >= 0);
+    while (escape_counter--) {
+        uu c = *data_ptr++;
+        if (c == '"' || c == '\\') {
+            if (left_write_count < 2) {
+                DO_REALLOC();
+            }
+            *cur_write_ptr++ = '\\';
+            *cur_write_ptr++ = c;
+            left_write_count -= 2;
+            write_len += 2;
+        } else if (c < ControlMax) {
+            usize count = _ControlJump[(usize) c];
+            if (left_write_count < count) {
+                DO_REALLOC();
+            }
+            memcpy((void *) cur_write_ptr, (const void *) &_ControlSeqTable<_Kind>[6 * (usize) c], count * sizeof(uu));
+            cur_write_ptr += count;
+            left_write_count -= count;
+            write_len += count;
+        } else {
+            if (!left_write_count) {
+                DO_REALLOC();
+            }
+            *cur_write_ptr++ = c;
+            left_write_count--;
+            write_len++;
+        }
+    }
+    if (!len) return true;
+    goto loop;
+}
+
+template<X86SIMDLevel _SIMDLevel>
+force_inline bool scan_and_write_unicode(ObjViewer *viewer, void *data_ptr, UCSKind kind, Py_ssize_t len, Py_ssize_t &write_len, Py_ssize_t &block_count) {
+    switch (kind) {
+        case UCSKind::UCS1: {
+            return scan_and_write_unicode_impl<_SIMDLevel, UCSKind::UCS1>(viewer, (u8 *) data_ptr, len, write_len, block_count);
+        }
+        case UCSKind::UCS2: {
+            return scan_and_write_unicode_impl<_SIMDLevel, UCSKind::UCS2>(viewer, (u16 *) data_ptr, len, write_len, block_count);
+        }
+        case UCSKind::UCS4: {
+            return scan_and_write_unicode_impl<_SIMDLevel, UCSKind::UCS4>(viewer, (u32 *) data_ptr, len, write_len, block_count);
+        }
+        default: {
+            Py_UNREACHABLE();
+            return false;
+        }
+    }
+}
+
 template<IndentSetting _IndentSetting, X86SIMDLevel _SIMDLevel>
 force_inline bool view_add_key(ObjViewer *viewer, PyObject *str, Py_ssize_t cur_nested_depth) {
     assert(PyUnicode_CheckExact(str));
-    char *_data = (char *) (((PyASCIIObject *) str) + 1);
-    char *_data_2 = (char *) (((PyCompactUnicodeObject *) str) + 1);
-    Py_ssize_t escaped_len = scan_unicode_escaped_len<_SIMDLevel>(str);
-    bool has_escape = escaped_len > PyUnicode_GET_LENGTH(str);
-    u32 view = (u32) ViewObjType_Key | ((u32) has_escape << VIEW_PAYLOAD_BIT);
-    bool _c = write_obj_view(viewer, view) && write_view_data<PyObject *>(viewer, str);
-    if (unlikely(has_escape)) {
-        _c = _c && write_view_data<Py_ssize_t>(viewer, escaped_len);
-    }
+    Py_ssize_t len;
+    UCSKind kind;
+    Py_ssize_t escaped_len;
+    Py_ssize_t *block_count_ptr;
+    void *data_ptr = get_unicode_data(str);
+    bool _c;
+    //
+    get_src_kind_and_len(str, kind, len);
+
+    block_count_ptr = reserve_view_data_buffer<Py_ssize_t>(viewer);
+    RETURN_ON_UNLIKELY_ERR(!block_count_ptr);
+
+    _c = scan_and_write_unicode<_SIMDLevel>(viewer, data_ptr, kind, len, escaped_len, *block_count_ptr);
+    RETURN_ON_UNLIKELY_ERR(!_c);
+    Py_ssize_t u8_blank_left = (*block_count_ptr) * sizeof(StrBlock<_SIMDLevel>) - escaped_len * (int) kind;
+    assert(0 <= u8_blank_left && u8_blank_left <= (Py_ssize_t) ((u8) -1));
+    u16 payload = (u16) u8_blank_left | (u16) kind << 8;
+    u32 view = (u32) ViewObjType_Key | ((u32) payload << VIEW_PAYLOAD_BIT);
+    _c = _c && write_obj_view(viewer, view);
+    //
     if constexpr (need_indent(_IndentSetting)) {
         // indent and spaces, two quotes, one colon, one space, and unicode
         viewer->m_unicode_count += 1 + _get_indent_space_count(cur_nested_depth, _IndentSetting) + 4 + escaped_len;
@@ -2086,13 +2466,26 @@ force_inline bool view_add_key(ObjViewer *viewer, PyObject *str, Py_ssize_t cur_
 template<IndentSetting _IndentSetting, X86SIMDLevel _SIMDLevel, bool _IsInsideObj>
 force_inline bool view_add_str(ObjViewer *viewer, PyObject *str, Py_ssize_t cur_nested_depth) {
     assert(PyUnicode_CheckExact(str));
-    Py_ssize_t escaped_len = scan_unicode_escaped_len<_SIMDLevel>(str);
-    bool has_escape = escaped_len > PyUnicode_GET_LENGTH(str);
-    u32 view = (u32) ViewObjType_Str | ((u32) has_escape << VIEW_PAYLOAD_BIT);
-    bool _c = write_obj_view(viewer, view) && write_view_data<PyObject *>(viewer, str);
-    if (unlikely(has_escape)) {
-        _c = _c && write_view_data<Py_ssize_t>(viewer, escaped_len);
-    }
+    Py_ssize_t len;
+    UCSKind kind;
+    Py_ssize_t escaped_len;
+    Py_ssize_t *block_count_ptr;
+    void *data_ptr = get_unicode_data(str);
+    bool _c;
+    //
+    get_src_kind_and_len(str, kind, len);
+
+    block_count_ptr = reserve_view_data_buffer<Py_ssize_t>(viewer);
+    RETURN_ON_UNLIKELY_ERR(!block_count_ptr);
+
+    _c = scan_and_write_unicode<_SIMDLevel>(viewer, data_ptr, kind, len, escaped_len, *block_count_ptr);
+    RETURN_ON_UNLIKELY_ERR(!_c);
+    Py_ssize_t u8_blank_left = (*block_count_ptr) * sizeof(StrBlock<_SIMDLevel>) - escaped_len * (int) kind;
+    assert(0 <= u8_blank_left && u8_blank_left <= (Py_ssize_t) ((u8) -1));
+    u16 payload = (u16) u8_blank_left | (u16) kind << 8;
+    u32 view = (u32) ViewObjType_Str | ((u32) payload << VIEW_PAYLOAD_BIT);
+    _c = _c && write_obj_view(viewer, view);
+    //
     if constexpr (need_indent(_IndentSetting) && !_IsInsideObj) {
         viewer->m_unicode_count += 1 + _get_indent_space_count(cur_nested_depth, _IndentSetting) + 3 + escaped_len;
     } else {
@@ -2651,15 +3044,26 @@ force_inline PyObject *pyyjson_dumps_view(ObjViewer *obj_viewer) {
             }
             case ViewObjType_Key: {
                 write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel, true>(obj_viewer, write_ptr);
-                PyObject *key = read_view_data<PyObject *>(obj_viewer);
-                char *data = (char *) get_unicode_data(key);
-                write_key<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, key, write_ptr);
+                Py_ssize_t block_count = read_view_data<Py_ssize_t>(obj_viewer);
+                u8 u8_blank_left = obj_viewer->m_view_payload & 0xff;
+                UCSKind this_kind = (UCSKind) (obj_viewer->m_view_payload >> 8);
+                Py_ssize_t escape_len = block_count * sizeof(StrBlock<_SIMDLevel>) - u8_blank_left;
+                assert((escape_len % (int) this_kind) == 0);
+                escape_len /= (int) this_kind;
+                void *buffer = (void *) retrive_str_data_buffer<_SIMDLevel>(obj_viewer, block_count);
+                write_key<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, buffer, escape_len, this_kind, write_ptr);
                 break;
             }
             case ViewObjType_Str: {
                 write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr);
-                PyObject *str = read_view_data<PyObject *>(obj_viewer);
-                write_str<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, str, write_ptr);
+                Py_ssize_t block_count = read_view_data<Py_ssize_t>(obj_viewer);
+                u8 u8_blank_left = obj_viewer->m_view_payload & 0xff;
+                UCSKind this_kind = (UCSKind) (obj_viewer->m_view_payload >> 8);
+                Py_ssize_t escape_len = block_count * sizeof(StrBlock<_SIMDLevel>) - u8_blank_left;
+                assert((escape_len % (int) this_kind) == 0);
+                escape_len /= (int) this_kind;
+                void *buffer = (void *) retrive_str_data_buffer<_SIMDLevel>(obj_viewer, block_count);
+                write_str<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, buffer, escape_len, this_kind, write_ptr);
                 break;
             }
             case ViewObjType_Zero: {
@@ -2734,7 +3138,7 @@ force_noinline PyObject *pyyjson_dumps_obj(PyObject *in_obj, DumpOption *option)
     init_viewer(&obj_viewer);
     PyObject *ret = NULL;
     //
-    bool success = pyyjson_dumps_obj_to_view<IndentSetting::INDENT_4, X86SIMDLevel::SSE4>(in_obj, &obj_viewer);
+    bool success = pyyjson_dumps_obj_to_view<IndentSetting::INDENT_4, X86SIMDLevel::AVX2>(in_obj, &obj_viewer);
     UCSKind kind;
 
     if (unlikely(!success)) goto finalize;
@@ -2744,15 +3148,15 @@ force_noinline PyObject *pyyjson_dumps_obj(PyObject *in_obj, DumpOption *option)
     kind = read_ucs_kind_from_view(&obj_viewer);
     switch (kind) {
         case UCSKind::UCS1: {
-            ret = pyyjson_dumps_view<IndentSetting::INDENT_4, X86SIMDLevel::SSE4, UCSKind::UCS1>(&obj_viewer);
+            ret = pyyjson_dumps_view<IndentSetting::INDENT_4, X86SIMDLevel::AVX2, UCSKind::UCS1>(&obj_viewer);
             break;
         }
         case UCSKind::UCS2: {
-            ret = pyyjson_dumps_view<IndentSetting::INDENT_4, X86SIMDLevel::SSE4, UCSKind::UCS2>(&obj_viewer);
+            ret = pyyjson_dumps_view<IndentSetting::INDENT_4, X86SIMDLevel::AVX2, UCSKind::UCS2>(&obj_viewer);
             break;
         }
         case UCSKind::UCS4: {
-            ret = pyyjson_dumps_view<IndentSetting::INDENT_4, X86SIMDLevel::SSE4, UCSKind::UCS4>(&obj_viewer);
+            ret = pyyjson_dumps_view<IndentSetting::INDENT_4, X86SIMDLevel::AVX2, UCSKind::UCS4>(&obj_viewer);
             break;
         }
         default: {
