@@ -75,7 +75,7 @@
             "preLaunchTask": "CMake: build"
         },
         {
-            "name": "(gdb) 启动 test.cpp",
+            "name": "(gdb) Launch test.cpp",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/a.out",
