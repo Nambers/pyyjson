@@ -72,7 +72,11 @@
       "typeinfo": "cpp",
       "variant": "cpp",
       "string.h": "c",
-      "pyconfig.h": "c"
+      "pyconfig.h": "c",
+      "semaphore": "cpp",
+      "stop_token": "cpp",
+      "thread": "cpp",
+      "cfenv": "cpp"
    },
    "cmake.cmakePath": "${workspaceFolder}/.nix-pyenv/bin/cmake",
    "terminal.integrated.defaultProfile.linux": "nix-dev",

@@ -7,7 +7,7 @@
             "command": "${workspaceFolder}/dev_tools/build.sh",
             "options": {
                 "shell": {
-                    "executable": "/run/current-system/sw/bin/nix",
+                    "executable": "nix",
                     "args": [
                         "develop",
                         "-c",
@@ -30,7 +30,7 @@
             "command": "${workspaceFolder}/dev_tools/pre-pytest.sh",
             "options": {
                 "shell": {
-                    "executable": "/run/current-system/sw/bin/nix",
+                    "executable": "nix",
                     "args": [
                         "develop",
                         "-c",
@@ -46,6 +46,37 @@
                 "isDefault": true
             },
             "detail": "Call pre-pytest.sh with nix develop"
+        },
+        {
+            "label": "CMake: build test.cpp",
+            "type": "shell",
+            "command": "${workspaceFolder}/.nix-pyenv/bin/clang++",
+            "args": [
+                "${workspaceFolder}/test.cpp",
+                "-msse4.1",
+                "-o",
+                "${workspaceFolder}/build/a.out",
+                "-g"
+            ],
+            "options": {
+                "shell": {
+                    "executable": "nix",
+                    "args": [
+                        "develop",
+                        "--command",
+                        "zsh",
+                        "-c"
+                    ],
+                }
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Call build.sh with nix develop"
         }
     ]
 }
