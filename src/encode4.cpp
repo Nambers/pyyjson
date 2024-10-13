@@ -5,12 +5,12 @@
 #include "encode_sse2.inl"
 #include "encode_sse4.inl"
 #include "pyyjson_config.h"
+#include "unicode_utils.hpp"
 #include "yyjson.h"
 #include <algorithm>
 #include <array>
+#include <memory>
 #include <stddef.h>
-
-#include "unicode_utils.hpp"
 
 /*==============================================================================
  * Macros
@@ -34,13 +34,12 @@
 
 #define NEED_INDENT(__indent) (static_cast<int>(__indent) != 0)
 
-#define ENCODE_MOVE_SRC_DST(src, src_count, dst, dst_left, move_count) \
-    do {                                                               \
-        Py_ssize_t _temp__ = (move_count);                             \
-        src += _temp__;                                                \
-        dst += _temp__;                                                \
-        src_count -= _temp__;                                          \
-        dst_left -= _temp__;                                           \
+#define ENCODE_MOVE_SRC_DST(src, src_count, dst, move_count) \
+    do {                                                     \
+        Py_ssize_t _temp__ = (move_count);                   \
+        src += _temp__;                                      \
+        dst += _temp__;                                      \
+        src_count -= _temp__;                                \
     } while (0)
 
 template<UCSKind __kind>
@@ -81,7 +80,7 @@ force_inline constexpr bool check_support_512_copy(X86SIMDLevel _SIMDLevel) {
 }
 
 force_inline constexpr bool check_support_256_copy(X86SIMDLevel _SIMDLevel) {
-    return _SIMDLevel >= X86SIMDLevel::AVX512;
+    return _SIMDLevel >= X86SIMDLevel::AVX2;
 }
 
 /*==============================================================================
@@ -357,50 +356,48 @@ force_inline bool check_and_write_512(void *dst, __m512i z) {
 template<X86SIMDLevel __simd_level>
 force_inline void cpy_once_512_impl(u8 *&ddst, u8 *&ssrc) {
     static_assert(__simd_level >= X86SIMDLevel::AVX512);
-    _mm512_storeu_si512((void *) ddst, _mm512_loadu_si512((void *) ssrc)); // vmovdqu32, AVX512F
+    memcpy((void *) ddst, (void *) ssrc, 512 / 8);
+    // _mm512_storeu_si512((void *) ddst, _mm512_loadu_si512((void *) ssrc)); // vmovdqu32, AVX512F
 }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Walign-mismatch"
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Walign-mismatch"
 template<X86SIMDLevel __simd_level>
 force_inline void cpy_aligned_once_512_impl(u8 *&ddst, u8 *&ssrc) {
     static_assert(__simd_level >= X86SIMDLevel::AVX512);
     _mm512_store_si512((void *) ddst, _mm512_load_si512((void *) ssrc)); // vmovdqa32, AVX512F
 }
-#pragma GCC diagnostic pop
+#pragma clang diagnostic pop
 
 template<X86SIMDLevel __simd_level>
-force_inline void cpy_fast_512_impl(u8 *&ddst, u8 *&ssrc, Py_ssize_t &count, Py_ssize_t &allow_write_size) {
+force_inline void cpy_fast_512_impl(u8 *&ddst, u8 *&ssrc, Py_ssize_t &count) {
     static_assert(__simd_level >= X86SIMDLevel::AVX512);
     constexpr size_t _Align = 512 / 8;
     uintptr_t align_mod = (uintptr_t) ddst % _Align;
     if (align_mod == ((uintptr_t) ssrc % _Align)) {
         if (align_mod) {
             uintptr_t align_diff = _Align - align_mod;
-            if (allow_write_size >= align_diff && count >= align_diff) {
-                memcpy((void *) ddst, (void *) ssrc, align_diff);
-                ENCODE_MOVE_SRC_DST(ssrc, count, ddst, allow_write_size, align_diff);
-            } else {
-                goto copy_unaligned;
-            }
+            memcpy((void *) ddst, (void *) ssrc, align_diff);
+            ENCODE_MOVE_SRC_DST(ssrc, count, ddst, align_diff);
         }
-        while (allow_write_size >= _Align && count > 0) {
+        while (count > 0) {
             cpy_aligned_once_512_impl<__simd_level>(ddst, ssrc); // AVX512F
-            ENCODE_MOVE_SRC_DST(ssrc, count, ddst, allow_write_size, _Align);
+            ENCODE_MOVE_SRC_DST(ssrc, count, ddst, _Align);
         }
         return;
     }
 copy_unaligned:;
-    while (allow_write_size >= _Align && count > 0) {
+    while (count > 0) {
         cpy_once_512_impl<__simd_level>(ddst, ssrc); // AVX512F
-        ENCODE_MOVE_SRC_DST(ssrc, count, ddst, allow_write_size, _Align);
+        ENCODE_MOVE_SRC_DST(ssrc, count, ddst, _Align);
     }
 }
 
 template<X86SIMDLevel __simd_level>
 force_inline void cpy_once_256_impl(u8 *&ddst, u8 *&ssrc) {
     static_assert(__simd_level >= X86SIMDLevel::AVX2);
-    _mm256_storeu_si256((__m256i *) ddst, _mm256_lddqu_si256((const __m256i_u *) ssrc)); // vmovdqu, vlddqu, AVX
+    memcpy((void *) ddst, (void *) ssrc, 256 / 8);
+    // _mm256_storeu_si256((__m256i *) ddst, _mm256_lddqu_si256((const __m256i_u *) ssrc)); // vmovdqu, vlddqu, AVX
 }
 
 #pragma GCC diagnostic push
@@ -413,31 +410,26 @@ force_inline void cpy_aligned_once_256_impl(u8 *&ddst, u8 *&ssrc) {
 #pragma GCC diagnostic pop
 
 template<X86SIMDLevel __simd_level>
-force_inline void cpy_fast_256_impl(u8 *&ddst, u8 *&ssrc, Py_ssize_t &count, Py_ssize_t &allow_write_size) {
+force_inline void cpy_fast_256_impl(u8 *&ddst, u8 *&ssrc, Py_ssize_t &count) {
     static_assert(__simd_level >= X86SIMDLevel::AVX2);
     constexpr size_t _Align = 256 / 8;
     uintptr_t align_mod = (uintptr_t) ddst % _Align;
     if (align_mod == ((uintptr_t) ssrc % _Align)) {
         if (align_mod) {
             uintptr_t align_diff = _Align - align_mod;
-            if (allow_write_size >= align_diff && count >= align_diff) {
-                memcpy((void *) ddst, (void *) ssrc, align_diff);
-                ENCODE_MOVE_SRC_DST(ssrc, count, ddst, allow_write_size, align_diff);
-            } else {
-                goto copy_unaligned;
-            }
+            memcpy((void *) ddst, (void *) ssrc, align_diff);
+            ENCODE_MOVE_SRC_DST(ssrc, count, ddst, align_diff);
         }
-        while (allow_write_size >= _Align && count > 0) {
+        while (count > 0) {
             cpy_aligned_once_256_impl<__simd_level>(ddst, ssrc); // AVX
-            ENCODE_MOVE_SRC_DST(ssrc, count, ddst, allow_write_size, _Align);
+            ENCODE_MOVE_SRC_DST(ssrc, count, ddst, _Align);
         }
         return;
     }
 copy_unaligned:;
-
-    while (allow_write_size >= _Align && count > 0) {
+    while (count > 0) {
         cpy_once_256_impl<__simd_level>(ddst, ssrc); // AVX
-        ENCODE_MOVE_SRC_DST(ssrc, count, ddst, allow_write_size, _Align);
+        ENCODE_MOVE_SRC_DST(ssrc, count, ddst, _Align);
     }
 }
 
@@ -450,44 +442,41 @@ force_inline void cpy_once_128_impl(u8 *&ddst, u8 *&ssrc) {
     }
 }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Walign-mismatch"
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Walign-mismatch"
 template<X86SIMDLevel __simd_level>
 force_inline void cpy_aligned_once_128_impl(u8 *&ddst, u8 *&ssrc) {
     _mm_store_si128((__m128i *) ddst, _mm_load_si128((const __m128i_u *) ssrc)); // movdqa, SSE2
 }
-#pragma GCC diagnostic pop
+#pragma clang diagnostic pop
 
 template<X86SIMDLevel __simd_level>
-force_inline void cpy_fast_128_impl(u8 *&ddst, u8 *&ssrc, Py_ssize_t &count, Py_ssize_t &allow_write_size) {
+force_inline void cpy_fast_128_impl(u8 *&ddst, u8 *&ssrc, Py_ssize_t &count) {
     constexpr size_t _Align = 128 / 8;
     uintptr_t align_mod = (uintptr_t) ddst % _Align;
     if (align_mod == ((uintptr_t) ssrc % _Align)) {
         if (align_mod) {
             uintptr_t align_diff = _Align - align_mod;
-            if (allow_write_size >= align_diff && count >= align_diff) {
-                memcpy((void *) ddst, (void *) ssrc, align_diff);
-                ENCODE_MOVE_SRC_DST(ssrc, count, ddst, allow_write_size, align_diff);
-            } else {
-                goto copy_unaligned;
-            }
+            memcpy((void *) ddst, (void *) ssrc, align_diff);
+            ENCODE_MOVE_SRC_DST(ssrc, count, ddst, align_diff);
         }
-        while (allow_write_size >= _Align && count > 0) {
+        while (count > 0) {
             cpy_aligned_once_128_impl<__simd_level>(ddst, ssrc); // SSE
-            ENCODE_MOVE_SRC_DST(ssrc, count, ddst, allow_write_size, _Align);
+            ENCODE_MOVE_SRC_DST(ssrc, count, ddst, _Align);
         }
         return;
     }
 copy_unaligned:;
-    while (allow_write_size >= _Align && count > 0) {
+    while (count > 0) {
         cpy_once_128_impl<__simd_level>(ddst, ssrc); // SSE2 or SSE3
-        ENCODE_MOVE_SRC_DST(ssrc, count, ddst, allow_write_size, _Align);
+        ENCODE_MOVE_SRC_DST(ssrc, count, ddst, _Align);
     }
 }
 
 template<X86SIMDLevel __simd_level>
-force_inline void cpy_fast(void *dst, void *src, Py_ssize_t count, Py_ssize_t allow_write_size) {
-    assert(count <= allow_write_size);
+force_inline void cpy_fast(void *dst, void *src, Py_ssize_t count) {
+    memcpy(dst, src, size_align_up((size_t) count, 128 / 8));
+    return;
     u8 *ddst = (u8 *) dst;
     u8 *ssrc = (u8 *) src;
     if constexpr (__simd_level >= X86SIMDLevel::AVX512) {
@@ -499,7 +488,7 @@ force_inline void cpy_fast(void *dst, void *src, Py_ssize_t count, Py_ssize_t al
     }
 copy_512:
     if constexpr (__simd_level >= X86SIMDLevel::AVX512) {
-        cpy_fast_512_impl<__simd_level>(ddst, ssrc, count, allow_write_size);
+        cpy_fast_512_impl<__simd_level>(ddst, ssrc, count);
     } else {
         Py_UNREACHABLE();
     }
@@ -507,14 +496,14 @@ copy_512:
     goto copy_256;
 copy_256:
     if constexpr (__simd_level >= X86SIMDLevel::AVX2) {
-        cpy_fast_256_impl<__simd_level>(ddst, ssrc, count, allow_write_size);
+        cpy_fast_256_impl<__simd_level>(ddst, ssrc, count);
     } else {
         Py_UNREACHABLE();
     }
     if (likely(count <= 0)) return;
     goto copy_128;
 copy_128:
-    cpy_fast_128_impl<__simd_level>(ddst, ssrc, count, allow_write_size);
+    cpy_fast_128_impl<__simd_level>(ddst, ssrc, count);
     if (likely(count <= 0)) return;
     goto copy_final;
 copy_final:
@@ -527,18 +516,16 @@ copy_final:
  *============================================================================*/
 
 template<UCSKind __from, UCSKind __to, X86SIMDLevel _SIMDLevel>
-force_inline void copy_ucs_elevate_avx512_nocheck(UCSType_t<__to> *&write_ptr, UCSType_t<__from> *src, Py_ssize_t len, Py_ssize_t write_count_left) {
+force_inline void copy_ucs_elevate_avx512_nocheck(UCSType_t<__to> *&write_ptr, UCSType_t<__from> *src, Py_ssize_t len) {
     static_assert(__from < __to);
     static_assert(_SIMDLevel >= X86SIMDLevel::AVX512);
-    assert(write_count_left >= 0);
     COMMON_TYPE_DEF();
     constexpr usize _ReadWriteOnce = 512 / 8 / sizeof(udst);
-    const usize can_write_max_times = (usize) write_count_left / _ReadWriteOnce;
     usize do_write_times;
     if constexpr (__from == UCSKind::UCS1 && __to == UCSKind::UCS4) {
         // 128 -> 512, * 4
         const usize want_write_times = size_align_up((usize) len * sizeof(usrc), 128 / 8) / (128 / 8);
-        do_write_times = std::min(can_write_max_times, want_write_times);
+        do_write_times = want_write_times;
         for (Py_ssize_t i = 0; i < do_write_times; ++i) {
             __m128i x = _mm_lddqu_si128((const __m128i_u *) src); // lddqu, SSE3
             __m512i z = _mm512_cvtepu8_epi32(x);                  // vpmovzxbd, AVX512F
@@ -549,7 +536,7 @@ force_inline void copy_ucs_elevate_avx512_nocheck(UCSType_t<__to> *&write_ptr, U
     } else {
         // 256 -> 512, * 2
         const usize want_write_times = size_align_up((usize) len * sizeof(usrc), 256 / 8) / (256 / 8);
-        do_write_times = std::min(can_write_max_times, want_write_times);
+        do_write_times = want_write_times;
         for (Py_ssize_t i = 0; i < do_write_times; ++i) {
             __m256i y = _mm256_lddqu_si256((const __m256i_u *) src); // vlddqu, AVX
             __m512i z;
@@ -566,46 +553,29 @@ force_inline void copy_ucs_elevate_avx512_nocheck(UCSType_t<__to> *&write_ptr, U
         }
     }
     len -= (Py_ssize_t) do_write_times * (Py_ssize_t) _ReadWriteOnce;
-    if (likely(len <= 0)) {
-        write_ptr += len;
-        return;
-    }
-    // manual copy
-    for (Py_ssize_t i = 0; i < len; ++i) {
-        *write_ptr = (udst) *src;
-        ++write_ptr;
-        ++src;
-    }
+    assert(len <= 0);
+    write_ptr += len;
 }
 
 template<UCSKind __from, UCSKind __to, X86SIMDLevel _SIMDLevel>
-force_inline void copy_ucs_elevate_sse4_or_avx2_nocheck(UCSType_t<__to> *&write_ptr, UCSType_t<__from> *src, Py_ssize_t len, Py_ssize_t write_count_left) {
+force_inline void copy_ucs_elevate_sse4_or_avx2_nocheck(UCSType_t<__to> *&write_ptr, UCSType_t<__from> *src, Py_ssize_t len) {
     static_assert(__from < __to);
     static_assert(_SIMDLevel >= X86SIMDLevel::SSE4);
-    assert(write_count_left >= 0);
     COMMON_TYPE_DEF();
     constexpr usize _ReadWriteOnce = 128 / 8 / sizeof(usrc);
-    const usize can_write_max_times = (usize) write_count_left / _ReadWriteOnce;
     const usize want_write_times = size_align_up((usize) len * sizeof(usrc), 128 / 8) / (128 / 8);
-    usize do_write_times = std::min(can_write_max_times, want_write_times);
+    usize do_write_times = want_write_times;
     for (usize i = 0; i < do_write_times; ++i) {
         __m128i x = _mm_lddqu_si128((const __m128i_u *) src); // lddqu, SSE3
         cvtepu_128<__from, __to, _SIMDLevel>(x, src, write_ptr);
     }
     len -= (Py_ssize_t) do_write_times * (Py_ssize_t) _ReadWriteOnce;
-    if (likely(len <= 0)) {
-        write_ptr += len;
-        return;
-    }
-    for (Py_ssize_t i = 0; i < len; ++i) {
-        *write_ptr = (udst) *src;
-        ++write_ptr;
-        ++src;
-    }
+    assert(len <= 0);
+    write_ptr += len;
 }
 
 template<UCSKind __from, UCSKind __to, X86SIMDLevel _SIMDLevel>
-force_inline void copy_ucs_elevate_general_nocheck(UCSType_t<__to> *&write_ptr, UCSType_t<__from> *src, Py_ssize_t len, Py_ssize_t write_count_left) {
+force_inline void copy_ucs_elevate_general_nocheck(UCSType_t<__to> *&write_ptr, UCSType_t<__from> *src, Py_ssize_t len) {
     using udst = UCSType_t<__to>;
     assert(len >= 0);
     for (Py_ssize_t i = 0; i < len; ++i) {
@@ -616,21 +586,21 @@ force_inline void copy_ucs_elevate_general_nocheck(UCSType_t<__to> *&write_ptr, 
 }
 
 template<UCSKind __from, UCSKind __to, X86SIMDLevel _SIMDLevel>
-force_inline void copy_elevate_nocheck(UCSType_t<__to> *&write_ptr, UCSType_t<__from> *src, Py_ssize_t len, Py_ssize_t write_count_left) {
+force_inline void copy_elevate_nocheck(UCSType_t<__to> *&write_ptr, UCSType_t<__from> *src, Py_ssize_t len) {
     static_assert(__from < __to);
     if constexpr (_SIMDLevel >= X86SIMDLevel::AVX512) {
-        return copy_ucs_elevate_avx512_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len, write_count_left);
+        return copy_ucs_elevate_avx512_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len);
     } else if constexpr (_SIMDLevel >= X86SIMDLevel::AVX2) {
-        return copy_ucs_elevate_sse4_or_avx2_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len, write_count_left);
+        return copy_ucs_elevate_sse4_or_avx2_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len);
     } else if constexpr (_SIMDLevel >= X86SIMDLevel::SSE4) {
-        return copy_ucs_elevate_sse4_or_avx2_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len, write_count_left);
+        return copy_ucs_elevate_sse4_or_avx2_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len);
     } else {
-        return copy_ucs_elevate_general_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len, write_count_left);
+        return copy_ucs_elevate_general_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len);
     }
 }
 
 template<UCSKind __from, UCSKind __to, X86SIMDLevel _SIMDLevel>
-force_inline void copy_ucs_elevate_128bits(UCSType_t<__from> *src, Py_ssize_t len, UCSType_t<__to> *&write_ptr, Py_ssize_t escape_len, Py_ssize_t write_count_left) {
+force_inline void copy_ucs_elevate_128bits(UCSType_t<__from> *src, Py_ssize_t len, UCSType_t<__to> *&write_ptr, Py_ssize_t escape_len) {
     static_assert(__from < __to);
     static_assert(_SIMDLevel >= X86SIMDLevel::SSE4);
     COMMON_TYPE_DEF();
@@ -638,7 +608,6 @@ force_inline void copy_ucs_elevate_128bits(UCSType_t<__from> *src, Py_ssize_t le
     constexpr usize _Check128Once = 128 / 8 / sizeof(usrc);
 
     assert(len < escape_len);
-    assert(escape_len <= write_count_left);
 
     std::ptrdiff_t temp;
     udst *write_old;
@@ -651,14 +620,12 @@ force_inline void copy_ucs_elevate_128bits(UCSType_t<__from> *src, Py_ssize_t le
         if (likely(v)) {
             cvtepu_128<__from, __to, _SIMDLevel>(x, src, write_ptr);
             len -= _Check128Once;
-            write_count_left -= _Check128Once;
             escape_len -= _Check128Once;
         } else {
             write_old = write_ptr;
             copy_escape_fixsize<__from, __to, 128>(src, write_ptr);
             temp = write_ptr - write_old;
             len -= _Check128Once;
-            write_count_left -= temp;
             escape_len -= temp;
             if (escape_len == len) {
                 goto no_escape;
@@ -668,26 +635,28 @@ force_inline void copy_ucs_elevate_128bits(UCSType_t<__from> *src, Py_ssize_t le
     }
     assert(len < (Py_ssize_t) _Check128Once);
     if (len == 0) return;
-    if (likely(write_count_left >= _Check128Once)) {
-        x = load_unaligned_si128<_SIMDLevel>((const __m128i_u *) src); // SSE2
-        v = check_escape_tail_128bits<__from, _SIMDLevel>(x, len);
-        if (likely(v)) {
-            write_old = write_ptr;
-            cvtepu_128<__from, __to, _SIMDLevel>(x, src, write_ptr);
-            write_ptr = write_old + len;
-            return;
-        }
+    yyjson_align(128 / 8) usrc xbuf[_Check128Once];
+    memcpy((void *) xbuf, (const void *) src, (size_t) len * sizeof(usrc));
+    // TODO fix dirty read
+    x = load_unaligned_si128<_SIMDLevel>((const __m128i_u *) xbuf); // SSE2
+    v = check_escape_tail_128bits<__from, _SIMDLevel>(x, len);
+    if (likely(v)) {
+        write_old = write_ptr;
+        usrc *xbuf_ptr = xbuf;
+        cvtepu_128<__from, __to, _SIMDLevel>(x, xbuf_ptr, write_ptr);
+        write_ptr = write_old + len;
+        return;
     }
     copy_escape_impl<__from, __to>(src, write_ptr, len);
     return;
 
 no_escape:;
-    copy_elevate_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len, write_count_left);
+    copy_elevate_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len);
     return;
 }
 
 template<UCSKind __from, UCSKind __to, X86SIMDLevel _SIMDLevel>
-force_inline void copy_ucs_elevate_256bits(UCSType_t<__from> *src, Py_ssize_t len, UCSType_t<__to> *&write_ptr, Py_ssize_t escape_len, Py_ssize_t write_count_left) {
+force_inline void copy_ucs_elevate_256bits(UCSType_t<__from> *src, Py_ssize_t len, UCSType_t<__to> *&write_ptr, Py_ssize_t escape_len) {
     static_assert(__from < __to);
     static_assert(_SIMDLevel >= X86SIMDLevel::AVX2);
     COMMON_TYPE_DEF();
@@ -696,7 +665,6 @@ force_inline void copy_ucs_elevate_256bits(UCSType_t<__from> *src, Py_ssize_t le
     constexpr usize _Check128Once = 128 / 8 / sizeof(usrc);
 
     assert(len < escape_len);
-    assert(escape_len <= write_count_left);
 
     std::ptrdiff_t temp;
     udst *write_old;
@@ -710,7 +678,6 @@ force_inline void copy_ucs_elevate_256bits(UCSType_t<__from> *src, Py_ssize_t le
         if (likely(v)) {
             cvtepu_256<__from, __to, _SIMDLevel>(y, src, write_ptr);
             len -= _Check256Once;
-            write_count_left -= _Check256Once;
             escape_len -= _Check256Once;
         } else {
             x = _mm256_castsi256_si128(y);
@@ -719,7 +686,6 @@ force_inline void copy_ucs_elevate_256bits(UCSType_t<__from> *src, Py_ssize_t le
                 // .x
                 cvtepu_128<__from, __to, _SIMDLevel>(x, src, write_ptr);
                 len -= _Check128Once;
-                write_count_left -= _Check128Once;
                 escape_len -= _Check128Once;
             }
             // x
@@ -727,7 +693,6 @@ force_inline void copy_ucs_elevate_256bits(UCSType_t<__from> *src, Py_ssize_t le
             copy_escape_fixsize<__from, __to, 128>(src, write_ptr);
             temp = write_ptr - write_old;
             len -= _Check128Once;
-            write_count_left -= temp;
             escape_len -= temp;
             if (escape_len == len) {
                 goto no_escape;
@@ -738,26 +703,16 @@ force_inline void copy_ucs_elevate_256bits(UCSType_t<__from> *src, Py_ssize_t le
     //
     assert(len < (Py_ssize_t) _Check256Once);
     if (len == 0) return;
-    if (likely(write_count_left >= _Check256Once)) {
-        y = _mm256_loadu_si256((const __m256i_u *) src); // vmovdqu32, AVX512F
-        v = check_escape_tail_256bits<__from, _SIMDLevel>(y, len);
-        if (likely(v)) {
-            write_old = write_ptr;
-            cvtepu_256<__from, __to, _SIMDLevel>(y, src, write_ptr);
-            write_ptr = write_old + len;
-            return;
-        }
-    }
-    copy_ucs_elevate_128bits<__from, __to, _SIMDLevel>(src, len, write_ptr, escape_len, write_count_left);
+    copy_ucs_elevate_128bits<__from, __to, _SIMDLevel>(src, len, write_ptr, escape_len);
     return;
 
 no_escape:;
-    copy_elevate_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len, write_count_left);
+    copy_elevate_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len);
     return;
 }
 
 template<UCSKind __from, UCSKind __to, X86SIMDLevel _SIMDLevel>
-force_inline void copy_ucs_elevate_512bits(UCSType_t<__from> *src, Py_ssize_t len, UCSType_t<__to> *&write_ptr, Py_ssize_t escape_len, Py_ssize_t write_count_left) {
+force_inline void copy_ucs_elevate_512bits(UCSType_t<__from> *src, Py_ssize_t len, UCSType_t<__to> *&write_ptr, Py_ssize_t escape_len) {
     static_assert(__from < __to);
     static_assert(_SIMDLevel >= X86SIMDLevel::AVX512);
     COMMON_TYPE_DEF();
@@ -767,7 +722,6 @@ force_inline void copy_ucs_elevate_512bits(UCSType_t<__from> *src, Py_ssize_t le
     constexpr usize _Check128Once = 128 / 8 / sizeof(usrc);
 
     assert(len < escape_len);
-    assert(escape_len <= write_count_left);
 
     std::ptrdiff_t temp;
     udst *write_old;
@@ -782,7 +736,6 @@ force_inline void copy_ucs_elevate_512bits(UCSType_t<__from> *src, Py_ssize_t le
         if (likely(v)) {
             cvtepu_512<__from, __to, _SIMDLevel>(z, src, write_ptr);
             len -= _Check512Once;
-            write_count_left -= _Check512Once;
             escape_len -= _Check512Once;
         } else {
             y = _mm512_castsi512_si256(z);
@@ -791,7 +744,6 @@ force_inline void copy_ucs_elevate_512bits(UCSType_t<__from> *src, Py_ssize_t le
                 // ..??
                 cvtepu_256<__from, __to, _SIMDLevel>(y, src, write_ptr);
                 len -= _Check256Once;
-                write_count_left -= _Check256Once;
                 escape_len -= _Check256Once;
                 // moved: ??
                 x = _mm512_extracti32x4_epi32(z, 2); // vextracti32x4, AVX512F
@@ -800,7 +752,6 @@ force_inline void copy_ucs_elevate_512bits(UCSType_t<__from> *src, Py_ssize_t le
                     // .x
                     cvtepu_128<__from, __to, _SIMDLevel>(x, src, write_ptr);
                     len -= _Check128Once;
-                    write_count_left -= _Check128Once;
                     escape_len -= _Check128Once;
                 }
                 // x
@@ -808,7 +759,6 @@ force_inline void copy_ucs_elevate_512bits(UCSType_t<__from> *src, Py_ssize_t le
                 copy_escape_fixsize<__from, __to, 128>(src, write_ptr);
                 temp = write_ptr - write_old;
                 len -= _Check128Once;
-                write_count_left -= temp;
                 escape_len -= temp;
                 if (escape_len == len) {
                     goto no_escape;
@@ -822,7 +772,6 @@ force_inline void copy_ucs_elevate_512bits(UCSType_t<__from> *src, Py_ssize_t le
                 // .x
                 cvtepu_128<__from, __to, _SIMDLevel>(x, src, write_ptr);
                 len -= _Check128Once;
-                write_count_left -= _Check128Once;
                 escape_len -= _Check128Once;
             }
             // x
@@ -830,7 +779,6 @@ force_inline void copy_ucs_elevate_512bits(UCSType_t<__from> *src, Py_ssize_t le
             copy_escape_fixsize<__from, __to, 128>(src, write_ptr);
             temp = write_ptr - write_old;
             len -= _Check128Once;
-            write_count_left -= temp;
             escape_len -= temp;
             if (escape_len == len) {
                 goto no_escape;
@@ -841,21 +789,11 @@ force_inline void copy_ucs_elevate_512bits(UCSType_t<__from> *src, Py_ssize_t le
     //
     assert(len < (Py_ssize_t) _Check512Once);
     if (len == 0) return;
-    if (likely(write_count_left >= _Check512Once)) {
-        z = _mm512_loadu_si512((const void *) src); // vmovdqu32, AVX512F
-        v = check_escape_tail_512bits<__from, _SIMDLevel>(z, len);
-        if (likely(v)) {
-            write_old = write_ptr;
-            cvtepu_512<__from, __to, _SIMDLevel>(z, src, write_ptr);
-            write_ptr = write_old + len;
-            return;
-        }
-    }
-    copy_ucs_elevate_256bits<__from, __to, _SIMDLevel>(write_ptr, src, len, write_count_left, escape_len);
+    copy_ucs_elevate_256bits<__from, __to, _SIMDLevel>(write_ptr, src, len, escape_len);
     return;
 
 no_escape:;
-    copy_elevate_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len, write_count_left);
+    copy_elevate_nocheck<__from, __to, _SIMDLevel>(write_ptr, src, len);
     return;
 }
 
@@ -883,33 +821,31 @@ force_inline void copy_ucs_elevate_general(UCSType_t<__from> *src, Py_ssize_t le
 }
 
 template<UCSKind __from, UCSKind __to, X86SIMDLevel __simd_level>
-force_inline void copy_ucs_elevate(UCSType_t<__from> *src, Py_ssize_t src_count, UCSType_t<__to> *&dst, UCSType_t<__to> *const end_ptr, Py_ssize_t escape_len) {
+force_inline void copy_ucs_elevate(UCSType_t<__from> *src, Py_ssize_t src_count, UCSType_t<__to> *&dst, Py_ssize_t escape_len) {
     COMMON_TYPE_DEF();
     static_assert(__from < __to);
-    Py_ssize_t write_count_left = end_ptr - dst;
 
     if constexpr (__simd_level >= X86SIMDLevel::AVX512) {
-        copy_ucs_elevate_512bits<__from, __to, __simd_level>(src, src_count, dst, escape_len, write_count_left);
+        copy_ucs_elevate_512bits<__from, __to, __simd_level>(src, src_count, dst, escape_len);
     } else if constexpr (__simd_level >= X86SIMDLevel::AVX2) {
-        copy_ucs_elevate_256bits<__from, __to, __simd_level>(src, src_count, dst, escape_len, write_count_left);
+        copy_ucs_elevate_256bits<__from, __to, __simd_level>(src, src_count, dst, escape_len);
     } else if constexpr (__simd_level >= X86SIMDLevel::SSE4) {
-        copy_ucs_elevate_128bits<__from, __to, __simd_level>(src, src_count, dst, escape_len, write_count_left);
+        copy_ucs_elevate_128bits<__from, __to, __simd_level>(src, src_count, dst, escape_len);
     } else {
-        copy_ucs_elevate_general<__from, __to>(src, src_count, dst, escape_len, write_count_left);
+        copy_ucs_elevate_general<__from, __to>(src, src_count, dst, escape_len);
     }
 }
 
 /*copy_ucs_same*/
 
 
-template<UCSKind __kind, X86SIMDLevel __simd_level>
-force_inline void copy_ucs_same_128bits(UCSType_t<__kind> *src, Py_ssize_t count, UCSType_t<__kind> *&dst, Py_ssize_t escape_count, Py_ssize_t write_count_left) {
+template<UCSKind __kind, X86SIMDLevel __simd_level, bool _AllowDirtyRead>
+force_inline void copy_ucs_same_128bits(UCSType_t<__kind> *src, Py_ssize_t count, UCSType_t<__kind> *&dst, Py_ssize_t escape_count) {
     using uu = UCSType_t<__kind>;
 
     constexpr std::ptrdiff_t _Process128OnceCount = 128 / 8 / sizeof(uu);
 
     assert(count <= escape_count);
-    assert(escape_count <= write_count_left);
 
     Py_ssize_t temp;
     uu *old_dst;
@@ -927,17 +863,15 @@ force_inline void copy_ucs_same_128bits(UCSType_t<__kind> *src, Py_ssize_t count
             src += _Process128OnceCount;
             count -= _Process128OnceCount;
             dst += _Process128OnceCount;
-            write_count_left -= _Process128OnceCount;
             escape_count -= _Process128OnceCount;
         } else {
             old_dst = dst;
             copy_escape_fixsize<__kind, __kind, 128>(src, dst);
-            // src, dst moved, update count and write_count_left
+            // src, dst moved, update count
             temp = dst - old_dst;
             count -= _Process128OnceCount;
-            write_count_left -= temp;
             escape_count -= temp;
-            assert(write_count_left >= 0 && escape_count >= 0);
+            assert(escape_count >= 0);
             if (escape_count == count) {
                 goto no_escape;
             }
@@ -947,27 +881,37 @@ force_inline void copy_ucs_same_128bits(UCSType_t<__kind> *src, Py_ssize_t count
     //
     assert(count < _Process128OnceCount);
     if (!count) return;
-    if (likely(write_count_left >= _Process128OnceCount)) {
-        // try a tail check
+    // TODO fix dirty read
+    // try a tail check
+    yyjson_align(128 / 8) uu xbuf[_Process128OnceCount];
+    if constexpr (!_AllowDirtyRead) {
+        memcpy((void *) xbuf, (const void *) src, (size_t) count * sizeof(uu));
+        memset((void *) (xbuf + count), ControlMax, (_Process128OnceCount - count) * sizeof(uu));
+        src = xbuf;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Walign-mismatch"
+        x = _mm_load_si128((const __m128i *) src); // movdqa, SSE2
+#pragma clang diagnostic pop
+    } else {
         x = load_unaligned_si128<__simd_level>((const __m128i_u *) src); // SSE2
-        _mm_storeu_si128((__m128i_u *) dst, x);                          // movdqu, SSE2
-        v = check_escape_tail_128bits<__kind, __simd_level>(x, count);
-        if (likely(v)) {
-            dst += count;
-            return;
-        }
+    }
+    _mm_storeu_si128((__m128i_u *) dst, x); // movdqu, SSE2
+    v = check_escape_tail_128bits<__kind, __simd_level>(x, count);
+    if (likely(v)) {
+        dst += count;
+        return;
     }
     copy_escape_impl<__kind, __kind>(src, dst, count);
     return;
 
 no_escape:;
-    cpy_fast<__simd_level>((void *) dst, (void *) src, count * sizeof(uu), write_count_left * sizeof(uu));
+    cpy_fast<__simd_level>((void *) dst, (void *) src, count * sizeof(uu));
     dst += count;
     return;
 }
 
-template<UCSKind __kind, X86SIMDLevel __simd_level>
-force_inline void copy_ucs_same_256bits(UCSType_t<__kind> *src, Py_ssize_t count, UCSType_t<__kind> *&dst, Py_ssize_t escape_count, Py_ssize_t write_count_left) {
+template<UCSKind __kind, X86SIMDLevel __simd_level, bool _AllowDirtyRead>
+force_inline void copy_ucs_same_256bits(UCSType_t<__kind> *src, Py_ssize_t count, UCSType_t<__kind> *&dst, Py_ssize_t escape_count) {
     static_assert(__simd_level >= X86SIMDLevel::AVX2, "Only AVX2 or above can use this");
 
     using uu = UCSType_t<__kind>;
@@ -976,7 +920,6 @@ force_inline void copy_ucs_same_256bits(UCSType_t<__kind> *src, Py_ssize_t count
     constexpr std::ptrdiff_t _Process128OnceCount = 128 / 8 / sizeof(uu);
 
     assert(count <= escape_count);
-    assert(escape_count <= write_count_left);
 
     Py_ssize_t temp;
     uu *old_dst;
@@ -995,7 +938,6 @@ force_inline void copy_ucs_same_256bits(UCSType_t<__kind> *src, Py_ssize_t count
             src += _Process256OnceCount;
             count -= _Process256OnceCount;
             dst += _Process256OnceCount;
-            write_count_left -= _Process256OnceCount;
             escape_count -= _Process256OnceCount;
         } else {
             x = _mm256_castsi256_si128(y); // no-op, AVX
@@ -1005,7 +947,6 @@ force_inline void copy_ucs_same_256bits(UCSType_t<__kind> *src, Py_ssize_t count
                 src += _Process128OnceCount;
                 count -= _Process128OnceCount;
                 dst += _Process128OnceCount;
-                write_count_left -= _Process128OnceCount;
                 escape_count -= _Process128OnceCount;
                 // moved: x
             }
@@ -1014,7 +955,6 @@ force_inline void copy_ucs_same_256bits(UCSType_t<__kind> *src, Py_ssize_t count
             copy_escape_fixsize<__kind, __kind, 128>(src, dst);
             temp = dst - old_dst;
             count -= _Process128OnceCount;
-            write_count_left -= temp;
             escape_count -= temp;
             if (escape_count == count) {
                 goto no_escape;
@@ -1025,27 +965,38 @@ force_inline void copy_ucs_same_256bits(UCSType_t<__kind> *src, Py_ssize_t count
     //
     assert(count < _Process256OnceCount);
     if (!count) return;
-    if (likely(write_count_left >= _Process256OnceCount)) {
-        // try a tail check
+    copy_escape_impl<__kind, __kind>(src, dst, count);
+    return;
+    // TODO fix dirty read
+    yyjson_align(256 / 8) uu xbuf[_Process256OnceCount];
+    if constexpr (!_AllowDirtyRead) {
+        memcpy((void *) xbuf, (const void *) src, (size_t) count * sizeof(uu));
+        memset((void *) (xbuf + count), ControlMax, (_Process256OnceCount - count) * sizeof(uu));
+        src = xbuf;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Walign-mismatch"
+        y = _mm256_load_si256((const __m256i_u *) xbuf); // vlddqu, AVX
+#pragma clang diagnostic pop
+    } else {
         y = _mm256_lddqu_si256((const __m256i_u *) src); // vlddqu, AVX
-        _mm256_storeu_si256((__m256i_u *) dst, y);       // vmovdqu, AVX
-        v = check_escape_tail_256bits<__kind, __simd_level>(y, count);
-        if (likely(v)) {
-            dst += count;
-            return;
-        }
     }
-    copy_ucs_same_128bits<__kind, __simd_level>(src, count, dst, escape_count, write_count_left);
+    _mm256_storeu_si256((__m256i_u *) dst, y); // vmovdqu, AVX
+    v = check_escape_256bits<__kind, __simd_level>(y);
+    if (likely(v)) {
+        dst += count;
+        return;
+    }
+    copy_ucs_same_128bits<__kind, __simd_level, false>(src, count, dst, escape_count);
     return;
 
 no_escape:;
-    cpy_fast<__simd_level>((void *) dst, (void *) src, count * sizeof(uu), write_count_left * sizeof(uu));
+    cpy_fast<__simd_level>((void *) dst, (void *) src, count * sizeof(uu));
     dst += count;
     return;
 }
 
-template<UCSKind __kind, X86SIMDLevel __simd_level>
-force_inline void copy_ucs_same_512bits(UCSType_t<__kind> *src, Py_ssize_t count, UCSType_t<__kind> *&dst, Py_ssize_t escape_count, Py_ssize_t write_count_left) {
+template<UCSKind __kind, X86SIMDLevel __simd_level, bool _AllowDirtyRead>
+force_inline void copy_ucs_same_512bits(UCSType_t<__kind> *src, Py_ssize_t count, UCSType_t<__kind> *&dst, Py_ssize_t escape_count) {
     static_assert(__simd_level >= X86SIMDLevel::AVX512, "Only AVX512 or above can use this");
     using uu = UCSType_t<__kind>;
 
@@ -1054,7 +1005,6 @@ force_inline void copy_ucs_same_512bits(UCSType_t<__kind> *src, Py_ssize_t count
     constexpr std::ptrdiff_t _Process128OnceCount = 128 / 8 / sizeof(uu);
 
     assert(count <= escape_count);
-    assert(escape_count <= write_count_left);
 
     Py_ssize_t temp;
     uu *old_dst;
@@ -1074,7 +1024,6 @@ force_inline void copy_ucs_same_512bits(UCSType_t<__kind> *src, Py_ssize_t count
             src += _Process512OnceCount;
             count -= _Process512OnceCount;
             dst += _Process512OnceCount;
-            write_count_left -= _Process512OnceCount;
             escape_count -= _Process512OnceCount;
         } else {
             y = _mm512_castsi512_si256(z); // no-op, AVX512F
@@ -1084,7 +1033,6 @@ force_inline void copy_ucs_same_512bits(UCSType_t<__kind> *src, Py_ssize_t count
                 src += _Process256OnceCount;
                 count -= _Process256OnceCount;
                 dst += _Process256OnceCount;
-                write_count_left -= _Process256OnceCount;
                 escape_count -= _Process256OnceCount;
                 // moved: ??
                 x = _mm512_extracti32x4_epi32(z, 2); // vextracti32x4, AVX512F
@@ -1094,7 +1042,6 @@ force_inline void copy_ucs_same_512bits(UCSType_t<__kind> *src, Py_ssize_t count
                     src += _Process128OnceCount;
                     count -= _Process128OnceCount;
                     dst += _Process128OnceCount;
-                    write_count_left -= _Process128OnceCount;
                     escape_count -= _Process128OnceCount;
                     // moved: x
                 }
@@ -1102,7 +1049,6 @@ force_inline void copy_ucs_same_512bits(UCSType_t<__kind> *src, Py_ssize_t count
                 copy_escape_fixsize<__kind, __kind, 128>(src, dst);
                 temp = dst - old_dst;
                 count -= _Process128OnceCount;
-                write_count_left -= temp;
                 escape_count -= temp;
                 if (escape_count == count) {
                     goto no_escape;
@@ -1117,7 +1063,6 @@ force_inline void copy_ucs_same_512bits(UCSType_t<__kind> *src, Py_ssize_t count
                     src += _Process128OnceCount;
                     count -= _Process128OnceCount;
                     dst += _Process128OnceCount;
-                    write_count_left -= _Process128OnceCount;
                     escape_count -= _Process128OnceCount;
                     // moved: x
                 }
@@ -1126,7 +1071,6 @@ force_inline void copy_ucs_same_512bits(UCSType_t<__kind> *src, Py_ssize_t count
                 copy_escape_fixsize<__kind, __kind, 128>(src, dst);
                 temp = dst - old_dst;
                 count -= _Process128OnceCount;
-                write_count_left -= temp;
                 escape_count -= temp;
                 if (escape_count == count) {
                     goto no_escape;
@@ -1138,43 +1082,47 @@ force_inline void copy_ucs_same_512bits(UCSType_t<__kind> *src, Py_ssize_t count
     //
     assert(count < _Process512OnceCount);
     if (!count) return;
-    if (likely(write_count_left >= _Process512OnceCount)) {
-        // try a tail check
+    yyjson_align(512 / 8) uu xbuf[_Process512OnceCount];
+    if constexpr (!_AllowDirtyRead) {
+        memcpy((void *) xbuf, (const void *) src, (size_t) count * sizeof(uu));
+        memset((void *) (xbuf + count), ControlMax, (_Process512OnceCount - count) * sizeof(uu));
+        src = xbuf;
+        z = _mm512_load_si512((void *) src); // vmovdqu32, AVX512F
+    } else {
         z = _mm512_loadu_si512((void *) src); // vmovdqu32, AVX512F
-        _mm512_storeu_si512((void *) dst, z); // vmovdqu32, AVX512F
-        v = check_escape_tail_512bits<__kind, __simd_level>(z, count);
-        if (likely(v)) {
-            dst += count;
-            return;
-        }
     }
-    copy_ucs_same_256bits<__kind, __simd_level>(src, count, dst, write_count_left);
+    _mm512_storeu_si512((void *) dst, z); // vmovdqu32, AVX512F
+    v = check_escape_512bits<__kind, __simd_level>(z, count);
+    if (likely(v)) {
+        dst += count;
+        return;
+    }
+    copy_ucs_same_256bits<__kind, __simd_level, false>(src, count, dst, escape_count);
     return;
 no_escape:;
-    cpy_fast<__simd_level>((void *) dst, (void *) src, count * sizeof(uu), write_count_left * sizeof(uu));
+    cpy_fast<__simd_level>((void *) dst, (void *) src, count * sizeof(uu));
     dst += count;
     return;
 }
 
 
 template<UCSKind __kind, X86SIMDLevel __simd_level>
-force_inline void copy_ucs_same(UCSType_t<__kind> *src, Py_ssize_t src_count, UCSType_t<__kind> *&dst, UCSType_t<__kind> *const end_ptr, Py_ssize_t escape_len) {
-    Py_ssize_t write_count_left = (Py_ssize_t) (end_ptr - dst);
+force_inline void copy_ucs_same(UCSType_t<__kind> *src, Py_ssize_t src_count, UCSType_t<__kind> *&dst, Py_ssize_t escape_len) {
     if constexpr (__simd_level >= X86SIMDLevel::AVX512) {
-        copy_ucs_same_512bits<__kind, __simd_level>(src, src_count, dst, escape_len, write_count_left);
+        copy_ucs_same_512bits<__kind, __simd_level, false>(src, src_count, dst, escape_len);
     } else if constexpr (__simd_level >= X86SIMDLevel::AVX2) {
-        copy_ucs_same_256bits<__kind, __simd_level>(src, src_count, dst, escape_len, write_count_left);
+        copy_ucs_same_256bits<__kind, __simd_level, false>(src, src_count, dst, escape_len);
     } else {
-        copy_ucs_same_128bits<__kind, __simd_level>(src, src_count, dst, escape_len, write_count_left);
+        copy_ucs_same_128bits<__kind, __simd_level, false>(src, src_count, dst, escape_len);
     }
 }
 
 template<UCSKind __from, UCSKind __to, X86SIMDLevel __simd_level>
-force_inline void copy_ucs(UCSType_t<__from> *src, Py_ssize_t src_count, UCSType_t<__to> *&dst, UCSType_t<__to> *const end_ptr, Py_ssize_t escape_len) {
+force_inline void copy_ucs(UCSType_t<__from> *src, Py_ssize_t src_count, UCSType_t<__to> *&dst, Py_ssize_t escape_len) {
     if constexpr (__from != __to) {
-        copy_ucs_elevate<__from, __to, __simd_level>(src, src_count, dst, end_ptr, escape_len);
+        copy_ucs_elevate<__from, __to, __simd_level>(src, src_count, dst, escape_len);
     } else {
-        copy_ucs_same<__from, __simd_level>(src, src_count, dst, end_ptr, escape_len);
+        copy_ucs_same<__from, __simd_level>(src, src_count, dst, escape_len);
     }
 }
 
@@ -1182,9 +1130,6 @@ typedef struct CtnType {
     PyObject *ctn;
     Py_ssize_t index;
 } CtnType;
-
-
-thread_local CtnType _CtnStack[PYYJSON_ENCODE_MAX_RECURSION];
 
 template<typename T, size_t L, T _DefaultVal, size_t... Is>
 constexpr auto make_filled_array_impl(std::index_sequence<Is...>) {
@@ -1293,8 +1238,19 @@ constexpr X86SIMDLevel check_simd_level() {
     return X86SIMDLevel::AVX2;
 }
 
-thread_local u32 _ObjViewFirstBuffer[(usize) PYYJSON_ENCODE_OBJ_VIEW_BUFFER_INIT_SIZE];
-thread_local void *_ViewDataFirstBuffer[(usize) PYYJSON_ENCODE_VIEW_DATA_BUFFER_INIT_SIZE];
+u32 *init_first_buffer() {
+    thread_local static std::unique_ptr<u64[]> local_ptr;
+    constexpr size_t u8_size = PYYJSON_ENCODE_OBJ_VIEW_BUFFER_INIT_SIZE * sizeof(u32) + PYYJSON_ENCODE_VIEW_DATA_BUFFER_INIT_SIZE * sizeof(void *) + 1024 * sizeof(CtnType);
+    static_assert((u8_size % 64) == 0);
+    constexpr size_t u64_size = u8_size / 8;
+    assert(!local_ptr);
+    local_ptr.reset(new u64[u64_size]);
+    return (u32 *) local_ptr.get();
+}
+
+thread_local u32 *_ObjViewFirstBuffer = NULL;    //[(usize) PYYJSON_ENCODE_OBJ_VIEW_BUFFER_INIT_SIZE];
+thread_local void **_ViewDataFirstBuffer = NULL; //[(usize) PYYJSON_ENCODE_VIEW_DATA_BUFFER_INIT_SIZE];
+CtnType *_CtnStack = NULL;                       //[PYYJSON_ENCODE_MAX_RECURSION];
 static_assert((PYYJSON_ENCODE_OBJ_VIEW_BUFFER_INIT_SIZE % (512 / 8 / sizeof(u32))) == 0);
 static_assert((PYYJSON_ENCODE_VIEW_DATA_BUFFER_INIT_SIZE % (512 / 8 / sizeof(void *))) == 0);
 
@@ -1304,7 +1260,10 @@ struct ObjViewer {
     UCSKind m_unicode_kind;
     bool m_is_all_ascii;
     // status
-    int *const obj_stack = (int *) &_CtnStack[0]; // points to _CtnStack, reuse
+    union {
+        CtnType *ctn_stack;
+        int *obj_stack; // points to _CtnStack, reuse
+    };
     Py_ssize_t m_cur_depth;
     u32 m_view_payload;
     bool m_is_in_obj;
@@ -1340,6 +1299,14 @@ force_inline void init_viewer(ObjViewer *viewer) {
     //
     viewer->m_obj_view_buffer_count = 1;
     viewer->m_obj_view_cur_rw_index = 0;
+    if (unlikely(!_ObjViewFirstBuffer)) {
+        assert(!_ViewDataFirstBuffer);
+        assert(!_CtnStack);
+        _ObjViewFirstBuffer = init_first_buffer();
+        _ViewDataFirstBuffer = (void **) (_ObjViewFirstBuffer + PYYJSON_ENCODE_OBJ_VIEW_BUFFER_INIT_SIZE);
+        _CtnStack = (CtnType *) (_ViewDataFirstBuffer + PYYJSON_ENCODE_VIEW_DATA_BUFFER_INIT_SIZE);
+    }
+    viewer->ctn_stack = _CtnStack;
     INIT_FROM_THREAD_LOCAL_BUFFER(viewer, m_cur_obj_view_rw_ptr, m_cur_obj_view_end_ptr, m_obj_view_buffers, _ObjViewFirstBuffer, PYYJSON_ENCODE_OBJ_VIEW_BUFFER_INIT_SIZE);
     //
     viewer->m_data_buffer_count = 1;
@@ -1545,55 +1512,54 @@ force_inline usize read_number_written_size(ObjViewer *viewer) {
 }
 
 template<UCSKind _Kind, usize _BitSize>
-force_inline void _do_simd_repeat_copy(UCSType_t<_Kind> *dst, UCSType_t<_Kind> *const end_ptr, const void *aligned_src, Py_ssize_t need_copy_count) {
+force_inline void _do_simd_repeat_copy(UCSType_t<_Kind> *dst, const void *aligned_src, Py_ssize_t need_copy_count) {
     using uu = UCSType_t<_Kind>;
     static_assert(_BitSize == 512 || _BitSize == 256 || _BitSize == 128);
-    assert(end_ptr >= dst);
+    // assert(end_ptr >= dst);
 
     constexpr usize _U8CopySize = _BitSize / 8;
     constexpr usize _CopyOnce = _U8CopySize / sizeof(uu);
 
-    const usize can_copy_times_max = ((uintptr_t) end_ptr - (uintptr_t) dst) / _U8CopySize;
+    // const usize can_copy_times_max = ((uintptr_t) end_ptr - (uintptr_t) dst) / _U8CopySize;
     const usize want_copy_times = size_align_up((usize) need_copy_count * sizeof(uu), _U8CopySize) / _U8CopySize;
-    usize do_copy_times = std::min(want_copy_times, can_copy_times_max);
+    usize do_copy_times = want_copy_times;
 
     assert(do_copy_times >= 0);
     if (((uintptr_t) dst % _U8CopySize) != 0) {
         for (usize i = 0; i < do_copy_times; ++i) {
-            if constexpr (_BitSize == 512) {
-                _mm512_storeu_si512((void *) dst, _mm512_load_si512(aligned_src));
-            } else if constexpr (_BitSize == 256) {
-                _mm256_storeu_si256((__m256i_u *) dst, _mm256_load_si256((const __m256i *) aligned_src));
-            } else {
-                _mm_storeu_si128((__m128i_u *) dst, _mm_load_si128((const __m128i *) aligned_src));
-            }
+            memcpy((void *) dst, aligned_src, _U8CopySize);
+            // if constexpr (_BitSize == 512) {
+            //     _mm512_storeu_si512((void *) dst, _mm512_load_si512(aligned_src));
+            // } else if constexpr (_BitSize == 256) {
+            //     _mm256_storeu_si256((__m256i_u *) dst, _mm256_load_si256((const __m256i *) aligned_src));
+            // } else {
+            //     _mm_storeu_si128((__m128i_u *) dst, _mm_load_si128((const __m128i *) aligned_src));
+            // }
             dst += _CopyOnce;
         }
     } else {
         for (usize i = 0; i < do_copy_times; ++i) {
-            if constexpr (_BitSize == 512) {
-                _mm512_store_si512((void *) dst, _mm512_load_si512(aligned_src));
-            } else if constexpr (_BitSize == 256) {
-                _mm256_store_si256((__m256i_u *) dst, _mm256_load_si256((const __m256i *) aligned_src));
-            } else {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Walign-mismatch"
-                _mm_store_si128((__m128i_u *) dst, _mm_load_si128((const __m128i *) aligned_src));
-#pragma GCC diagnostic pop
-            }
+            memcpy((void *) dst, aligned_src, _U8CopySize);
+
+            //             if constexpr (_BitSize == 512) {
+            // #pragma clang diagnostic push
+            // #pragma clang diagnostic ignored "-Walign-mismatch"
+            //                 _mm512_store_si512((void *) dst, _mm512_load_si512(aligned_src));
+            //             } else if constexpr (_BitSize == 256) {
+            //                 _mm256_store_si256((__m256i_u *) dst, _mm256_load_si256((const __m256i *) aligned_src));
+            //             } else {
+            //                 _mm_store_si128((__m128i_u *) dst, _mm_load_si128((const __m128i *) aligned_src));
+            // #pragma clang diagnostic pop
+            //             }
             dst += _CopyOnce;
         }
     }
     need_copy_count -= (Py_ssize_t) do_copy_times * (Py_ssize_t) _CopyOnce;
-    if (unlikely(need_copy_count > 0)) {
-        assert(need_copy_count < (Py_ssize_t) _CopyOnce);
-        assert(end_ptr - dst < _CopyOnce);
-        memcpy((void *) dst, aligned_src, (size_t) need_copy_count * sizeof(uu));
-    }
+    assert(need_copy_count <= 0);
 }
 
 template<IndentSetting _IndentSetting, UCSKind _Kind, X86SIMDLevel _SIMDLevel, bool _IsForceIndent = false>
-void write_newline_and_indent_from_view(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
+void write_newline_and_indent_from_view(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr) {
     using uu = UCSType_t<_Kind>;
 
     if constexpr (!need_indent(_IndentSetting)) {
@@ -1607,7 +1573,6 @@ void write_newline_and_indent_from_view(ObjViewer *viewer, UCSType_t<_Kind> *&wr
 
     uu *dst = write_ptr;
     write_ptr += indent_space_count + 1;
-    assert(write_ptr <= end_ptr);
     // begin write / copy
     *dst++ = (uu) '\n';
 
@@ -1617,29 +1582,26 @@ void write_newline_and_indent_from_view(ObjViewer *viewer, UCSType_t<_Kind> *&wr
     constexpr usize _Copy128Once = 128 / 8 / sizeof(uu);
     constexpr yyjson_align(512 / 8) std::array<uu, _Copy512Once> _Template = create_array<uu, _Copy512Once, _FillVal>();
     //
-    if constexpr (check_support_512_copy(_SIMDLevel)) {
-        _do_simd_repeat_copy<_Kind, 512>(dst, end_ptr, _Template.data(), indent_space_count);
-    } else if constexpr (check_support_256_copy(_SIMDLevel)) {
-        _do_simd_repeat_copy<_Kind, 256>(dst, end_ptr, _Template.data(), indent_space_count);
-    } else {
-        _do_simd_repeat_copy<_Kind, 128>(dst, end_ptr, _Template.data(), indent_space_count);
+    for (usize i = 0; i < indent_space_count; ++i) {
+        *dst++ = (uu) ' ';
     }
+    // if constexpr (check_support_512_copy(_SIMDLevel)) {
+    //     _do_simd_repeat_copy<_Kind, 512>(dst, _Template.data(), indent_space_count);
+    // } else if constexpr (check_support_256_copy(_SIMDLevel)) {
+    //     _do_simd_repeat_copy<_Kind, 256>(dst, _Template.data(), indent_space_count);
+    // } else {
+    //     _do_simd_repeat_copy<_Kind, 128>(dst, _Template.data(), indent_space_count);
+    // }
 }
 
 template<bool _IsWriteObj, UCSKind _Kind>
-force_inline void write_empty_ctn(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
+force_inline void write_empty_ctn(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr) {
     using uu = UCSType_t<_Kind>;
-    constexpr uu _Template[3] = {
+    constexpr uu _Template[4] = {
             (uu) ('[' | ((u8) _IsWriteObj << 5)),
             (uu) (']' | ((u8) _IsWriteObj << 5)),
             (uu) ',',
     };
-    if (unlikely(write_ptr + 3 > end_ptr)) {
-        assert(write_ptr + 2 == end_ptr);
-        memcpy((void *) write_ptr, (const void *) &_Template[0], 2 * sizeof(uu));
-        write_ptr = end_ptr;
-        return;
-    }
     memcpy((void *) write_ptr, (const void *) &_Template[0], sizeof(_Template));
     write_ptr += 3;
 }
@@ -1657,23 +1619,20 @@ force_inline void view_decrease_indent(ObjViewer *viewer) {
 }
 
 template<bool _IsWriteObj, UCSKind _Kind>
-force_inline void write_ctn_begin(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
+force_inline void write_ctn_begin(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr) {
     using uu = UCSType_t<_Kind>;
     *write_ptr++ = (uu) '[' | ((uu) _IsWriteObj << 5);
-    assert(write_ptr <= end_ptr);
 }
 
 template<bool _IsWriteObj, UCSKind _Kind>
-force_inline void write_ctn_end(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
+force_inline void write_ctn_end(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr) {
     using uu = UCSType_t<_Kind>;
-
     *write_ptr++ = (uu) ']' | ((uu) _IsWriteObj << 5);
-    if (unlikely(write_ptr >= end_ptr)) return;
     *write_ptr++ = (uu) ',';
 }
 
 template<UCSKind _Kind, X86SIMDLevel _SIMDLevel>
-void copy_raw_unicode_with_escape(ObjViewer *viewer, PyObject *unicode, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr, Py_ssize_t escape_len) {
+force_inline void copy_raw_unicode_with_escape(ObjViewer *viewer, PyObject *unicode, UCSType_t<_Kind> *&write_ptr, Py_ssize_t escape_len) {
     using udst = UCSType_t<_Kind>;
     udst *const start_write_ptr = write_ptr;
 
@@ -1686,16 +1645,16 @@ void copy_raw_unicode_with_escape(ObjViewer *viewer, PyObject *unicode, UCSType_
 
     if constexpr (_Kind == UCSKind::UCS1) {
         assert(src_kind == UCSKind::UCS1);
-        copy_ucs<UCSKind::UCS1, _Kind, _SIMDLevel>((u8 *) PyUnicode_DATA(unicode), len, write_ptr, end_ptr, escape_len);
+        copy_ucs<UCSKind::UCS1, _Kind, _SIMDLevel>((u8 *) get_unicode_data(unicode), len, write_ptr, escape_len);
         return;
     } else if constexpr (_Kind == UCSKind::UCS2) {
         switch (src_kind) {
             case UCSKind::UCS1: {
-                copy_ucs<UCSKind::UCS1, _Kind, _SIMDLevel>((u8 *) PyUnicode_DATA(unicode), len, write_ptr, end_ptr, escape_len);
+                copy_ucs<UCSKind::UCS1, _Kind, _SIMDLevel>((u8 *) get_unicode_data(unicode), len, write_ptr, escape_len);
                 break;
             }
             case UCSKind::UCS2: {
-                copy_ucs<UCSKind::UCS2, _Kind, _SIMDLevel>((u16 *) PyUnicode_DATA(unicode), len, write_ptr, end_ptr, escape_len);
+                copy_ucs<UCSKind::UCS2, _Kind, _SIMDLevel>((u16 *) get_unicode_data(unicode), len, write_ptr, escape_len);
                 break;
             }
             default: {
@@ -1706,15 +1665,15 @@ void copy_raw_unicode_with_escape(ObjViewer *viewer, PyObject *unicode, UCSType_
     } else {
         switch (src_kind) {
             case UCSKind::UCS1: {
-                copy_ucs<UCSKind::UCS1, _Kind, _SIMDLevel>((u8 *) PyUnicode_DATA(unicode), len, write_ptr, end_ptr, escape_len);
+                copy_ucs<UCSKind::UCS1, _Kind, _SIMDLevel>((u8 *) get_unicode_data(unicode), len, write_ptr, escape_len);
                 break;
             }
             case UCSKind::UCS2: {
-                copy_ucs<UCSKind::UCS2, _Kind, _SIMDLevel>((u16 *) PyUnicode_DATA(unicode), len, write_ptr, end_ptr, escape_len);
+                copy_ucs<UCSKind::UCS2, _Kind, _SIMDLevel>((u16 *) get_unicode_data(unicode), len, write_ptr, escape_len);
                 break;
             }
             case UCSKind::UCS4: {
-                copy_ucs<UCSKind::UCS4, _Kind, _SIMDLevel>((u32 *) PyUnicode_DATA(unicode), len, write_ptr, end_ptr, escape_len);
+                copy_ucs<UCSKind::UCS4, _Kind, _SIMDLevel>((u32 *) get_unicode_data(unicode), len, write_ptr, escape_len);
                 break;
             }
             default: {
@@ -1724,43 +1683,50 @@ void copy_raw_unicode_with_escape(ObjViewer *viewer, PyObject *unicode, UCSType_
         }
     }
 
-
     assert(write_ptr - start_write_ptr > len);
-    assert(write_ptr <= end_ptr);
 }
 
+force_inline void get_src_kind_and_len(PyObject *unicode, UCSKind &kind, Py_ssize_t &len) {
+    kind = (UCSKind) PyUnicode_KIND(unicode);
+    len = PyUnicode_GET_LENGTH(unicode);
+}
+
+
 template<UCSKind _Kind, X86SIMDLevel _SIMDLevel>
-void copy_raw_unicode(ObjViewer *viewer, PyObject *unicode, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
-    UCSKind src_kind = (UCSKind) PyUnicode_KIND(unicode);
-    Py_ssize_t len = PyUnicode_GET_LENGTH(unicode);
+force_inline void copy_raw_unicode(ObjViewer *viewer, PyObject *unicode, UCSType_t<_Kind> *&write_ptr) {
+    // UCSKind src_kind = (UCSKind) PyUnicode_KIND(unicode);
+    // Py_ssize_t len = PyUnicode_GET_LENGTH(unicode);
+    UCSKind src_kind;
+    Py_ssize_t len;
+    get_src_kind_and_len(unicode, src_kind, len);
     if constexpr (_Kind == UCSKind::UCS1) {
         assert(src_kind == UCSKind::UCS1);
-        cpy_fast<_SIMDLevel>((void *) write_ptr, (void *) PyUnicode_DATA(unicode), len, (Py_ssize_t) end_ptr - (Py_ssize_t) write_ptr);
+        cpy_fast<_SIMDLevel>((void *) write_ptr, get_unicode_data(unicode), len);
         write_ptr += len;
     } else if constexpr (_Kind == UCSKind::UCS2) {
         if (src_kind == UCSKind::UCS1) {
-            copy_elevate_nocheck<UCSKind::UCS1, UCSKind::UCS2, _SIMDLevel>(write_ptr, (u8 *) PyUnicode_DATA(unicode), len, end_ptr - write_ptr);
+            copy_elevate_nocheck<UCSKind::UCS1, UCSKind::UCS2, _SIMDLevel>(write_ptr, (u8 *) get_unicode_data(unicode), len);
         } else {
             assert(src_kind == UCSKind::UCS2);
-            cpy_fast<_SIMDLevel>((void *) write_ptr, (void *) PyUnicode_DATA(unicode), len * 2, (Py_ssize_t) end_ptr - (Py_ssize_t) write_ptr);
+            cpy_fast<_SIMDLevel>((void *) write_ptr, get_unicode_data(unicode), len * 2);
             write_ptr += len;
         }
     } else {
         static_assert(_Kind == UCSKind::UCS4);
         if (src_kind == UCSKind::UCS1) {
-            copy_elevate_nocheck<UCSKind::UCS1, UCSKind::UCS4, _SIMDLevel>(write_ptr, (u8 *) PyUnicode_DATA(unicode), len, end_ptr - write_ptr);
+            copy_elevate_nocheck<UCSKind::UCS1, UCSKind::UCS4, _SIMDLevel>(write_ptr, (u8 *) get_unicode_data(unicode), len);
         } else if (src_kind == UCSKind::UCS2) {
-            copy_elevate_nocheck<UCSKind::UCS2, UCSKind::UCS4, _SIMDLevel>(write_ptr, (u16 *) PyUnicode_DATA(unicode), len, end_ptr - write_ptr);
+            copy_elevate_nocheck<UCSKind::UCS2, UCSKind::UCS4, _SIMDLevel>(write_ptr, (u16 *) get_unicode_data(unicode), len);
         } else {
             assert(src_kind == UCSKind::UCS4);
-            cpy_fast<_SIMDLevel>((void *) write_ptr, (void *) PyUnicode_DATA(unicode), len * 4, (Py_ssize_t) end_ptr - (Py_ssize_t) write_ptr);
+            cpy_fast<_SIMDLevel>((void *) write_ptr, get_unicode_data(unicode), len * 4);
             write_ptr += len;
         }
     }
 }
 
 template<UCSKind _Kind, X86SIMDLevel _SIMDLevel>
-Py_ssize_t scan_unicode_escaped_len_impl(UCSType_t<_Kind> *unicode_data, Py_ssize_t unicode_len) {
+force_inline Py_ssize_t scan_unicode_escaped_len_impl(UCSType_t<_Kind> *unicode_data, Py_ssize_t unicode_len) {
     using uu = UCSType_t<_Kind>;
     Py_ssize_t escaped_len = 0;
 
@@ -1874,8 +1840,8 @@ Py_ssize_t scan_unicode_escaped_len_impl(UCSType_t<_Kind> *unicode_data, Py_ssiz
 }
 
 template<X86SIMDLevel _SIMDLevel>
-Py_ssize_t scan_unicode_escaped_len(PyObject *str) {
-    void *ptr = (void *) PyUnicode_DATA(str);
+force_inline Py_ssize_t scan_unicode_escaped_len(PyObject *str) {
+    void *ptr = get_unicode_data(str);
     Py_ssize_t len = PyUnicode_GET_LENGTH(str);
     switch (PyUnicode_KIND(str)) {
         case PyUnicode_1BYTE_KIND: {
@@ -1897,7 +1863,7 @@ Py_ssize_t scan_unicode_escaped_len(PyObject *str) {
 }
 
 template<IndentSetting _IndentSetting, UCSKind _Kind, X86SIMDLevel _SIMDLevel>
-force_inline void write_key(ObjViewer *viewer, PyObject *key, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
+force_inline void write_key(ObjViewer *viewer, PyObject *key, UCSType_t<_Kind> *&write_ptr) {
     using uu = UCSType_t<_Kind>;
     assert(PyUnicode_CheckExact(key));
     *write_ptr++ = (uu) '"';
@@ -1906,24 +1872,23 @@ force_inline void write_key(ObjViewer *viewer, PyObject *key, UCSType_t<_Kind> *
     if (unlikely(has_escape)) {
         // additional escape data is written in the view data buffer
         Py_ssize_t escape_len = read_view_data<Py_ssize_t>(viewer);
-        copy_raw_unicode_with_escape<_Kind, _SIMDLevel>(viewer, key, write_ptr, end_ptr, escape_len);
+        copy_raw_unicode_with_escape<_Kind, _SIMDLevel>(viewer, key, write_ptr, escape_len);
         assert(write_ptr - old_write_ptr == escape_len);
     } else {
-        copy_raw_unicode<_Kind, _SIMDLevel>(viewer, key, write_ptr, end_ptr);
+        copy_raw_unicode<_Kind, _SIMDLevel>(viewer, key, write_ptr);
     }
-    constexpr uu _Template[3] = {
+    constexpr uu _Template[4] = {
             (uu) '"',
             (uu) ':',
             (uu) ' ',
     };
     constexpr usize copy_count = need_indent(_IndentSetting) ? 3 : 2;
-    memcpy((void *) write_ptr, (const void *) &_Template[0], copy_count * sizeof(uu));
+    memcpy((void *) write_ptr, (const void *) &_Template[0], sizeof(_Template));
     write_ptr += copy_count;
-    assert(write_ptr <= end_ptr);
 }
 
 template<IndentSetting _IndentSetting, UCSKind _Kind, X86SIMDLevel _SIMDLevel>
-force_inline void write_str(ObjViewer *viewer, PyObject *str, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
+force_inline void write_str(ObjViewer *viewer, PyObject *str, UCSType_t<_Kind> *&write_ptr) {
     using uu = UCSType_t<_Kind>;
     assert(PyUnicode_CheckExact(str));
     *write_ptr++ = (uu) '"';
@@ -1932,60 +1897,44 @@ force_inline void write_str(ObjViewer *viewer, PyObject *str, UCSType_t<_Kind> *
     if (unlikely(has_escape)) {
         // additional escape data is written in the view data buffer
         Py_ssize_t escape_len = read_view_data<Py_ssize_t>(viewer);
-        copy_raw_unicode_with_escape<_Kind, _SIMDLevel>(viewer, str, write_ptr, end_ptr, escape_len);
+        copy_raw_unicode_with_escape<_Kind, _SIMDLevel>(viewer, str, write_ptr, escape_len);
         assert(write_ptr - old_write_ptr == escape_len);
     } else {
-        copy_raw_unicode<_Kind, _SIMDLevel>(viewer, str, write_ptr, end_ptr);
+        copy_raw_unicode<_Kind, _SIMDLevel>(viewer, str, write_ptr);
     }
     constexpr uu _Template[2] = {
             (uu) '"',
             (uu) ',',
     };
-    if (unlikely(end_ptr - write_ptr < 2)) {
-        *write_ptr++ = (uu) '"';
-        assert(write_ptr == end_ptr);
-        return;
-    }
-    memcpy((void *) write_ptr, (const void *) &_Template[0], 2 * sizeof(uu));
+    memcpy((void *) write_ptr, (const void *) &_Template[0], sizeof(_Template));
     write_ptr += 2;
-    assert(write_ptr <= end_ptr);
 }
 
 template<UCSKind _Kind>
-force_inline void write_zero(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
+force_inline void write_zero(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr) {
     using uu = UCSType_t<_Kind>;
     *write_ptr++ = (uu) '0';
-    if (unlikely(write_ptr >= end_ptr)) {
-        assert(write_ptr == end_ptr);
-        return;
-    }
     *write_ptr++ = (uu) ',';
 }
 
 template<UCSKind _Kind>
-force_inline void write_true(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
+force_inline void write_true(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr) {
     using uu = UCSType_t<_Kind>;
-    constexpr uu _Template[6] = {
+    constexpr uu _Template[size_align_up(5 * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu)] = {
             (uu) 't',
             (uu) 'r',
             (uu) 'u',
             (uu) 'e',
             (uu) ',',
     };
-    assert(end_ptr >= write_ptr + 5);
-    if (unlikely(write_ptr + 5 >= end_ptr)) {
-        memcpy((void *) write_ptr, (const void *) &_Template[0], 5 * sizeof(uu));
-        write_ptr = end_ptr;
-        return;
-    }
     memcpy((void *) write_ptr, (const void *) &_Template[0], sizeof(_Template));
     write_ptr += 5;
 }
 
 template<UCSKind _Kind>
-force_inline void write_false(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
+force_inline void write_false(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr) {
     using uu = UCSType_t<_Kind>;
-    constexpr uu _Template[6] = {
+    constexpr uu _Template[size_align_up(6 * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu)] = {
             (uu) 'f',
             (uu) 'a',
             (uu) 'l',
@@ -1993,38 +1942,32 @@ force_inline void write_false(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr, U
             (uu) 'e',
             (uu) ',',
     };
-    assert(end_ptr >= write_ptr + 6);
     memcpy((void *) write_ptr, (const void *) &_Template[0], sizeof(_Template));
     write_ptr += 6;
 }
 
 template<UCSKind _Kind>
-force_inline void write_null(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
+force_inline void write_null(ObjViewer *viewer, UCSType_t<_Kind> *&write_ptr) {
     using uu = UCSType_t<_Kind>;
-    constexpr uu _Template[6] = {
+    constexpr uu _Template[size_align_up(5 * sizeof(uu), SIZEOF_VOID_P) / sizeof(uu)] = {
             (uu) 'n',
             (uu) 'u',
             (uu) 'l',
             (uu) 'l',
             (uu) ',',
     };
-    assert(end_ptr >= write_ptr + 5);
-    if (unlikely(write_ptr + 5 >= end_ptr)) {
-        memcpy((void *) write_ptr, (const void *) &_Template[0], 5 * sizeof(uu));
-        write_ptr = end_ptr;
-        return;
-    }
     memcpy((void *) write_ptr, (const void *) &_Template[0], sizeof(_Template));
     write_ptr += 5;
 }
 
 template<UCSKind _Kind, X86SIMDLevel _SIMDLevel>
-force_inline void write_number(ObjViewer *viewer, u8 *buffer, usize buffer_len, UCSType_t<_Kind> *&write_ptr, UCSType_t<_Kind> *const end_ptr) {
-    if constexpr (_Kind > UCSKind ::UCS1) {
-        copy_elevate_nocheck<UCSKind::UCS1, _Kind, _SIMDLevel>(write_ptr, buffer, buffer_len, end_ptr - write_ptr);
+force_inline void write_number(ObjViewer *viewer, u8 *buffer, usize buffer_len, UCSType_t<_Kind> *&write_ptr) {
+    if constexpr (_Kind > UCSKind::UCS1) {
+        copy_elevate_nocheck<UCSKind::UCS1, _Kind, _SIMDLevel>(write_ptr, buffer, buffer_len);
     } else {
         // copy
-        cpy_fast<_SIMDLevel>((void *) write_ptr, (void *) buffer, buffer_len, (Py_ssize_t) end_ptr - (Py_ssize_t) write_ptr);
+        memcpy((void *) write_ptr, (const void *) buffer, 32);
+        // cpy_fast<_SIMDLevel>((void *) write_ptr, (void *) buffer, buffer_len, (Py_ssize_t) end_ptr - (Py_ssize_t) write_ptr);
         write_ptr += buffer_len;
     }
     *write_ptr++ = ',';
@@ -2121,6 +2064,8 @@ force_inline void view_update_str_info(ObjViewer *viewer, PyObject *str) {
 template<IndentSetting _IndentSetting, X86SIMDLevel _SIMDLevel>
 force_inline bool view_add_key(ObjViewer *viewer, PyObject *str, Py_ssize_t cur_nested_depth) {
     assert(PyUnicode_CheckExact(str));
+    char *_data = (char *) (((PyASCIIObject *) str) + 1);
+    char *_data_2 = (char *) (((PyCompactUnicodeObject *) str) + 1);
     Py_ssize_t escaped_len = scan_unicode_escaped_len<_SIMDLevel>(str);
     bool has_escape = escaped_len > PyUnicode_GET_LENGTH(str);
     u32 view = (u32) ViewObjType_Key | ((u32) has_escape << VIEW_PAYLOAD_BIT);
@@ -2375,7 +2320,7 @@ force_inline EncodeValJumpFlag view_process_val(
                 _c = view_add_ctn_begin<_IndentSetting, true, _IsInsideObj>(obj_viewer, cur_nested_depth);
                 RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
                 CTN_SIZE_GROW();
-                CtnType *cur_write_ctn = _CtnStack + (cur_nested_depth++);
+                CtnType *cur_write_ctn = obj_viewer->ctn_stack + (cur_nested_depth++);
                 cur_write_ctn->ctn = cur_obj;
                 cur_write_ctn->index = cur_pos;
                 cur_obj = val;
@@ -2393,7 +2338,7 @@ force_inline EncodeValJumpFlag view_process_val(
                 bool _c = view_add_ctn_begin<_IndentSetting, false, _IsInsideObj>(obj_viewer, cur_nested_depth);
                 RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
                 CTN_SIZE_GROW();
-                CtnType *cur_write_ctn = _CtnStack + (cur_nested_depth++);
+                CtnType *cur_write_ctn = obj_viewer->ctn_stack + (cur_nested_depth++);
                 cur_write_ctn->ctn = cur_obj;
                 cur_write_ctn->index = cur_pos;
                 cur_obj = val;
@@ -2428,7 +2373,7 @@ pyyjson_dumps_obj_to_view(PyObject *in_obj, ObjViewer *obj_viewer) {
     Py_ssize_t cur_pos = 0;
     Py_ssize_t cur_nested_depth = 0;
     // alias thread local buffer
-    CtnType *const ctn_stack = _CtnStack;
+    CtnType *const ctn_stack = obj_viewer->ctn_stack;
 
     if (PyDict_CheckExact(cur_obj)) {
         if (unlikely(PyDict_GET_SIZE(cur_obj) == 0)) {
@@ -2652,7 +2597,7 @@ force_inline PyObject *pyyjson_dumps_view(ObjViewer *obj_viewer) {
     Py_ssize_t ucs_len = read_size_from_view(obj_viewer);
     PyObject *ret = My_PyUnicode_New<_Kind>(ucs_len, get_max_char_from_ucs_kind(_Kind, obj_viewer->m_is_all_ascii));
     if (unlikely(!ret)) return NULL;
-    uu *write_ptr = (uu *) PyUnicode_DATA(ret);
+    uu *write_ptr = (uu *) get_unicode_data(ret);
     uu *const end_ptr = write_ptr + ucs_len;
     while (1) {
         ViewObjType view = view_obj(obj_viewer);
@@ -2661,25 +2606,25 @@ force_inline PyObject *pyyjson_dumps_view(ObjViewer *obj_viewer) {
                 goto success;
             }
             case ViewObjType_EmptyObj: {
-                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
-                write_empty_ctn<true, _Kind>(obj_viewer, write_ptr, end_ptr);
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr);
+                write_empty_ctn<true, _Kind>(obj_viewer, write_ptr);
                 break;
             }
             case ViewObjType_EmptyArr: {
-                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
-                write_empty_ctn<false, _Kind>(obj_viewer, write_ptr, end_ptr);
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr);
+                write_empty_ctn<false, _Kind>(obj_viewer, write_ptr);
                 break;
             }
             case ViewObjType_ObjBegin: {
-                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
-                write_ctn_begin<true, _Kind>(obj_viewer, write_ptr, end_ptr);
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr);
+                write_ctn_begin<true, _Kind>(obj_viewer, write_ptr);
                 // then increase indent
                 view_increase_indent(obj_viewer, true);
                 break;
             }
             case ViewObjType_ArrBegin: {
-                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
-                write_ctn_begin<false, _Kind>(obj_viewer, write_ptr, end_ptr);
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr);
+                write_ctn_begin<false, _Kind>(obj_viewer, write_ptr);
                 // then increase indent
                 view_increase_indent(obj_viewer, false);
                 break;
@@ -2690,8 +2635,8 @@ force_inline PyObject *pyyjson_dumps_view(ObjViewer *obj_viewer) {
                 assert(*write_ptr == ',');
                 // decrease indent
                 view_decrease_indent(obj_viewer);
-                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel, true>(obj_viewer, write_ptr, end_ptr);
-                write_ctn_end<true, _Kind>(obj_viewer, write_ptr, end_ptr);
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel, true>(obj_viewer, write_ptr);
+                write_ctn_end<true, _Kind>(obj_viewer, write_ptr);
                 break;
             }
             case ViewObjType_ArrEnd: {
@@ -2700,70 +2645,71 @@ force_inline PyObject *pyyjson_dumps_view(ObjViewer *obj_viewer) {
                 assert(*write_ptr == ',');
                 // decrease indent first
                 view_decrease_indent(obj_viewer);
-                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel, true>(obj_viewer, write_ptr, end_ptr);
-                write_ctn_end<false, _Kind>(obj_viewer, write_ptr, end_ptr);
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel, true>(obj_viewer, write_ptr);
+                write_ctn_end<false, _Kind>(obj_viewer, write_ptr);
                 break;
             }
             case ViewObjType_Key: {
-                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel, true>(obj_viewer, write_ptr, end_ptr);
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel, true>(obj_viewer, write_ptr);
                 PyObject *key = read_view_data<PyObject *>(obj_viewer);
-                write_key<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, key, write_ptr, end_ptr);
+                char *data = (char *) get_unicode_data(key);
+                write_key<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, key, write_ptr);
                 break;
             }
             case ViewObjType_Str: {
-                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr);
                 PyObject *str = read_view_data<PyObject *>(obj_viewer);
-                write_str<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, str, write_ptr, end_ptr);
+                write_str<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, str, write_ptr);
                 break;
             }
             case ViewObjType_Zero: {
-                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
-                write_zero<_Kind>(obj_viewer, write_ptr, end_ptr);
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr);
+                write_zero<_Kind>(obj_viewer, write_ptr);
                 break;
             }
             case ViewObjType_Number: {
                 usize payload_number_size = read_number_written_size(obj_viewer);
                 assert(payload_number_size <= 32);
-                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr);
                 u8 *buffer = (u8 *) read_view_data_buffer<u8[32]>(obj_viewer);
                 usize view_ptr_retreat = (32 - payload_number_size) / SIZEOF_VOID_P;
                 obj_viewer->m_cur_data_rw_ptr -= view_ptr_retreat;
-                write_number<_Kind, _SIMDLevel>(obj_viewer, buffer, payload_number_size, write_ptr, end_ptr);
+                write_number<_Kind, _SIMDLevel>(obj_viewer, buffer, payload_number_size, write_ptr);
                 break;
             }
             case ViewObjType_True: {
-                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
-                write_true<_Kind>(obj_viewer, write_ptr, end_ptr);
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr);
+                write_true<_Kind>(obj_viewer, write_ptr);
                 break;
             }
             case ViewObjType_False: {
-                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
-                write_false<_Kind>(obj_viewer, write_ptr, end_ptr);
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr);
+                write_false<_Kind>(obj_viewer, write_ptr);
                 break;
             }
             case ViewObjType_Null: {
-                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
-                write_null<_Kind>(obj_viewer, write_ptr, end_ptr);
+                write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr);
+                write_null<_Kind>(obj_viewer, write_ptr);
                 break;
             }
             // case ViewObjType_PosNaN: {
-            //     write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
-            //     write_pos_nan(obj_viewer, write_ptr, end_ptr);
+            //     write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr);
+            //     write_pos_nan(obj_viewer, write_ptr);
             //     break;
             // }
             // case ViewObjType_NegNaN: {
-            //     write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
-            //     write_neg_nan(obj_viewer, write_ptr, end_ptr);
+            //     write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr);
+            //     write_neg_nan(obj_viewer, write_ptr);
             //     break;
             // }
             // case ViewObjType_PosInf: {
-            //     write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
-            //     write_pos_inf(obj_viewer, write_ptr, end_ptr);
+            //     write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr);
+            //     write_pos_inf(obj_viewer, write_ptr);
             //     break;
             // }
             // case ViewObjType_NegInf: {
-            //     write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr, end_ptr);
-            //     write_neg_inf(obj_viewer, write_ptr, end_ptr);
+            //     write_newline_and_indent_from_view<_IndentSetting, _Kind, _SIMDLevel>(obj_viewer, write_ptr);
+            //     write_neg_inf(obj_viewer, write_ptr);
             //     break;
             // }
             //... TODO
@@ -2774,7 +2720,7 @@ force_inline PyObject *pyyjson_dumps_view(ObjViewer *obj_viewer) {
     }
 
 success:;
-    assert(write_ptr == end_ptr);
+    assert(write_ptr - 1 == end_ptr);
     PyObject *true_ret = My_Realloc_Unicode(ret, unicode_real_u8_size<_Kind>(ucs_len, obj_viewer->m_is_all_ascii));
     if (unlikely(!true_ret)) {
         Py_DECREF(ret);
@@ -2788,7 +2734,7 @@ force_noinline PyObject *pyyjson_dumps_obj(PyObject *in_obj, DumpOption *option)
     init_viewer(&obj_viewer);
     PyObject *ret = NULL;
     //
-    bool success = pyyjson_dumps_obj_to_view<IndentSetting::INDENT_4, X86SIMDLevel::AVX2>(in_obj, &obj_viewer);
+    bool success = pyyjson_dumps_obj_to_view<IndentSetting::INDENT_4, X86SIMDLevel::SSE4>(in_obj, &obj_viewer);
     UCSKind kind;
 
     if (unlikely(!success)) goto finalize;
@@ -2798,15 +2744,15 @@ force_noinline PyObject *pyyjson_dumps_obj(PyObject *in_obj, DumpOption *option)
     kind = read_ucs_kind_from_view(&obj_viewer);
     switch (kind) {
         case UCSKind::UCS1: {
-            ret = pyyjson_dumps_view<IndentSetting::INDENT_4, X86SIMDLevel::AVX2, UCSKind::UCS1>(&obj_viewer);
+            ret = pyyjson_dumps_view<IndentSetting::INDENT_4, X86SIMDLevel::SSE4, UCSKind::UCS1>(&obj_viewer);
             break;
         }
         case UCSKind::UCS2: {
-            ret = pyyjson_dumps_view<IndentSetting::INDENT_4, X86SIMDLevel::AVX2, UCSKind::UCS2>(&obj_viewer);
+            ret = pyyjson_dumps_view<IndentSetting::INDENT_4, X86SIMDLevel::SSE4, UCSKind::UCS2>(&obj_viewer);
             break;
         }
         case UCSKind::UCS4: {
-            ret = pyyjson_dumps_view<IndentSetting::INDENT_4, X86SIMDLevel::AVX2, UCSKind::UCS4>(&obj_viewer);
+            ret = pyyjson_dumps_view<IndentSetting::INDENT_4, X86SIMDLevel::SSE4, UCSKind::UCS4>(&obj_viewer);
             break;
         }
         default: {
