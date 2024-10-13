@@ -14,10 +14,10 @@ let
     python312
     python313
   ]);
-  pyenvs_map = py: (py.withPackages required_python_packages);
-  pyenvs = builtins.map pyenvs_map using_pythons;
   # import required python packages
   required_python_packages = import ./py_requirements.nix;
+  pyenvs_map = py: (py.withPackages required_python_packages);
+  pyenvs = builtins.map pyenvs_map using_pythons;
   #
   nix_pyenv_directory = ".nix-pyenv";
   # define version
@@ -112,13 +112,18 @@ pkgs.mkShell {
     fi
     if [[ ! -d orjson ]]; then
         # this is a directory, not a tarball
-        cp -r ${pkgs.python312Packages.orjson.src} orjson
+        _ORJSON_SOURCE=${(builtins.elemAt(builtins.filter (x: x.pname == "orjson") (required_python_packages using_python.pkgs)) 0).src}
+        cp -r $_ORJSON_SOURCE orjson
         chmod -R 700 orjson
-        echo "orjson source copied"
+        echo "orjson source copied: $_ORJSON_SOURCE"
     fi
     cd ..
-    # python lib
-    # export PYTHONPATH=${pyenv}/${using_python.sitePackages}:$PYTHONPATH
+
     # echo ${builtins.toString env_concate}
+
+    # save env for external use
+    echo "PATH=$PATH" > ${nix_pyenv_directory}/.shell-env
+    echo "CC=$CC" >> ${nix_pyenv_directory}/.shell-env
+    echo "CXX=$CXX" >> ${nix_pyenv_directory}/.shell-env
   '';
 }
