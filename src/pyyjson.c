@@ -67,6 +67,11 @@ static void module_free(void *m) {
 #endif // PYYJSON_ENABLE_TRACE
 }
 
+#if PY_MINOR_VERSION >= 13
+void _init_PyNone_Type(PyTypeObject* none_type);
+#endif
+
+
 PyMODINIT_FUNC PyInit_pyyjson(void) {
     PyObject *module;
 
@@ -103,6 +108,10 @@ PyMODINIT_FUNC PyInit_pyyjson(void) {
 
     // do pyyjson internal init.
     memset(AssociativeKeyCache, 0, sizeof(AssociativeKeyCache));
+
+#if PY_MINOR_VERSION >= 13
+    _init_PyNone_Type(Py_TYPE(Py_None));
+#endif
 
     return module;
 }
