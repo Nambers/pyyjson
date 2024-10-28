@@ -1,6 +1,7 @@
 #include "encode_shared.h"
+#include "simd_detect.h"
 
-#define cpy_inline yyjson_inline
+#define cpy_inline static yyjson_inline
 
 cpy_inline void pyyjson_memcpy_big_first(void *dst, const void *src, usize count) {
     u8 *w = (u8 *) dst;

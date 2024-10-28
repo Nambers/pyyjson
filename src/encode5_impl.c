@@ -201,10 +201,10 @@ force_inline bool init_stack_vars(StackVars *stack_vars, PyObject *in_obj) {
         return false;
     }
     memset(&stack_vars->unicode_info, 0, sizeof(UnicodeInfo));
-    GET_VEC(stack_vars) = PyObject_Malloc(65535);
+    GET_VEC(stack_vars) = PyObject_Malloc(131072);
     if (likely(GET_VEC(stack_vars))) {
         GET_VEC(stack_vars)->head.write_u8 = (u8 *) (((PyASCIIObject *) GET_VEC(stack_vars)) + 1);
-        GET_VEC(stack_vars)->head.write_end = (void *) ((u8 *) (GET_VEC(stack_vars)) + 65535);
+        GET_VEC(stack_vars)->head.write_end = (void *) ((u8 *) (GET_VEC(stack_vars)) + 131072);
         return true;
     }
     PyErr_NoMemory();
@@ -378,126 +378,9 @@ force_inline bool vec_in_boundary(UnicodeVector *vec) {
 #include "encode_utils_impl.inl"
 #undef COMPILE_WRITE_UCS_LEVEL
 
-#define COMPILE_INDENT_LEVEL 0
+#include "encode_simd_utils_wrap.inl"
 
-#define COMPILE_READ_UCS_LEVEL 1
-#define COMPILE_WRITE_UCS_LEVEL 1
-#include "encode_unicode_impl.inl"
-#undef COMPILE_WRITE_UCS_LEVEL
-#undef COMPILE_READ_UCS_LEVEL
-
-#define COMPILE_READ_UCS_LEVEL 1
-#define COMPILE_WRITE_UCS_LEVEL 2
-#include "encode_unicode_impl.inl"
-#undef COMPILE_WRITE_UCS_LEVEL
-#undef COMPILE_READ_UCS_LEVEL
-
-#define COMPILE_READ_UCS_LEVEL 1
-#define COMPILE_WRITE_UCS_LEVEL 4
-#include "encode_unicode_impl.inl"
-#undef COMPILE_WRITE_UCS_LEVEL
-#undef COMPILE_READ_UCS_LEVEL
-
-#define COMPILE_READ_UCS_LEVEL 2
-#define COMPILE_WRITE_UCS_LEVEL 2
-#include "encode_unicode_impl.inl"
-#undef COMPILE_WRITE_UCS_LEVEL
-#undef COMPILE_READ_UCS_LEVEL
-
-#define COMPILE_READ_UCS_LEVEL 2
-#define COMPILE_WRITE_UCS_LEVEL 4
-#include "encode_unicode_impl.inl"
-#undef COMPILE_WRITE_UCS_LEVEL
-#undef COMPILE_READ_UCS_LEVEL
-
-#define COMPILE_READ_UCS_LEVEL 4
-#define COMPILE_WRITE_UCS_LEVEL 4
-#include "encode_unicode_impl.inl"
-#undef COMPILE_WRITE_UCS_LEVEL
-#undef COMPILE_READ_UCS_LEVEL
-
-#undef COMPILE_INDENT_LEVEL
-
-
-#define COMPILE_INDENT_LEVEL 2
-
-#define COMPILE_READ_UCS_LEVEL 1
-#define COMPILE_WRITE_UCS_LEVEL 1
-#include "encode_unicode_impl.inl"
-#undef COMPILE_WRITE_UCS_LEVEL
-#undef COMPILE_READ_UCS_LEVEL
-
-#define COMPILE_READ_UCS_LEVEL 1
-#define COMPILE_WRITE_UCS_LEVEL 2
-#include "encode_unicode_impl.inl"
-#undef COMPILE_WRITE_UCS_LEVEL
-#undef COMPILE_READ_UCS_LEVEL
-
-#define COMPILE_READ_UCS_LEVEL 1
-#define COMPILE_WRITE_UCS_LEVEL 4
-#include "encode_unicode_impl.inl"
-#undef COMPILE_WRITE_UCS_LEVEL
-#undef COMPILE_READ_UCS_LEVEL
-
-#define COMPILE_READ_UCS_LEVEL 2
-#define COMPILE_WRITE_UCS_LEVEL 2
-#include "encode_unicode_impl.inl"
-#undef COMPILE_WRITE_UCS_LEVEL
-#undef COMPILE_READ_UCS_LEVEL
-
-#define COMPILE_READ_UCS_LEVEL 2
-#define COMPILE_WRITE_UCS_LEVEL 4
-#include "encode_unicode_impl.inl"
-#undef COMPILE_WRITE_UCS_LEVEL
-#undef COMPILE_READ_UCS_LEVEL
-
-#define COMPILE_READ_UCS_LEVEL 4
-#define COMPILE_WRITE_UCS_LEVEL 4
-#include "encode_unicode_impl.inl"
-#undef COMPILE_WRITE_UCS_LEVEL
-#undef COMPILE_READ_UCS_LEVEL
-
-#undef COMPILE_INDENT_LEVEL
-
-#define COMPILE_INDENT_LEVEL 4
-
-#define COMPILE_READ_UCS_LEVEL 1
-#define COMPILE_WRITE_UCS_LEVEL 1
-#include "encode_unicode_impl.inl"
-#undef COMPILE_WRITE_UCS_LEVEL
-#undef COMPILE_READ_UCS_LEVEL
-
-#define COMPILE_READ_UCS_LEVEL 1
-#define COMPILE_WRITE_UCS_LEVEL 2
-#include "encode_unicode_impl.inl"
-#undef COMPILE_WRITE_UCS_LEVEL
-#undef COMPILE_READ_UCS_LEVEL
-
-#define COMPILE_READ_UCS_LEVEL 1
-#define COMPILE_WRITE_UCS_LEVEL 4
-#include "encode_unicode_impl.inl"
-#undef COMPILE_WRITE_UCS_LEVEL
-#undef COMPILE_READ_UCS_LEVEL
-
-#define COMPILE_READ_UCS_LEVEL 2
-#define COMPILE_WRITE_UCS_LEVEL 2
-#include "encode_unicode_impl.inl"
-#undef COMPILE_WRITE_UCS_LEVEL
-#undef COMPILE_READ_UCS_LEVEL
-
-#define COMPILE_READ_UCS_LEVEL 2
-#define COMPILE_WRITE_UCS_LEVEL 4
-#include "encode_unicode_impl.inl"
-#undef COMPILE_WRITE_UCS_LEVEL
-#undef COMPILE_READ_UCS_LEVEL
-
-#define COMPILE_READ_UCS_LEVEL 4
-#define COMPILE_WRITE_UCS_LEVEL 4
-#include "encode_unicode_impl.inl"
-#undef COMPILE_WRITE_UCS_LEVEL
-#undef COMPILE_READ_UCS_LEVEL
-
-#undef COMPILE_INDENT_LEVEL
+#include "encode_unicode_impl_wrap.inl"
 
 /* -------- */
 #define COMPILE_INDENT_LEVEL 0
@@ -580,7 +463,7 @@ force_noinline PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject
         // options.indent_level = IndentLevel::INDENT_4;
     }
 
-    PyObject *ret = pyyjson_dumps_obj_4_0(obj);
+    PyObject *ret = pyyjson_dumps_obj_2_0(obj);
 
     if (unlikely(!ret)) {
         if (!PyErr_Occurred()) {

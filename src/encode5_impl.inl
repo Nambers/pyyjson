@@ -245,7 +245,7 @@ force_inline bool VECTOR_APPEND_STR(UnicodeVector *vec, PyObject *val, StackVars
 
 #define VECTOR_APPEND_LONG PYYJSON_CONCAT3(vector_append_long, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline bool VECTOR_APPEND_LONG(UnicodeVector *vec, PyObject *val, StackVars *stack_vars, bool is_in_obj) {
+force_noinline bool VECTOR_APPEND_LONG(UnicodeVector *vec, PyObject *val, StackVars *stack_vars, bool is_in_obj) {
     assert(PyLong_CheckExact(val));
     // 32 < TAIL_PADDING == 64 so this is enough
     WRITE_INDENT_RETURN_IF_FAIL(stack_vars, is_in_obj, TAIL_PADDING);
@@ -325,7 +325,7 @@ force_inline bool VECTOR_APPEND_NULL(StackVars *stack_vars, bool is_in_obj) {
 
 #define VECTOR_APPEND_FLOAT PYYJSON_CONCAT3(vector_append_float, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline bool VECTOR_APPEND_FLOAT(StackVars *stack_vars, PyObject *val, bool is_in_obj) {
+force_noinline bool VECTOR_APPEND_FLOAT(StackVars *stack_vars, PyObject *val, bool is_in_obj) {
     UnicodeVector *vec = GET_VEC(stack_vars);
     WRITE_INDENT_RETURN_IF_FAIL(stack_vars, is_in_obj, TAIL_PADDING);
     double v = PyFloat_AS_DOUBLE(val);
@@ -665,8 +665,7 @@ PYYJSON_DUMPS_OBJ(
 
 dict_pair_begin:;
     assert(PyDict_GET_SIZE(stack_vars->cur_obj) != 0);
-
-    if (PyDict_Next(stack_vars->cur_obj, &stack_vars->cur_pos, &stack_vars->key, &stack_vars->val)) {
+    if (_PyDict_Next(stack_vars->cur_obj, &stack_vars->cur_pos, &stack_vars->key, &stack_vars->val, NULL)) {
         if (unlikely(!PyUnicode_CheckExact(stack_vars->key))) {
             goto fail_keytype;
         }
