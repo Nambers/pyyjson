@@ -249,7 +249,7 @@ force_noinline void WRITE_SIMD_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_TYPE SIMD_V
 #if COMPILE_READ_UCS_LEVEL == 2
 // 2->4
 #if SIMD_BIT_SIZE == 512
-assert(false);
+    assert(false);
     // // 256->512
     // __m256i _y;
     // __m512i _z;
@@ -275,7 +275,7 @@ assert(false);
     partlen = partlen > 0 ? (2 * partlen) : 0;
     _x = SIMD_EXTRACT_HALF(SIMD_VAR, 0);
     _y = elevate_2_4_to256(_x);
-    load_256(&_MaskTable_32[(usize)(CHECK_COUNT_MAX - partlen)][0], &writemask);
+    load_256(&_MaskTable_32[(usize) (CHECK_COUNT_MAX - partlen)][0], &writemask);
     write_simd_256_with_writemask_4(dst, _y, writemask);
     // write_simd((void *) dst, _y);
     dst += CHECK_COUNT_MAX / 2;
@@ -283,12 +283,12 @@ assert(false);
     partlen = (len < CHECK_COUNT_MAX / 2) ? (2 * len) : CHECK_COUNT_MAX;
     _x = SIMD_EXTRACT_HALF(SIMD_VAR, 1);
     _y = elevate_2_4_to256(_x);
-    load_256(&_MaskTable_32[(usize)(CHECK_COUNT_MAX - partlen)][0], &writemask);
+    load_256(&_MaskTable_32[(usize) (CHECK_COUNT_MAX - partlen)][0], &writemask);
     write_simd_256_with_writemask_4(dst, _y, writemask);
     // write_simd((void *) dst, _y);
     dst += CHECK_COUNT_MAX / 2;
 #else  // SIMD_BIT_SIZE == 128
-assert(false);
+    assert(false);
     // 64(128)->128
     // __m128i _x;
     // // 0
@@ -305,7 +305,7 @@ assert(false);
 #if COMPILE_WRITE_UCS_LEVEL == 2
 // 1->2
 #if SIMD_BIT_SIZE == 512
-assert(false);
+    assert(false);
     // 256->512
     __m512i _z;
     __m256i _y;
@@ -330,7 +330,7 @@ assert(false);
     partlen = partlen > 0 ? (2 * partlen) : 0;
     _x = SIMD_EXTRACT_HALF(SIMD_VAR, 0);
     _y = elevate_1_2_to256(_x);
-    load_256(&_MaskTable_16[(usize)(CHECK_COUNT_MAX - partlen)][0], &writemask);
+    load_256(&_MaskTable_16[(usize) (CHECK_COUNT_MAX - partlen)][0], &writemask);
     write_simd_256_with_writemask_2(dst, _y, writemask);
     // write_simd((void *) dst, _y);
     dst += CHECK_COUNT_MAX / 2;
@@ -338,7 +338,7 @@ assert(false);
     partlen = (len < CHECK_COUNT_MAX / 2) ? (2 * len) : CHECK_COUNT_MAX;
     _x = SIMD_EXTRACT_HALF(SIMD_VAR, 1);
     _y = elevate_1_2_to256(_x);
-    load_256(&_MaskTable_16[(usize)(CHECK_COUNT_MAX - partlen)][0], &writemask);
+    load_256(&_MaskTable_16[(usize) (CHECK_COUNT_MAX - partlen)][0], &writemask);
     write_simd_256_with_writemask_2(dst, _y, writemask);
     // write_simd((void *) dst, _y);
     dst += CHECK_COUNT_MAX / 2;
@@ -356,7 +356,7 @@ assert(false);
 #else  // COMPILE_WRITE_UCS_LEVEL == 4
 // 1->4
 #if SIMD_BIT_SIZE == 512
-assert(false);
+    assert(false);
     // 128->512
     __m512i _z;
     __m128i _x;
@@ -391,7 +391,7 @@ assert(false);
     partlen = partlen > 0 ? (4 * partlen) : 0;
     _x = SIMD_EXTRACT_HALF(SIMD_VAR, 0);
     _y = elevate_1_4_to256(_x);
-    load_256(&_MaskTable_8[(usize)(CHECK_COUNT_MAX - partlen)][0], &writemask);
+    load_256(&_MaskTable_8[(usize) (CHECK_COUNT_MAX - partlen)][0], &writemask);
     write_simd_256_with_writemask_4(dst, _y, writemask);
     // write_simd((void *) dst, _y);
     dst += CHECK_COUNT_MAX / 2;
@@ -401,7 +401,7 @@ assert(false);
     partlen = partlen < CHECK_COUNT_MAX / 4 ? (4 * partlen) : CHECK_COUNT_MAX;
     RIGHT_SHIFT_128BITS(_x, 64, &_x);
     _y = elevate_1_4_to256(_x);
-    load_256(&_MaskTable_8[(usize)(CHECK_COUNT_MAX - partlen)][0], &writemask);
+    load_256(&_MaskTable_8[(usize) (CHECK_COUNT_MAX - partlen)][0], &writemask);
     write_simd_256_with_writemask_4(dst, _y, writemask);
     // write_simd((void *) dst, _y);
     dst += CHECK_COUNT_MAX / 2;
@@ -411,7 +411,7 @@ assert(false);
     partlen = partlen < CHECK_COUNT_MAX / 4 ? (4 * partlen) : CHECK_COUNT_MAX;
     _x = SIMD_EXTRACT_HALF(SIMD_VAR, 1);
     _y = elevate_1_4_to256(_x);
-    load_256(&_MaskTable_8[(usize)(CHECK_COUNT_MAX - partlen)][0], &writemask);
+    load_256(&_MaskTable_8[(usize) (CHECK_COUNT_MAX - partlen)][0], &writemask);
     write_simd_256_with_writemask_4(dst, _y, writemask);
     // write_simd((void *) dst, _y);
     dst += CHECK_COUNT_MAX / 2;
@@ -420,7 +420,7 @@ assert(false);
     partlen = partlen < CHECK_COUNT_MAX / 4 ? (4 * partlen) : CHECK_COUNT_MAX;
     RIGHT_SHIFT_128BITS(_x, 64, &_x);
     _y = elevate_1_4_to256(_x);
-    load_256(&_MaskTable_8[(usize)(CHECK_COUNT_MAX - partlen)][0], &writemask);
+    load_256(&_MaskTable_8[(usize) (CHECK_COUNT_MAX - partlen)][0], &writemask);
     write_simd_256_with_writemask_4(dst, _y, writemask);
     // write_simd((void *) dst, _y);
     dst += CHECK_COUNT_MAX / 2;
@@ -454,8 +454,8 @@ assert(false);
 }
 #endif // COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL && COMPILE_INDENT_LEVEL == 0
 
-force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(_FROM_TYPE* src, Py_ssize_t len, StackVars*stack_vars) {
-    UnicodeVector* vec = GET_VEC(stack_vars);
+force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(_FROM_TYPE *src, Py_ssize_t len, StackVars *stack_vars) {
+    UnicodeVector *vec = GET_VEC(stack_vars);
 #if SIMD_BIT_SIZE == 256
     __m256i y;
     _FROM_TYPE *load_start = src + len - CHECK_COUNT_MAX;
@@ -476,6 +476,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(_FROM_TYPE* src, 
 #else
         WRITE_SIMD_WITH_TAIL_LEN(store_start, y, len);
 #endif
+        _WRITER(vec) += len;
     } else {
         vec = VECTOR_WRITE_ESCAPE_IMPL(stack_vars, src, len, 0);
         RETURN_ON_UNLIKELY_ERR(!vec);
