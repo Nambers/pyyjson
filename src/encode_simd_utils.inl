@@ -100,15 +100,15 @@ force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(_FROM_TYPE *src, SIMD_TYP
 
 #elif SIMD_BIT_SIZE == 256
     *SIMD_VAR = _mm256_loadu_si256((const __m256i_u *) src);
-    __m256i t1 = _mm256_load_si256((__m256i *) _Quote_i8);      // vmovdqa, AVX
-    __m256i t2 = _mm256_load_si256((__m256i *) _Slash_i8);      // vmovdqa, AVX
-    __m256i t3 = _mm256_load_si256((__m256i *) _MinusOne_i8);   // vmovdqa, AVX
-    __m256i t4 = _mm256_load_si256((__m256i *) _ControlMax_i8); // vmovdqa, AVX
+    __m256i t1 = _mm256_set1_epi8(_Quote);//_mm256_load_si256((__m256i *) _Quote_i8);      // vmovdqa, AVX
+    __m256i t2 = _mm256_set1_epi8(_Slash);//_mm256_load_si256((__m256i *) _Slash_i8);      // vmovdqa, AVX
+    // __m256i t3 = _mm256_load_si256((__m256i *) _MinusOne_i8);   // vmovdqa, AVX
+    __m256i t4 = _mm256_set1_epi8(32);//_mm256_load_si256((__m256i *) _ControlMax_i8); // vmovdqa, AVX
     __m256i m1 = _mm256_cmpeq_epi8(*SIMD_VAR, t1);              // vpcmpeqb, AVX2
     __m256i m2 = _mm256_cmpeq_epi8(*SIMD_VAR, t2);              // vpcmpeqb, AVX2
-    __m256i _1 = _mm256_cmpgt_epi8(*SIMD_VAR, t3);              // u > -1, vpcmpgtb, AVX2
-    __m256i _2 = _mm256_cmpgt_epi8(t4, *SIMD_VAR);              // 32 > u, vpcmpgtb, AVX2
-    __m256i m3 = _mm256_and_si256(_1, _2);                      // vpand, AVX2
+    // __m256i _1 = _mm256_cmpgt_epi8(*SIMD_VAR, t3);              // u > -1, vpcmpgtb, AVX2
+    __m256i m3 = _mm256_subs_epu8(t4, *SIMD_VAR);              // 32 > u, vpcmpgtb, AVX2
+    // __m256i m3 = _mm256_and_si256(_1, _2);                      // vpand, AVX2
     __m256i r = _mm256_or_si256(_mm256_or_si256(m1, m2), m3);
     return r;
 #else // SIMD_BIT_SIZE
