@@ -201,10 +201,10 @@ force_inline bool init_stack_vars(StackVars *stack_vars, PyObject *in_obj) {
         return false;
     }
     memset(&stack_vars->unicode_info, 0, sizeof(UnicodeInfo));
-    GET_VEC(stack_vars) = PyObject_Malloc(131072);
+    GET_VEC(stack_vars) = PyObject_Malloc(PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
     if (likely(GET_VEC(stack_vars))) {
         GET_VEC(stack_vars)->head.write_u8 = (u8 *) (((PyASCIIObject *) GET_VEC(stack_vars)) + 1);
-        GET_VEC(stack_vars)->head.write_end = (void *) ((u8 *) (GET_VEC(stack_vars)) + 131072);
+        GET_VEC(stack_vars)->head.write_end = (void *) ((u8 *) (GET_VEC(stack_vars)) + PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
         return true;
     }
     PyErr_NoMemory();

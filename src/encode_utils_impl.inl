@@ -29,7 +29,7 @@ force_inline UnicodeVector *VEC_RESERVE(StackVars *stack_vars, Py_ssize_t size) 
         // Py_ssize_t target_size = u8_diff;
         Py_ssize_t target_size = VEC_MEM_U8_DIFF(vec, VEC_END(vec));
         assert(target_size >= 0);
-        Py_ssize_t inc_size = target_size / 5;
+        Py_ssize_t inc_size = target_size;
         if (unlikely(target_size > (PY_SSIZE_T_MAX - inc_size))) {
             PyErr_NoMemory();
             return NULL;
