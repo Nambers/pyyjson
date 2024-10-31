@@ -619,16 +619,19 @@ done:;
 force_inline void VECTOR_WRITE_INDENT(StackVars *stack_vars) {
 #if COMPILE_INDENT_LEVEL > 0
     UnicodeVector *vec = GET_VEC(stack_vars);
-    *_WRITER(vec)++ = '\n';
+    _TARGET_TYPE *writer = _WRITER(vec);
+    // *_WRITER(vec)++ = '\n';
+    *writer++ = '\n';
     usize cur_nested_depth = (usize) stack_vars->cur_nested_depth;
     for (usize i = 0; i < cur_nested_depth; i++) {
-        *_WRITER(vec)++ = ' ';
-        *_WRITER(vec)++ = ' ';
+        *writer++ = ' ';
+        *writer++ = ' ';
 #if COMPILE_INDENT_LEVEL == 4
-        *_WRITER(vec)++ = ' ';
-        *_WRITER(vec)++ = ' ';
+        *writer++ = ' ';
+        *writer++ = ' ';
 #endif
     }
+    _WRITER(vec) += COMPILE_INDENT_LEVEL * cur_nested_depth;
 #endif
 }
 #endif // COMPILE_READ_UCS_LEVEL == 1
@@ -645,11 +648,16 @@ force_inline bool PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, COMPILE_R
     RETURN_ON_UNLIKELY_ERR(!vec);
     vec = VEC_RESERVE(stack_vars, 3 + TAIL_PADDING);
     RETURN_ON_UNLIKELY_ERR(!vec);
-    *_WRITER(vec)++ = '"';
-    *_WRITER(vec)++ = ':';
+    _TARGET_TYPE *writer = _WRITER(vec);
+    *writer++ = '"';
+    *writer++ = ':';
 #if COMPILE_INDENT_LEVEL > 0
     *_WRITER(vec)++ = ' ';
-#endif
+#if SIZEOF_VOID_P == 8 || COMPILE_WRITE_UCS_LEVEL != 4
+    *writer = 0;
+#endif // SIZEOF_VOID_P == 8 || COMPILE_WRITE_UCS_LEVEL != 4
+#endif // COMPILE_INDENT_LEVEL > 0
+    _WRITER(vec) += (COMPILE_INDENT_LEVEL > 0) ? 3 : 2;
     assert(vec_in_boundary(vec));
     return true;
 }
@@ -671,8 +679,10 @@ force_inline bool PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, COMPILE_R
     RETURN_ON_UNLIKELY_ERR(!vec);
     vec = VEC_RESERVE(stack_vars, 2 + TAIL_PADDING);
     RETURN_ON_UNLIKELY_ERR(!vec);
-    *_WRITER(vec)++ = '"';
-    *_WRITER(vec)++ = ',';
+    _TARGET_TYPE *writer = _WRITER(vec);
+    *writer++ = '"';
+    *writer++ = ',';
+    _WRITER(vec) += 2;
     assert(vec_in_boundary(vec));
     return true;
 }

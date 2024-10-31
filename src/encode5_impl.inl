@@ -10,6 +10,7 @@
 #define VEC_RESERVE PYYJSON_CONCAT2(vec_reserve, 1)
 #define VECTOR_WRITE_INDENT PYYJSON_CONCAT3(vector_write_indent, COMPILE_INDENT_LEVEL, 1)
 #define _WRITER U8_WRITER
+#define _TARGET_TYPE u8
 #define VEC_WRITE_U64 PYYJSON_CONCAT2(vec_write_u64, 1)
 #define VEC_WRITE_F64 PYYJSON_CONCAT2(vec_write_f64, 1)
 #define _INDENT_WRITER PYYJSON_CONCAT3(indent_writer, COMPILE_INDENT_LEVEL, 1)
@@ -18,8 +19,10 @@
 #define VECTOR_WRITE_INDENT PYYJSON_CONCAT3(vector_write_indent, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 #if COMPILE_UCS_LEVEL == 2
 #define _WRITER U16_WRITER
+#define _TARGET_TYPE u16
 #else
 #define _WRITER U32_WRITER
+#define _TARGET_TYPE u32
 #endif
 #define VEC_WRITE_U64 PYYJSON_CONCAT2(vec_write_u64, COMPILE_UCS_LEVEL)
 #define VEC_WRITE_F64 PYYJSON_CONCAT2(vec_write_f64, COMPILE_UCS_LEVEL)
@@ -251,8 +254,10 @@ force_noinline bool VECTOR_APPEND_LONG(UnicodeVector *vec, PyObject *val, StackV
     WRITE_INDENT_RETURN_IF_FAIL(stack_vars, is_in_obj, TAIL_PADDING);
 
     if (pylong_is_zero(val)) {
-        *_WRITER(vec)++ = '0';
-        *_WRITER(vec)++ = ',';
+        _TARGET_TYPE *writer = _WRITER(vec);
+        *writer++ = '0';
+        *writer++ = ',';
+        _WRITER(vec) += 2;
     } else {
         // u8 *const buffer = (u8 *) reserve_view_data_buffer<u8[32]>(viewer);
         u64 v;
@@ -288,12 +293,31 @@ force_noinline bool VECTOR_APPEND_LONG(UnicodeVector *vec, PyObject *val, StackV
 force_inline bool VECTOR_APPEND_FALSE(StackVars *stack_vars, bool is_in_obj) {
     UnicodeVector *vec = GET_VEC(stack_vars);
     WRITE_INDENT_RETURN_IF_FAIL(stack_vars, is_in_obj, TAIL_PADDING);
-    *_WRITER(vec)++ = 'f';
-    *_WRITER(vec)++ = 'a';
-    *_WRITER(vec)++ = 'l';
-    *_WRITER(vec)++ = 's';
-    *_WRITER(vec)++ = 'e';
-    *_WRITER(vec)++ = ',';
+    _TARGET_TYPE *writer = _WRITER(vec);
+    //   6,12,24
+    //-> 8,16,24/32 (64)
+    //-> 8,12,24 (32)
+    *writer++ = 'f';
+    *writer++ = 'a';
+    *writer++ = 'l';
+    *writer++ = 's';
+    *writer++ = 'e';
+    *writer++ = ',';
+#if COMPILE_UCS_LEVEL == 1
+    *writer++ = 0;
+    *writer++ = 0;
+#elif COMPILE_UCS_LEVEL == 2
+#if SIZEOF_VOID_P == 8
+    *writer++ = 0;
+    *writer++ = 0;
+#endif // SIZEOF_VOID_P
+#else  // COMPILE_UCS_LEVEL == 4
+#if __AVX__
+    *writer++ = 0;
+    *writer++ = 0;
+#endif // __AVX__
+#endif // COMPILE_UCS_LEVEL
+    _WRITER(vec) += 6;
     return true;
 }
 
@@ -302,11 +326,35 @@ force_inline bool VECTOR_APPEND_FALSE(StackVars *stack_vars, bool is_in_obj) {
 force_inline bool VECTOR_APPEND_TRUE(StackVars *stack_vars, bool is_in_obj) {
     UnicodeVector *vec = GET_VEC(stack_vars);
     WRITE_INDENT_RETURN_IF_FAIL(stack_vars, is_in_obj, TAIL_PADDING);
-    *_WRITER(vec)++ = 't';
-    *_WRITER(vec)++ = 'r';
-    *_WRITER(vec)++ = 'u';
-    *_WRITER(vec)++ = 'e';
-    *_WRITER(vec)++ = ',';
+    _TARGET_TYPE *writer = _WRITER(vec);
+    //   5,10,20
+    //-> 8,16,24/32 (64)
+    //-> 8,12,20 (32)
+    *writer++ = 't';
+    *writer++ = 'r';
+    *writer++ = 'u';
+    *writer++ = 'e';
+    *writer++ = ',';
+#if COMPILE_UCS_LEVEL == 1
+    *writer++ = 0;
+    *writer++ = 0;
+    *writer++ = 0;
+#elif COMPILE_UCS_LEVEL == 2
+    *writer++ = 0;
+#if SIZEOF_VOID_P == 8
+    *writer++ = 0;
+    *writer++ = 0;
+#endif // SIZEOF_VOID_P == 8
+#else  // COMPILE_UCS_LEVEL == 4
+#if SIZEOF_VOID_P == 8
+    *writer++ = 0;
+#if __AVX__
+    *writer++ = 0;
+    *writer++ = 0;
+#endif // __AVX__
+#endif
+#endif // COMPILE_UCS_LEVEL
+    _WRITER(vec) += 5;
     return true;
 }
 
@@ -315,11 +363,35 @@ force_inline bool VECTOR_APPEND_TRUE(StackVars *stack_vars, bool is_in_obj) {
 force_inline bool VECTOR_APPEND_NULL(StackVars *stack_vars, bool is_in_obj) {
     UnicodeVector *vec = GET_VEC(stack_vars);
     WRITE_INDENT_RETURN_IF_FAIL(stack_vars, is_in_obj, TAIL_PADDING);
-    *_WRITER(vec)++ = 'n';
-    *_WRITER(vec)++ = 'u';
-    *_WRITER(vec)++ = 'l';
-    *_WRITER(vec)++ = 'l';
-    *_WRITER(vec)++ = ',';
+    _TARGET_TYPE *writer = _WRITER(vec);
+    //   5,10,20
+    //-> 8,16,24/32 (64)
+    //-> 8,12,20 (32)
+    *writer++ = 'n';
+    *writer++ = 'u';
+    *writer++ = 'l';
+    *writer++ = 'l';
+    *writer++ = ',';
+#if COMPILE_UCS_LEVEL == 1
+    *writer++ = 0;
+    *writer++ = 0;
+    *writer++ = 0;
+#elif COMPILE_UCS_LEVEL == 2
+    *writer++ = 0;
+#if SIZEOF_VOID_P == 8
+    *writer++ = 0;
+    *writer++ = 0;
+#endif // SIZEOF_VOID_P == 8
+#else  // COMPILE_UCS_LEVEL == 4
+#if SIZEOF_VOID_P == 8
+    *writer++ = 0;
+#if __AVX__
+    *writer++ = 0;
+    *writer++ = 0;
+#endif // __AVX__
+#endif
+#endif // COMPILE_UCS_LEVEL
+    _WRITER(vec) += 5;
     return true;
 }
 
@@ -332,7 +404,7 @@ force_noinline bool VECTOR_APPEND_FLOAT(StackVars *stack_vars, PyObject *val, bo
     // u8 *const buffer = (u8 *) reserve_view_data_buffer<u8[32]>(viewer);
     u64 *raw = (u64 *) &v;
     VEC_WRITE_F64(stack_vars, *raw);
-    *_WRITER(GET_VEC(stack_vars))++ = ',';
+    *_WRITER(vec)++ = ',';
     return true;
 }
 
@@ -341,9 +413,17 @@ force_noinline bool VECTOR_APPEND_FLOAT(StackVars *stack_vars, PyObject *val, bo
 force_inline bool VECTOR_APPEND_EMPTY_ARR(StackVars *stack_vars, bool is_in_obj) {
     UnicodeVector *vec = GET_VEC(stack_vars);
     WRITE_INDENT_RETURN_IF_FAIL(stack_vars, is_in_obj, TAIL_PADDING);
-    *_WRITER(vec)++ = '[';
-    *_WRITER(vec)++ = ']';
-    *_WRITER(vec)++ = ',';
+    _TARGET_TYPE *writer = _WRITER(vec);
+    //   3,6,12
+    //-> 4,8,16 (64)
+    //-> 4,8,12 (32)
+    *writer++ = '[';
+    *writer++ = ']';
+    *writer++ = ',';
+#if SIZEOF_VOID_P == 8 || COMPILE_UCS_LEVEL != 4
+    *writer = 0;
+#endif
+    _WRITER(vec) += 3;
     return true;
 }
 
@@ -361,9 +441,17 @@ force_inline bool VECTOR_APPEND_ARR_BEGIN(StackVars *stack_vars, bool is_in_obj)
 force_inline bool VECTOR_APPEND_EMPTY_OBJ(StackVars *stack_vars, bool is_in_obj) {
     UnicodeVector *vec = GET_VEC(stack_vars);
     WRITE_INDENT_RETURN_IF_FAIL(stack_vars, is_in_obj, TAIL_PADDING);
-    *_WRITER(vec)++ = '{';
-    *_WRITER(vec)++ = '}';
-    *_WRITER(vec)++ = ',';
+    _TARGET_TYPE *writer = _WRITER(vec);
+    //   3,6,12
+    //-> 4,8,16 (64)
+    //-> 4,8,12 (32)
+    *writer++ = '{';
+    *writer++ = '}';
+    *writer++ = ',';
+#if SIZEOF_VOID_P == 8 || COMPILE_UCS_LEVEL != 4
+    *writer = 0;
+#endif
+    _WRITER(vec) += 3;
     return true;
 }
 
@@ -384,8 +472,10 @@ force_inline bool VECTOR_APPEND_OBJ_END(StackVars *stack_vars) {
     VEC_BACK1(vec);
     // this is not a *value*, the indent is always needed. i.e. `is_in_obj` should always pass false
     WRITE_INDENT_RETURN_IF_FAIL(stack_vars, false, TAIL_PADDING);
-    *_WRITER(vec)++ = '}';
-    *_WRITER(vec)++ = ',';
+    _TARGET_TYPE *writer = _WRITER(vec);
+    *writer++ = '}';
+    *writer++ = ',';
+    _WRITER(vec) += 2;
     return true;
 }
 
@@ -397,8 +487,10 @@ force_inline bool VECTOR_APPEND_ARR_END(StackVars *stack_vars) {
     VEC_BACK1(vec);
     // this is not a *value*, the indent is always needed. i.e. `is_in_obj` should always pass false
     WRITE_INDENT_RETURN_IF_FAIL(stack_vars, false, TAIL_PADDING);
-    *_WRITER(vec)++ = ']';
-    *_WRITER(vec)++ = ',';
+    _TARGET_TYPE *writer = _WRITER(vec);
+    *writer++ = ']';
+    *writer++ = ',';
+    _WRITER(vec) += 2;
     return true;
 }
 
@@ -974,6 +1066,7 @@ fail_keytype:;
 #undef _INDENT_WRITER
 #undef VEC_WRITE_F64
 #undef VEC_WRITE_U64
+#undef _TARGET_TYPE
 #undef _WRITER
 #undef VECTOR_WRITE_INDENT
 #undef VEC_RESERVE
