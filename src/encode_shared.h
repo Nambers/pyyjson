@@ -9,8 +9,8 @@
  * Macros
  *============================================================================*/
 #define static_inline static yyjson_inline
-// #define force_inline static yyjson_inline
-#define force_inline force_noinline
+#define force_inline static yyjson_inline
+// #define force_inline force_noinline
 #define force_noinline yyjson_noinline
 #define likely yyjson_likely
 #define unlikely yyjson_unlikely

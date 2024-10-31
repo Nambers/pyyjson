@@ -241,7 +241,7 @@ force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(StackVars *stack_vars, _F
 // }
 
 #if COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL && COMPILE_INDENT_LEVEL == 0
-force_noinline void WRITE_SIMD_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR, Py_ssize_t len) {
+force_inline void WRITE_SIMD_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR, Py_ssize_t len) {
 #if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
     assert(false);
     // write_simd((void *) dst, SIMD_VAR);
@@ -492,7 +492,7 @@ static_assert(sizeof(PyASCIIObject) >= 16, "sizeof(PyASCIIObject) == ?");
 static_assert(sizeof(PyASCIIObject) >= 32, "sizeof(PyASCIIObject) == ?");
 #endif
 
-force_noinline UnicodeVector *VECTOR_WRITE_UNICODE_IMPL(StackVars *stack_vars, _FROM_TYPE *src, Py_ssize_t len) {
+force_inline UnicodeVector *VECTOR_WRITE_UNICODE_IMPL(StackVars *stack_vars, _FROM_TYPE *src, Py_ssize_t len) {
     UnicodeVector *vec = GET_VEC(stack_vars);
     usize total_size = (usize) len;
     __m128i x;
