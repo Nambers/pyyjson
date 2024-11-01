@@ -1,7 +1,7 @@
 #ifndef PYYJSON_ENCODE_FLOAT_H
 #define PYYJSON_ENCODE_FLOAT_H
 
-#include "encode_shared.hpp"
+#include "encode_shared.h"
 
 /* These codes are modified from yyjson. */
 

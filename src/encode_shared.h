@@ -1,7 +1,7 @@
 #ifndef PYYJSON_ENCODE_SHARED_H
 #define PYYJSON_ENCODE_SHARED_H
 
-#include "encode.hpp"
+#include "encode.h"
 #include "yyjson.h"
 #include <stddef.h>
 
