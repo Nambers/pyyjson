@@ -90,7 +90,7 @@ force_inline void _ELEVATE_FROM_U8_NUM_BUFFER(UnicodeVector *vec, u8 *buffer, Py
     SIMD_128 _x;
 #endif
     while (buffer < buffer_end) {
-        load_128((const void *) buffer, &x);
+        x = load_128((const void *) buffer);
 #if SIMD_BIT_SIZE == 512
         z = elevate_1_4_to_512(x);
         write_512((void *) writer, z);

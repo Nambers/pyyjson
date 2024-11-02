@@ -200,7 +200,7 @@ force_inline void long_back_elevate_1_2(u16 *write_start, u8 *read_start, Py_ssi
         SIMD_128 x;
         SIMD_256 y, mask, blend;
         u16 *const write_tail_start = write_end - read_once_count;
-        load_128((const void *) (read_end - read_once_count), &x);
+        x = load_128((const void *) (read_end - read_once_count));
         y = elevate_1_2_to_256(x);
         mask = load_256_aligned((const void *) &_MaskTable_16[read_once_count - tail_len][0]);
         blend = load_256((const void *) write_tail_start);
