@@ -28,26 +28,6 @@
 #define ControlMax (32)
 
 
-// #define COMMON_TYPE_DEF()                                          \
-//     using usrc = UCSType_t<__from>;                                \
-//     using udst = UCSType_t<__to>;                                  \
-//      Py_ssize_t _SizeRatio = sizeof(udst) / sizeof(usrc); \
-//     static_assert((sizeof(udst) % sizeof(usrc)) == 0)
-
-// #define SIMD_COMMON_DEF(_BitSize)               \
-//     COMMON_TYPE_DEF();                          \
-//      Py_ssize_t _BitsMax = (_BitSize); \
-//      Py_ssize_t _MoveSrc = _BitsMax / (sizeof(usrc) * 8)
-
-
-// #define CVTEPU_COMMON_DEF(_BitSizeSrc, _BitSizeDst)                   \
-//     COMMON_TYPE_DEF();                                                \
-//      size_t _SrcReadBits = (_BitSizeSrc);                    \
-//      size_t _DstWriteBits = (_BitSizeDst);                   \
-//      Py_ssize_t _MoveSrc = _BitSizeSrc / (sizeof(usrc) * 8); \
-//      Py_ssize_t _MoveDst = _BitSizeDst / (sizeof(udst) * 8)
-
-
 /*==============================================================================
  * Types
  *============================================================================*/
@@ -77,33 +57,6 @@ enum UCSKind {
     UCS4 = 4,
 };
 
-// template<UCSKind __uu>
-// struct UCSType;
-
-// template<>
-// struct UCSType<UCSKind::UCS1> {
-//     using type = u8;
-//      static auto escape = UCSKind::UCS2;
-// };
-
-// template<>
-// struct UCSType<UCSKind::UCS2> {
-//     using type = u16;
-//      static auto escape = UCSKind::UCS4;
-// };
-
-// template<>
-// struct UCSType<UCSKind::UCS4> {
-//     using type = u32;
-//      static auto escape = UCSKind::UCS4_WithEscape;
-// };
-
-// template<>
-// struct UCSType<UCSKind::UCS4_WithEscape> {
-//     using type = u64;
-// };
-
-
 enum X86SIMDLevel {
     SSE2,
     SSE3,
@@ -114,48 +67,7 @@ enum X86SIMDLevel {
 };
 
 
-// template<UCSKind __type>
-// using UCSType_t = typename UCSType<__type>::type;
-
-// #define UCS_ESCAPE_KIND(__type) UCSType_t<UCSType<__type>::escape>
-
 #define CONTROL_SEQ_ESCAPE_PREFIX _Slash, 'u', '0', '0'
-
-// template<UCSKind __type>
-// static u8 _ControlSeqTable[ControlMax * 6] = {
-//         CONTROL_SEQ_ESCAPE_PREFIX, '0', '0', // 0
-//         CONTROL_SEQ_ESCAPE_PREFIX, '0', '1', // 1
-//         CONTROL_SEQ_ESCAPE_PREFIX, '0', '2', // 2
-//         CONTROL_SEQ_ESCAPE_PREFIX, '0', '3', // 3
-//         CONTROL_SEQ_ESCAPE_PREFIX, '0', '4', // 4
-//         CONTROL_SEQ_ESCAPE_PREFIX, '0', '5', // 5
-//         CONTROL_SEQ_ESCAPE_PREFIX, '0', '6', // 6
-//         CONTROL_SEQ_ESCAPE_PREFIX, '0', '7', // 7
-//         '\\', 'b', ' ', ' ', ' ', ' ',       // 8
-//         '\\', 't', ' ', ' ', ' ', ' ',       // 9
-//         '\\', 'n', ' ', ' ', ' ', ' ',       // 10
-//         CONTROL_SEQ_ESCAPE_PREFIX, '0', 'b', // 11
-//         '\\', 'f', ' ', ' ', ' ', ' ',       // 12
-//         '\\', 'r', ' ', ' ', ' ', ' ',       // 13
-//         CONTROL_SEQ_ESCAPE_PREFIX, '0', 'e', // 14
-//         CONTROL_SEQ_ESCAPE_PREFIX, '0', 'f', // 15
-//         CONTROL_SEQ_ESCAPE_PREFIX, '1', '0', // 16
-//         CONTROL_SEQ_ESCAPE_PREFIX, '1', '1', // 17
-//         CONTROL_SEQ_ESCAPE_PREFIX, '1', '2', // 18
-//         CONTROL_SEQ_ESCAPE_PREFIX, '1', '3', // 19
-//         CONTROL_SEQ_ESCAPE_PREFIX, '1', '4', // 20
-//         CONTROL_SEQ_ESCAPE_PREFIX, '1', '5', // 21
-//         CONTROL_SEQ_ESCAPE_PREFIX, '1', '6', // 22
-//         CONTROL_SEQ_ESCAPE_PREFIX, '1', '7', // 23
-//         CONTROL_SEQ_ESCAPE_PREFIX, '1', '8', // 24
-//         CONTROL_SEQ_ESCAPE_PREFIX, '1', '9', // 25
-//         CONTROL_SEQ_ESCAPE_PREFIX, '1', 'a', // 26
-//         CONTROL_SEQ_ESCAPE_PREFIX, '1', 'b', // 27
-//         CONTROL_SEQ_ESCAPE_PREFIX, '1', 'c', // 28
-//         CONTROL_SEQ_ESCAPE_PREFIX, '1', 'd', // 29
-//         CONTROL_SEQ_ESCAPE_PREFIX, '1', 'e', // 30
-//         CONTROL_SEQ_ESCAPE_PREFIX, '1', 'f', // 31
-// };
 
 static Py_ssize_t _ControlJump[ControlMax] = {
         6, 6, 6, 6, 6, 6, 6, 6, 2, 2, 2, 6, 2, 2, 6, 6, // 0-15
@@ -167,110 +79,11 @@ static i32 _ControlLengthAdd[ControlMax] = {
         5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, // 16-31
 };
 
-// template<typename T, std::size_t n>
-// auto _generate_mask_array() {
-//     std::array<std::array<T, n>, n> res{};
-
-//     for (int a = 0; a < n; ++a) {
-//         for (int b = 0; b < n; ++b) {
-//             res[a][b] = a > b ? static_cast<T>(-1) : static_cast<T>(0);
-//         }
-//     }
-
-//     return res;
-// }
-
-// #define _MASK_ARRAY_SIZE (512 / 8 / sizeof(T))
-// template<typename T>
-// yyjson_align(64) inline std::array<std::array<T, _MASK_ARRAY_SIZE>, _MASK_ARRAY_SIZE> _MaskArray = _generate_mask_array<T, _MASK_ARRAY_SIZE>();
-// #undef _MASK_ARRAY_SIZE
-
 /*==============================================================================
  * Buffer
  *============================================================================*/
 
 static_assert((PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE % 64) == 0, "(PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE % 64) == 0");
-
-/* use 64 align for better simd r/w */
-// yyjson_align(64) inline thread_local u64 _ThreadLocal_DstBuffer[PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE / 8];
-
-// typedef struct BufferInfo {
-//     void *m_buffer_start;
-//     Py_ssize_t m_size;
-
-//     force_inline static BufferInfo init() {
-//         BufferInfo ret{
-//                 (void *) &_ThreadLocal_DstBuffer[0],
-//                 PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE,
-//         };
-//         return ret;
-//     }
-
-//     template<UCSKind __kind>
-//     force_inline bool resizer(UCSType_t<__kind> *&dst, Py_ssize_t required_len) {
-//         using uu = UCSType_t<__kind>;
-//         assert(m_size >= 0);
-//         assert(required_len > m_size);
-//         assert((char *) dst >= (char *) this->m_buffer_start);
-//         assert(((char *) dst - (char *) this->m_buffer_start) % static_cast<std::ptrdiff_t>(__kind) == 0);
-//         std::ptrdiff_t dst_offset = this->calc_dst_offset<__kind>(dst);
-//         Py_ssize_t _CurSizeMax = (PY_SSIZE_T_MAX & ~(Py_ssize_t) 3) / 3 * 2;
-//         if (unlikely(this->m_size > _CurSizeMax || required_len > (PY_SSIZE_T_MAX / 4 * 4))) {
-//             PyErr_NoMemory();
-//             return false;
-//         }
-//         Py_ssize_t to_alloc = this->m_size + this->m_size / 2;
-//         if (unlikely(to_alloc < required_len)) {
-//             to_alloc = required_len;
-//         }
-//         to_alloc = (to_alloc + 3) & ~3;
-//         // start alloc
-//         void *new_buffer = malloc((size_t) to_alloc);
-//         if (unlikely(!new_buffer)) {
-//             PyErr_NoMemory();
-//             return false;
-//         }
-//         size_t to_copy_len = (size_t) ((char *) dst - (char *) this->m_buffer_start);
-//         memcpy(new_buffer, this->m_buffer_start, to_copy_len);
-//         if (unlikely(!this->is_static_buffer())) {
-//             free(this->m_buffer_start);
-//         }
-//         this->m_buffer_start = new_buffer;
-//         this->m_size = to_alloc;
-//         // move dst
-//         dst = ((uu *) new_buffer) + dst_offset;
-//         return true;
-//     }
-
-//     template<UCSKind __kind>
-//     std::ptrdiff_t calc_dst_offset(UCSType_t<__kind> *dst) const {
-//         using uu = UCSType_t<__kind>;
-//         std::ptrdiff_t dst_offset = dst - (uu *) this->m_buffer_start;
-//         return dst_offset;
-//     }
-
-//     template<UCSKind __kind>
-//     std::ptrdiff_t calc_dst_offset_u8(UCSType_t<__kind> *dst) const {
-//         std::ptrdiff_t dst_offset = (char *) dst - (char *) this->m_buffer_start;
-//         return dst_offset;
-//     }
-
-//     force_inline bool is_static_buffer() {
-//         return this->m_buffer_start == (void *) &_ThreadLocal_DstBuffer[0];
-//     }
-
-//     template<UCSKind __kind>
-//     force_inline Py_ssize_t get_required_len_u8(UCSType_t<__kind> *dst, Py_ssize_t additional_ucs_count) {
-//         return this->calc_dst_offset_u8<__kind>(dst) + additional_ucs_count * sizeof(UCSType_t<__kind>);
-//     }
-
-//     force_inline void release() {
-//         if (unlikely(!this->is_static_buffer())) {
-//             free(this->m_buffer_start);
-//         }
-//         this->m_buffer_start = nullptr;
-//     }
-// } BufferInfo;
 
 
 /*==============================================================================
