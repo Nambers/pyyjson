@@ -21,8 +21,7 @@
             "sourceFileMap": {
                 "/build": "${workspaceFolder}/debug_source"
             },
-            
-            "stopAtEntry": true,
+            "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",
             "environment": [],
             "externalConsole": false,
@@ -53,8 +52,7 @@
             "sourceFileMap": {
                 "/build": "${workspaceFolder}/debug_source"
             },
-            
-            "stopAtEntry": true,
+            "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",
             "environment": [],
             "externalConsole": false,

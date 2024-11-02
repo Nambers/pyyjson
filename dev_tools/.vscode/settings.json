@@ -76,7 +76,11 @@
       "semaphore": "cpp",
       "stop_token": "cpp",
       "thread": "cpp",
-      "cfenv": "cpp"
+      "cfenv": "cpp",
+      "encode_shared.h": "c",
+      "encode_unicode_impl.inl": "c",
+      "encode_utils_impl.inl": "c",
+      "pycore_typeobject.h": "c"
    },
    "cmake.cmakePath": "${workspaceFolder}/.nix-pyenv/bin/cmake",
    "terminal.integrated.defaultProfile.linux": "nix-dev",
