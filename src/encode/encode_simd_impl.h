@@ -9,11 +9,13 @@
 #define SIMD_TYPE __m512i
 #define SIMD_MASK_TYPE u64
 #define SIMD_SMALL_MASK_TYPE u16
+#define SIMD_HALF_TYPE __m256i
 #elif SIMD_BIT_SIZE == 256
 #define SIMD_VAR y
 #define SIMD_TYPE __m256i
 #define SIMD_MASK_TYPE SIMD_TYPE
 #define SIMD_SMALL_MASK_TYPE __m128i
+#define SIMD_HALF_TYPE __m128i
 #else
 #define SIMD_VAR x
 #define SIMD_TYPE __m128i
@@ -21,7 +23,7 @@
 #define SIMD_SMALL_MASK_TYPE SIMD_TYPE
 #endif
 
-force_inline SIMD_256 elevate_2_4_to256(SIMD_128 x) {
+force_inline SIMD_256 elevate_2_4_to_256(SIMD_128 x) {
 #if __AVX2__
     return _mm256_cvtepu16_epi32(x);
 #else
@@ -29,7 +31,7 @@ force_inline SIMD_256 elevate_2_4_to256(SIMD_128 x) {
 #endif
 }
 
-force_inline SIMD_256 elevate_1_2_to256(SIMD_128 x) {
+force_inline SIMD_256 elevate_1_2_to_256(SIMD_128 x) {
 #if __AVX2__
     return _mm256_cvtepu8_epi16(x);
 #else
@@ -37,7 +39,7 @@ force_inline SIMD_256 elevate_1_2_to256(SIMD_128 x) {
 #endif
 }
 
-force_inline SIMD_256 elevate_1_4_to256(SIMD_64 x) {
+force_inline SIMD_256 elevate_1_4_to_256(SIMD_64 x) {
 #if __AVX2__
     return _mm256_cvtepu8_epi32(x);
 #else
@@ -73,21 +75,19 @@ force_inline void load_128(const void *src, SIMD_128 *x) {
 #endif
 }
 
-force_inline void load_256(const void *src, SIMD_256 *y) {
 #if __AVX__
-    *y = _mm256_lddqu_si256((const __m256i_u *) src);
-#else
-    Py_UNREACHABLE();
-#endif
+force_inline SIMD_256 load_256_aligned(const void *src) {
+    return _mm256_load_si256((const __m256i *) src);
+}
+
+force_inline SIMD_256 load_256(const void *src) {
+    return _mm256_lddqu_si256((const __m256i_u *) src);
 }
 
 force_inline void write_256(void *dst, SIMD_256 y) {
-#if __AVX__
     _mm256_storeu_si256((__m256i_u *) dst, y);
-#else
-    Py_UNREACHABLE();
-#endif
 }
+#endif
 
 force_inline SIMD_256 simd_and_256(SIMD_256 a, SIMD_256 b) {
 #if __AVX2__
@@ -97,10 +97,44 @@ force_inline SIMD_256 simd_and_256(SIMD_256 a, SIMD_256 b) {
 #endif
 }
 
+force_inline SIMD_TYPE blendv(SIMD_TYPE blend, SIMD_TYPE SIMD_VAR, SIMD_MASK_TYPE mask) {
+#if SIMD_BIT_SIZE == 256
+    return _mm256_blendv_epi8(blend, SIMD_VAR, mask);
+#endif
+}
 
-#undef SIMD_VAR
-#undef SIMD_TYPE
-#undef SIMD_MASK_TYPE
-#undef SIMD_SMALL_MASK_TYPE
+#if defined(SIMD_HALF_TYPE)
+force_inline SIMD_HALF_TYPE load_aligned_half(const void *src) {
+#if SIMD_BIT_SIZE == 256
+    return _mm_load_si128((const __m128i *) src);
+#else
+    return _mm256_load_si256((const __m256i *) src);
+#endif
+}
+
+force_inline SIMD_HALF_TYPE load_half(const void *src) {
+#if SIMD_BIT_SIZE == 256
+    return _mm_loadu_si128((const __m128i *) src);
+#else
+    return _mm256_loadu_si256((const __m256i *) src);
+#endif
+}
+
+#endif
+
+force_inline void write_aligned(void *dst, SIMD_TYPE SIMD_VAR) {
+#if SIMD_BIT_SIZE == 128
+    _mm_store_si128((__m128i *) dst, SIMD_VAR);
+#elif SIMD_BIT_SIZE == 256
+    _mm256_store_si256((__m256i *) dst, SIMD_VAR);
+#else
+    _mm512_store_si512(dst, SIMD_VAR);
+#endif
+}
+
+// #undef SIMD_VAR
+// #undef SIMD_TYPE
+// #undef SIMD_MASK_TYPE
+// #undef SIMD_SMALL_MASK_TYPE
 
 #endif // ENCODE_SIMD_IMPL_H

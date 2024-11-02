@@ -1,5 +1,19 @@
 // #include "cpy_utils.inl"
 #include "encode_shared.h"
+#include "encode_simd_impl.h"
+#include "simd_detect.h"
+
+
+#define PYYJSON_CONCAT2_EX(a, b) a##_##b
+#define PYYJSON_CONCAT2(a, b) PYYJSON_CONCAT2_EX(a, b)
+
+#define PYYJSON_CONCAT3_EX(a, b, c) a##_##b##_##c
+#define PYYJSON_CONCAT3(a, b, c) PYYJSON_CONCAT3_EX(a, b, c)
+
+#define PYYJSON_CONCAT4_EX(a, b, c, d) a##_##b##_##c##_##d
+#define PYYJSON_CONCAT4(a, b, c, d) PYYJSON_CONCAT4_EX(a, b, c, d)
+
+
 typedef struct UnicodeVecHead {
     union {
         u8 *write_u8;
@@ -173,6 +187,98 @@ force_inline void memorize_ucs2_to_ucs4(StackVars *stack_vars) {
 
 force_inline void long_back_elevate_1_2(u16 *write_start, u8 *read_start, Py_ssize_t len) {
     // TODO
+    // only 128 -> 256 and 256 -> 512 should consider aligness.
+    // 64(128) -> 128 cannot be aligned anyway.
+    u8 *read_end = read_start + len;
+    u16 *write_end = write_start + len;
+#if SIMD_BIT_SIZE > 128
+
+    const Py_ssize_t read_once_count = SIMD_BIT_SIZE / 2 / 8;
+    Py_ssize_t tail_len = len & (read_once_count - 1);
+    if (tail_len) {
+#if SIMD_BIT_SIZE == 256
+        // read and write with blendv.
+        SIMD_128 x;
+        SIMD_256 y, mask, blend;
+        u16 *const write_tail_start = write_end - read_once_count;
+        load_128((const void *) (read_end - read_once_count), &x);
+        y = elevate_1_2_to_256(x);
+        mask = load_256_aligned((const void *) &_MaskTable_16[read_once_count - tail_len][0]);
+        blend = load_256((const void *) write_tail_start);
+        y = blendv(blend, y, mask);
+        write_256((void *) write_tail_start, y);
+#else
+        // 512, use maskwrite.
+
+#endif // SIMD_BIT_SIZE
+        len &= ~(read_once_count - 1);
+        read_end = read_start + len;
+        write_end = write_start + len;
+    }
+    if (0 == (((Py_ssize_t) (read_start)) & (read_once_count - 1))) {
+        if (0 == (((Py_ssize_t) (write_start)) & (read_once_count * 2 - 1))) {
+            goto elevate_both_aliged;
+        } else {
+            goto elevate_src_aligned;
+        }
+    } else {
+        if (0 == (((Py_ssize_t) (write_start)) & (read_once_count * 2 - 1))) {
+            goto elevate_dst_aliged;
+        } else {
+            goto elevate_both_not_aligned;
+        }
+    }
+elevate_both_aliged:;
+    read_end -= read_once_count;
+    write_end -= read_once_count;
+    while (read_end >= read_start) {
+        SIMD_HALF_TYPE half;
+        SIMD_TYPE full;
+        half = load_aligned_half(read_end);
+        full = PYYJSON_CONCAT2(elevate_1_2_to, SIMD_BIT_SIZE)(half);
+        write_aligned(write_end, full);
+        read_end -= read_once_count;
+        write_end -= read_once_count;
+    }
+elevate_src_aligned:;
+    read_end -= read_once_count;
+    write_end -= read_once_count;
+    while (read_end >= read_start) {
+        SIMD_HALF_TYPE half;
+        SIMD_TYPE full;
+        half = load_aligned_half(read_end);
+        full = PYYJSON_CONCAT2(elevate_1_2_to, SIMD_BIT_SIZE)(half);
+        write_simd(write_end, full);
+        read_end -= read_once_count;
+        write_end -= read_once_count;
+    }
+elevate_dst_aliged:;
+    read_end -= read_once_count;
+    write_end -= read_once_count;
+    while (read_end >= read_start) {
+        SIMD_HALF_TYPE half;
+        SIMD_TYPE full;
+        half = load_half(read_end);
+        full = PYYJSON_CONCAT2(elevate_1_2_to, SIMD_BIT_SIZE)(half);
+        write_aligned(write_end, full);
+        read_end -= read_once_count;
+        write_end -= read_once_count;
+    }
+elevate_both_not_aligned:;
+    read_end -= read_once_count;
+    write_end -= read_once_count;
+    while (read_end >= read_start) {
+        SIMD_HALF_TYPE half;
+        SIMD_TYPE full;
+        half = load_half(read_end);
+        full = PYYJSON_CONCAT2(elevate_1_2_to, SIMD_BIT_SIZE)(half);
+        write_simd(write_end, full);
+        read_end -= read_once_count;
+        write_end -= read_once_count;
+    }
+#else // SIMD_BIT_SIZE == 128
+
+#endif
 }
 
 force_inline void long_back_elevate_1_4(u32 *write_start, u8 *read_start, Py_ssize_t len) {
@@ -377,15 +483,6 @@ force_inline PyFastTypes fast_type_check(PyObject *val) {
 #define U32_WRITER(vec) (vec->head.write_u32)
 #define U16_WRITER(vec) (vec->head.write_u16)
 #define U8_WRITER(vec) (vec->head.write_u8)
-
-#define PYYJSON_CONCAT2_EX(a, b) a##_##b
-#define PYYJSON_CONCAT2(a, b) PYYJSON_CONCAT2_EX(a, b)
-
-#define PYYJSON_CONCAT3_EX(a, b, c) a##_##b##_##c
-#define PYYJSON_CONCAT3(a, b, c) PYYJSON_CONCAT3_EX(a, b, c)
-
-#define PYYJSON_CONCAT4_EX(a, b, c, d) a##_##b##_##c##_##d
-#define PYYJSON_CONCAT4(a, b, c, d) PYYJSON_CONCAT4_EX(a, b, c, d)
 
 
 #define VEC_END(vec) (vec->head.write_end)
