@@ -129,15 +129,6 @@ static _TARGET_TYPE _CONTROL_SEQ_TABLE[ControlMax * 6] = {
 };
 #endif // COMPILE_READ_UCS_LEVEL == 1 && COMPILE_INDENT_LEVEL == 0
 
-// #if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
-// #define WRITE_SIMD_IMPL(x, y) _mm256_storeu_si256((__m256i_u *) x, y)
-// #elif COMPILE_WRITE_UCS_LEVEL == 2
-// // COMPILE_READ_UCS_LEVEL is 1
-// static_assert(COMPILE_READ_UCS_LEVEL == 1);
-// #else
-
-// #endif
-
 
 // define: SIMD_EXTRACT_PART, SIMD_MASK_EXTRACT_PART
 #if SIMD_BIT_SIZE == 512

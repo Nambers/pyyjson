@@ -1,5 +1,5 @@
 #define PY_SSIZE_T_CLEAN
-#include "decode.h"
+#include "decode/decode.h"
 #include "yyjson.h"
 
 #define MODULE_STATE(o) ((modulestate *) PyModule_GetState(o))
