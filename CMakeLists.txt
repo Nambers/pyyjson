@@ -82,11 +82,10 @@ add_definitions(-DYYJSON_DISABLE_UTILS=1)
 # ------------------------------------------------------------------------------
 # Library
 add_library(pyyjson SHARED
-    src/yyjson.h
-    src/yyjson.c
-    src/decode.c
+    src/decode/yyjson.c
+    src/decode/decode.c
     src/pyyjson.c
-    src/encode.cpp
+    src/encode/encode_impl.c
 )
 target_include_directories(pyyjson PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src> ${Python3_INCLUDE_DIRS})
 # set_target_properties(pyyjson PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PYYJSON_SOVERSION})
@@ -127,18 +126,24 @@ elseif(MSVC)
     target_compile_options(pyyjson PRIVATE $<$<CXX_COMPILER_ID:MSVC>:${YYJSON_FLAGS}>)
     
 elseif(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|Intel")
-    set(YYJSON_FLAGS "")
+    if(CMAKE_C_COMPILER_ID MATCHES Clang)
+        # https://github.com/llvm/llvm-project/issues/63963
+        set(YYJSON_FLAGS "-Wno-constant-logical-operand")
+    else()
+        set(YYJSON_FLAGS "")
+    endif()
+
     if(YYJSON_ENABLE_FASTMATH)
         set(YYJSON_FLAGS "-ffast-math")
     endif()
-    
+
     target_compile_options(pyyjson PRIVATE $<$<COMPILE_LANGUAGE:C>:${YYJSON_FLAGS}>)
     target_compile_options(pyyjson PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${YYJSON_FLAGS}>)
 
-    if(YYJSON_FORCE_32_BIT)
-        set(CMAKE_C_FLAGS -m32)
-        set(CMAKE_CXX_FLAGS -m32)
-    endif()
+    # if(YYJSON_FORCE_32_BIT)
+    #     set(CMAKE_C_FLAGS -m32)
+    #     set(CMAKE_CXX_FLAGS -m32)
+    # endif()
 
 endif()
 
@@ -154,14 +159,22 @@ if(WIN32)
 endif()
 # endif()
 
+message("CMAKE_C_COMPILER_ID = ${CMAKE_C_COMPILER_ID}")
+
 # optimize for Release build
-if (CMAKE_BUILD_TYPE MATCHES ".*Rel.*")
+if (CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
+    message("Release mode with debug info, enabling maximal optimization and debug symbols")
+    target_compile_options(pyyjson PRIVATE -Werror -pedantic -pedantic-errors)
+elseif (CMAKE_BUILD_TYPE MATCHES ".*Rel.*")
     message("Release mode, enabling maximal optimization")
     target_compile_options(pyyjson PRIVATE -Werror -pedantic -pedantic-errors)
-else(CMAKE_BUILD_TYPE MATCHES ".*Rel.*")
+else()
     message("Debug mode, enabling debug symbols")
-    target_compile_options(pyyjson PUBLIC -g -O0)
-endif (CMAKE_BUILD_TYPE MATCHES ".*Rel.*")
+    # target_compile_options(pyyjson PRIVATE -g -O0 -mavx2)
+endif ()
+
+# TODO remove this
+# target_compile_options(pyyjson PRIVATE -mavx2)
 
 # ------------------------------------------------------------------------------
 # Install
