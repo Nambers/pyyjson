@@ -11,7 +11,6 @@ if [[ $CUR_PYVER != $y ]]; then
     rm -rf build
 fi
 
-# 定义一个函数来提取CMAKE_BUILD_TYPE的值
 get_cmake_build_type() {
     if [ -f "./build/CMakeCache.txt" ]; then
         build_type=$(grep "CMAKE_BUILD_TYPE" ./build/CMakeCache.txt | cut -d'=' -f2)
@@ -23,12 +22,8 @@ get_cmake_build_type() {
         echo "CMAKE_BUILD_TYPE mismatch, removing build dir"
         rm -rf build
     fi
-
-    # 返回结果
-    echo "提取到的值是: '$build_type'"
 }
 
-# 调用函数
 get_cmake_build_type
 
 mkdir -p build

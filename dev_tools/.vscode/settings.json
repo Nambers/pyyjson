@@ -80,7 +80,9 @@
       "encode_shared.h": "c",
       "encode_unicode_impl.inl": "c",
       "encode_utils_impl.inl": "c",
-      "pycore_typeobject.h": "c"
+      "pycore_typeobject.h": "c",
+      "encode_utils_impl_wrap.inl": "c",
+      "encode_simd_utils_wrap.inl": "c"
    },
    "cmake.cmakePath": "${workspaceFolder}/.nix-pyenv/bin/cmake",
    "terminal.integrated.defaultProfile.linux": "nix-dev",

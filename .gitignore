@@ -5,6 +5,7 @@
 /bench
 /python-test
 /test.py
+/test_decode.py
 /debug_source
 /.direnv
 
