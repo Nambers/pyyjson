@@ -192,7 +192,6 @@ force_inline void long_back_elevate_1_2(u16 *write_start, u8 *read_start, Py_ssi
     u8 *read_end = read_start + len;
     u16 *write_end = write_start + len;
 #if SIMD_BIT_SIZE > 128
-
     const Py_ssize_t read_once_count = SIMD_BIT_SIZE / 2 / 8;
     Py_ssize_t tail_len = len & (read_once_count - 1);
     if (tail_len) {
@@ -208,8 +207,12 @@ force_inline void long_back_elevate_1_2(u16 *write_start, u8 *read_start, Py_ssi
         y = blendv(blend, y, mask);
         write_256((void *) write_tail_start, y);
 #else
-        // 512, use maskwrite.
-
+        // 512, use mask_storeu.
+        SIMD_256 y;
+        SIMD_512 z;
+        y = load_256((const void *) (read_end - tail_len));
+        z = elevate_1_2_to_512(y);
+        _mm512_mask_storeu_epi16((void *) (write_end - tail_len), (1 << (usize) tail_len) - 1, z);
 #endif // SIMD_BIT_SIZE
         len &= ~(read_once_count - 1);
         read_end = read_start + len;
@@ -217,18 +220,18 @@ force_inline void long_back_elevate_1_2(u16 *write_start, u8 *read_start, Py_ssi
     }
     if (0 == (((Py_ssize_t) (read_start)) & (read_once_count - 1))) {
         if (0 == (((Py_ssize_t) (write_start)) & (read_once_count * 2 - 1))) {
-            goto elevate_both_aliged;
+            goto elevate_both_aligned;
         } else {
             goto elevate_src_aligned;
         }
     } else {
         if (0 == (((Py_ssize_t) (write_start)) & (read_once_count * 2 - 1))) {
-            goto elevate_dst_aliged;
+            goto elevate_dst_aligned;
         } else {
             goto elevate_both_not_aligned;
         }
     }
-elevate_both_aliged:;
+elevate_both_aligned:;
     read_end -= read_once_count;
     write_end -= read_once_count;
     while (read_end >= read_start) {
@@ -240,6 +243,7 @@ elevate_both_aliged:;
         read_end -= read_once_count;
         write_end -= read_once_count;
     }
+    return;
 elevate_src_aligned:;
     read_end -= read_once_count;
     write_end -= read_once_count;
@@ -252,7 +256,8 @@ elevate_src_aligned:;
         read_end -= read_once_count;
         write_end -= read_once_count;
     }
-elevate_dst_aliged:;
+    return;
+elevate_dst_aligned:;
     read_end -= read_once_count;
     write_end -= read_once_count;
     while (read_end >= read_start) {
@@ -264,6 +269,7 @@ elevate_dst_aliged:;
         read_end -= read_once_count;
         write_end -= read_once_count;
     }
+    return;
 elevate_both_not_aligned:;
     read_end -= read_once_count;
     write_end -= read_once_count;
@@ -276,8 +282,9 @@ elevate_both_not_aligned:;
         read_end -= read_once_count;
         write_end -= read_once_count;
     }
+    return;
 #else // SIMD_BIT_SIZE == 128
-
+// TODO
 #endif
 }
 
