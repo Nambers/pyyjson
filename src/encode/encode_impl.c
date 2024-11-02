@@ -171,19 +171,59 @@ force_inline void memorize_ucs2_to_ucs4(StackVars *stack_vars) {
     stack_vars->unicode_info.cur_ucs_type = 4;
 }
 
+force_inline void long_back_elevate_1_2(u16 *write_start, u8 *read_start, Py_ssize_t len) {
+    // TODO
+}
+
+force_inline void long_back_elevate_1_4(u32 *write_start, u8 *read_start, Py_ssize_t len) {
+    // TODO
+}
+
+force_inline void long_back_elevate_2_4(u32 *write_start, u16 *read_start, Py_ssize_t len) {
+    // TODO
+}
+
 force_inline void ascii_elevate2(StackVars *stack_vars) {
+    UnicodeInfo *unicode_info = &stack_vars->unicode_info;
+    UnicodeVector *vec = GET_VEC(stack_vars);
+    u8 *start = ((u8 *) GET_VEC_ASCII_START(vec));
+    u16 *write_start = ((u16 *) GET_VEC_COMPACT_START(vec));
+    long_back_elevate_1_2(write_start, start, unicode_info->ascii_size);
 }
 
 force_inline void ascii_elevate4(StackVars *stack_vars) {
+    UnicodeInfo *unicode_info = &stack_vars->unicode_info;
+    UnicodeVector *vec = GET_VEC(stack_vars);
+    u8 *start = ((u8 *) GET_VEC_ASCII_START(vec));
+    u32 *write_start = ((u32 *) GET_VEC_COMPACT_START(vec));
+    long_back_elevate_1_4(write_start, start, unicode_info->ascii_size);
 }
 
 force_inline void ucs1_elevate2(StackVars *stack_vars) {
+    UnicodeInfo *unicode_info = &stack_vars->unicode_info;
+    UnicodeVector *vec = GET_VEC(stack_vars);
+    Py_ssize_t offset = unicode_info->ascii_size;
+    u8 *start = ((u8 *) GET_VEC_COMPACT_START(vec)) + offset;
+    u16 *write_start = ((u16 *) GET_VEC_COMPACT_START(vec)) + offset;
+    long_back_elevate_1_2(write_start, start, unicode_info->u8_size);
 }
 
 force_inline void ucs1_elevate4(StackVars *stack_vars) {
+    UnicodeInfo *unicode_info = &stack_vars->unicode_info;
+    UnicodeVector *vec = GET_VEC(stack_vars);
+    Py_ssize_t offset = unicode_info->ascii_size;
+    u8 *start = ((u8 *) GET_VEC_COMPACT_START(vec)) + offset;
+    u32 *write_start = ((u32 *) GET_VEC_COMPACT_START(vec)) + offset;
+    long_back_elevate_1_4(write_start, start, unicode_info->u8_size);
 }
 
 force_inline void ucs2_elevate4(StackVars *stack_vars) {
+    UnicodeInfo *unicode_info = &stack_vars->unicode_info;
+    UnicodeVector *vec = GET_VEC(stack_vars);
+    Py_ssize_t offset = unicode_info->ascii_size + unicode_info->u8_size;
+    u16 *start = ((u16 *) GET_VEC_COMPACT_START(vec)) + offset;
+    u32 *write_start = ((u32 *) GET_VEC_COMPACT_START(vec)) + offset;
+    long_back_elevate_2_4(write_start, start, unicode_info->u16_size);
 }
 
 force_inline void ascii_elevate1(StackVars *stack_vars) {
