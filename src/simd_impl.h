@@ -32,6 +32,10 @@
         *(out_ptr) = _mm_bsrli_si128((x), (bits) / 8);         \
     } while (0)
 
+/*
+ * write memory with length sizeof(SIMD_TYPE) to `dst`.
+ * this is unaligned.
+ */
 force_inline void write_simd(void *dst, SIMD_TYPE SIMD_VAR) {
 #if SIMD_BIT_SIZE == 512
     _mm512_storeu_si512(dst, SIMD_VAR);
@@ -42,7 +46,24 @@ force_inline void write_simd(void *dst, SIMD_TYPE SIMD_VAR) {
 #endif
 }
 
-force_inline void write_simd_128_impl(void *dst, SIMD_128 x) {
+/*
+ * write memory with length sizeof(SIMD_TYPE) to `dst`.
+ * The `dst` must be aligned.
+ */
+force_inline void write_aligned(void *dst, SIMD_TYPE SIMD_VAR) {
+#if SIMD_BIT_SIZE == 128
+    _mm_store_si128((__m128i *) dst, SIMD_VAR);
+#elif SIMD_BIT_SIZE == 256
+    _mm256_store_si256((__m256i *) dst, SIMD_VAR);
+#else
+    _mm512_store_si512(dst, SIMD_VAR);
+#endif
+}
+
+/*
+ * write memory with length sizeof(SIMD_TYPE) to dst.
+ */
+force_inline void write_128(void *dst, SIMD_128 x) {
     _mm_storeu_si128((__m128i_u *) dst, x);
 }
 
@@ -54,24 +75,39 @@ force_inline SIMD_128 load_128(const void *src) {
 #endif
 }
 
-force_inline void write_aligned(void *dst, SIMD_TYPE SIMD_VAR) {
-#if SIMD_BIT_SIZE == 128
-    _mm_store_si128((__m128i *) dst, SIMD_VAR);
-#elif SIMD_BIT_SIZE == 256
-    _mm256_store_si256((__m256i *) dst, SIMD_VAR);
-#else
-    _mm512_store_si512(dst, SIMD_VAR);
-#endif
+force_inline SIMD_128 load_128_aligned(const void *src) {
+    return _mm_load_si128((const __m128i *) src);
 }
+
+force_inline SIMD_128 simd_and_128(SIMD_128 a, SIMD_128 b) {
+    return _mm_and_si128(a, b);
+}
+
+/*==============================================================================
+ * AVX only SIMD code
+ *============================================================================*/
+#if __AVX__
+force_inline SIMD_256 load_256(const void *src) {
+    return _mm256_lddqu_si256((const __m256i_u *) src);
+}
+
+force_inline SIMD_256 load_256_aligned(const void *src) {
+    return _mm256_load_si256((const __m256i *) src);
+}
+
+force_inline void write_256(void *dst, SIMD_256 y) {
+    _mm256_storeu_si256((__m256i_u *) dst, y);
+}
+
+force_inline void write_256_aligned(void *dst, SIMD_256 y) {
+    _mm256_store_si256((__m256i *) dst, y);
+}
+#endif
 
 /*==============================================================================
  * AVX2 only SIMD code
  *============================================================================*/
 #if __AVX2__
-force_inline SIMD_256 elevate_2_4_to_256(SIMD_128 x) {
-    return _mm256_cvtepu16_epi32(x);
-}
-
 force_inline SIMD_256 elevate_1_2_to_256(SIMD_128 x) {
     return _mm256_cvtepu8_epi16(x);
 }
@@ -80,25 +116,33 @@ force_inline SIMD_256 elevate_1_4_to_256(SIMD_64 x) {
     return _mm256_cvtepu8_epi32(x);
 }
 
+force_inline SIMD_256 elevate_2_4_to_256(SIMD_128 x) {
+    return _mm256_cvtepu16_epi32(x);
+}
+
 force_inline SIMD_256 simd_and_256(SIMD_256 a, SIMD_256 b) {
     return _mm256_and_si256(a, b);
 }
 #endif
 
 /*==============================================================================
- * AVX only SIMD code
+ * AVX512F only SIMD code
  *============================================================================*/
-#if __AVX__
-force_inline SIMD_256 load_256_aligned(const void *src) {
-    return _mm256_load_si256((const __m256i *) src);
+#if __AVX512F__
+force_inline SIMD_512 load_512(const void *src) {
+    return _mm512_loadu_si512(src);
 }
 
-force_inline SIMD_256 load_256(const void *src) {
-    return _mm256_lddqu_si256((const __m256i_u *) src);
+force_inline SIMD_512 load_512_aligned(const void *src) {
+    return _mm512_load_si512(src);
 }
 
-force_inline void write_256(void *dst, SIMD_256 y) {
-    _mm256_storeu_si256((__m256i_u *) dst, y);
+force_inline void write_512(void *dst, SIMD_512 z) {
+    _mm512_storeu_si512(dst, z);
+}
+
+force_inline void write_512_aligned(void *dst, SIMD_512 z) {
+    _mm512_store_si512(dst, z);
 }
 #endif
 
@@ -123,26 +167,20 @@ force_inline SIMD_TYPE blendv(SIMD_TYPE blend, SIMD_TYPE SIMD_VAR, SIMD_MASK_TYP
 #if defined(SIMD_HALF_TYPE)
 force_inline SIMD_HALF_TYPE load_aligned_half(const void *src) {
 #if SIMD_BIT_SIZE == 256
-    return _mm_load_si128((const __m128i *) src);
-#else
-    return _mm256_load_si256((const __m256i *) src);
+    return load_128_aligned(src);
+#else // SIMD_BIT_SIZE == 512
+    return load_256_aligned(src);
 #endif
 }
 
 force_inline SIMD_HALF_TYPE load_half(const void *src) {
 #if SIMD_BIT_SIZE == 256
-    return _mm_loadu_si128((const __m128i *) src);
+    return load_128(src);
 #else
-    return _mm256_loadu_si256((const __m256i *) src);
+    return load_256(src);
 #endif
 }
 
 #endif // defined(SIMD_HALF_TYPE)
-
-
-// #undef SIMD_VAR
-// #undef SIMD_TYPE
-// #undef SIMD_MASK_TYPE
-// #undef SIMD_SMALL_MASK_TYPE
 
 #endif // ENCODE_SIMD_IMPL_H

@@ -38,23 +38,6 @@
 #endif
 
 
-// #if SIMD_BIT_SIZE == 512
-// #define SIMD_VAR z
-// #define SIMD_TYPE __m512i
-// #define SIMD_MASK_TYPE u64
-// #define SIMD_SMALL_MASK_TYPE u16
-// #elif SIMD_BIT_SIZE == 256
-// #define SIMD_VAR y
-// #define SIMD_TYPE __m256i
-// #define SIMD_MASK_TYPE SIMD_TYPE
-// #define SIMD_SMALL_MASK_TYPE __m128i
-// #else
-// #define SIMD_VAR x
-// #define SIMD_TYPE __m128i
-// #define SIMD_MASK_TYPE SIMD_TYPE
-// #define SIMD_SMALL_MASK_TYPE SIMD_TYPE
-// #endif
-
 #define CHECK_COUNT_MAX (SIMD_BIT_SIZE / 8 / sizeof(_FROM_TYPE))
 
 // encode_utils_impl.inl
@@ -94,39 +77,46 @@
 // #define SIMD_EXTRACT_PART PYYJSON_CONCAT2(simd_extract_part, COMPILE_READ_UCS_LEVEL)
 
 #if COMPILE_READ_UCS_LEVEL == 1 && COMPILE_INDENT_LEVEL == 0
-static _TARGET_TYPE _CONTROL_SEQ_TABLE[ControlMax * 6] = {
-        CONTROL_SEQ_ESCAPE_PREFIX, '0', '0', // 0
-        CONTROL_SEQ_ESCAPE_PREFIX, '0', '1', // 1
-        CONTROL_SEQ_ESCAPE_PREFIX, '0', '2', // 2
-        CONTROL_SEQ_ESCAPE_PREFIX, '0', '3', // 3
-        CONTROL_SEQ_ESCAPE_PREFIX, '0', '4', // 4
-        CONTROL_SEQ_ESCAPE_PREFIX, '0', '5', // 5
-        CONTROL_SEQ_ESCAPE_PREFIX, '0', '6', // 6
-        CONTROL_SEQ_ESCAPE_PREFIX, '0', '7', // 7
-        '\\', 'b', ' ', ' ', ' ', ' ',       // 8
-        '\\', 't', ' ', ' ', ' ', ' ',       // 9
-        '\\', 'n', ' ', ' ', ' ', ' ',       // 10
-        CONTROL_SEQ_ESCAPE_PREFIX, '0', 'b', // 11
-        '\\', 'f', ' ', ' ', ' ', ' ',       // 12
-        '\\', 'r', ' ', ' ', ' ', ' ',       // 13
-        CONTROL_SEQ_ESCAPE_PREFIX, '0', 'e', // 14
-        CONTROL_SEQ_ESCAPE_PREFIX, '0', 'f', // 15
-        CONTROL_SEQ_ESCAPE_PREFIX, '1', '0', // 16
-        CONTROL_SEQ_ESCAPE_PREFIX, '1', '1', // 17
-        CONTROL_SEQ_ESCAPE_PREFIX, '1', '2', // 18
-        CONTROL_SEQ_ESCAPE_PREFIX, '1', '3', // 19
-        CONTROL_SEQ_ESCAPE_PREFIX, '1', '4', // 20
-        CONTROL_SEQ_ESCAPE_PREFIX, '1', '5', // 21
-        CONTROL_SEQ_ESCAPE_PREFIX, '1', '6', // 22
-        CONTROL_SEQ_ESCAPE_PREFIX, '1', '7', // 23
-        CONTROL_SEQ_ESCAPE_PREFIX, '1', '8', // 24
-        CONTROL_SEQ_ESCAPE_PREFIX, '1', '9', // 25
-        CONTROL_SEQ_ESCAPE_PREFIX, '1', 'a', // 26
-        CONTROL_SEQ_ESCAPE_PREFIX, '1', 'b', // 27
-        CONTROL_SEQ_ESCAPE_PREFIX, '1', 'c', // 28
-        CONTROL_SEQ_ESCAPE_PREFIX, '1', 'd', // 29
-        CONTROL_SEQ_ESCAPE_PREFIX, '1', 'e', // 30
-        CONTROL_SEQ_ESCAPE_PREFIX, '1', 'f', // 31
+static _TARGET_TYPE _CONTROL_SEQ_TABLE[(_Slash + 1) * 8] = {
+        CONTROL_SEQ_ESCAPE_PREFIX, '0', '0', CONTROL_SEQ_ESCAPE_SUFFIX,  // 0
+        CONTROL_SEQ_ESCAPE_PREFIX, '0', '1', CONTROL_SEQ_ESCAPE_SUFFIX,  // 1
+        CONTROL_SEQ_ESCAPE_PREFIX, '0', '2', CONTROL_SEQ_ESCAPE_SUFFIX,  // 2
+        CONTROL_SEQ_ESCAPE_PREFIX, '0', '3', CONTROL_SEQ_ESCAPE_SUFFIX,  // 3
+        CONTROL_SEQ_ESCAPE_PREFIX, '0', '4', CONTROL_SEQ_ESCAPE_SUFFIX,  // 4
+        CONTROL_SEQ_ESCAPE_PREFIX, '0', '5', CONTROL_SEQ_ESCAPE_SUFFIX,  // 5
+        CONTROL_SEQ_ESCAPE_PREFIX, '0', '6', CONTROL_SEQ_ESCAPE_SUFFIX,  // 6
+        CONTROL_SEQ_ESCAPE_PREFIX, '0', '7', CONTROL_SEQ_ESCAPE_SUFFIX,  // 7
+        '\\', 'b', CONTROL_SEQ_ESCAPE_MIDDLE, CONTROL_SEQ_ESCAPE_SUFFIX, // 8
+        '\\', 't', CONTROL_SEQ_ESCAPE_MIDDLE, CONTROL_SEQ_ESCAPE_SUFFIX, // 9
+        '\\', 'n', CONTROL_SEQ_ESCAPE_MIDDLE, CONTROL_SEQ_ESCAPE_SUFFIX, // 10
+        CONTROL_SEQ_ESCAPE_PREFIX, '0', 'b', CONTROL_SEQ_ESCAPE_SUFFIX,  // 11
+        '\\', 'f', CONTROL_SEQ_ESCAPE_MIDDLE, CONTROL_SEQ_ESCAPE_SUFFIX, // 12
+        '\\', 'r', CONTROL_SEQ_ESCAPE_MIDDLE, CONTROL_SEQ_ESCAPE_SUFFIX, // 13
+        CONTROL_SEQ_ESCAPE_PREFIX, '0', 'e', CONTROL_SEQ_ESCAPE_SUFFIX,  // 14
+        CONTROL_SEQ_ESCAPE_PREFIX, '0', 'f', CONTROL_SEQ_ESCAPE_SUFFIX,  // 15
+        CONTROL_SEQ_ESCAPE_PREFIX, '1', '0', CONTROL_SEQ_ESCAPE_SUFFIX,  // 16
+        CONTROL_SEQ_ESCAPE_PREFIX, '1', '1', CONTROL_SEQ_ESCAPE_SUFFIX,  // 17
+        CONTROL_SEQ_ESCAPE_PREFIX, '1', '2', CONTROL_SEQ_ESCAPE_SUFFIX,  // 18
+        CONTROL_SEQ_ESCAPE_PREFIX, '1', '3', CONTROL_SEQ_ESCAPE_SUFFIX,  // 19
+        CONTROL_SEQ_ESCAPE_PREFIX, '1', '4', CONTROL_SEQ_ESCAPE_SUFFIX,  // 20
+        CONTROL_SEQ_ESCAPE_PREFIX, '1', '5', CONTROL_SEQ_ESCAPE_SUFFIX,  // 21
+        CONTROL_SEQ_ESCAPE_PREFIX, '1', '6', CONTROL_SEQ_ESCAPE_SUFFIX,  // 22
+        CONTROL_SEQ_ESCAPE_PREFIX, '1', '7', CONTROL_SEQ_ESCAPE_SUFFIX,  // 23
+        CONTROL_SEQ_ESCAPE_PREFIX, '1', '8', CONTROL_SEQ_ESCAPE_SUFFIX,  // 24
+        CONTROL_SEQ_ESCAPE_PREFIX, '1', '9', CONTROL_SEQ_ESCAPE_SUFFIX,  // 25
+        CONTROL_SEQ_ESCAPE_PREFIX, '1', 'a', CONTROL_SEQ_ESCAPE_SUFFIX,  // 26
+        CONTROL_SEQ_ESCAPE_PREFIX, '1', 'b', CONTROL_SEQ_ESCAPE_SUFFIX,  // 27
+        CONTROL_SEQ_ESCAPE_PREFIX, '1', 'c', CONTROL_SEQ_ESCAPE_SUFFIX,  // 28
+        CONTROL_SEQ_ESCAPE_PREFIX, '1', 'd', CONTROL_SEQ_ESCAPE_SUFFIX,  // 29
+        CONTROL_SEQ_ESCAPE_PREFIX, '1', 'e', CONTROL_SEQ_ESCAPE_SUFFIX,  // 30
+        CONTROL_SEQ_ESCAPE_PREFIX, '1', 'f', CONTROL_SEQ_ESCAPE_SUFFIX,  // 31
+        CONTROL_SEQ_ESCAPE_FULL_ZERO_REPEAT2,                            // 32 ~ 33
+        '\\', '"', CONTROL_SEQ_ESCAPE_MIDDLE, CONTROL_SEQ_ESCAPE_SUFFIX, // 34
+        CONTROL_SEQ_ESCAPE_FULL_ZERO_REPEAT32,                           // 35 ~ 66
+        CONTROL_SEQ_ESCAPE_FULL_ZERO_REPEAT16,                           // 67 ~ 82
+        CONTROL_SEQ_ESCAPE_FULL_ZERO_REPEAT8,                            // 83 ~ 90
+        CONTROL_SEQ_ESCAPE_FULL_ZERO,                                    // 91
+        '\\', '\\'                                                       // 92
 };
 #endif // COMPILE_READ_UCS_LEVEL == 1 && COMPILE_INDENT_LEVEL == 0
 
@@ -146,35 +136,39 @@ static _TARGET_TYPE _CONTROL_SEQ_TABLE[ControlMax * 6] = {
 
 force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(StackVars *stack_vars, _FROM_TYPE *src, Py_ssize_t len, Py_ssize_t additional_len) {
     UnicodeVector *vec = GET_VEC(stack_vars);
-    while (len) {
-        if (*src == _Slash) {
-            vec = VEC_RESERVE(stack_vars, 2 + len + TAIL_PADDING + additional_len);
-            RETURN_ON_UNLIKELY_ERR(!vec);
-            *_WRITER(vec)++ = '\\';
-            *_WRITER(vec)++ = '\\';
-        } else if (*src == _Quote) {
-            vec = VEC_RESERVE(stack_vars, 2 + len + TAIL_PADDING + additional_len);
-            RETURN_ON_UNLIKELY_ERR(!vec);
-            *_WRITER(vec)++ = '\\';
-            *_WRITER(vec)++ = '"';
-        } else if (*src < 32) {
-            vec = VEC_RESERVE(stack_vars, 6 + len + TAIL_PADDING + additional_len);
-            RETURN_ON_UNLIKELY_ERR(!vec);
-            Py_ssize_t len = _ControlJump[(usize) *src];
-            assert(len == 6 || len == 2);
-            if (len == 2) {
-                memcpy((void *) _WRITER(vec), (void *) &_CONTROL_SEQ_TABLE[(usize) (*src) * 6], 2 * sizeof(_TARGET_TYPE));
-                _WRITER(vec) += 2;
-            } else {
-                memcpy((void *) _WRITER(vec), (void *) &_CONTROL_SEQ_TABLE[(usize) (*src) * 6], 6 * sizeof(_TARGET_TYPE));
-                _WRITER(vec) += 6;
-            }
+    _TARGET_TYPE *writer = _WRITER(vec);
+    _FROM_TYPE *src_end = src + len;
+    while (src < src_end) {
+        _TARGET_TYPE srcval = (_TARGET_TYPE) *src;
+        usize unicode_point = (usize) srcval;
+        Py_ssize_t copy_count = _ControlJump[unicode_point];
+        if (likely(!copy_count)) {
+            *writer++ = srcval;
         } else {
-            *_WRITER(vec)++ = *src;
+            _TARGET_TYPE *copy_ptr = &_CONTROL_SEQ_TABLE[unicode_point * 8];
+            if (copy_count == 2) {
+                _WRITER(vec) = writer;
+                vec = VEC_RESERVE(stack_vars, 2 + len + TAIL_PADDING / sizeof(_TARGET_TYPE) + additional_len);
+                RETURN_ON_UNLIKELY_ERR(!vec);
+                writer = _WRITER(vec);
+                memcpy((void *) writer, (const void *) copy_ptr, 2 * sizeof(_TARGET_TYPE));
+                writer += 2;
+            } else {
+                _WRITER(vec) = writer;
+                vec = VEC_RESERVE(stack_vars, 6 + len + TAIL_PADDING / sizeof(_TARGET_TYPE) + additional_len);
+                RETURN_ON_UNLIKELY_ERR(!vec);
+                writer = _WRITER(vec);
+#if COMPILE_WRITE_UCS_LEVEL == 1 || SIZEOF_VOID_P == 8
+                memcpy((void *) writer, (const void *) copy_ptr, 8 * sizeof(_TARGET_TYPE));
+#else //  COMPILE_WRITE_UCS_LEVEL == 1 || SIZEOF_VOID_P == 8
+                memcpy((void *) writer, (const void *) copy_ptr, 6 * sizeof(_TARGET_TYPE));
+#endif
+                writer += 6;
+            }
         }
-        len--;
         src++;
     }
+    _WRITER(vec) = writer;
     return vec;
 }
 
@@ -194,7 +188,7 @@ force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(StackVars *stack_vars, _F
 // tail_128:;
 //     while (len >= 128 / 8 / sizeof(_FROM_TYPE)) {
 //         mask_128 = CHECK_ESCAPE_IMPL_GET_MASK_128(src, &x);
-//         write_simd_128_impl(_WRITER(vec), x);
+//         write_128(_WRITER(vec), x);
 //         if (likely(CHECK_MASK_ZERO_SMALL(mask_128))) {
 //             _WRITER(vec) += 128 / 8 / sizeof(_FROM_TYPE);
 //         } else {
@@ -218,7 +212,7 @@ force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(StackVars *stack_vars, _F
 // tail_more_128:;
 //     mask_128 = CHECK_ESCAPE_IMPL_GET_MASK_128(src + len - 128 / 8 / sizeof(_FROM_TYPE), &x);
 //     if (likely(CHECK_MASK_ZERO_SMALL(mask_128))) {
-//         write_simd_128_impl(_WRITER(vec) + len - 128 / 8 / sizeof(_FROM_TYPE), x);
+//         write_128(_WRITER(vec) + len - 128 / 8 / sizeof(_FROM_TYPE), x);
 //         goto done;
 //     }
 //     goto tail_less_128;
@@ -511,7 +505,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_IMPL(StackVars *stack_vars, _FR
             assert(_Loop > 1);
             small_mask = SIMD_EXTRACT_PART(mask, 0);
             if (CHECK_MASK_ZERO_SMALL(small_mask)) {
-                write_simd_128_impl((void *) _WRITER(vec), SIMD_EXTRACT_PART(SIMD_VAR, 0));
+                write_128((void *) _WRITER(vec), SIMD_EXTRACT_PART(SIMD_VAR, 0));
                 _WRITER(vec) += CHECK_COUNT_MAX / _Loop;
             } else {
                 vec = VECTOR_WRITE_ESCAPE_IMPL(stack_vars, src, CHECK_COUNT_MAX / _Loop, len - CHECK_COUNT_MAX / _Loop);
@@ -521,7 +515,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_IMPL(StackVars *stack_vars, _FR
             len -= CHECK_COUNT_MAX / _Loop;
             small_mask = SIMD_EXTRACT_PART(mask, 1);
             if (CHECK_MASK_ZERO_SMALL(small_mask)) {
-                write_simd_128_impl((void *) _WRITER(vec), SIMD_EXTRACT_PART(SIMD_VAR, 1));
+                write_128((void *) _WRITER(vec), SIMD_EXTRACT_PART(SIMD_VAR, 1));
                 _WRITER(vec) += CHECK_COUNT_MAX / _Loop;
             } else {
                 vec = VECTOR_WRITE_ESCAPE_IMPL(stack_vars, src, CHECK_COUNT_MAX / _Loop, len - CHECK_COUNT_MAX / _Loop);

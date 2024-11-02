@@ -68,16 +68,28 @@ enum X86SIMDLevel {
 
 
 #define CONTROL_SEQ_ESCAPE_PREFIX _Slash, 'u', '0', '0'
+#define CONTROL_SEQ_ESCAPE_SUFFIX '\0', '\0'
+#define CONTROL_SEQ_ESCAPE_MIDDLE CONTROL_SEQ_ESCAPE_SUFFIX, CONTROL_SEQ_ESCAPE_SUFFIX
+#define CONTROL_SEQ_ESCAPE_FULL_ZERO CONTROL_SEQ_ESCAPE_MIDDLE, CONTROL_SEQ_ESCAPE_MIDDLE
+#define CONTROL_SEQ_ESCAPE_FULL_ZERO_REPEAT2 CONTROL_SEQ_ESCAPE_FULL_ZERO, CONTROL_SEQ_ESCAPE_FULL_ZERO
+#define CONTROL_SEQ_ESCAPE_FULL_ZERO_REPEAT4 CONTROL_SEQ_ESCAPE_FULL_ZERO_REPEAT2, CONTROL_SEQ_ESCAPE_FULL_ZERO_REPEAT2
+#define CONTROL_SEQ_ESCAPE_FULL_ZERO_REPEAT8 CONTROL_SEQ_ESCAPE_FULL_ZERO_REPEAT4, CONTROL_SEQ_ESCAPE_FULL_ZERO_REPEAT4
+#define CONTROL_SEQ_ESCAPE_FULL_ZERO_REPEAT16 CONTROL_SEQ_ESCAPE_FULL_ZERO_REPEAT8, CONTROL_SEQ_ESCAPE_FULL_ZERO_REPEAT8
+#define CONTROL_SEQ_ESCAPE_FULL_ZERO_REPEAT32 CONTROL_SEQ_ESCAPE_FULL_ZERO_REPEAT16, CONTROL_SEQ_ESCAPE_FULL_ZERO_REPEAT16
 
-static Py_ssize_t _ControlJump[ControlMax] = {
+static Py_ssize_t _ControlJump[_Slash + 1] = {
         6, 6, 6, 6, 6, 6, 6, 6, 2, 2, 2, 6, 2, 2, 6, 6, // 0-15
         6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, // 16-31
+        0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 32-47
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 48-63
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 64-79
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 // 80-92
 };
 
-static i32 _ControlLengthAdd[ControlMax] = {
-        5, 5, 5, 5, 5, 5, 5, 5, 1, 1, 1, 5, 1, 1, 5, 5, // 0-15
-        5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, // 16-31
-};
+// static i32 _ControlLengthAdd[ControlMax] = {
+//         5, 5, 5, 5, 5, 5, 5, 5, 1, 1, 1, 5, 1, 1, 5, 5, // 0-15
+//         5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, // 16-31
+// };
 
 /*==============================================================================
  * Buffer
