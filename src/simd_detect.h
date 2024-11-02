@@ -1,7 +1,9 @@
 #ifndef PYYJSON_SIMD_DETECT_H
 #define PYYJSON_SIMD_DETECT_H
 
-#if defined(__x86_64__) || defined(_M_X64)
+#if PYYJSON_DETECT_SIMD
+
+#if TARGET_SIMD_ARCH == x86
 #if __AVX512F__ && __AVX512BW__ && __AVX512VL__
 #define SIMD_BIT_SIZE 512
 #elif __AVX2__
@@ -16,9 +18,10 @@
 #define SIMD_256 __m256i
 #define SIMD_512 __m512i
 #define HAS_SIMD 1
-#elif defined(i386) || defined(__i386__) || defined(__i386) || defined(_M_IX86)
-#elif defined(__aarch64__) || defined(_M_ARM64)
+
+#elif TARGET_SIMD_ARCH == aarch
 // aarch64
+#endif
 #endif
 
 #endif // PYYJSON_SIMD_DETECT_H

@@ -161,17 +161,45 @@ endif()
 
 message("CMAKE_C_COMPILER_ID = ${CMAKE_C_COMPILER_ID}")
 
-# optimize for Release build
+# Werror for Release build
+# TODO move this to GNU|Clang
+message("CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 if (CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
-    message("Release mode with debug info, enabling maximal optimization and debug symbols")
+    # message("Release mode with debug info, enabling maximal optimization and debug symbols")
     target_compile_options(pyyjson PRIVATE -Werror -pedantic -pedantic-errors)
 elseif (CMAKE_BUILD_TYPE MATCHES ".*Rel.*")
-    message("Release mode, enabling maximal optimization")
+    # message("Release mode, enabling maximal optimization")
     target_compile_options(pyyjson PRIVATE -Werror -pedantic -pedantic-errors)
 else()
-    message("Debug mode, enabling debug symbols")
-    # target_compile_options(pyyjson PRIVATE -g -O0 -mavx2)
+    # message("Debug mode, enabling debug symbols")
 endif ()
+
+message("CMAKE_SYSTEM_PROCESSOR = ${CMAKE_SYSTEM_PROCESSOR}")
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "(^aarch64)|(^arm64)|(^ARM64)")
+    set(PYYJSON_DETECT_SIMD 1)
+    set(TARGET_SIMD_ARCH aarch)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^arm")
+    set(PYYJSON_DETECT_SIMD 1)
+    set(TARGET_SIMD_ARCH aarch)
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(x86_64)|(AMD64|amd64)|(^i.86$)")
+    set(PYYJSON_DETECT_SIMD 1)
+    set(TARGET_SIMD_ARCH x86)
+    else()
+    set(PYYJSON_DETECT_SIMD 0)
+endif()
+
+if(PYYJSON_DETECT_SIMD)
+    target_compile_definitions(pyyjson PRIVATE PYYJSON_DETECT_SIMD=1 TARGET_SIMD_ARCH=${TARGET_SIMD_ARCH})
+endif()
+
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+
+elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
+
+else()
+
+endif()
 
 # TODO remove this
 # target_compile_options(pyyjson PRIVATE -mavx2)

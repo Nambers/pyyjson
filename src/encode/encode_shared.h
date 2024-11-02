@@ -276,58 +276,20 @@ static_assert((PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE % 64) == 0, "(PYYJSON_ENCODE_
 /*==============================================================================
  * Utils
  *============================================================================*/
-// template<UCSKind __kind, size_t __bit_size>
-// force_inline void ptr_move_bits(UCSType_t<__kind> *&ptr) {
-//     using uu = UCSType_t<__kind>;
-//     static_assert((__bit_size % 8) == 0);
-//     size_t _MoveBytes = __bit_size / 8;
-//     static_assert((_MoveBytes % sizeof(uu)) == 0);
-//     static_assert((_MoveBytes / sizeof(uu)) != 0);
-//     ptr += _MoveBytes / sizeof(uu);
-// }
 
-/*
- * Copy escape implementation.
- * Before calling this, the dst buffer should reserve enough space.
- */
-// template<UCSKind __from, UCSKind __to>
-// force_noinline void copy_escape_impl(UCSType_t<__from> *&src, UCSType_t<__to> *&dst, usize move_src_ptr) { // no simd
-//     COMMON_TYPE_DEF();
-//     for (Py_ssize_t i = 0; i < move_src_ptr; i++) {
-//         usrc u_f = *src;
-//         if (u_f == _Quote) {
-//             // add \ before u_f. No need to check the buffer length.
-//             udst _QuoteEscaped[2] = {_Slash, _Quote};
-//             *(UCS_ESCAPE_KIND(__to) *) dst = *(UCS_ESCAPE_KIND(__to) *) &_QuoteEscaped[0];
-//             src++;
-//             dst += 2;
-//         } else if (u_f == _Slash) {
-//             // add \ before u_f. No need to check the buffer length.
-//             udst _SlashEscaped[2] = {_Slash, _Slash};
-//             *(UCS_ESCAPE_KIND(__to) *) dst = *(UCS_ESCAPE_KIND(__to) *) &_SlashEscaped[0];
-//             src++;
-//             dst += 2;
-//         } else if (unlikely(u_f < ControlMax)) {
-//             // escape to \u00xx. This should be very "unlikely".
-//             usize dst_move = (usize) _ControlJump[(size_t) u_f];
-//             assert(dst_move == 2 || dst_move == 6);
-//             memcpy((void *) dst, (void *) &_ControlSeqTable<__to>[(usize) u_f * 6], dst_move * sizeof(udst));
-//             src++;
-//             dst += dst_move;
-//         } else {
-//             *dst = (udst) u_f;
-//             src++;
-//             dst++;
-//         }
-//     }
-// }
+/** Returns whether the size is power of 2 (size should not be 0). */
+static_inline bool size_is_pow2(usize size) {
+    return (size & (size - 1)) == 0;
+}
 
-// template<UCSKind __from, UCSKind __to, size_t __SrcBitSize>
-// force_inline void copy_escape_fixsize(UCSType_t<__from> *&src, UCSType_t<__to> *&dst) {
-//     SIMD_COMMON_DEF(__SrcBitSize);
-//     // it is assumed that the buffer is currently enough to store the dst data.
-//     copy_escape_impl<__from, __to>(src, dst, (usize) _MoveSrc);
-// }
+/** Align size upwards (may overflow). */
+force_inline usize size_align_up(usize size, usize align) {
+    if (size_is_pow2(align)) {
+        return (size + (align - 1)) & ~(align - 1);
+    } else {
+        return size + align - (size + align - 1) % align - 1;
+    }
+}
 
 /*==============================================================================
  * Python Utils

@@ -22,15 +22,27 @@
 #endif
 
 force_inline SIMD_256 elevate_2_4_to256(SIMD_128 x) {
+#if __AVX2__
     return _mm256_cvtepu16_epi32(x);
+#else
+    Py_UNREACHABLE();
+#endif
 }
 
 force_inline SIMD_256 elevate_1_2_to256(SIMD_128 x) {
+#if __AVX2__
     return _mm256_cvtepu8_epi16(x);
+#else
+    Py_UNREACHABLE();
+#endif
 }
 
 force_inline SIMD_256 elevate_1_4_to256(SIMD_64 x) {
+#if __AVX2__
     return _mm256_cvtepu8_epi32(x);
+#else
+    Py_UNREACHABLE();
+#endif
 }
 
 #define RIGHT_SHIFT_128BITS(x, bits, out_ptr)                  \
@@ -53,12 +65,36 @@ force_inline void write_simd_128_impl(void *dst, SIMD_128 x) {
     _mm_storeu_si128((__m128i_u *) dst, x);
 }
 
-force_inline void load_256(const void *src, SIMD_256 *y) {
-    *y = _mm256_lddqu_si256((const __m256i_u *) src);
+force_inline void load_128(const void *src, SIMD_128 *x) {
+#if __SSE3__
+    *x = _mm_lddqu_si128((const __m128i_u *) src);
+#else
+    *x = _mm_loadu_si128((const __m128i_u *) src);
+#endif
 }
 
-force_inline SIMD_256 simd_and_256(SIMD_256 a, SIMD_256 b){
+force_inline void load_256(const void *src, SIMD_256 *y) {
+#if __AVX__
+    *y = _mm256_lddqu_si256((const __m256i_u *) src);
+#else
+    Py_UNREACHABLE();
+#endif
+}
+
+force_inline void write_256(void *dst, SIMD_256 y) {
+#if __AVX__
+    _mm256_storeu_si256((__m256i_u *) dst, y);
+#else
+    Py_UNREACHABLE();
+#endif
+}
+
+force_inline SIMD_256 simd_and_256(SIMD_256 a, SIMD_256 b) {
+#if __AVX2__
     return _mm256_and_si256(a, b);
+#else
+    Py_UNREACHABLE();
+#endif
 }
 
 

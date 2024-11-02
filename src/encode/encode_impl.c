@@ -366,83 +366,17 @@ force_inline bool vec_in_boundary(UnicodeVector *vec) {
     return vec->head.write_u8 <= (u8 *) vec->head.write_end && vec->head.write_u8 >= (u8 *) GET_VEC_ASCII_START(vec);
 }
 
-#define COMPILE_WRITE_UCS_LEVEL 1
-#include "encode_utils_impl.inl"
-#undef COMPILE_WRITE_UCS_LEVEL
-
-#define COMPILE_WRITE_UCS_LEVEL 2
-#include "encode_utils_impl.inl"
-#undef COMPILE_WRITE_UCS_LEVEL
-
-#define COMPILE_WRITE_UCS_LEVEL 4
-#include "encode_utils_impl.inl"
-#undef COMPILE_WRITE_UCS_LEVEL
+/* 
+ * Some utility functions only related to *write*, like vector reserve, writing number
+ * need macro: COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4
+ */
+#include "encode_utils_impl_wrap.inl"
 
 #include "encode_simd_utils_wrap.inl"
 
 #include "encode_unicode_impl_wrap.inl"
 
-/* -------- */
-#define COMPILE_INDENT_LEVEL 0
-
-#define COMPILE_UCS_LEVEL 4
-#include "encode_impl.inl"
-#undef COMPILE_UCS_LEVEL
-
-#define COMPILE_UCS_LEVEL 2
-#include "encode_impl.inl"
-#undef COMPILE_UCS_LEVEL
-
-#define COMPILE_UCS_LEVEL 1
-#include "encode_impl.inl"
-#undef COMPILE_UCS_LEVEL
-
-#define COMPILE_UCS_LEVEL 0
-#include "encode_impl.inl"
-#undef COMPILE_UCS_LEVEL
-
-#undef COMPILE_INDENT_LEVEL
-
-#define COMPILE_INDENT_LEVEL 2
-
-#define COMPILE_UCS_LEVEL 4
-#include "encode_impl.inl"
-#undef COMPILE_UCS_LEVEL
-
-#define COMPILE_UCS_LEVEL 2
-#include "encode_impl.inl"
-#undef COMPILE_UCS_LEVEL
-
-#define COMPILE_UCS_LEVEL 1
-#include "encode_impl.inl"
-#undef COMPILE_UCS_LEVEL
-
-#define COMPILE_UCS_LEVEL 0
-#include "encode_impl.inl"
-#undef COMPILE_UCS_LEVEL
-
-#undef COMPILE_INDENT_LEVEL
-
-#define COMPILE_INDENT_LEVEL 4
-
-#define COMPILE_UCS_LEVEL 4
-#include "encode_impl.inl"
-#undef COMPILE_UCS_LEVEL
-
-#define COMPILE_UCS_LEVEL 2
-#include "encode_impl.inl"
-#undef COMPILE_UCS_LEVEL
-
-#define COMPILE_UCS_LEVEL 1
-#include "encode_impl.inl"
-#undef COMPILE_UCS_LEVEL
-
-#define COMPILE_UCS_LEVEL 0
-#include "encode_impl.inl"
-#undef COMPILE_UCS_LEVEL
-
-#undef COMPILE_INDENT_LEVEL
-
+#include "encode_impl_wrap.inl"
 
 force_noinline PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject *kwargs) {
     PyObject *obj;

@@ -1,4 +1,5 @@
 #include "encode_float.inl"
+#include "encode_simd_impl.h"
 
 #ifndef COMPILE_WRITE_UCS_LEVEL
 #error "COMPILE_WRITE_UCS_LEVEL is not defined"
@@ -18,8 +19,11 @@
 #endif
 
 #define VEC_RESERVE PYYJSON_CONCAT2(vec_reserve, COMPILE_WRITE_UCS_LEVEL)
-#define _ELEVATE_U8_COPY PYYJSON_CONCAT2(_elevate_u8_copy, COMPILE_WRITE_UCS_LEVEL)
+#define _ELEVATE_FROM_U8_NUM_BUFFER PYYJSON_CONCAT2(_elevate_u8_copy, COMPILE_WRITE_UCS_LEVEL)
 
+/*
+ * Reserve space for the vector.
+ */
 force_inline UnicodeVector *VEC_RESERVE(StackVars *stack_vars, Py_ssize_t size) {
     UnicodeVector *vec = GET_VEC(stack_vars);
     _TARGET_TYPE *target_ptr = _WRITER(vec) + size;
@@ -49,25 +53,74 @@ force_inline UnicodeVector *VEC_RESERVE(StackVars *stack_vars, Py_ssize_t size) 
     return vec;
 }
 
-force_inline void _ELEVATE_U8_COPY(StackVars *stack_vars, u8 *buffer, Py_ssize_t len) {
-#if COMPILE_WRITE_UCS_LEVEL > 1
-    assert(len >= 0);
-    while (len > 0) {
-        *(_WRITER(stack_vars->vec))++ = *buffer++;
-        len--;
-    } // TODO
-#else
+/*
+ * (PRIVATE)
+ * Elevate the u8 buffer to the vector.
+ * The space (32 * sizeof(_TARGET_TYPE)) must be reserved before calling this function.
+ */
+force_inline void _ELEVATE_FROM_U8_NUM_BUFFER(UnicodeVector *vec, u8 *buffer, Py_ssize_t len) {
+#if COMPILE_WRITE_UCS_LEVEL == 1
+    Py_UNREACHABLE();
     assert(false);
+#else // COMPILE_WRITE_UCS_LEVEL != 1
+    assert(len >= 0 && len <= 32);
+    // there are two cases: 1 -> 2 or 1 -> 4
+    // 1 -> 2:
+    // for simd size < 512, load 128 (16 bytes) and write 128 or 256.
+    // for simd size == 512, load 256 (32 bytes) and write 512.
+    // 2 -> 4:
+    // always load 128 (16 bytes), and write 128/256/512.
+#if SIMD_BIT_SIZE == 512 && COMPILE_WRITE_UCS_LEVEL == 2
+    SIMD_256 y;
+    SIMD_512 z;
+    load_256((const void *) buffer, &y);
+    z = elevate_1_2_to512(y);
+    write_512((void *) _WRITER(vec), z); // processed 32, done
+    _WRITER(vec) += len;
+#else // SIMD_BIT_SIZE == 512 && COMPILE_WRITE_UCS_LEVEL == 2
+    const Py_ssize_t per_write_count = SIMD_BIT_SIZE / 8 / COMPILE_WRITE_UCS_LEVEL;
+    _TARGET_TYPE *writer = _WRITER(vec);
+    u8 *buffer_end = buffer + len;
+    SIMD_128 x;
+#if SIMD_BIT_SIZE == 512
+    SIMD_512 z;
+#elif SIMD_BIT_SIZE == 256
+    SIMD_256 y;
+#else
+    SIMD_128 _x;
 #endif
+    while (buffer < buffer_end) {
+        load_128((const void *) buffer, &x);
+#if SIMD_BIT_SIZE == 512
+        z = elevate_1_4_to512(x);
+        write_512((void *) writer, z);
+#elif SIMD_BIT_SIZE == 256
+        y = PYYJSON_CONCAT3(elevate_1, COMPILE_WRITE_UCS_LEVEL, to256)(x);
+        write_256((void *) writer, y);
+#else  // SIMD_BIT_SIZE == 128
+        _x = PYYJSON_CONCAT3(elevate_1, COMPILE_WRITE_UCS_LEVEL, to128)(x);
+        write_128((void *) writer, y);
+#endif // SIMD_BIT_SIZE
+        writer += per_write_count;
+        buffer += per_write_count;
+    }
+    _WRITER(vec) += len;
+#endif // SIMD_BIT_SIZE == 512 && COMPILE_WRITE_UCS_LEVEL == 2
+    assert(vec_in_boundary(vec));
+#endif // COMPILE_WRITE_UCS_LEVEL != 1
 }
 
+/*
+ * Write a u64 number to the vector.
+ * The space (32 * sizeof(_TARGET_TYPE)) must be reserved before calling this function.
+ */
 force_inline void PYYJSON_CONCAT2(vec_write_u64, COMPILE_WRITE_UCS_LEVEL)(StackVars *stack_vars, u64 val, usize sign) {
     assert(sign <= 1);
-#if COMPILE_WRITE_UCS_LEVEL == 1
     UnicodeVector *vec = GET_VEC(stack_vars);
+#if COMPILE_WRITE_UCS_LEVEL == 1
     u8 *buffer = _WRITER(vec);
 #else
-    u8 _buffer[32];
+    u8 _buffer[64];
     u8 *buffer = _buffer;
 #endif
     if (sign) *buffer = '-';
@@ -76,13 +129,18 @@ force_inline void PYYJSON_CONCAT2(vec_write_u64, COMPILE_WRITE_UCS_LEVEL)(StackV
     vec->head.write_u8 = buffer_end;
 #else
     Py_ssize_t write_len = buffer_end - buffer;
-    _ELEVATE_U8_COPY(stack_vars, buffer, write_len);
+    _ELEVATE_FROM_U8_NUM_BUFFER(vec, buffer, write_len);
 #endif
+    assert(vec_in_boundary(vec));
 }
 
+/*
+ * Write a f64 number to the vector.
+ * The space (32 * sizeof(_TARGET_TYPE)) must be reserved before calling this function.
+ */
 force_inline void PYYJSON_CONCAT2(vec_write_f64, COMPILE_WRITE_UCS_LEVEL)(StackVars *stack_vars, u64 val_u64_repr) {
-#if COMPILE_WRITE_UCS_LEVEL == 1
     UnicodeVector *vec = GET_VEC(stack_vars);
+#if COMPILE_WRITE_UCS_LEVEL == 1
     u8 *buffer = _WRITER(vec);
 #else
     u8 _buffer[32];
@@ -93,11 +151,11 @@ force_inline void PYYJSON_CONCAT2(vec_write_f64, COMPILE_WRITE_UCS_LEVEL)(StackV
     vec->head.write_u8 = buffer_end;
 #else
     Py_ssize_t write_len = buffer_end - buffer;
-    _ELEVATE_U8_COPY(stack_vars, buffer, write_len);
+    _ELEVATE_FROM_U8_NUM_BUFFER(vec, buffer, write_len);
 #endif
 }
 
-#undef _ELEVATE_U8_COPY
+#undef _ELEVATE_FROM_U8_NUM_BUFFER
 #undef VEC_RESERVE
 #undef _TARGET_TYPE
 #undef _WRITER
