@@ -1,5 +1,5 @@
 #include "encode_float.inl"
-#include "encode_simd_impl.h"
+#include "simd_impl.h"
 
 #ifndef COMPILE_WRITE_UCS_LEVEL
 #error "COMPILE_WRITE_UCS_LEVEL is not defined"

@@ -1,5 +1,5 @@
-#include "encode_simd_impl.h"
 #include "simd_detect.h"
+#include "simd_impl.h"
 #include <immintrin.h>
 
 #ifndef COMPILE_READ_UCS_LEVEL
@@ -602,7 +602,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_IMPL(StackVars *stack_vars, _FR
 done:;
     assert(vec_in_boundary(vec));
     return vec;
-// #undef SIMD_VAR
+    // #undef SIMD_VAR
 }
 
 

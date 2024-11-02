@@ -1,7 +1,7 @@
 // #include "cpy_utils.inl"
 #include "encode_shared.h"
-#include "encode_simd_impl.h"
 #include "simd_detect.h"
+#include "simd_impl.h"
 
 
 #define PYYJSON_CONCAT2_EX(a, b) a##_##b
