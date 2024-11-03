@@ -8,6 +8,7 @@
 /test_decode.py
 /debug_source
 /.direnv
+/dev_tools/.vscode/settings.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
