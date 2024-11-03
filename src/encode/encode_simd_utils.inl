@@ -62,19 +62,6 @@
 #define WRITE_SIMD_IMPL PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define WRITE_SIMD_256_WITH_WRITEMASK PYYJSON_CONCAT2(write_simd_256_with_writemask, COMPILE_WRITE_UCS_LEVEL)
 #define WRITE_SIMD_WITH_TAIL_LEN PYYJSON_CONCAT3(write_simd_with_tail_len, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
-#if SIMD_BIT_SIZE == 512
-#define SIMD_EXTRACT_PART _mm512_extracti32x4_epi32
-#define SIMD_MASK_EXTRACT_PART(m, i) (u16)((m >> (i * 16)) & 0xFFFF)
-#define SIMD_EXTRACT_HALF _mm512_extracti32x8_epi32
-#elif SIMD_BIT_SIZE == 256
-#define SIMD_EXTRACT_PART _mm256_extracti128_si256
-#define SIMD_MASK_EXTRACT_PART SIMD_EXTRACT_PART
-#define SIMD_EXTRACT_HALF SIMD_EXTRACT_PART
-#else
-#define SIMD_EXTRACT_PART assert(false)
-#define SIMD_MASK_EXTRACT_PART assert(false)
-#define SIMD_EXTRACT_HALF assert(false)
-#endif
 
 
 #if COMPILE_WRITE_UCS_LEVEL == 4
@@ -100,14 +87,14 @@ force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(_FROM_TYPE *src, SIMD_TYP
 
 #elif SIMD_BIT_SIZE == 256
     *SIMD_VAR = _mm256_loadu_si256((const __m256i_u *) src);
-    __m256i t1 = _mm256_set1_epi8(_Quote);//_mm256_load_si256((__m256i *) _Quote_i8);      // vmovdqa, AVX
-    __m256i t2 = _mm256_set1_epi8(_Slash);//_mm256_load_si256((__m256i *) _Slash_i8);      // vmovdqa, AVX
+    __m256i t1 = _mm256_set1_epi8(_Quote); //_mm256_load_si256((__m256i *) _Quote_i8);      // vmovdqa, AVX
+    __m256i t2 = _mm256_set1_epi8(_Slash); //_mm256_load_si256((__m256i *) _Slash_i8);      // vmovdqa, AVX
     // __m256i t3 = _mm256_load_si256((__m256i *) _MinusOne_i8);   // vmovdqa, AVX
-    __m256i t4 = _mm256_set1_epi8(32);//_mm256_load_si256((__m256i *) _ControlMax_i8); // vmovdqa, AVX
-    __m256i m1 = _mm256_cmpeq_epi8(*SIMD_VAR, t1);              // vpcmpeqb, AVX2
-    __m256i m2 = _mm256_cmpeq_epi8(*SIMD_VAR, t2);              // vpcmpeqb, AVX2
+    __m256i t4 = _mm256_set1_epi8(32);             //_mm256_load_si256((__m256i *) _ControlMax_i8); // vmovdqa, AVX
+    __m256i m1 = _mm256_cmpeq_epi8(*SIMD_VAR, t1); // vpcmpeqb, AVX2
+    __m256i m2 = _mm256_cmpeq_epi8(*SIMD_VAR, t2); // vpcmpeqb, AVX2
     // __m256i _1 = _mm256_cmpgt_epi8(*SIMD_VAR, t3);              // u > -1, vpcmpgtb, AVX2
-    __m256i m3 = _mm256_subs_epu8(t4, *SIMD_VAR);              // 32 > u, vpcmpgtb, AVX2
+    __m256i m3 = _mm256_subs_epu8(t4, *SIMD_VAR); // 32 > u, vpcmpgtb, AVX2
     // __m256i m3 = _mm256_and_si256(_1, _2);                      // vpand, AVX2
     __m256i r = _mm256_or_si256(_mm256_or_si256(m1, m2), m3);
     return r;
@@ -368,27 +355,21 @@ force_inline void WRITE_SIMD_IMPL(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR) {
 }
 
 
-
-
-
 #if COMPILE_READ_UCS_LEVEL == 1
 force_inline void WRITE_SIMD_256_WITH_WRITEMASK(_TARGET_TYPE *dst, SIMD_256 y, SIMD_256 mask) {
 #if COMPILE_WRITE_UCS_LEVEL == 4
-// we can use _mm256_maskstore_epi32
-    _mm256_maskstore_epi32((i32*)dst, mask, y);
+    // we can use _mm256_maskstore_epi32
+    _mm256_maskstore_epi32((i32 *) dst, mask, y);
 #else
     // load-then-blend-then-write
     SIMD_256 blend;
     blend = load_256(dst);
     y = _mm256_blendv_epi8(blend, y, mask);
-    _mm256_storeu_si256((__m256i*)dst, y);
+    _mm256_storeu_si256((__m256i *) dst, y);
 #endif
 }
 #endif // COMPILE_READ_UCS_LEVEL == 1
 
-#undef SIMD_EXTRACT_HALF
-#undef SIMD_MASK_EXTRACT_PART
-#undef SIMD_EXTRACT_PART
 #undef WRITE_SIMD_WITH_TAIL_LEN
 #undef WRITE_SIMD_256_WITH_WRITEMASK
 #undef WRITE_SIMD_IMPL
@@ -397,10 +378,6 @@ force_inline void WRITE_SIMD_256_WITH_WRITEMASK(_TARGET_TYPE *dst, SIMD_256 y, S
 #undef CHECK_MASK_ZERO_SMALL
 #undef CHECK_MASK_ZERO
 #undef CHECK_ESCAPE_IMPL_GET_MASK
-// #undef SIMD_SMALL_MASK_TYPE
-// #undef SIMD_MASK_TYPE
-// #undef SIMD_TYPE
-// #undef SIMD_VAR
 #undef CHECK_COUNT_MAX
 #undef _FROM_TYPE
 #undef _TARGET_TYPE

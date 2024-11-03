@@ -10,12 +10,18 @@
 #define SIMD_MASK_TYPE u64
 #define SIMD_SMALL_MASK_TYPE u16
 #define SIMD_HALF_TYPE __m256i
+#define SIMD_EXTRACT_PART _mm512_extracti32x4_epi32
+#define SIMD_MASK_EXTRACT_PART(m, i) (u16)((m >> (i * 16)) & 0xFFFF)
+#define SIMD_EXTRACT_HALF _mm512_extracti32x8_epi32
 #elif SIMD_BIT_SIZE == 256
 #define SIMD_VAR y
 #define SIMD_TYPE __m256i
 #define SIMD_MASK_TYPE SIMD_TYPE
 #define SIMD_SMALL_MASK_TYPE __m128i
 #define SIMD_HALF_TYPE __m128i
+#define SIMD_EXTRACT_PART _mm256_extracti128_si256
+#define SIMD_MASK_EXTRACT_PART SIMD_EXTRACT_PART
+#define SIMD_EXTRACT_HALF SIMD_EXTRACT_PART
 #else
 #define SIMD_VAR x
 #define SIMD_TYPE __m128i
