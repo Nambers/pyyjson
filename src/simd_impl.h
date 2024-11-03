@@ -32,6 +32,10 @@
 /*==============================================================================
  * common SIMD code
  *============================================================================*/
+
+/*
+ * Right shift 128 bits. Shifted bits should be multiple of 8.
+ */
 #define RIGHT_SHIFT_128BITS(x, bits, out_ptr)                  \
     do {                                                       \
         static_assert(((bits) % 8) == 0, "((bits) % 8) == 0"); \
@@ -39,8 +43,8 @@
     } while (0)
 
 /*
- * write memory with length sizeof(SIMD_TYPE) to `dst`.
- * this is unaligned.
+ * Write memory with length sizeof(SIMD_TYPE) to `dst`.
+ * This is unaligned.
  */
 force_inline void write_simd(void *dst, SIMD_TYPE SIMD_VAR) {
 #if SIMD_BIT_SIZE == 512
@@ -88,6 +92,66 @@ force_inline SIMD_128 load_128_aligned(const void *src) {
 force_inline SIMD_128 simd_and_128(SIMD_128 a, SIMD_128 b) {
     return _mm_and_si128(a, b);
 }
+
+force_inline SIMD_128 broadcast_32_128(i32 v) {
+    return _mm_set1_epi32(v);
+}
+
+force_inline SIMD_128 broadcast_64_128(i64 v) {
+    return _mm_set1_epi64((__m64) v);
+}
+
+force_inline SIMD_128 set_32_128(i32 a, i32 b, i32 c, i32 d) {
+    return _mm_set_epi32(a, b, c, d);
+}
+
+force_inline SIMD_128 unpack_hi_64_128(SIMD_128 a, SIMD_128 b) {
+    return _mm_unpackhi_epi64(a, b);
+}
+
+/* Elevate utilities.
+ * See https://github.com/samyvilar/dyn_perf/blob/master/sse2.h
+ */
+force_inline SIMD_128 elevate_1_2_to_128(SIMD_128 a) {
+#if __SSE4_1__
+    return _mm_cvtepu8_epi16(a);
+#elif __SSSE3__
+    return _mm_shuffle_epi8(a, _mm_set_epi8(0x80, 7, 0x80, 6, 0x80, 5, 0x80, 4, 0x80, 3, 0x80, 2, 0x80, 1, 0x80, 0));
+#else
+    return _mm_unpacklo_epi8(a, _mm_setzero_si128()); // ~2 cycles ..
+#endif
+}
+
+force_inline SIMD_128 elevate_1_4_to_128(SIMD_128 a) {
+#if __SSE4_1__
+    return _mm_cvtepu8_epi32(a);
+#elif __SSSE3__
+    return _mm_shuffle_epi8(
+            a,
+            _mm_set_epi8(
+                    0x80, 0x80, 0x80, 3,
+                    0x80, 0x80, 0x80, 2,
+                    0x80, 0x80, 0x80, 1,
+                    0x80, 0x80, 0x80, 0));
+#else
+    a = _mm_unpacklo_epi8(a, a);                         // a0, a0, a1, a1, a2, a2, a3, a3, ....
+    return _mm_srli_epi32(_mm_unpacklo_epi16(a, a), 24); // ~ 3 cycles ...
+#endif
+}
+/*==============================================================================
+ * SSE4.1 only SIMD code
+ *============================================================================*/
+#if __SSE4_1__
+force_inline SIMD_128 blendv_128(SIMD_128 blend, SIMD_128 x, SIMD_128 mask) {
+    return _mm_blendv_epi8(blend, x, mask);
+}
+#endif
+
+/*==============================================================================
+ * SSE4.2 only SIMD code
+ *============================================================================*/
+#if __SSE4_2__
+#endif
 
 /*==============================================================================
  * AVX only SIMD code

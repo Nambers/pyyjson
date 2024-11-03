@@ -128,7 +128,7 @@ force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(StackVars *stack_vars, _F
     while (src < src_end) {
         _TARGET_TYPE srcval = (_TARGET_TYPE) *src;
         usize unicode_point = (usize) srcval;
-        Py_ssize_t copy_count = _ControlJump[unicode_point];
+        Py_ssize_t copy_count = (unicode_point <= _Slash) ? _ControlJump[unicode_point] : 0;
         if (likely(!copy_count)) {
             *writer++ = srcval;
         } else {
@@ -625,7 +625,7 @@ force_inline bool PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, COMPILE_R
     *writer++ = '"';
     *writer++ = ':';
 #if COMPILE_INDENT_LEVEL > 0
-    *_WRITER(vec)++ = ' ';
+    *writer++ = ' ';
 #if SIZEOF_VOID_P == 8 || COMPILE_WRITE_UCS_LEVEL != 4
     *writer = 0;
 #endif // SIZEOF_VOID_P == 8 || COMPILE_WRITE_UCS_LEVEL != 4
