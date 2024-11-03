@@ -72,4 +72,15 @@
 #define PYYJSON_ENCODE_VIEW_DATA_BUFFER_INIT_SIZE ((Py_ssize_t)1 << 14)
 #endif
 
+/*
+ When a character needs escape when encoding,
+ the following `PYYJSON_ENCODE_ESCAPE_ONCE_BYTES`
+ bytes will be processed character by character without using SIMD.
+ Adjust this value if the characters that need to be escaped
+ are centralized in a certain range.
+ */
+#ifndef PYYJSON_ENCODE_ESCAPE_ONCE_BYTES
+#define PYYJSON_ENCODE_ESCAPE_ONCE_BYTES (16)
+#endif
+
 #endif

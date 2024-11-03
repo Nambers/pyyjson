@@ -9,6 +9,7 @@
 #define SIMD_TYPE __m512i
 #define SIMD_MASK_TYPE u64
 #define SIMD_SMALL_MASK_TYPE u16
+#define SIMD_BIT_MASK_TYPE u64
 #define SIMD_HALF_TYPE __m256i
 #define SIMD_EXTRACT_PART _mm512_extracti32x4_epi32
 #define SIMD_MASK_EXTRACT_PART(m, i) (u16)((m >> (i * 16)) & 0xFFFF)
@@ -18,6 +19,7 @@
 #define SIMD_TYPE __m256i
 #define SIMD_MASK_TYPE SIMD_TYPE
 #define SIMD_SMALL_MASK_TYPE __m128i
+#define SIMD_BIT_MASK_TYPE u32
 #define SIMD_HALF_TYPE __m128i
 #define SIMD_EXTRACT_PART _mm256_extracti128_si256
 #define SIMD_MASK_EXTRACT_PART SIMD_EXTRACT_PART
@@ -27,6 +29,7 @@
 #define SIMD_TYPE __m128i
 #define SIMD_MASK_TYPE SIMD_TYPE
 #define SIMD_SMALL_MASK_TYPE SIMD_TYPE
+#define SIMD_BIT_MASK_TYPE u16
 #endif
 
 /*==============================================================================
@@ -193,6 +196,15 @@ force_inline SIMD_256 elevate_2_4_to_256(SIMD_128 x) {
 force_inline SIMD_256 simd_and_256(SIMD_256 a, SIMD_256 b) {
     return _mm256_and_si256(a, b);
 }
+
+force_inline u32 to_bitmask_256(SIMD_256 a) {
+    int t = _mm256_movemask_epi8(a);
+    return (u32) t;
+}
+
+force_inline SIMD_256 cmpeq0_8_256(SIMD_256 a) {
+    return _mm256_cmpeq_epi8(a, _mm256_setzero_si256());
+}
 #endif
 
 /*==============================================================================
@@ -252,5 +264,20 @@ force_inline SIMD_HALF_TYPE load_half(const void *src) {
 }
 
 #endif // defined(SIMD_HALF_TYPE)
+
+/*==============================================================================
+ * TZCNT.
+ *============================================================================*/
+force_noinline u32 tzcnt_u32(u32 x) {
+    // never pass a zero here.
+    assert(x);
+    return _mm_tzcnt_32(x);
+}
+
+force_noinline u64 tzcnt_u64(u64 x) {
+    // never pass a zero here.
+    assert(x);
+    return _mm_tzcnt_64(x);
+}
 
 #endif // ENCODE_SIMD_IMPL_H

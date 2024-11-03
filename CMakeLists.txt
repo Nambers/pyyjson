@@ -171,6 +171,7 @@ elseif (CMAKE_BUILD_TYPE MATCHES ".*Rel.*")
     # message("Release mode, enabling maximal optimization")
     target_compile_options(pyyjson PRIVATE -Werror -pedantic -pedantic-errors)
 else()
+    target_compile_options(pyyjson PRIVATE -O0)
     # message("Debug mode, enabling debug symbols")
 endif ()
 

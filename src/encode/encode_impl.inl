@@ -73,32 +73,34 @@ force_inline void VEC_BACK1(UnicodeVector *vec) {
 #define _PREPARE_UNICODE_WRITE PYYJSON_CONCAT3(prepare_unicode_write, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
 force_inline void _PREPARE_UNICODE_WRITE(PyObject *obj, StackVars *stack_vars, Py_ssize_t *out_len, int *read_kind, int *write_kind) {
-    *out_len = PyUnicode_GET_LENGTH(obj);
-    *read_kind = PyUnicode_KIND(obj);
+    Py_ssize_t out_len_val = PyUnicode_GET_LENGTH(obj);
+    *out_len = out_len_val;
+    int read_kind_val = PyUnicode_KIND(obj);
+    *read_kind = read_kind_val;
 
 #if COMPILE_UCS_LEVEL == 4
     *write_kind = 4;
 #elif COMPILE_UCS_LEVEL == 2
     *write_kind = 2;
-    if (unlikely(*read_kind == 4)) {
+    if (unlikely(read_kind_val == 4)) {
         memorize_ucs2_to_ucs4(stack_vars);
         *write_kind = 4;
     }
 #elif COMPILE_UCS_LEVEL == 1
     *write_kind = 1;
-    if (unlikely(*read_kind == 2)) {
+    if (unlikely(read_kind_val == 2)) {
         memorize_ucs1_to_ucs2(stack_vars);
         *write_kind = 2;
-    } else if (unlikely(*read_kind == 4)) {
+    } else if (unlikely(read_kind_val == 4)) {
         memorize_ucs1_to_ucs4(stack_vars);
         *write_kind = 4;
     }
 #elif COMPILE_UCS_LEVEL == 0
     *write_kind = 0;
-    if (unlikely(*read_kind == 2)) {
+    if (unlikely(read_kind_val == 2)) {
         memorize_ascii_to_ucs2(stack_vars);
         *write_kind = 2;
-    } else if (unlikely(*read_kind == 4)) {
+    } else if (unlikely(read_kind_val == 4)) {
         memorize_ascii_to_ucs4(stack_vars);
         *write_kind = 4;
     } else if (unlikely(!PyUnicode_IS_ASCII(obj))) {

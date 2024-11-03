@@ -2,7 +2,19 @@
 #include "decode/decode.h"
 #include "yyjson.h"
 
+#if defined(_MSC_VER)
+#include <intrin.h>
+#define cpuid(info, x) __cpuidex(info, x, 0)
+#else
+#include <cpuid.h>
+void cpuid(int info[4], int x) {
+    __cpuid_count(x, 0, info[0], info[1], info[2], info[3]);
+}
+#endif
+
 #define MODULE_STATE(o) ((modulestate *) PyModule_GetState(o))
+
+// bool is_lzcnt_supported(void);
 
 PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *pyyjson_Decode(PyObject *self, PyObject *args, PyObject *kwargs);
@@ -12,10 +24,12 @@ PyObject *pyyjson_DecodeFile(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *JSONDecodeError = NULL;
 PyObject *JSONEncodeError = NULL;
 
+// bool lzcnt_supported = 0;
+
 static PyMethodDef pyyjson_Methods[] = {
-        {"encode", (PyCFunction)pyyjson_Encode, METH_VARARGS | METH_KEYWORDS, "Converts arbitrary object recursively into JSON."},
+        {"encode", (PyCFunction) pyyjson_Encode, METH_VARARGS | METH_KEYWORDS, "Converts arbitrary object recursively into JSON."},
         {"decode", (PyCFunction) pyyjson_Decode, METH_VARARGS | METH_KEYWORDS, "Converts JSON as string to dict object structure."},
-        {"dumps", (PyCFunction)pyyjson_Encode, METH_VARARGS | METH_KEYWORDS, "Converts arbitrary object recursively into JSON."},
+        {"dumps", (PyCFunction) pyyjson_Encode, METH_VARARGS | METH_KEYWORDS, "Converts arbitrary object recursively into JSON."},
         {"loads", (PyCFunction) pyyjson_Decode, METH_VARARGS | METH_KEYWORDS, "Converts JSON as string to dict object structure."},
         // {"dump", (PyCFunction)pyyjson_FileEncode, METH_VARARGS | METH_KEYWORDS, "Converts arbitrary object recursively into JSON file. "},
         // {"load", (PyCFunction)pyyjson_DecodeFile, METH_VARARGS | METH_KEYWORDS, "Converts JSON as file to dict object structure."},
@@ -68,7 +82,7 @@ static void module_free(void *m) {
 }
 
 #if PY_MINOR_VERSION >= 13
-void _init_PyNone_Type(PyTypeObject* none_type);
+void _init_PyNone_Type(PyTypeObject *none_type);
 #endif
 
 
@@ -106,6 +120,9 @@ PyMODINIT_FUNC PyInit_pyyjson(void) {
         return NULL;
     }
 
+    // feature checks.
+    // lzcnt_supported = is_lzcnt_supported();
+
     // do pyyjson internal init.
     memset(AssociativeKeyCache, 0, sizeof(AssociativeKeyCache));
 
@@ -134,3 +151,14 @@ PyObject *pyyjson_Decode(PyObject *self, PyObject *args, PyObject *kwargs) {
 
     return root;
 }
+
+/* Runtime check if lzcnt is supported. */
+// bool is_lzcnt_supported(void) {
+//     int info[4];
+//     cpuid(info, 0);
+//     if (info[0] >= 7) {
+//         cpuid(info, 7);
+//         return (info[1] & (1 << 5)) != 0;
+//     }
+//     return false;
+// }

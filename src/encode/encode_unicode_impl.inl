@@ -51,9 +51,9 @@
 // define here
 #define _CONTROL_SEQ_TABLE PYYJSON_CONCAT2(_ControlSeqTable, COMPILE_WRITE_UCS_LEVEL)
 // define here
-#define VECTOR_WRITE_UNICODE_IMPL PYYJSON_CONCAT4(vector_write_unicode_impl, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL, COMPILE_INDENT_LEVEL)
-#define VECTOR_WRITE_UNICODE_TRAILING_IMPL PYYJSON_CONCAT4(vector_write_unicode_trailing_impl, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL, COMPILE_INDENT_LEVEL)
-#define VECTOR_WRITE_ESCAPE_IMPL PYYJSON_CONCAT4(vector_write_escape_impl, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL, COMPILE_INDENT_LEVEL)
+#define VECTOR_WRITE_UNICODE_IMPL PYYJSON_CONCAT4(vector_write_unicode_impl, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
+#define VECTOR_WRITE_UNICODE_TRAILING_IMPL PYYJSON_CONCAT4(vector_write_unicode_trailing_impl, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
+#define VECTOR_WRITE_ESCAPE_IMPL PYYJSON_CONCAT4(vector_write_escape_impl, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define VECTOR_WRITE_INDENT PYYJSON_CONCAT3(vector_write_indent, COMPILE_INDENT_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define MASK_RIGHT_SHIFT PYYJSON_CONCAT2(mask_right_shift, COMPILE_READ_UCS_LEVEL)
 #define SIMD_RIGHT_SHIFT PYYJSON_CONCAT2(simd_right_shift, COMPILE_READ_UCS_LEVEL)
@@ -141,6 +141,7 @@ force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(StackVars *stack_vars, _F
                 memcpy((void *) writer, (const void *) copy_ptr, 2 * sizeof(_TARGET_TYPE));
                 writer += 2;
             } else {
+                assert(6 == copy_count);
                 _WRITER(vec) = writer;
                 vec = VEC_RESERVE(stack_vars, 6 + len + TAIL_PADDING / sizeof(_TARGET_TYPE) + additional_len);
                 RETURN_ON_UNLIKELY_ERR(!vec);
@@ -300,18 +301,18 @@ force_inline void WRITE_SIMD_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR
     Py_ssize_t partlen;
     // 0
     partlen = len - CHECK_COUNT_MAX / 2;
-    partlen = partlen > 0 ? (2 * partlen) : 0;
+    partlen = partlen > 0 ? (partlen) : 0;
     _x = SIMD_EXTRACT_HALF(SIMD_VAR, 0);
     _y = elevate_1_2_to_256(_x);
-    writemask = load_256_aligned(&_MaskTable_16[(usize) (CHECK_COUNT_MAX - partlen)][0]);
+    writemask = load_256_aligned(&_MaskTable_16[(usize) (CHECK_COUNT_MAX / 2 - partlen)][0]);
     write_simd_256_with_writemask_2(dst, _y, writemask);
     // write_simd((void *) dst, _y);
     dst += CHECK_COUNT_MAX / 2;
     // 1
-    partlen = (len < CHECK_COUNT_MAX / 2) ? (2 * len) : CHECK_COUNT_MAX;
+    partlen = (len < CHECK_COUNT_MAX / 2) ? (len) : (CHECK_COUNT_MAX / 2);
     _x = SIMD_EXTRACT_HALF(SIMD_VAR, 1);
     _y = elevate_1_2_to_256(_x);
-    writemask = load_256_aligned(&_MaskTable_16[(usize) (CHECK_COUNT_MAX - partlen)][0]);
+    writemask = load_256_aligned(&_MaskTable_16[(usize) (CHECK_COUNT_MAX / 2 - partlen)][0]);
     write_simd_256_with_writemask_2(dst, _y, writemask);
     // write_simd((void *) dst, _y);
     dst += CHECK_COUNT_MAX / 2;
@@ -477,6 +478,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_IMPL(StackVars *stack_vars, _FR
 #endif
     SIMD_MASK_TYPE mask;
     SIMD_SMALL_MASK_TYPE small_mask;
+    SIMD_BIT_MASK_TYPE bit_mask;
     bool _c;
     while (len >= CHECK_COUNT_MAX) {
         mask = CHECK_ESCAPE_IMPL_GET_MASK(src, &SIMD_VAR);
@@ -487,33 +489,58 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_IMPL(StackVars *stack_vars, _FR
             len -= CHECK_COUNT_MAX;
         } else {
 #if SIMD_BIT_SIZE == 512
+            bit_mask = mask;
+            assert(bit_mask);
+            u64 done_count = tzcnt_u64(bit_mask) / sizeof(_FROM_TYPE);
 #elif SIMD_BIT_SIZE == 256
-            const usize _Loop = SIMD_BIT_SIZE / 128;
-            assert(_Loop > 1);
-            small_mask = SIMD_EXTRACT_PART(mask, 0);
-            if (CHECK_MASK_ZERO_SMALL(small_mask)) {
-                write_128((void *) _WRITER(vec), SIMD_EXTRACT_PART(SIMD_VAR, 0));
-                _WRITER(vec) += CHECK_COUNT_MAX / _Loop;
-            } else {
-                vec = VECTOR_WRITE_ESCAPE_IMPL(stack_vars, src, CHECK_COUNT_MAX / _Loop, len - CHECK_COUNT_MAX / _Loop);
-                RETURN_ON_UNLIKELY_ERR(!vec);
-            }
-            src += CHECK_COUNT_MAX / _Loop;
-            len -= CHECK_COUNT_MAX / _Loop;
-            small_mask = SIMD_EXTRACT_PART(mask, 1);
-            if (CHECK_MASK_ZERO_SMALL(small_mask)) {
-                write_128((void *) _WRITER(vec), SIMD_EXTRACT_PART(SIMD_VAR, 1));
-                _WRITER(vec) += CHECK_COUNT_MAX / _Loop;
-            } else {
-                vec = VECTOR_WRITE_ESCAPE_IMPL(stack_vars, src, CHECK_COUNT_MAX / _Loop, len - CHECK_COUNT_MAX / _Loop);
-                RETURN_ON_UNLIKELY_ERR(!vec);
-            }
-            src += CHECK_COUNT_MAX / _Loop;
-            len -= CHECK_COUNT_MAX / _Loop;
+            // for bit size < 512, we don't have cmp_epu8, the mask is calculated by subs_epu8
+            // so we have to cmpeq with zero to get the real bit mask.
+            mask = cmpeq0_8_256(mask);
+            bit_mask = to_bitmask_256(mask);
+            bit_mask = ~bit_mask;
+            assert(bit_mask);
+            u32 done_count = tzcnt_u32(bit_mask) / sizeof(_FROM_TYPE);
+            // const usize _Loop = SIMD_BIT_SIZE / 128;
+            // assert(_Loop > 1);
+            // small_mask = SIMD_EXTRACT_PART(mask, 0);
+            // if (CHECK_MASK_ZERO_SMALL(small_mask)) {
+            //     write_128((void *) _WRITER(vec), SIMD_EXTRACT_PART(SIMD_VAR, 0));
+            //     _WRITER(vec) += CHECK_COUNT_MAX / _Loop;
+            // } else {
+            //     vec = VECTOR_WRITE_ESCAPE_IMPL(stack_vars, src, CHECK_COUNT_MAX / _Loop, len - CHECK_COUNT_MAX / _Loop);
+            //     RETURN_ON_UNLIKELY_ERR(!vec);
+            // }
+            // src += CHECK_COUNT_MAX / _Loop;
+            // len -= CHECK_COUNT_MAX / _Loop;
+            // small_mask = SIMD_EXTRACT_PART(mask, 1);
+            // if (CHECK_MASK_ZERO_SMALL(small_mask)) {
+            //     write_128((void *) _WRITER(vec), SIMD_EXTRACT_PART(SIMD_VAR, 1));
+            //     _WRITER(vec) += CHECK_COUNT_MAX / _Loop;
+            // } else {
+            //     vec = VECTOR_WRITE_ESCAPE_IMPL(stack_vars, src, CHECK_COUNT_MAX / _Loop, len - CHECK_COUNT_MAX / _Loop);
+            //     RETURN_ON_UNLIKELY_ERR(!vec);
+            // }
+            // src += CHECK_COUNT_MAX / _Loop;
+            // len -= CHECK_COUNT_MAX / _Loop;
 #else
-            vec = VECTOR_WRITE_ESCAPE_IMPL(stack_vars, src, CHECK_COUNT_MAX, len - CHECK_COUNT_MAX);
-            src += CHECK_COUNT_MAX;
+            mask = cmpeq0_8_128(mask);
+            bit_mask = to_bitmask_128(mask);
+            bit_mask = ~bit_mask;
+            assert(bit_mask);
+            u32 done_count = tzcnt_u32((u32) bit_mask) / sizeof(_FROM_TYPE);
+            // vec = VECTOR_WRITE_ESCAPE_IMPL(stack_vars, src, CHECK_COUNT_MAX, len - CHECK_COUNT_MAX);
+            // src += CHECK_COUNT_MAX;
 #endif
+            assert(len >= done_count);
+            len -= done_count;
+            src += done_count;
+            _WRITER(vec) += done_count;
+            Py_ssize_t process_escape_count = PYYJSON_ENCODE_ESCAPE_ONCE_BYTES / sizeof(_FROM_TYPE);
+            process_escape_count = process_escape_count > len ? len : process_escape_count;
+            vec = VECTOR_WRITE_ESCAPE_IMPL(stack_vars, src, process_escape_count, len - process_escape_count);
+            RETURN_ON_UNLIKELY_ERR(!vec);
+            len -= process_escape_count;
+            src += process_escape_count;
         }
     }
     if (!len) goto done;
@@ -604,7 +631,7 @@ force_inline void VECTOR_WRITE_INDENT(StackVars *stack_vars) {
         *writer++ = ' ';
 #endif
     }
-    _WRITER(vec) += COMPILE_INDENT_LEVEL * cur_nested_depth;
+    _WRITER(vec) += COMPILE_INDENT_LEVEL * cur_nested_depth + 1;
 #endif
 }
 #endif // COMPILE_READ_UCS_LEVEL == 1
