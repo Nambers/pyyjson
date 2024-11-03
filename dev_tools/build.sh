@@ -1,8 +1,12 @@
 #!/bin/bash
 
-# TARGET_BUILD_TYPE=Debug
-# TARGET_BUILD_TYPE=Release
-TARGET_BUILD_TYPE=RelWithDebInfo
+if [ $# -eq 0 ]; then
+    cd build
+    cmake --build .
+    exit 0
+fi
+
+TARGET_BUILD_TYPE=$1
 
 CUR_PYVER=$(echo "$(python --version)" | cut -d'.' -f2)
 y=$(cat build/pyver 2>/dev/null)
