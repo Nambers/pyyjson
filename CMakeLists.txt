@@ -203,7 +203,7 @@ else()
 endif()
 
 # TODO remove this
-# target_compile_options(pyyjson PRIVATE -mavx2)
+target_compile_options(pyyjson PRIVATE -msse4.1 -msse4.2)
 
 # ------------------------------------------------------------------------------
 # Install

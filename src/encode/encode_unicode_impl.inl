@@ -430,7 +430,8 @@ force_inline void WRITE_SIMD_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR
 
 force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(_FROM_TYPE *src, Py_ssize_t len, StackVars *stack_vars) {
     UnicodeVector *vec = GET_VEC(stack_vars);
-#if SIMD_BIT_SIZE == 256
+#if SIMD_BIT_SIZE == 512
+#elif SIMD_BIT_SIZE == 256
     __m256i y;
     _FROM_TYPE *load_start = src + len - CHECK_COUNT_MAX;
     _TARGET_TYPE *store_start = _WRITER(vec) + len - CHECK_COUNT_MAX;
@@ -455,8 +456,9 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(_FROM_TYPE *src, 
         vec = VECTOR_WRITE_ESCAPE_IMPL(stack_vars, src, len, 0);
         RETURN_ON_UNLIKELY_ERR(!vec);
     }
-#endif
+#else // SIMD_BIT_SIZE == 128
     // TODO
+#endif
     return vec;
 }
 
@@ -500,32 +502,19 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_IMPL(StackVars *stack_vars, _FR
             bit_mask = ~bit_mask;
             assert(bit_mask);
             u32 done_count = tzcnt_u32(bit_mask) / sizeof(_FROM_TYPE);
-            // const usize _Loop = SIMD_BIT_SIZE / 128;
-            // assert(_Loop > 1);
-            // small_mask = SIMD_EXTRACT_PART(mask, 0);
-            // if (CHECK_MASK_ZERO_SMALL(small_mask)) {
-            //     write_128((void *) _WRITER(vec), SIMD_EXTRACT_PART(SIMD_VAR, 0));
-            //     _WRITER(vec) += CHECK_COUNT_MAX / _Loop;
-            // } else {
-            //     vec = VECTOR_WRITE_ESCAPE_IMPL(stack_vars, src, CHECK_COUNT_MAX / _Loop, len - CHECK_COUNT_MAX / _Loop);
-            //     RETURN_ON_UNLIKELY_ERR(!vec);
-            // }
-            // src += CHECK_COUNT_MAX / _Loop;
-            // len -= CHECK_COUNT_MAX / _Loop;
-            // small_mask = SIMD_EXTRACT_PART(mask, 1);
-            // if (CHECK_MASK_ZERO_SMALL(small_mask)) {
-            //     write_128((void *) _WRITER(vec), SIMD_EXTRACT_PART(SIMD_VAR, 1));
-            //     _WRITER(vec) += CHECK_COUNT_MAX / _Loop;
-            // } else {
-            //     vec = VECTOR_WRITE_ESCAPE_IMPL(stack_vars, src, CHECK_COUNT_MAX / _Loop, len - CHECK_COUNT_MAX / _Loop);
-            //     RETURN_ON_UNLIKELY_ERR(!vec);
-            // }
-            // src += CHECK_COUNT_MAX / _Loop;
-            // len -= CHECK_COUNT_MAX / _Loop;
-#else
+#else // SIMD_BIT_SIZE
+#if COMPILE_READ_UCS_LEVEL != 4
+            // for bit size < 512, we don't have cmp_epu8,
+            // the mask is calculated by subs_epu for ucs < 4
+            // so we have to cmpeq with zero to get the real bit mask.
             mask = cmpeq0_8_128(mask);
             bit_mask = to_bitmask_128(mask);
             bit_mask = ~bit_mask;
+#else
+            // ucs4 does not have subs_epu, so we don't need cmpeq0.
+            // The mask itself is ready for use
+            bit_mask = to_bitmask_128(mask);
+#endif // COMPILE_READ_UCS_LEVEL
             assert(bit_mask);
             u32 done_count = tzcnt_u32((u32) bit_mask) / sizeof(_FROM_TYPE);
             // vec = VECTOR_WRITE_ESCAPE_IMPL(stack_vars, src, CHECK_COUNT_MAX, len - CHECK_COUNT_MAX);

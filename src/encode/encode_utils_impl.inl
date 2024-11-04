@@ -99,7 +99,7 @@ force_inline void _ELEVATE_FROM_U8_NUM_BUFFER(UnicodeVector *vec, u8 *buffer, Py
         write_256((void *) writer, y);
 #else  // SIMD_BIT_SIZE == 128
         _x = PYYJSON_CONCAT3(elevate_1, COMPILE_WRITE_UCS_LEVEL, to_128)(x);
-        write_128((void *) writer, y);
+        write_128((void *) writer, _x);
 #endif // SIMD_BIT_SIZE
         writer += per_write_count;
         buffer += per_write_count;
@@ -143,7 +143,7 @@ force_inline void PYYJSON_CONCAT2(vec_write_f64, COMPILE_WRITE_UCS_LEVEL)(StackV
 #if COMPILE_WRITE_UCS_LEVEL == 1
     u8 *buffer = _WRITER(vec);
 #else
-    u8 _buffer[32];
+    u8 _buffer[64];
     u8 *buffer = _buffer;
 #endif
     u8 *buffer_end = write_f64_raw(buffer, val_u64_repr);

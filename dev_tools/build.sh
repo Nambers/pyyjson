@@ -1,6 +1,7 @@
 #!/bin/bash
 
 if [ $# -eq 0 ]; then
+    set -e
     cd build
     cmake --build .
     exit 0

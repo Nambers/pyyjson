@@ -96,6 +96,14 @@ force_inline SIMD_128 simd_and_128(SIMD_128 a, SIMD_128 b) {
     return _mm_and_si128(a, b);
 }
 
+force_inline SIMD_128 simd_or_128(SIMD_128 a, SIMD_128 b) {
+    return _mm_or_si128(a, b);
+}
+
+force_inline SIMD_128 cmpgt_i32_128(SIMD_128 a, SIMD_128 b) {
+    return _mm_cmpgt_epi32(a, b);
+}
+
 force_inline SIMD_128 broadcast_32_128(i32 v) {
     return _mm_set1_epi32(v);
 }
@@ -110,6 +118,30 @@ force_inline SIMD_128 set_32_128(i32 a, i32 b, i32 c, i32 d) {
 
 force_inline SIMD_128 unpack_hi_64_128(SIMD_128 a, SIMD_128 b) {
     return _mm_unpackhi_epi64(a, b);
+}
+
+force_inline SIMD_128 cmpeq0_8_128(SIMD_128 a) {
+    return _mm_cmpeq_epi8(a, _mm_setzero_si128());
+}
+
+force_inline u16 to_bitmask_128(SIMD_128 a) {
+    return (u16) _mm_movemask_epi8(a);
+}
+
+force_inline SIMD_128 cmpeq_8_128(SIMD_128 a, SIMD_128 b) {
+    return _mm_cmpeq_epi8(a, b);
+}
+
+force_inline SIMD_128 cmpeq_16_128(SIMD_128 a, SIMD_128 b) {
+    return _mm_cmpeq_epi16(a, b);
+}
+
+force_inline SIMD_128 cmpeq_32_128(SIMD_128 a, SIMD_128 b) {
+    return _mm_cmpeq_epi32(a, b);
+}
+
+force_inline SIMD_128 satureate_minus_128(SIMD_128 a, SIMD_128 b) {
+    return _mm_subs_epu8(a, b);
 }
 
 /* Elevate utilities.
@@ -141,6 +173,24 @@ force_inline SIMD_128 elevate_1_4_to_128(SIMD_128 a) {
     return _mm_srli_epi32(_mm_unpacklo_epi16(a, a), 24); // ~ 3 cycles ...
 #endif
 }
+
+force_inline SIMD_128 elevate_2_4_to_128(SIMD_128 a) {
+
+#if defined(__SSE4_1__)
+    return _mm_cvtepu16_epi32(a);
+#elif defined(__SSSE3__)
+    return _mm_shuffle_epi8(
+            a,
+            _mm_set_epi8(
+                    0x80, 0x80, 7, 6,
+                    0x80, 0x80, 5, 4,
+                    0x80, 0x80, 3, 2,
+                    0x80, 0x80, 1, 0));
+#else
+    return _mm_unpacklo_epi16(a, _mm_setzero_si128());
+#endif
+}
+
 /*==============================================================================
  * SSE4.1 only SIMD code
  *============================================================================*/

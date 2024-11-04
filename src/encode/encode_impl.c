@@ -468,6 +468,7 @@ elevate_both_not_aligned:;
 #endif
 }
 
+#if SIMD_BIT_SIZE > 128
 force_inline void _long_back_elevate_2_4_loop_impl(u16 *read_start, u16 *read_end, u32 *write_end, Py_ssize_t read_once_count, SIMD_HALF_TYPE (*load_interface)(const void *), void (*write_interface)(void *, SIMD_TYPE)) {
     read_end -= read_once_count;
     write_end -= read_once_count;
@@ -481,6 +482,7 @@ force_inline void _long_back_elevate_2_4_loop_impl(u16 *read_start, u16 *read_en
         write_end -= read_once_count;
     }
 }
+#endif // SIMD_BIT_SIZE > 128
 
 force_inline void long_back_elevate_2_4(u32 *write_start, u16 *read_start, Py_ssize_t len) {
     // TODO
