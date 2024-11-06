@@ -1,19 +1,40 @@
-{ pkgs ? import <nixpkgs> { } }:
+{
+  pkgs ? import <nixpkgs> { },
+}:
 let
-  using_pythons_map = py:
+  using_pythons_map =
+    py:
     let
-      x = ((pkgs.enableDebugging py).override {
-        self = x;
-      });
+      x = (
+        (pkgs.enableDebugging py).override {
+          self = x;
+          packageOverrides = (
+            self: super:
+            if !py.isPy39 then
+              { }
+            else
+              {
+                setuptools = super.setuptools.overridePythonAttrs (superAttr: {
+                  patches = superAttr.patches ++ [
+                    ./fix.patch
+                  ];
+                });
+              }
+          );
+        }
+      );
     in
     x;
-  using_pythons = builtins.map using_pythons_map (with pkgs;[
-    python39
-    python310
-    python311
-    python312
-    python313
-  ]);
+  using_pythons = builtins.map using_pythons_map (
+    with pkgs;
+    [
+      python39
+      python310
+      python311
+      python312
+      python313
+    ]
+  );
   # import required python packages
   required_python_packages = import ./py_requirements.nix;
   pyenvs_map = py: (py.withPackages required_python_packages);
@@ -21,7 +42,7 @@ let
   #
   nix_pyenv_directory = ".nix-pyenv";
   # define version
-  use_minor_ver = 12;
+  use_minor_ver = 9;
   using_python = builtins.elemAt using_pythons (use_minor_ver - 9);
   pyenv = builtins.elemAt pyenvs (use_minor_ver - 9);
   path_concate = x: builtins.toString "${x}";
@@ -30,17 +51,21 @@ in
 pkgs.mkShell {
   # this defines the order in PATH.
   # make sure pyenv selected by use_minor_ver is the first one
-  packages = [ pyenv ] ++ (with pkgs;[
-    cmake
-    gdb
-    valgrind
-    clang
-    gcc
-    python-launcher # use python-launcher to use other versions
-  ]) ++ pyenvs;
+  packages =
+    [ pyenv ]
+    ++ (with pkgs; [
+      cmake
+      gdb
+      valgrind
+      clang
+      gcc
+      python-launcher # use python-launcher to use other versions
+    ])
+    ++ pyenvs;
   shellHook = ''
     _SOURCE_ROOT=$(readlink -f ${builtins.toString ./.}/..)
     if [[ $_SOURCE_ROOT == /nix/store* ]]; then
+        IN_FLAKE=true
         _SOURCE_ROOT=$(readlink -f .)
     fi
     cd $_SOURCE_ROOT
@@ -93,7 +118,10 @@ pkgs.mkShell {
     else
         TEMP_NIX_BUILD_COMMAND=/run/current-system/sw/bin/nix-build
     fi
-    $TEMP_NIX_BUILD_COMMAND shell.nix -A inputDerivation -o ${nix_pyenv_directory}/.nix-shell-inputs
+
+    if [[ -z "$IN_FLAKE" ]]; then
+        $TEMP_NIX_BUILD_COMMAND shell.nix -A inputDerivation -o ${nix_pyenv_directory}/.nix-shell-inputs
+    fi
     unset TEMP_NIX_BUILD_COMMAND
 
     # custom
@@ -112,7 +140,11 @@ pkgs.mkShell {
     fi
     if [[ ! -d orjson ]]; then
         # this is a directory, not a tarball
-        _ORJSON_SOURCE=${(builtins.elemAt(builtins.filter (x: x.pname == "orjson") (required_python_packages using_python.pkgs)) 0).src}
+        _ORJSON_SOURCE=${
+          (builtins.elemAt (builtins.filter (x: x.pname == "orjson") (
+            required_python_packages using_python.pkgs
+          )) 0).src
+        }
         cp -r $_ORJSON_SOURCE orjson
         chmod -R 700 orjson
         echo "orjson source copied: $_ORJSON_SOURCE"

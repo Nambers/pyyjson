@@ -36,7 +36,7 @@ jobs:
     - name: Nix flake update
       run: |
         nix flake update --commit-lock-file
-    - name: Nix flake check
+    - name: Nix develop check
       run: |
         nix develop --command echo DONE
         nix flake check

@@ -43,22 +43,21 @@ with pypkgs;
         [ cffi ]
         ++ (with pkgs.rustPlatform; [
           cargoSetupHook
-          (pypkgs.callPackage
-            ({ pkgsHostTarget }:
-              pkgs.makeSetupHook
-                {
-                  name = "maturin-build-hook.sh";
-                  propagatedBuildInputs = [
-                    pkgsHostTarget.maturin
-                    pkgsHostTarget.cargo
-                    pkgsHostTarget.rustc
-                    pypkgs.wrapPython
-                  ];
-                  substitutions = {
-                    inherit (pkgs.rust.envVars) rustTargetPlatformSpec setEnv;
-                  };
-                } ./maturin-build-hook.sh)
-            { })
+          (pypkgs.callPackage (
+            { pkgsHostTarget }:
+            pkgs.makeSetupHook {
+              name = "maturin-build-hook.sh";
+              propagatedBuildInputs = [
+                pkgsHostTarget.maturin
+                pkgsHostTarget.cargo
+                pkgsHostTarget.rustc
+                pypkgs.wrapPython
+              ];
+              substitutions = {
+                inherit (pkgs.rust.envVars) rustTargetPlatformSpec setEnv;
+              };
+            } ./maturin-build-hook.sh
+          ) { })
         ]);
 
       buildInputs = lib.optionals stdenv.isDarwin [ libiconv ];
@@ -89,7 +88,5 @@ with pypkgs;
       };
     })
   )
-] ++
-(with pypkgs;
-(lib.optional (minorVer < 13) objgraph)
-)
+]
+++ (with pypkgs; (lib.optional (minorVer < 13) objgraph))
