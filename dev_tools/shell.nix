@@ -113,16 +113,25 @@ pkgs.mkShell {
     # export PATH=${using_python}/bin:${nix_pyenv_directory}/bin:$PATH
     export PATH=${nix_pyenv_directory}/bin:$PATH
     # prevent gc
-    if command -v nix-build > /dev/null 2>&1; then
-        TEMP_NIX_BUILD_COMMAND=nix-build
-    else
-        TEMP_NIX_BUILD_COMMAND=/run/current-system/sw/bin/nix-build
-    fi
+
 
     if [[ -z "$IN_FLAKE" ]]; then
+        if command -v nix-build > /dev/null 2>&1; then
+            TEMP_NIX_BUILD_COMMAND=nix-build
+        else
+            TEMP_NIX_BUILD_COMMAND=/run/current-system/sw/bin/nix-build
+        fi
         $TEMP_NIX_BUILD_COMMAND shell.nix -A inputDerivation -o ${nix_pyenv_directory}/.nix-shell-inputs
+        unset TEMP_NIX_BUILD_COMMAND
+    else
+        if command -v nix > /dev/null 2>&1; then
+            TEMP_NIX_COMMAND=nix
+        else
+            TEMP_NIX_COMMAND=/run/current-system/sw/bin/nix-build
+        fi
+        $TEMP_NIX_COMMAND build .#default.inputDerivation -o ${nix_pyenv_directory}/.nix-shell-inputs
+        unset TEMP_NIX_COMMAND
     fi
-    unset TEMP_NIX_BUILD_COMMAND
 
     # custom
     ensure_symlink "${nix_pyenv_directory}/bin/valgrind" ${pkgs.valgrind}/bin/valgrind
