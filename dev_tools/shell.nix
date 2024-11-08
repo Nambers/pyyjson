@@ -112,9 +112,8 @@ pkgs.mkShell {
     ensure_symlink "${nix_pyenv_directory}/bin/python" ${pyenv}/bin/python
     # export PATH=${using_python}/bin:${nix_pyenv_directory}/bin:$PATH
     export PATH=${nix_pyenv_directory}/bin:$PATH
+
     # prevent gc
-
-
     if [[ -z "$IN_FLAKE" ]]; then
         if command -v nix-build > /dev/null 2>&1; then
             TEMP_NIX_BUILD_COMMAND=nix-build
