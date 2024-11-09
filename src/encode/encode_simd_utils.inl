@@ -43,23 +43,6 @@
 
 #define CHECK_COUNT_MAX (SIMD_BIT_SIZE / 8 / sizeof(_FROM_TYPE))
 
-// #if SIMD_BIT_SIZE == 512
-// #define SIMD_VAR z
-// #define SIMD_TYPE __m512i
-// #define SIMD_MASK_TYPE u64
-// #define SIMD_SMALL_MASK_TYPE u16
-// #elif SIMD_BIT_SIZE == 256
-// #define SIMD_VAR y
-// #define SIMD_TYPE __m256i
-// #define SIMD_MASK_TYPE SIMD_TYPE
-// #define SIMD_SMALL_MASK_TYPE __m128i
-// #else
-// #define SIMD_VAR x
-// #define SIMD_TYPE __m128i
-// #define SIMD_MASK_TYPE SIMD_TYPE
-// #define SIMD_SMALL_MASK_TYPE SIMD_TYPE
-// #endif
-
 // read only
 #define CHECK_ESCAPE_IMPL_GET_MASK PYYJSON_CONCAT2(check_escape_impl_get_mask, COMPILE_READ_UCS_LEVEL)
 #define CHECK_MASK_ZERO PYYJSON_CONCAT2(check_mask_zero, COMPILE_READ_UCS_LEVEL)
@@ -200,11 +183,6 @@ force_inline CHECK_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(_FROM_TYPE *restrict src
 #endif
 }
 #endif // COMPILE_WRITE_UCS_LEVEL == 1
-
-// #if COMPILE_WRITE_UCS_LEVEL == 1
-// force_inline SIMD_MASK_TYPE MASKTAIL(usize len) {
-// }
-// #endif // COMPILE_WRITE_UCS_LEVEL == 1
 
 #if COMPILE_WRITE_UCS_LEVEL == 4
 force_inline bool CHECK_MASK_ZERO(CHECK_MASK_TYPE SIMD_VAR) {
