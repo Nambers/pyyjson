@@ -1,5 +1,4 @@
 pypkgs:
-
 let
   pkgs = pypkgs.pkgs;
   lib = pkgs.lib;
@@ -7,15 +6,19 @@ let
 in
 with pypkgs;
 [
-  pip
-  pytest
-  # needed by tests
-  arrow
   psutil
-  pytest-random-order
-  pytest-xdist
   pytz
-  # add packages here
+]
+++ (
+  with pypkgs; # needed by tests
+  (lib.optionals (minorVer < 14) [
+    pytest
+    arrow
+    pytest-random-order
+    pytest-xdist
+  ])
+)
+++ (lib.optionals (minorVer < 14) [
   (
     (pypkgs.buildPythonPackage rec {
       pname = "orjson";
@@ -88,5 +91,5 @@ with pypkgs;
       };
     })
   )
-]
-++ (with pypkgs; (lib.optional (minorVer < 13) objgraph))
+])
+++ (with pypkgs; (lib.optionals (minorVer < 13) [ objgraph ]))
