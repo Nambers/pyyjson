@@ -199,7 +199,16 @@ force_inline void _long_back_elevate_1_2_loop_impl(u8 *read_start, u8 *read_end,
         write_end -= read_once_count;
     }
 }
-#endif
+#else
+force_inline void _long_back_elevate_1_2_small_tail_1(u8**read_end_addr, u16**write_end_addr){
+    SIMD_128 x_read, elevated;
+    *read_end_addr -= 8;
+    *write_end_addr -= 8;
+    x_read = broadcast_64_128(*(i64 *) *read_end_addr);
+    elevated = elevate_1_2_to_128(x_read);
+    write_128((void *) *write_end_addr, elevated);
+}
+#endif // SIMD_BIT_SIZE
 
 force_inline void long_back_elevate_1_2(u16 *write_start, u8 *read_start, Py_ssize_t len) {
     // only 128 -> 256 and 256 -> 512 should consider aligness.
@@ -259,7 +268,35 @@ elevate_both_not_aligned:;
     _long_back_elevate_1_2_loop_impl(read_start, read_end, write_end, read_once_count, load_half, write_simd);
     return;
 #else // SIMD_BIT_SIZE == 128
-// TODO
+
+    SIMD_128 x_read;
+    SIMD_128 x;
+    // 16 bytes as a block.
+    Py_ssize_t tail_len = len & (Py_ssize_t) 15;
+    if (tail_len) {
+        usize tail_parts = (usize) tail_len >> 3;
+        usize small_tail_len = (usize) tail_len & 7;
+        for (usize i = 0; i < small_tail_len; ++i) {
+            *--write_end = *--read_end;
+        }
+        if (tail_parts) {
+            // 64 -> 128.
+            _long_back_elevate_1_2_small_tail_1(&read_end, &write_end);
+        }
+        len &= ~(Py_ssize_t) 15;
+    }
+    read_end -= 16;
+    write_end -= 16;
+    while (read_end >= read_start) {
+        x_read = load_128((const void *) read_end);
+        x = elevate_1_2_to_128(x_read);
+        write_128((void *) write_end, x);
+        x_read = unpack_hi_64_128(x_read, x_read);
+        x = elevate_1_2_to_128(x_read);
+        write_128((void *) (write_end + 8), x);
+        read_end -= 16;
+        write_end -= 16;
+    }
 #endif
 }
 
@@ -464,6 +501,8 @@ elevate_both_not_aligned:;
         SIMD_VAR = elevate_1_4_to_128(x_read);
         write_128((void *) (write_end + 12), SIMD_VAR);
 #endif
+        read_end -= 16;
+        write_end -= 16;
     }
 #endif
 }
