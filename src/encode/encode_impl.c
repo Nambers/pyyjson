@@ -228,7 +228,7 @@ force_inline void long_back_elevate_1_2(u16 *write_start, u8 *read_start, Py_ssi
         y = elevate_1_2_to_256(x);
         mask = load_256_aligned((const void *) &_MaskTable_16[read_once_count - tail_len][0]);
         blend = load_256((const void *) write_tail_start);
-        y = blendv(blend, y, mask);
+        y = blendv_256(blend, y, mask);
         write_256((void *) write_tail_start, y);
 #else
         // 512, use mask_storeu.
@@ -542,7 +542,7 @@ force_inline void long_back_elevate_2_4(u32 *write_start, u16 *read_start, Py_ss
         y = elevate_2_4_to_256(x);
         mask = load_256_aligned((const void *) &_MaskTable_32[read_once_count - tail_len][0]);
         blend = load_256((const void *) write_tail_start);
-        y = blendv(blend, y, mask);
+        y = blendv_256(blend, y, mask);
         write_256((void *) write_tail_start, y);
 #else
         // 512, use mask_storeu.

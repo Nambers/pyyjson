@@ -473,12 +473,17 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(_FROM_TYPE *src, 
     check_mask = simd_and_128(check_mask, mask);
     if (likely(CHECK_MASK_ZERO(check_mask))) {
 #if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
-        x = blendv(load_128((const void *) store_start), x, mask);
+#if __SSE4_1__
+        x = blendv_128(load_128((const void *) store_start), x, mask);
         write_128((void *) store_start, x);
-#else
-        x = runtime_right_shift_128bits(x, (int)(CHECK_COUNT_MAX - len));
+#else  // < __SSE4_1__
+        x = runtime_right_shift_128bits(x, COMPILE_READ_UCS_LEVEL * (int) (CHECK_COUNT_MAX - len));
+        write_128(_WRITER(vec), x);
+#endif // __SSE4_1__
+#else  // COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
+        x = runtime_right_shift_128bits(x, COMPILE_READ_UCS_LEVEL * (int) (CHECK_COUNT_MAX - len));
         WRITE_SIMD_IMPL(_WRITER(vec), x);
-#endif
+#endif // COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
         _WRITER(vec) += len;
     } else {
         vec = VECTOR_WRITE_ESCAPE_IMPL(stack_vars, src, len, 0);

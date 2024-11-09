@@ -330,6 +330,10 @@ force_inline u32 to_bitmask_256(SIMD_256 a) {
 force_inline SIMD_256 cmpeq0_8_256(SIMD_256 a) {
     return _mm256_cmpeq_epi8(a, _mm256_setzero_si256());
 }
+
+force_inline SIMD_256 blendv_256(SIMD_256 blend, SIMD_256 SIMD_VAR, SIMD_256 mask) {
+    return _mm256_blendv_epi8(blend, SIMD_VAR, mask);
+}
 #endif
 
 /*==============================================================================
@@ -350,20 +354,6 @@ force_inline void write_512(void *dst, SIMD_512 z) {
 
 force_inline void write_512_aligned(void *dst, SIMD_512 z) {
     _mm512_store_si512(dst, z);
-}
-#endif
-
-/*==============================================================================
- * blendv
- * This does not have AVX512 version.
- *============================================================================*/
-#if SIMD_BIT_SIZE != 512
-force_inline SIMD_TYPE blendv(SIMD_TYPE blend, SIMD_TYPE SIMD_VAR, SIMD_MASK_TYPE mask) {
-#if SIMD_BIT_SIZE == 256
-    return _mm256_blendv_epi8(blend, SIMD_VAR, mask);
-#elif SIMD_BIT_SIZE == 128
-    return _mm_blendv_epi8(blend, SIMD_VAR, mask);
-#endif
 }
 #endif
 
