@@ -122,10 +122,10 @@ static _TARGET_TYPE _CONTROL_SEQ_TABLE[(_Slash + 1) * 8] = {
 #endif
 
 
-force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(StackVars *stack_vars, _FROM_TYPE *src, Py_ssize_t len, Py_ssize_t additional_len) {
+force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(StackVars *stack_vars, const _FROM_TYPE *src, Py_ssize_t len, Py_ssize_t additional_len) {
     UnicodeVector *vec = GET_VEC(stack_vars);
     _TARGET_TYPE *writer = _WRITER(vec);
-    _FROM_TYPE *src_end = src + len;
+    const _FROM_TYPE *src_end = src + len;
     while (src < src_end) {
         _TARGET_TYPE srcval = (_TARGET_TYPE) *src;
         usize unicode_point = (usize) srcval;
@@ -407,7 +407,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
 #undef _MASK_STOREU
 #elif SIMD_BIT_SIZE == 256
     __m256i y;
-    _FROM_TYPE *load_start = src + len - CHECK_COUNT_MAX;
+    const _FROM_TYPE *load_start = src + len - CHECK_COUNT_MAX;
     _TARGET_TYPE *store_start = _WRITER(vec) + len - CHECK_COUNT_MAX;
     __m256i mask, check_mask;
 #if COMPILE_READ_UCS_LEVEL == 1
@@ -434,7 +434,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
     // TODO
     assert(len < CHECK_COUNT_MAX);
     SIMD_128 x, mask, check_mask;
-    _FROM_TYPE *load_start = src + len - CHECK_COUNT_MAX;
+    const _FROM_TYPE *load_start = src + len - CHECK_COUNT_MAX;
     _TARGET_TYPE *store_start = _WRITER(vec) + len - CHECK_COUNT_MAX;
 #if COMPILE_READ_UCS_LEVEL == 1
     mask = load_128_aligned((const void *) &_MaskTable_8[(usize) (CHECK_COUNT_MAX - len)][0]);

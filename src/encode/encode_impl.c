@@ -186,7 +186,7 @@ force_inline void memorize_ucs2_to_ucs4(StackVars *stack_vars) {
 }
 
 #if SIMD_BIT_SIZE > 128
-force_inline void _long_back_elevate_1_2_loop_impl(u8 *read_start, u8 *read_end, u16 *write_end, Py_ssize_t read_once_count, SIMD_HALF_TYPE (*load_interface)(const void *), void (*write_interface)(void *, SIMD_TYPE)) {
+force_inline void _long_back_elevate_1_2_loop_impl(u8 *restrict read_start, u8 *restrict read_end, u16 *restrict write_end, Py_ssize_t read_once_count, SIMD_HALF_TYPE (*load_interface)(const void *), void (*write_interface)(void *, SIMD_TYPE)) {
     read_end -= read_once_count;
     write_end -= read_once_count;
     while (read_end >= read_start) {
@@ -200,7 +200,7 @@ force_inline void _long_back_elevate_1_2_loop_impl(u8 *read_start, u8 *read_end,
     }
 }
 #else
-force_inline void _long_back_elevate_1_2_small_tail_1(u8**read_end_addr, u16**write_end_addr){
+force_inline void _long_back_elevate_1_2_small_tail_1(u8 **read_end_addr, u16 **write_end_addr) {
     SIMD_128 x_read, elevated;
     *read_end_addr -= 8;
     *write_end_addr -= 8;
@@ -210,7 +210,7 @@ force_inline void _long_back_elevate_1_2_small_tail_1(u8**read_end_addr, u16**wr
 }
 #endif // SIMD_BIT_SIZE
 
-force_inline void long_back_elevate_1_2(u16 *write_start, u8 *read_start, Py_ssize_t len) {
+force_inline void long_back_elevate_1_2(u16 *restrict write_start, u8 *restrict read_start, Py_ssize_t len) {
     // only 128 -> 256 and 256 -> 512 should consider aligness.
     // 64(128) -> 128 cannot be aligned anyway.
     u8 *read_end = read_start + len;
@@ -302,7 +302,7 @@ elevate_both_not_aligned:;
 
 // long_back_elevate_1_4 tool
 #if SIMD_BIT_SIZE == 512
-force_inline void _long_back_elevate_1_4_loop_impl(u8 *read_start, u8 *read_end, u32 *write_end, Py_ssize_t read_once_count, SIMD_128 (*load_interface)(const void *), void (*write_interface)(void *, SIMD_TYPE)) {
+force_inline void _long_back_elevate_1_4_loop_impl(u8 *restrict read_start, u8 *restrict read_end, u32 *restrict write_end, Py_ssize_t read_once_count, SIMD_128 (*load_interface)(const void *), void (*write_interface)(void *, SIMD_TYPE)) {
     SIMD_128 small;
     SIMD_512 full;
     read_end -= read_once_count;
@@ -317,7 +317,7 @@ force_inline void _long_back_elevate_1_4_loop_impl(u8 *read_start, u8 *read_end,
 }
 #endif
 
-force_inline void _long_back_elevate_1_4_small_tail_1(u8 **read_end_addr, u32 **write_end_addr) {
+force_inline void _long_back_elevate_1_4_small_tail_1(u8 **restrict read_end_addr, u32 **restrict write_end_addr) {
     SIMD_128 x_read, elevated;
     *read_end_addr -= 4;
     *write_end_addr -= 4;
@@ -326,7 +326,7 @@ force_inline void _long_back_elevate_1_4_small_tail_1(u8 **read_end_addr, u32 **
     write_128((void *) *write_end_addr, elevated);
 }
 
-force_inline void _long_back_elevate_1_4_small_tail_2(u8 **read_end_addr, u32 **write_end_addr) {
+force_inline void _long_back_elevate_1_4_small_tail_2(u8 **restrict read_end_addr, u32 **restrict write_end_addr) {
 #if SIMD_BIT_SIZE == 256
     // 64 -> 256.
     SIMD_128 x_read;
@@ -351,7 +351,7 @@ force_inline void _long_back_elevate_1_4_small_tail_2(u8 **read_end_addr, u32 **
 #endif
 }
 
-force_inline void long_back_elevate_1_4(u32 *write_start, u8 *read_start, Py_ssize_t len) {
+force_inline void long_back_elevate_1_4(u32 *restrict write_start, u8 *restrict read_start, Py_ssize_t len) {
     // only 128 -> 512 should consider aligness.
     // 32/64(128) -> 128/256 cannot be aligned anyway.
     u8 *read_end = read_start + len;
@@ -508,7 +508,7 @@ elevate_both_not_aligned:;
 }
 
 #if SIMD_BIT_SIZE > 128
-force_inline void _long_back_elevate_2_4_loop_impl(u16 *read_start, u16 *read_end, u32 *write_end, Py_ssize_t read_once_count, SIMD_HALF_TYPE (*load_interface)(const void *), void (*write_interface)(void *, SIMD_TYPE)) {
+force_inline void _long_back_elevate_2_4_loop_impl(u16 *restrict read_start, u16 *restrict read_end, u32 *restrict write_end, Py_ssize_t read_once_count, SIMD_HALF_TYPE (*load_interface)(const void *), void (*write_interface)(void *, SIMD_TYPE)) {
     read_end -= read_once_count;
     write_end -= read_once_count;
     while (read_end >= read_start) {
@@ -523,7 +523,7 @@ force_inline void _long_back_elevate_2_4_loop_impl(u16 *read_start, u16 *read_en
 }
 #endif // SIMD_BIT_SIZE > 128
 
-force_inline void long_back_elevate_2_4(u32 *write_start, u16 *read_start, Py_ssize_t len) {
+force_inline void long_back_elevate_2_4(u32 *restrict write_start, u16 *restrict read_start, Py_ssize_t len) {
     // TODO
     // only 128 -> 256 and 256 -> 512 should consider aligness.
     // 64(128) -> 128 cannot be aligned anyway.

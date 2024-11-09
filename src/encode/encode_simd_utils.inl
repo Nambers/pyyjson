@@ -73,7 +73,7 @@ force_inline bool CHECK_MASK_ZERO_SMALL(SIMD_SMALL_MASK_TYPE small_mask) {
 #endif // COMPILE_WRITE_UCS_LEVEL == 1
 
 #if COMPILE_WRITE_UCS_LEVEL == 4
-force_inline CHECK_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(_FROM_TYPE *restrict src, SIMD_TYPE *restrict SIMD_VAR) {
+force_inline CHECK_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restrict src, SIMD_TYPE *restrict SIMD_VAR) {
 #if COMPILE_READ_UCS_LEVEL == 1
 #if SIMD_BIT_SIZE == 512
     *SIMD_VAR = load_512((const void *) src);
