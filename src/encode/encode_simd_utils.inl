@@ -397,7 +397,7 @@ force_inline void WRITE_SIMD_256_WITH_WRITEMASK(_TARGET_TYPE *dst, SIMD_256 y, S
     _mm256_storeu_si256((__m256i *) dst, y);
 #endif
 #endif // SIMD_BIT_SIZE == 256
-    // TODO
+    assert(false);
 }
 #endif // COMPILE_READ_UCS_LEVEL == 1
 

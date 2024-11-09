@@ -267,13 +267,13 @@ force_inline void WRITE_SIMD_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR
     // __m128i _x;
     // // 0
     // _x = elevate_2_4_to_128(SIMD_VAR);
-    // write_simd((void *) dst, _x);
-    // dst += CHECK_COUNT_MAX / 2;
-    // // 1
-    // RIGHT_SHIFT_128BITS(SIMD_VAR, 64, &SIMD_VAR);
-    // _x = elevate_2_4_to_128(SIMD_VAR);
-    // write_simd((void *) dst, _x);
-    // dst += CHECK_COUNT_MAX / 2;
+// write_simd((void *) dst, _x);
+// dst += CHECK_COUNT_MAX / 2;
+// // 1
+// RIGHT_SHIFT_128BITS(SIMD_VAR, 64, &SIMD_VAR);
+// _x = elevate_2_4_to_128(SIMD_VAR);
+// write_simd((void *) dst, _x);
+// dst += CHECK_COUNT_MAX / 2;
 #endif // SIMD_BIT_SIZE
 #else  // COMPILE_READ_UCS_LEVEL == 1
 #if COMPILE_WRITE_UCS_LEVEL == 2
@@ -458,6 +458,32 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(_FROM_TYPE *src, 
     }
 #else // SIMD_BIT_SIZE == 128
     // TODO
+    assert(len < CHECK_COUNT_MAX);
+    SIMD_128 x, mask, check_mask;
+    _FROM_TYPE *load_start = src + len - CHECK_COUNT_MAX;
+    _TARGET_TYPE *store_start = _WRITER(vec) + len - CHECK_COUNT_MAX;
+#if COMPILE_READ_UCS_LEVEL == 1
+    mask = load_128_aligned((const void *) &_MaskTable_8[(usize) (CHECK_COUNT_MAX - len)][0]);
+#elif COMPILE_READ_UCS_LEVEL == 2
+    mask = load_128_aligned((const void *) &_MaskTable_16[(usize) (CHECK_COUNT_MAX - len)][0]);
+#else
+    mask = load_128_aligned((const void *) &_MaskTable_32[(usize) (CHECK_COUNT_MAX - len)][0]);
+#endif
+    check_mask = CHECK_ESCAPE_IMPL_GET_MASK(load_start, &x);
+    check_mask = simd_and_128(check_mask, mask);
+    if (likely(CHECK_MASK_ZERO(check_mask))) {
+#if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
+        x = blendv(load_128((const void *) store_start), x, mask);
+        write_128((void *) store_start, x);
+#else
+        x = runtime_right_shift_128bits(x, (int)(CHECK_COUNT_MAX - len));
+        WRITE_SIMD_IMPL(_WRITER(vec), x);
+#endif
+        _WRITER(vec) += len;
+    } else {
+        vec = VECTOR_WRITE_ESCAPE_IMPL(stack_vars, src, len, 0);
+        RETURN_ON_UNLIKELY_ERR(!vec);
+    }
 #endif
     return vec;
 }

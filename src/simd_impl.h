@@ -60,6 +60,81 @@ force_inline void write_simd(void *dst, SIMD_TYPE SIMD_VAR) {
 }
 
 /*
+ * Right shift 128 bits for the case imm8 cannot be determined at compile time.
+ Shifted bits should be multiple of 8; imm8 is the number of "bytes" to shift.
+ */
+force_inline SIMD_128 runtime_right_shift_128bits(SIMD_128 x, int imm8) {
+    switch (imm8) {
+        case 1: {
+            return _mm_bsrli_si128(x, 1);
+            break;
+        }
+        case 2: {
+            return _mm_bsrli_si128(x, 2);
+            break;
+        }
+        case 3: {
+            return _mm_bsrli_si128(x, 3);
+            break;
+        }
+        case 4: {
+            return _mm_bsrli_si128(x, 4);
+            break;
+        }
+        case 5: {
+            return _mm_bsrli_si128(x, 5);
+            break;
+        }
+        case 6: {
+            return _mm_bsrli_si128(x, 6);
+            break;
+        }
+        case 7: {
+            return _mm_bsrli_si128(x, 7);
+            break;
+        }
+        case 8: {
+            return _mm_bsrli_si128(x, 8);
+            break;
+        }
+        case 9: {
+            return _mm_bsrli_si128(x, 9);
+            break;
+        }
+        case 10: {
+            return _mm_bsrli_si128(x, 10);
+            break;
+        }
+        case 11: {
+            return _mm_bsrli_si128(x, 11);
+            break;
+        }
+        case 12: {
+            return _mm_bsrli_si128(x, 12);
+            break;
+        }
+        case 13: {
+            return _mm_bsrli_si128(x, 13);
+            break;
+        }
+        case 14: {
+            return _mm_bsrli_si128(x, 14);
+            break;
+        }
+        case 15: {
+            return _mm_bsrli_si128(x, 15);
+            break;
+        }
+        default: {
+            Py_UNREACHABLE();
+            assert(false);
+        }
+    }
+    Py_UNREACHABLE();
+    return x;
+}
+
+/*
  * write memory with length sizeof(SIMD_TYPE) to `dst`.
  * The `dst` must be aligned.
  */
