@@ -28,10 +28,13 @@
 #endif
 
 #if COMPILE_READ_UCS_LEVEL == 4
+#define CHECK_MASK_TYPE u16
 #define _FROM_TYPE u32
 #elif COMPILE_READ_UCS_LEVEL == 2
+#define CHECK_MASK_TYPE u32
 #define _FROM_TYPE u16
 #elif COMPILE_READ_UCS_LEVEL == 1
+#define CHECK_MASK_TYPE u64
 #define _FROM_TYPE u8
 #else
 #error "COMPILE_READ_UCS_LEVEL must be 1, 2 or 4"
@@ -57,10 +60,11 @@
 #define VECTOR_WRITE_INDENT PYYJSON_CONCAT3(vector_write_indent, COMPILE_INDENT_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define MASK_RIGHT_SHIFT PYYJSON_CONCAT2(mask_right_shift, COMPILE_READ_UCS_LEVEL)
 #define SIMD_RIGHT_SHIFT PYYJSON_CONCAT2(simd_right_shift, COMPILE_READ_UCS_LEVEL)
-
+#define CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512 PYYJSON_CONCAT2(check_escape_tail_impl_get_mask_512, COMPILE_READ_UCS_LEVEL)
 
 // #define CHECK_ESCAPE_IMPL PYYJSON_CONCAT2(check_escape_impl, COMPILE_READ_UCS_LEVEL)
 #define WRITE_SIMD_IMPL PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
+#define MASK_ELEVATE_WRITE_512 PYYJSON_CONCAT3(mask_elevate_write_512, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 // #define SIMD_EXTRACT_PART PYYJSON_CONCAT2(simd_extract_part, COMPILE_READ_UCS_LEVEL)
 
 #if COMPILE_READ_UCS_LEVEL == 1 && COMPILE_INDENT_LEVEL == 0
@@ -217,8 +221,7 @@ force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(StackVars *stack_vars, _F
 #if COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL && COMPILE_INDENT_LEVEL == 0
 force_inline void WRITE_SIMD_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR, Py_ssize_t len) {
 #if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
-    assert(false);
-    // write_simd((void *) dst, SIMD_VAR);
+    static_assert(false, "Unreachable for compiler");
 #else
 #if COMPILE_READ_UCS_LEVEL == 2
 // 2->4
@@ -428,9 +431,37 @@ force_inline void WRITE_SIMD_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR
 }
 #endif // COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL && COMPILE_INDENT_LEVEL == 0
 
-force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(_FROM_TYPE *src, Py_ssize_t len, StackVars *stack_vars) {
+
+
+force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t len, StackVars *stack_vars) {
     UnicodeVector *vec = GET_VEC(stack_vars);
 #if SIMD_BIT_SIZE == 512
+    SIMD_512 z;
+#if COMPILE_READ_UCS_LEVEL == 1
+#define _MASKZ_LOADU _mm512_maskz_loadu_epi8
+#define _MASK_STOREU _mm512_mask_storeu_epi8
+    CHECK_MASK_TYPE RW_MASK = ((u64) 1 << (usize) len) - 1;
+#elif COMPILE_READ_UCS_LEVEL == 2
+#define _MASKZ_LOADU _mm512_maskz_loadu_epi16
+#define _MASK_STOREU _mm512_mask_storeu_epi16
+    CHECK_MASK_TYPE RW_MASK = ((u32) 1 << (usize) len) - 1;
+#else // COMPILE_READ_UCS_LEVEL == 4
+#define _MASKZ_LOADU _mm512_maskz_loadu_epi16
+#define _MASK_STOREU _mm512_mask_storeu_epi16
+    CHECK_MASK_TYPE RW_MASK = ((u16) 1 << (usize) len) - 1;
+#endif
+    z = _MASKZ_LOADU(RW_MASK, (const void *) src);
+    CHECK_MASK_TYPE tail_mask = CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(z, RW_MASK);
+    if (likely(CHECK_MASK_ZERO(tail_mask))) {
+#if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
+        _MASK_STOREU((void *) _WRITER(vec), RW_MASK, z);
+#else
+        MASK_ELEVATE_WRITE_512(_WRITER(vec), z, len);
+#endif
+    } else {
+    }
+#undef _MASKZ_LOADU
+#undef _MASK_STOREU
 #elif SIMD_BIT_SIZE == 256
     __m256i y;
     _FROM_TYPE *load_start = src + len - CHECK_COUNT_MAX;
@@ -707,6 +738,7 @@ force_inline bool PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, COMPILE_R
     return true;
 }
 
+#undef MASK_ELEVATE_WRITE_512
 #undef WRITE_SIMD_IMPL
 #undef WRITE_SIMD_WITH_TAIL_LEN
 #undef WRITE_SIMD_256_WITH_WRITEMASK
@@ -715,6 +747,7 @@ force_inline bool PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, COMPILE_R
 #undef CHECK_ESCAPE_IMPL_GET_MASK
 #undef CHECK_COUNT_MAX
 #undef _CONTROL_SEQ_TABLE
+#undef CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512
 #undef SIMD_RIGHT_SHIFT
 #undef MASK_RIGHT_SHIFT
 #undef VECTOR_WRITE_INDENT
@@ -723,5 +756,6 @@ force_inline bool PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, COMPILE_R
 #undef VECTOR_WRITE_UNICODE_TRAILING_IMPL
 #undef VECTOR_WRITE_UNICODE_IMPL
 #undef _FROM_TYPE
+#undef CHECK_MASK_TYPE
 #undef _TARGET_TYPE
 #undef _WRITER

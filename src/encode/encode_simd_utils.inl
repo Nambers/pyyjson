@@ -24,13 +24,21 @@
 #endif
 
 #if COMPILE_READ_UCS_LEVEL == 4
+#define CHECK_MASK_TYPE u16
 #define _FROM_TYPE u32
 #elif COMPILE_READ_UCS_LEVEL == 2
+#define CHECK_MASK_TYPE u32
 #define _FROM_TYPE u16
 #elif COMPILE_READ_UCS_LEVEL == 1
+#define CHECK_MASK_TYPE u64
 #define _FROM_TYPE u8
 #else
 #error "COMPILE_READ_UCS_LEVEL must be 1, 2 or 4"
+#endif
+
+#if SIMD_BIT_SIZE < 512
+#undef CHECK_MASK_TYPE
+#define CHECK_MASK_TYPE SIMD_MASK_TYPE
 #endif
 
 #define CHECK_COUNT_MAX (SIMD_BIT_SIZE / 8 / sizeof(_FROM_TYPE))
@@ -58,11 +66,12 @@
 #define CHECK_MASK_ZERO_SMALL PYYJSON_CONCAT2(check_mask_zero_small, COMPILE_READ_UCS_LEVEL)
 #define MASK_RIGHT_SHIFT PYYJSON_CONCAT2(mask_right_shift, COMPILE_READ_UCS_LEVEL)
 #define SIMD_RIGHT_SHIFT PYYJSON_CONCAT2(simd_right_shift, COMPILE_READ_UCS_LEVEL)
-// write only
+#define CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512 PYYJSON_CONCAT2(check_escape_tail_impl_get_mask_512, COMPILE_READ_UCS_LEVEL)
+// write only or read-write
 #define WRITE_SIMD_IMPL PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define WRITE_SIMD_256_WITH_WRITEMASK PYYJSON_CONCAT2(write_simd_256_with_writemask, COMPILE_WRITE_UCS_LEVEL)
 #define WRITE_SIMD_WITH_TAIL_LEN PYYJSON_CONCAT3(write_simd_with_tail_len, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
-
+#define MASK_ELEVATE_WRITE_512 PYYJSON_CONCAT3(mask_elevate_write_512, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 
 #if COMPILE_WRITE_UCS_LEVEL == 4
 force_inline bool CHECK_MASK_ZERO_SMALL(SIMD_SMALL_MASK_TYPE small_mask) {
@@ -81,16 +90,16 @@ force_inline bool CHECK_MASK_ZERO_SMALL(SIMD_SMALL_MASK_TYPE small_mask) {
 #endif // COMPILE_WRITE_UCS_LEVEL == 1
 
 #if COMPILE_WRITE_UCS_LEVEL == 4
-force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(_FROM_TYPE *restrict src, SIMD_TYPE *restrict SIMD_VAR) {
+force_inline CHECK_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(_FROM_TYPE *restrict src, SIMD_TYPE *restrict SIMD_VAR) {
 #if COMPILE_READ_UCS_LEVEL == 1
 #if SIMD_BIT_SIZE == 512
     *SIMD_VAR = load_512((const void *) src);
     SIMD_512 t1 = load_512_aligned((const void *) _Quote_i8);
     SIMD_512 t2 = load_512_aligned((const void *) _Slash_i8);
     SIMD_512 t3 = load_512_aligned((const void *) _ControlMax_i8);
-    SIMD_MASK_TYPE m1 = _mm512_cmpeq_epi8_mask(*SIMD_VAR, t1); // AVX512BW
-    SIMD_MASK_TYPE m2 = _mm512_cmpeq_epi8_mask(*SIMD_VAR, t2); // AVX512BW
-    SIMD_MASK_TYPE m3 = _mm512_cmplt_epu8_mask(*SIMD_VAR, t3); // AVX512BW
+    CHECK_MASK_TYPE m1 = _mm512_cmpeq_epi8_mask(*SIMD_VAR, t1); // AVX512BW
+    CHECK_MASK_TYPE m2 = _mm512_cmpeq_epi8_mask(*SIMD_VAR, t2); // AVX512BW
+    CHECK_MASK_TYPE m3 = _mm512_cmplt_epu8_mask(*SIMD_VAR, t3); // AVX512BW
     return m1 | m2 | m3;
 #elif SIMD_BIT_SIZE == 256
     *SIMD_VAR = _mm256_loadu_si256((const __m256i_u *) src);
@@ -122,9 +131,9 @@ force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(_FROM_TYPE *restrict src,
     SIMD_512 t1 = load_512_aligned((const void *) _Quote_i16);
     SIMD_512 t2 = load_512_aligned((const void *) _Slash_i16);
     SIMD_512 t3 = load_512_aligned((const void *) _ControlMax_i16);
-    SIMD_MASK_TYPE m1 = _mm512_cmpeq_epi16_mask(*SIMD_VAR, t1); // AVX512BW
-    SIMD_MASK_TYPE m2 = _mm512_cmpeq_epi16_mask(*SIMD_VAR, t2); // AVX512BW
-    SIMD_MASK_TYPE m3 = _mm512_cmplt_epu16_mask(*SIMD_VAR, t3); // AVX512BW
+    CHECK_MASK_TYPE m1 = _mm512_cmpeq_epi16_mask(*SIMD_VAR, t1); // AVX512BW
+    CHECK_MASK_TYPE m2 = _mm512_cmpeq_epi16_mask(*SIMD_VAR, t2); // AVX512BW
+    CHECK_MASK_TYPE m3 = _mm512_cmplt_epu16_mask(*SIMD_VAR, t3); // AVX512BW
     return m1 | m2 | m3;
 #elif SIMD_BIT_SIZE == 256
     *SIMD_VAR = _mm256_loadu_si256((const __m256i_u *) src);
@@ -156,9 +165,9 @@ force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(_FROM_TYPE *restrict src,
     SIMD_512 t1 = load_512_aligned((const void *) _Quote_i32);
     SIMD_512 t2 = load_512_aligned((const void *) _Slash_i32);
     SIMD_512 t3 = load_512_aligned((const void *) _ControlMax_i32);
-    SIMD_MASK_TYPE m1 = _mm512_cmpeq_epi32_mask(*SIMD_VAR, t1); // AVX512F
-    SIMD_MASK_TYPE m2 = _mm512_cmpeq_epi32_mask(*SIMD_VAR, t2); // AVX512F
-    SIMD_MASK_TYPE m3 = _mm512_cmplt_epu32_mask(*SIMD_VAR, t3); // AVX512F
+    CHECK_MASK_TYPE m1 = _mm512_cmpeq_epi32_mask(*SIMD_VAR, t1); // AVX512F
+    CHECK_MASK_TYPE m2 = _mm512_cmpeq_epi32_mask(*SIMD_VAR, t2); // AVX512F
+    CHECK_MASK_TYPE m3 = _mm512_cmplt_epu32_mask(*SIMD_VAR, t3); // AVX512F
     return m1 | m2 | m3;
 #elif SIMD_BIT_SIZE == 256
     *SIMD_VAR = _mm256_loadu_si256((const __m256i_u *) src);
@@ -198,7 +207,7 @@ force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(_FROM_TYPE *restrict src,
 // #endif // COMPILE_WRITE_UCS_LEVEL == 1
 
 #if COMPILE_WRITE_UCS_LEVEL == 4
-force_inline bool CHECK_MASK_ZERO(SIMD_MASK_TYPE SIMD_VAR) {
+force_inline bool CHECK_MASK_ZERO(CHECK_MASK_TYPE SIMD_VAR) {
 #if SIMD_BIT_SIZE == 512
     return SIMD_VAR == 0;
 #elif SIMD_BIT_SIZE == 256
@@ -226,6 +235,40 @@ force_inline void MASK_RIGHT_SHIFT(SIMD_MASK_TYPE mask, usize shift_count, SIMD_
 #endif
 }
 #endif // COMPILE_WRITE_UCS_LEVEL == 4
+
+#if COMPILE_WRITE_UCS_LEVEL == 4
+#if SIMD_BIT_SIZE == 512
+CHECK_MASK_TYPE CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(SIMD_512 z, CHECK_MASK_TYPE rw_mask) {
+#if COMPILE_READ_UCS_LEVEL == 1
+    // *SIMD_VAR = load_512((const void *) src);
+    SIMD_512 t1 = load_512_aligned((const void *) _Quote_i8);
+    SIMD_512 t2 = load_512_aligned((const void *) _Slash_i8);
+    SIMD_512 t3 = load_512_aligned((const void *) _ControlMax_i8);
+    CHECK_MASK_TYPE m1 = _mm512_mask_cmpeq_epi8_mask(rw_mask, z, t1); // AVX512BW
+    CHECK_MASK_TYPE m2 = _mm512_mask_cmpeq_epi8_mask(rw_mask, z, t2); // AVX512BW
+    CHECK_MASK_TYPE m3 = _mm512_mask_cmplt_epu8_mask(rw_mask, z, t3); // AVX512BW
+    return m1 | m2 | m3;
+#elif COMPILE_READ_UCS_LEVEL == 2
+    SIMD_512 t1 = load_512_aligned((const void *) _Quote_i16);
+    SIMD_512 t2 = load_512_aligned((const void *) _Slash_i16);
+    SIMD_512 t3 = load_512_aligned((const void *) _ControlMax_i16);
+    CHECK_MASK_TYPE m1 = _mm512_mask_cmpeq_epi16_mask(rw_mask, z, t1); // AVX512BW
+    CHECK_MASK_TYPE m2 = _mm512_mask_cmpeq_epi16_mask(rw_mask, z, t2); // AVX512BW
+    CHECK_MASK_TYPE m3 = _mm512_mask_cmplt_epu16_mask(rw_mask, z, t3); // AVX512BW
+    return m1 | m2 | m3;
+#else
+    SIMD_512 t1 = load_512_aligned((const void *) _Quote_i32);
+    SIMD_512 t2 = load_512_aligned((const void *) _Slash_i32);
+    SIMD_512 t3 = load_512_aligned((const void *) _ControlMax_i32);
+    CHECK_MASK_TYPE m1 = _mm512_mask_cmpeq_epi32_mask(rw_mask, z, t1); // AVX512F
+    CHECK_MASK_TYPE m2 = _mm512_mask_cmpeq_epi32_mask(rw_mask, z, t2); // AVX512F
+    CHECK_MASK_TYPE m3 = _mm512_mask_cmplt_epu32_mask(rw_mask, z, t3); // AVX512F
+    return m1 | m2 | m3;
+#endif
+}
+#endif // SIMD_BIT_SIZE == 512
+#endif // COMPILE_WRITE_UCS_LEVEL == 4
+
 #if COMPILE_WRITE_UCS_LEVEL == 4
 
 force_inline void SIMD_RIGHT_SHIFT(SIMD_TYPE SIMD_VAR, usize shift_count, SIMD_TYPE *write_var) {
@@ -418,13 +461,23 @@ force_inline void WRITE_SIMD_256_WITH_WRITEMASK(_TARGET_TYPE *dst, SIMD_256 y, S
     _mm256_storeu_si256((__m256i *) dst, y);
 #endif
 #endif // SIMD_BIT_SIZE == 256
+    Py_UNREACHABLE();
     assert(false);
 }
 #endif // COMPILE_READ_UCS_LEVEL == 1
 
+#if SIMD_BIT_SIZE == 512
+force_inline void MASK_ELEVATE_WRITE_512(_TARGET_TYPE *dst, SIMD_512 z, Py_ssize_t len) {
+    // TODO
+}
+#endif
+
+
+#undef MASK_ELEVATE_WRITE_512
 #undef WRITE_SIMD_WITH_TAIL_LEN
 #undef WRITE_SIMD_256_WITH_WRITEMASK
 #undef WRITE_SIMD_IMPL
+#undef CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512
 #undef SIMD_RIGHT_SHIFT
 #undef MASK_RIGHT_SHIFT
 #undef CHECK_MASK_ZERO_SMALL
@@ -432,5 +485,6 @@ force_inline void WRITE_SIMD_256_WITH_WRITEMASK(_TARGET_TYPE *dst, SIMD_256 y, S
 #undef CHECK_ESCAPE_IMPL_GET_MASK
 #undef CHECK_COUNT_MAX
 #undef _FROM_TYPE
+#undef CHECK_MASK_TYPE
 #undef _TARGET_TYPE
 #undef _WRITER
