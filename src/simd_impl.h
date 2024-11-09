@@ -13,7 +13,7 @@
 #define SIMD_HALF_TYPE __m256i
 #define SIMD_EXTRACT_PART _mm512_extracti32x4_epi32
 #define SIMD_MASK_EXTRACT_PART(m, i) (u16)((m >> (i * 16)) & 0xFFFF)
-#define SIMD_EXTRACT_HALF _mm512_extracti32x8_epi32
+#define SIMD_EXTRACT_HALF _mm512_extracti64x4_epi64
 #elif SIMD_BIT_SIZE == 256
 #define SIMD_VAR y
 #define SIMD_TYPE __m256i
@@ -354,6 +354,23 @@ force_inline void write_512(void *dst, SIMD_512 z) {
 
 force_inline void write_512_aligned(void *dst, SIMD_512 z) {
     _mm512_store_si512(dst, z);
+}
+
+force_inline SIMD_512 elevate_2_4_to_512(SIMD_256 y){
+    return _mm512_cvtepu16_epi32(y);
+}
+
+force_inline SIMD_512 elevate_1_4_to_512(SIMD_128 x){
+    return _mm512_cvtepu8_epi32(x);
+}
+#endif
+
+/*==============================================================================
+ * AVX512BW only SIMD code
+ *============================================================================*/
+#if __AVX512BW__
+force_inline SIMD_512 elevate_1_2_to_512(SIMD_256 y){
+    return _mm512_cvtepu8_epi16(y);
 }
 #endif
 

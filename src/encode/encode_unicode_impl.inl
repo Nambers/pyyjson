@@ -230,12 +230,12 @@ force_inline void WRITE_SIMD_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR
     // // 0
     // _y = SIMD_EXTRACT_HALF(SIMD_VAR, 0);
     // _z = elevate_2_4_to_512(_y);
-    // WRITE_SIMD_512(dst, _z);
+    // write_512(dst, _z);
     // dst += CHECK_COUNT_MAX / 2;
     // // 1
     // _y = SIMD_EXTRACT_HALF(SIMD_VAR, 1);
     // _z = elevate_2_4_to_512(_y);
-    // WRITE_SIMD_512(dst, _z);
+    // write_512(dst, _z);
     // dst += CHECK_COUNT_MAX / 2;
 #elif SIMD_BIT_SIZE == 256
     // 2 * CHECK_COUNT_MAX
@@ -286,12 +286,12 @@ force_inline void WRITE_SIMD_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR
     // 0
     _y = SIMD_EXTRACT_HALF(SIMD_VAR, 0);
     _z = elevate_1_2_to_512(_y);
-    WRITE_SIMD_512(dst, _z);
+    write_512(dst, _z);
     dst += CHECK_COUNT_MAX / 2;
     // 1
     _y = SIMD_EXTRACT_HALF(SIMD_VAR, 1);
     _z = elevate_1_2_to_512(_y);
-    WRITE_SIMD_512(dst, _z);
+    write_512(dst, _z);
     dst += CHECK_COUNT_MAX / 2;
 #elif SIMD_BIT_SIZE == 256
     // 128->256
@@ -337,22 +337,22 @@ force_inline void WRITE_SIMD_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR
     // 0
     _x = SIMD_EXTRACT_PART(SIMD_VAR, 0);
     _z = elevate_1_4_to_512(_x);
-    WRITE_SIMD_512(dst, _z);
+    write_512(dst, _z);
     dst += CHECK_COUNT_MAX / 4;
     // 1
     _x = SIMD_EXTRACT_PART(SIMD_VAR, 1);
     _z = elevate_1_4_to_512(_x);
-    WRITE_SIMD_512(dst, _z);
+    write_512(dst, _z);
     dst += CHECK_COUNT_MAX / 4;
     // 2
     _x = SIMD_EXTRACT_PART(SIMD_VAR, 2);
     _z = elevate_1_4_to_512(_x);
-    WRITE_SIMD_512(dst, _z);
+    write_512(dst, _z);
     dst += CHECK_COUNT_MAX / 4;
     // 3
     _x = SIMD_EXTRACT_PART(SIMD_VAR, 3);
     _z = elevate_1_4_to_512(_x);
-    WRITE_SIMD_512(dst, _z);
+    write_512(dst, _z);
     dst += CHECK_COUNT_MAX / 4;
 #elif SIMD_BIT_SIZE == 256
     // 64(128)->256

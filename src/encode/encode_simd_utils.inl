@@ -81,10 +81,17 @@ force_inline bool CHECK_MASK_ZERO_SMALL(SIMD_SMALL_MASK_TYPE small_mask) {
 #endif // COMPILE_WRITE_UCS_LEVEL == 1
 
 #if COMPILE_WRITE_UCS_LEVEL == 4
-force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(_FROM_TYPE *src, SIMD_TYPE *SIMD_VAR) {
+force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(_FROM_TYPE *restrict src, SIMD_TYPE *restrict SIMD_VAR) {
 #if COMPILE_READ_UCS_LEVEL == 1
 #if SIMD_BIT_SIZE == 512
-
+    *SIMD_VAR = load_512((const void *) src);
+    SIMD_512 t1 = load_512_aligned((const void *) _Quote_i8);
+    SIMD_512 t2 = load_512_aligned((const void *) _Slash_i8);
+    SIMD_512 t3 = load_512_aligned((const void *) _ControlMax_i8);
+    SIMD_MASK_TYPE m1 = _mm512_cmpeq_epi8_mask(*SIMD_VAR, t1); // AVX512BW
+    SIMD_MASK_TYPE m2 = _mm512_cmpeq_epi8_mask(*SIMD_VAR, t2); // AVX512BW
+    SIMD_MASK_TYPE m3 = _mm512_cmplt_epu8_mask(*SIMD_VAR, t3); // AVX512BW
+    return m1 | m2 | m3;
 #elif SIMD_BIT_SIZE == 256
     *SIMD_VAR = _mm256_loadu_si256((const __m256i_u *) src);
     __m256i t1 = _mm256_set1_epi8(_Quote); //_mm256_load_si256((__m256i *) _Quote_i8);      // vmovdqa, AVX
@@ -98,7 +105,7 @@ force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(_FROM_TYPE *src, SIMD_TYP
     // __m256i m3 = _mm256_and_si256(_1, _2);                      // vpand, AVX2
     __m256i r = _mm256_or_si256(_mm256_or_si256(m1, m2), m3);
     return r;
-#else // SIMD_BIT_SIZE
+#else  // SIMD_BIT_SIZE
     *SIMD_VAR = load_128((const void *) src);
     SIMD_128 t1 = load_128_aligned((const void *) _Quote_i8);
     SIMD_128 t2 = load_128_aligned((const void *) _Slash_i8);
@@ -111,7 +118,14 @@ force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(_FROM_TYPE *src, SIMD_TYP
 #endif // SIMD_BIT_SIZE
 #elif COMPILE_READ_UCS_LEVEL == 2
 #if SIMD_BIT_SIZE == 512
-    
+    *SIMD_VAR = load_512((const void *) src);
+    SIMD_512 t1 = load_512_aligned((const void *) _Quote_i16);
+    SIMD_512 t2 = load_512_aligned((const void *) _Slash_i16);
+    SIMD_512 t3 = load_512_aligned((const void *) _ControlMax_i16);
+    SIMD_MASK_TYPE m1 = _mm512_cmpeq_epi16_mask(*SIMD_VAR, t1); // AVX512BW
+    SIMD_MASK_TYPE m2 = _mm512_cmpeq_epi16_mask(*SIMD_VAR, t2); // AVX512BW
+    SIMD_MASK_TYPE m3 = _mm512_cmplt_epu16_mask(*SIMD_VAR, t3); // AVX512BW
+    return m1 | m2 | m3;
 #elif SIMD_BIT_SIZE == 256
     *SIMD_VAR = _mm256_loadu_si256((const __m256i_u *) src);
     __m256i t1 = _mm256_load_si256((__m256i *) _Quote_i16);      // vmovdqa, AVX
@@ -125,7 +139,7 @@ force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(_FROM_TYPE *src, SIMD_TYP
     __m256i m3 = _mm256_and_si256(_1, _2);                       // vpand, AVX2
     __m256i r = _mm256_or_si256(_mm256_or_si256(m1, m2), m3);
     return r;
-#else // SIMD_BIT_SIZE
+#else  // SIMD_BIT_SIZE
     *SIMD_VAR = load_128((const void *) src);
     SIMD_128 t1 = load_128_aligned((const void *) _Quote_i16);
     SIMD_128 t2 = load_128_aligned((const void *) _Slash_i16);
@@ -138,7 +152,14 @@ force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(_FROM_TYPE *src, SIMD_TYP
 #endif // SIMD_BIT_SIZE
 #elif COMPILE_READ_UCS_LEVEL == 4
 #if SIMD_BIT_SIZE == 512
-    // TODO
+    *SIMD_VAR = load_512((const void *) src);
+    SIMD_512 t1 = load_512_aligned((const void *) _Quote_i32);
+    SIMD_512 t2 = load_512_aligned((const void *) _Slash_i32);
+    SIMD_512 t3 = load_512_aligned((const void *) _ControlMax_i32);
+    SIMD_MASK_TYPE m1 = _mm512_cmpeq_epi32_mask(*SIMD_VAR, t1); // AVX512F
+    SIMD_MASK_TYPE m2 = _mm512_cmpeq_epi32_mask(*SIMD_VAR, t2); // AVX512F
+    SIMD_MASK_TYPE m3 = _mm512_cmplt_epu32_mask(*SIMD_VAR, t3); // AVX512F
+    return m1 | m2 | m3;
 #elif SIMD_BIT_SIZE == 256
     *SIMD_VAR = _mm256_loadu_si256((const __m256i_u *) src);
     __m256i t1 = _mm256_load_si256((__m256i *) _Quote_i32);      // vmovdqa, AVX
@@ -177,7 +198,7 @@ force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(_FROM_TYPE *src, SIMD_TYP
 // #endif // COMPILE_WRITE_UCS_LEVEL == 1
 
 #if COMPILE_WRITE_UCS_LEVEL == 4
-force_inline bool CHECK_MASK_ZERO(SIMD_TYPE SIMD_VAR) {
+force_inline bool CHECK_MASK_ZERO(SIMD_MASK_TYPE SIMD_VAR) {
 #if SIMD_BIT_SIZE == 512
     return SIMD_VAR == 0;
 #elif SIMD_BIT_SIZE == 256
@@ -229,12 +250,12 @@ force_inline void WRITE_SIMD_IMPL(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR) {
     // 0
     _y = SIMD_EXTRACT_HALF(SIMD_VAR, 0);
     _z = elevate_2_4_to_512(_y);
-    WRITE_SIMD_512(dst, _z);
+    write_512(dst, _z);
     dst += CHECK_COUNT_MAX / 2;
     // 1
     _y = SIMD_EXTRACT_HALF(SIMD_VAR, 1);
     _z = elevate_2_4_to_512(_y);
-    WRITE_SIMD_512(dst, _z);
+    write_512(dst, _z);
     dst += CHECK_COUNT_MAX / 2;
 #elif SIMD_BIT_SIZE == 256
     // 128->256
@@ -273,12 +294,12 @@ force_inline void WRITE_SIMD_IMPL(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR) {
     // 0
     _y = SIMD_EXTRACT_HALF(SIMD_VAR, 0);
     _z = elevate_1_2_to_512(_y);
-    WRITE_SIMD_512(dst, _z);
+    write_512(dst, _z);
     dst += CHECK_COUNT_MAX / 2;
     // 1
     _y = SIMD_EXTRACT_HALF(SIMD_VAR, 1);
     _z = elevate_1_2_to_512(_y);
-    WRITE_SIMD_512(dst, _z);
+    write_512(dst, _z);
     dst += CHECK_COUNT_MAX / 2;
 #elif SIMD_BIT_SIZE == 256
     // 128->256
@@ -312,22 +333,22 @@ force_inline void WRITE_SIMD_IMPL(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR) {
     // 0
     _x = SIMD_EXTRACT_PART(SIMD_VAR, 0);
     _z = elevate_1_4_to_512(_x);
-    WRITE_SIMD_512(dst, _z);
+    write_512(dst, _z);
     dst += CHECK_COUNT_MAX / 4;
     // 1
     _x = SIMD_EXTRACT_PART(SIMD_VAR, 1);
     _z = elevate_1_4_to_512(_x);
-    WRITE_SIMD_512(dst, _z);
+    write_512(dst, _z);
     dst += CHECK_COUNT_MAX / 4;
     // 2
     _x = SIMD_EXTRACT_PART(SIMD_VAR, 2);
     _z = elevate_1_4_to_512(_x);
-    WRITE_SIMD_512(dst, _z);
+    write_512(dst, _z);
     dst += CHECK_COUNT_MAX / 4;
     // 3
     _x = SIMD_EXTRACT_PART(SIMD_VAR, 3);
     _z = elevate_1_4_to_512(_x);
-    WRITE_SIMD_512(dst, _z);
+    write_512(dst, _z);
     dst += CHECK_COUNT_MAX / 4;
 #elif SIMD_BIT_SIZE == 256
     // 64(128)->256
