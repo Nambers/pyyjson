@@ -444,11 +444,74 @@ force_inline void WRITE_SIMD_256_WITH_WRITEMASK(_TARGET_TYPE *dst, SIMD_256 y, S
 }
 #endif // COMPILE_READ_UCS_LEVEL == 1
 
-#if SIMD_BIT_SIZE == 512
+#if SIMD_BIT_SIZE == 512 && COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
 force_inline void MASK_ELEVATE_WRITE_512(_TARGET_TYPE *dst, SIMD_512 z, Py_ssize_t len) {
-    // TODO
-}
+#if COMPILE_READ_UCS_LEVEL == 1 && COMPILE_WRITE_UCS_LEVEL == 4
+    assert(len < CHECK_COUNT_MAX && len > 0);
+    assert(CHECK_COUNT_MAX == 64);
+    usize parts = (usize) size_align_up(len, CHECK_COUNT_MAX / 4) / (CHECK_COUNT_MAX / 4);
+    SIMD_128 x;
+    SIMD_512 to_write;
+    switch (parts) {
+        case 4: {
+            x = SIMD_EXTRACT_PART(z, 3);
+            to_write = elevate_1_4_to_512(x);
+            write_512((void *) (dst + (CHECK_COUNT_MAX / 4) * 3), to_write);
+        }
+        case 3: {
+            x = SIMD_EXTRACT_PART(z, 2);
+            to_write = elevate_1_4_to_512(x);
+            write_512((void *) (dst + (CHECK_COUNT_MAX / 4) * 2), to_write);
+        }
+        case 2: {
+            x = SIMD_EXTRACT_PART(z, 1);
+            to_write = elevate_1_4_to_512(x);
+            write_512((void *) (dst + (CHECK_COUNT_MAX / 4) * 1), to_write);
+        }
+        case 1: {
+            x = SIMD_EXTRACT_PART(z, 0);
+            to_write = elevate_1_4_to_512(x);
+            write_512((void *) dst, to_write);
+            break;
+        }
+        default: {
+            Py_UNREACHABLE();
+            assert(false);
+        }
+    }
+#else
+#if COMPILE_READ_UCS_LEVEL == 1
+#define ELEVATOR elevate_1_2_to_512
+#elif COMPILE_READ_UCS_LEVEL == 2
+#define ELEVATOR elevate_2_4_to_512
+#else
+#error "Compiler unreachable code"
 #endif
+    assert(len < CHECK_COUNT_MAX && len > 0);
+    usize parts = (usize) size_align_up(len, CHECK_COUNT_MAX / 2) / (CHECK_COUNT_MAX / 2);
+    SIMD_256 y;
+    SIMD_512 to_write;
+    switch (parts) {
+        case 2: {
+            y = SIMD_EXTRACT_HALF(z, 1);
+            to_write = ELEVATOR(y);
+            write_512((void *) (dst + (CHECK_COUNT_MAX / 2) * 1), to_write);
+        }
+        case 1: {
+            y = SIMD_EXTRACT_HALF(z, 0);
+            to_write = ELEVATOR(y);
+            write_512((void *) dst, to_write);
+            break;
+        }
+        default: {
+            Py_UNREACHABLE();
+            assert(false);
+        }
+    }
+#undef ELEVATOR
+#endif
+}
+#endif // SIMD_BIT_SIZE == 512 && COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
 
 
 #undef MASK_ELEVATE_WRITE_512

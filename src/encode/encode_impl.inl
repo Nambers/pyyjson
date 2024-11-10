@@ -1029,15 +1029,12 @@ fail:;
     if (stack_vars->ctn_stack) {
         free(stack_vars->ctn_stack);
     }
-    // TODO
     return NULL;
 fail_ctntype:;
-
-    // TODO
+    PyErr_SetString(JSONEncodeError, "Unsupported type");
     goto fail;
 fail_keytype:;
-
-    // TODO
+    PyErr_SetString(JSONEncodeError, "Expected `str` as key");
     goto fail;
 }
 
