@@ -411,6 +411,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
 #else
         if(tzcnt) MASK_ELEVATE_WRITE_512(_WRITER(vec), z, tzcnt);
 #endif
+        _WRITER(vec) += tzcnt;
         vec = VECTOR_WRITE_ESCAPE_IMPL(stack_vars, src + tzcnt, len - tzcnt, 0);
         RETURN_ON_UNLIKELY_ERR(!vec);
     }
