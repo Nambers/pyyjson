@@ -375,7 +375,6 @@ force_inline void WRITE_SIMD_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR
 #endif // COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL && COMPILE_INDENT_LEVEL == 0
 
 
-
 force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t len, StackVars *stack_vars) {
     UnicodeVector *vec = GET_VEC(stack_vars);
 #if SIMD_BIT_SIZE == 512
@@ -383,25 +382,37 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
 #if COMPILE_READ_UCS_LEVEL == 1
 #define _MASKZ_LOADU _mm512_maskz_loadu_epi8
 #define _MASK_STOREU _mm512_mask_storeu_epi8
-    CHECK_MASK_TYPE RW_MASK = ((u64) 1 << (usize) len) - 1;
 #elif COMPILE_READ_UCS_LEVEL == 2
 #define _MASKZ_LOADU _mm512_maskz_loadu_epi16
 #define _MASK_STOREU _mm512_mask_storeu_epi16
-    CHECK_MASK_TYPE RW_MASK = ((u32) 1 << (usize) len) - 1;
 #else // COMPILE_READ_UCS_LEVEL == 4
 #define _MASKZ_LOADU _mm512_maskz_loadu_epi16
 #define _MASK_STOREU _mm512_mask_storeu_epi16
-    CHECK_MASK_TYPE RW_MASK = ((u16) 1 << (usize) len) - 1;
 #endif
-    z = _MASKZ_LOADU(RW_MASK, (const void *) src);
-    CHECK_MASK_TYPE tail_mask = CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(z, RW_MASK);
+    CHECK_MASK_TYPE rw_mask, tail_mask;
+    rw_mask = ((CHECK_MASK_TYPE) 1 << (usize) len) - 1;
+    z = _MASKZ_LOADU(rw_mask, (const void *) src);
+    tail_mask = CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(z, rw_mask);
     if (likely(CHECK_MASK_ZERO(tail_mask))) {
 #if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
-        _MASK_STOREU((void *) _WRITER(vec), RW_MASK, z);
+        _MASK_STOREU((void *) _WRITER(vec), rw_mask, z);
 #else
         MASK_ELEVATE_WRITE_512(_WRITER(vec), z, len);
 #endif
     } else {
+#if COMPILE_READ_UCS_LEVEL == 1
+        usize tzcnt = (usize) tzcnt_u64(tail_mask);
+#else
+        usize tzcnt = (usize) tzcnt_u32((u32) tail_mask);
+#endif
+        assert(tzcnt < len);
+#if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
+        _MASK_STOREU((void *) _WRITER(vec), ((CHECK_MASK_TYPE) 1 << tzcnt) - 1, z);
+#else
+        if(tzcnt) MASK_ELEVATE_WRITE_512(_WRITER(vec), z, tzcnt);
+#endif
+        vec = VECTOR_WRITE_ESCAPE_IMPL(stack_vars, src + tzcnt, len - tzcnt, 0);
+        RETURN_ON_UNLIKELY_ERR(!vec);
     }
 #undef _MASKZ_LOADU
 #undef _MASK_STOREU
