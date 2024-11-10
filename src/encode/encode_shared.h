@@ -83,7 +83,7 @@ static Py_ssize_t _ControlJump[_Slash + 1] = {
         0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 32-47
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 48-63
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 64-79
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 // 80-92
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2           // 80-92
 };
 
 // static i32 _ControlLengthAdd[ControlMax] = {
@@ -177,6 +177,14 @@ force_inline i64 pylong_value_signed(PyObject *obj, i64 *value) {
     return true;
 }
 
+force_inline int pydict_next(PyObject *op, Py_ssize_t *ppos, PyObject **pkey,
+                             PyObject **pvalue) {
+#if PY_MINOR_VERSION >= 13
+    return PyDict_Next(op, ppos, pkey, pvalue);
+#else
+    return _PyDict_Next(op, ppos, pkey, pvalue, NULL);
+#endif
+}
 
 /*==============================================================================
  * Constants

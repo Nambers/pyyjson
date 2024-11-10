@@ -33,10 +33,10 @@
 // avoid compile again
 force_inline UnicodeVector *_INDENT_WRITER(StackVars *stack_vars, bool is_in_obj, Py_ssize_t additional_reserve_count) {
     UnicodeVector *vec;
-// #pragma GCC diagnostic push
-// #pragma GCC diagnostic ignored "-Wconstant-logical-operand"
+    // #pragma GCC diagnostic push
+    // #pragma GCC diagnostic ignored "-Wconstant-logical-operand"
     if (!is_in_obj && COMPILE_INDENT_LEVEL) {
-// #pragma GCC diagnostic pop
+        // #pragma GCC diagnostic pop
         vec = VEC_RESERVE(stack_vars, get_indent_char_count(stack_vars, COMPILE_INDENT_LEVEL) + additional_reserve_count);
         RETURN_ON_UNLIKELY_ERR(!vec);
         VECTOR_WRITE_INDENT(stack_vars);
@@ -759,7 +759,7 @@ PYYJSON_DUMPS_OBJ(
 
 dict_pair_begin:;
     assert(PyDict_GET_SIZE(stack_vars->cur_obj) != 0);
-    if (_PyDict_Next(stack_vars->cur_obj, &stack_vars->cur_pos, &stack_vars->key, &stack_vars->val, NULL)) {
+    if (pydict_next(stack_vars->cur_obj, &stack_vars->cur_pos, &stack_vars->key, &stack_vars->val)) {
         if (unlikely(!PyUnicode_CheckExact(stack_vars->key))) {
             goto fail_keytype;
         }
