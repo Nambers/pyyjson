@@ -384,59 +384,15 @@ force_inline void long_back_elevate_1_4(u32 *restrict write_start, u8 *restrict 
     }
 elevate_both_aligned:;
     _long_back_elevate_1_4_loop_impl(read_start, read_end, write_end, read_once_count, load_128_aligned, write_aligned);
-    // read_end -= read_once_count;
-    // write_end -= read_once_count;
-    // while (read_end >= read_start) {
-    //     SIMD_128 small;
-    //     SIMD_512 full;
-    //     small = load_128_aligned((const void *) read_end);
-    //     full = elevate_1_4_to_512(small);
-    //     write_aligned(write_end, full);
-    //     read_end -= read_once_count;
-    //     write_end -= read_once_count;
-    // }
     return;
 elevate_src_aligned:;
     _long_back_elevate_1_4_loop_impl(read_start, read_end, write_end, read_once_count, load_128_aligned, write_simd);
-    // read_end -= read_once_count;
-    // write_end -= read_once_count;
-    // while (read_end >= read_start) {
-    //     SIMD_128 small;
-    //     SIMD_512 full;
-    //     small = load_128_aligned((const void *) read_end);
-    //     full = elevate_1_4_to_512(small);
-    //     write_simd(write_end, full);
-    //     read_end -= read_once_count;
-    //     write_end -= read_once_count;
-    // }
     return;
 elevate_dst_aligned:;
     _long_back_elevate_1_4_loop_impl(read_start, read_end, write_end, read_once_count, load_128, write_aligned);
-    // read_end -= read_once_count;
-    // write_end -= read_once_count;
-    // while (read_end >= read_start) {
-    //     SIMD_128 small;
-    //     SIMD_512 full;
-    //     small = load_128((const void *) read_end);
-    //     full = elevate_1_4_to_512(small);
-    //     write_aligned(write_end, full);
-    //     read_end -= read_once_count;
-    //     write_end -= read_once_count;
-    // }
     return;
 elevate_both_not_aligned:;
     _long_back_elevate_1_4_loop_impl(read_start, read_end, write_end, read_once_count, load_128, write_simd);
-    // read_end -= read_once_count;
-    // write_end -= read_once_count;
-    // while (read_end >= read_start) {
-    //     SIMD_128 small;
-    //     SIMD_512 full;
-    //     small = load_128((const void *) read_end);
-    //     full = elevate_1_4_to_512(small);
-    //     write_simd(write_end, full);
-    //     read_end -= read_once_count;
-    //     write_end -= read_once_count;
-    // }
     return;
 #else
     SIMD_128 x_read;
