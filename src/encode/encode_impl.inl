@@ -1025,6 +1025,9 @@ success:;
     bool _c = vector_resize_to_fit(stack_vars, final_len, COMPILE_UCS_LEVEL);
     GOTO_FAIL_ON_UNLIKELY_ERR(!_c);
     init_py_unicode(stack_vars, final_len, COMPILE_UCS_LEVEL);
+    if (stack_vars->ctn_stack) {
+        free(stack_vars->ctn_stack);
+    }
     return (PyObject *) GET_VEC(stack_vars);
 fail:;
     if (stack_vars->vec) {

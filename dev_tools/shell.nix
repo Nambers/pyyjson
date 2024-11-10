@@ -85,7 +85,7 @@ let
   #
   nix_pyenv_directory = ".nix-pyenv";
   # define version
-  use_minor_ver = 13;
+  use_minor_ver = 14;
   using_python = builtins.elemAt using_pythons (use_minor_ver - 9);
   pyenv = builtins.elemAt pyenvs (use_minor_ver - 9);
   path_concate = x: builtins.toString "${x}";
@@ -104,7 +104,7 @@ pkgs.mkShell {
       gcc
       python-launcher # use python-launcher to use other versions
     ])
-    ++ pyenvs;
+    ++ (if (use_minor_ver != 14) then pyenvs else [(builtins.elemAt pyenvs (14-9))]);
   shellHook = ''
     _SOURCE_ROOT=$(readlink -f ${builtins.toString ./.}/..)
     if [[ $_SOURCE_ROOT == /nix/store* ]]; then
@@ -179,6 +179,7 @@ pkgs.mkShell {
     ensure_symlink "${nix_pyenv_directory}/bin/valgrind" ${pkgs.valgrind}/bin/valgrind
     export CC=${pkgs.clang}/bin/clang
     export CXX=${pkgs.clang}/bin/clang++
+    export Python3_ROOT_DIR=${using_python}
     ensure_symlink "${nix_pyenv_directory}/bin/clang" $CC
     ensure_symlink "${nix_pyenv_directory}/bin/clang++" $CXX
     ensure_symlink "${nix_pyenv_directory}/bin/cmake" ${pkgs.cmake}/bin/cmake

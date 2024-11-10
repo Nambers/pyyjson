@@ -10,9 +10,11 @@
 
 #if PY_MINOR_VERSION >= 13
 // these are hidden in Python 3.13
+#if PY_MINOR_VERSION == 13
 PyAPI_FUNC(Py_hash_t) _Py_HashBytes(const void *, Py_ssize_t);
+#endif // PY_MINOR_VERSION == 13
 PyAPI_FUNC(int) _PyDict_SetItem_KnownHash(PyObject *mp, PyObject *key, PyObject *item, Py_hash_t hash);
-#endif
+#endif // PY_MINOR_VERSION >= 13
 
 #if PY_MINOR_VERSION >= 12
 #define PYYJSON_PY_DECREF_DEBUG() (_Py_DECREF_STAT_INC())
@@ -163,7 +165,11 @@ static yyjson_inline PyObject *make_string(const char *utf8_str, Py_ssize_t len,
 success:
     if (flag & PYYJSON_STRING_FLAG_OBJ_KEY) {
         assert(((PyASCIIObject *) obj)->hash == -1);
+#if PY_MINOR_VERSION >= 14
+        ((PyASCIIObject *) obj)->hash = PyUnicode_Type.tp_hash(obj);
+#else
         ((PyASCIIObject *) obj)->hash = _Py_HashBytes(utf8_str, real_len);
+#endif
     }
     return obj;
 }

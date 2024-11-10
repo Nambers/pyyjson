@@ -36,6 +36,9 @@ echo $CUR_PYVER > build/pyver
 cd build
 
 set -e
-
-cmake .. -DCMAKE_BUILD_TYPE=$TARGET_BUILD_TYPE
+if [[ $CUR_PYVER == "14" ]]; then
+    cmake .. -DCMAKE_BUILD_TYPE=$TARGET_BUILD_TYPE -DPython3_INCLUDE_DIR=$(python -c "from sysconfig import get_config_h_filename; from os.path import dirname; print(dirname(get_config_h_filename()))") -DPython3_EXECUTABLE=$(readlink -f $(which python)) -DPython3_LIBRARY=$(python -c "from sysconfig import get_config_var; print(get_config_var('LIBDIR'))")
+else
+    cmake .. -DCMAKE_BUILD_TYPE=$TARGET_BUILD_TYPE
+fi
 cmake --build . --config $TARGET_BUILD_TYPE
