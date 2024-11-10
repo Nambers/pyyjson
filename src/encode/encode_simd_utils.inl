@@ -424,25 +424,22 @@ force_inline void WRITE_SIMD_IMPL(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR) {
 #endif
 }
 
-
-#if COMPILE_READ_UCS_LEVEL == 1
+#if COMPILE_READ_UCS_LEVEL == 1 && SIMD_BIT_SIZE
 force_inline void WRITE_SIMD_256_WITH_WRITEMASK(_TARGET_TYPE *dst, SIMD_256 y, SIMD_256 mask) {
-#if SIMD_BIT_SIZE == 256
 #if COMPILE_WRITE_UCS_LEVEL == 4
     // we can use _mm256_maskstore_epi32
     _mm256_maskstore_epi32((i32 *) dst, mask, y);
-#else
+#elif COMPILE_WRITE_UCS_LEVEL < 4
     // load-then-blend-then-write
     SIMD_256 blend;
     blend = load_256(dst);
     y = _mm256_blendv_epi8(blend, y, mask);
     _mm256_storeu_si256((__m256i *) dst, y);
+#else
+#error "Compiler unreachable code"
 #endif
-#endif // SIMD_BIT_SIZE == 256
-    Py_UNREACHABLE();
-    assert(false);
 }
-#endif // COMPILE_READ_UCS_LEVEL == 1
+#endif // COMPILE_READ_UCS_LEVEL == 1 && SIMD_BIT_SIZE
 
 #if SIMD_BIT_SIZE == 512 && COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
 force_inline void MASK_ELEVATE_WRITE_512(_TARGET_TYPE *dst, SIMD_512 z, Py_ssize_t len) {
