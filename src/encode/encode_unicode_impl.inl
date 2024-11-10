@@ -122,7 +122,7 @@ static _TARGET_TYPE _CONTROL_SEQ_TABLE[(_Slash + 1) * 8] = {
 #endif
 
 
-force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(StackVars *stack_vars, const _FROM_TYPE *src, Py_ssize_t len, Py_ssize_t additional_len) {
+force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(StackVars *restrict stack_vars, const _FROM_TYPE *restrict src, Py_ssize_t len, Py_ssize_t additional_len) {
     UnicodeVector *vec = GET_VEC(stack_vars);
     _TARGET_TYPE *writer = _WRITER(vec);
     const _FROM_TYPE *src_end = src + len;
@@ -144,14 +144,15 @@ force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(StackVars *stack_vars, co
             } else {
                 assert(6 == copy_count);
                 _WRITER(vec) = writer;
-                vec = VEC_RESERVE(stack_vars, 6 + len + TAIL_PADDING / sizeof(_TARGET_TYPE) + additional_len);
+#if COMPILE_WRITE_UCS_LEVEL < 4 || SIZEOF_VOID_P == 8
+                const usize _CopyLen = 8;
+#else //  COMPILE_WRITE_UCS_LEVEL == 4 && SIZEOF_VOID_P < 8
+                const usize _CopyLen = 6;
+#endif
+                vec = VEC_RESERVE(stack_vars, _CopyLen + len + TAIL_PADDING / sizeof(_TARGET_TYPE) + additional_len);
                 RETURN_ON_UNLIKELY_ERR(!vec);
                 writer = _WRITER(vec);
-#if COMPILE_WRITE_UCS_LEVEL == 1 || SIZEOF_VOID_P == 8
-                memcpy((void *) writer, (const void *) copy_ptr, 8 * sizeof(_TARGET_TYPE));
-#else //  COMPILE_WRITE_UCS_LEVEL == 1 || SIZEOF_VOID_P == 8
-                memcpy((void *) writer, (const void *) copy_ptr, 6 * sizeof(_TARGET_TYPE));
-#endif
+                memcpy((void *) writer, (const void *) copy_ptr, _CopyLen * sizeof(_TARGET_TYPE));
                 writer += 6;
             }
         }
@@ -161,29 +162,14 @@ force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(StackVars *stack_vars, co
     return vec;
 }
 
-#if COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL && COMPILE_INDENT_LEVEL == 0
+#if SIMD_BIT_SIZE != 512 && COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL && COMPILE_INDENT_LEVEL == 0
 force_inline void WRITE_SIMD_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR, Py_ssize_t len) {
 #if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
-    static_assert(false, "Unreachable for compiler");
+#error "Compiler unreachable code"
 #else
 #if COMPILE_READ_UCS_LEVEL == 2
 // 2->4
-#if SIMD_BIT_SIZE == 512
-    assert(false);
-    // // 256->512
-    // __m256i _y;
-    // __m512i _z;
-    // // 0
-    // _y = SIMD_EXTRACT_HALF(SIMD_VAR, 0);
-    // _z = elevate_2_4_to_512(_y);
-    // write_512(dst, _z);
-    // dst += CHECK_COUNT_MAX / 2;
-    // // 1
-    // _y = SIMD_EXTRACT_HALF(SIMD_VAR, 1);
-    // _z = elevate_2_4_to_512(_y);
-    // write_512(dst, _z);
-    // dst += CHECK_COUNT_MAX / 2;
-#elif SIMD_BIT_SIZE == 256
+#if SIMD_BIT_SIZE == 256
     // 2 * CHECK_COUNT_MAX
     // 128->256
     __m128i _x;
@@ -208,6 +194,7 @@ force_inline void WRITE_SIMD_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR
     // write_simd((void *) dst, _y);
     dst += CHECK_COUNT_MAX / 2;
 #else  // SIMD_BIT_SIZE == 128
+    // TODO check/impl this
     assert(false);
     // 64(128)->128
     // __m128i _x;
@@ -224,22 +211,7 @@ force_inline void WRITE_SIMD_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR
 #else  // COMPILE_READ_UCS_LEVEL == 1
 #if COMPILE_WRITE_UCS_LEVEL == 2
 // 1->2
-#if SIMD_BIT_SIZE == 512
-    assert(false);
-    // 256->512
-    __m512i _z;
-    __m256i _y;
-    // 0
-    _y = SIMD_EXTRACT_HALF(SIMD_VAR, 0);
-    _z = elevate_1_2_to_512(_y);
-    write_512(dst, _z);
-    dst += CHECK_COUNT_MAX / 2;
-    // 1
-    _y = SIMD_EXTRACT_HALF(SIMD_VAR, 1);
-    _z = elevate_1_2_to_512(_y);
-    write_512(dst, _z);
-    dst += CHECK_COUNT_MAX / 2;
-#elif SIMD_BIT_SIZE == 256
+#if SIMD_BIT_SIZE == 256
     // 128->256
     __m128i _x;
     __m256i _y;
@@ -275,32 +247,7 @@ force_inline void WRITE_SIMD_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR
 #endif // SIMD_BIT_SIZE
 #else  // COMPILE_WRITE_UCS_LEVEL == 4
 // 1->4
-#if SIMD_BIT_SIZE == 512
-    assert(false);
-    // 128->512
-    __m512i _z;
-    __m128i _x;
-    // 0
-    _x = SIMD_EXTRACT_PART(SIMD_VAR, 0);
-    _z = elevate_1_4_to_512(_x);
-    write_512(dst, _z);
-    dst += CHECK_COUNT_MAX / 4;
-    // 1
-    _x = SIMD_EXTRACT_PART(SIMD_VAR, 1);
-    _z = elevate_1_4_to_512(_x);
-    write_512(dst, _z);
-    dst += CHECK_COUNT_MAX / 4;
-    // 2
-    _x = SIMD_EXTRACT_PART(SIMD_VAR, 2);
-    _z = elevate_1_4_to_512(_x);
-    write_512(dst, _z);
-    dst += CHECK_COUNT_MAX / 4;
-    // 3
-    _x = SIMD_EXTRACT_PART(SIMD_VAR, 3);
-    _z = elevate_1_4_to_512(_x);
-    write_512(dst, _z);
-    dst += CHECK_COUNT_MAX / 4;
-#elif SIMD_BIT_SIZE == 256
+#if SIMD_BIT_SIZE == 256
     // 64(128)->256
     __m128i _x;
     __m256i _y;
@@ -372,7 +319,7 @@ force_inline void WRITE_SIMD_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR
 #endif
 #endif
 }
-#endif // COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL && COMPILE_INDENT_LEVEL == 0
+#endif // SIMD_BIT_SIZE != 512 && COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL && COMPILE_INDENT_LEVEL == 0
 
 
 force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t len, StackVars *stack_vars) {
@@ -405,11 +352,11 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
 #else
         usize tzcnt = (usize) tzcnt_u32((u32) tail_mask);
 #endif
-        assert(tzcnt < len);
+        assert(tzcnt < (usize) len);
 #if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
         _MASK_STOREU((void *) _WRITER(vec), ((CHECK_MASK_TYPE) 1 << tzcnt) - 1, z);
 #else
-        if(tzcnt) MASK_ELEVATE_WRITE_512(_WRITER(vec), z, tzcnt);
+        if (tzcnt) MASK_ELEVATE_WRITE_512(_WRITER(vec), z, tzcnt);
 #endif
         _WRITER(vec) += tzcnt;
         vec = VECTOR_WRITE_ESCAPE_IMPL(stack_vars, src + tzcnt, len - tzcnt, 0);
