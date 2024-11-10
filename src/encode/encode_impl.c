@@ -2,7 +2,7 @@
 #include "encode_shared.h"
 #include "simd_detect.h"
 #include "simd_impl.h"
-
+#include <threads.h>
 
 #define PYYJSON_CONCAT2_EX(a, b) a##_##b
 #define PYYJSON_CONCAT2(a, b) PYYJSON_CONCAT2_EX(a, b)
@@ -624,11 +624,13 @@ force_inline void ascii_elevate1(StackVars *stack_vars) {
     memmove(GET_VEC_COMPACT_START(stack_vars->vec), GET_VEC_ASCII_START(stack_vars->vec), stack_vars->unicode_info.ascii_size);
 }
 
+thread_local CtnType __tls_ctn_stack[PYYJSON_ENCODE_MAX_RECURSION];
+
 force_inline bool init_stack_vars(StackVars *stack_vars, PyObject *in_obj) {
     stack_vars->cur_obj = in_obj;
     stack_vars->cur_pos = 0;
     stack_vars->cur_nested_depth = 0;
-    stack_vars->ctn_stack = malloc(sizeof(CtnType) * 1024);
+    stack_vars->ctn_stack = __tls_ctn_stack;
     if (unlikely(!stack_vars->ctn_stack)) {
         stack_vars->vec = NULL; // avoid freeing a wild pointer
         PyErr_NoMemory();
