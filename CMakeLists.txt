@@ -172,8 +172,8 @@ elseif (CMAKE_BUILD_TYPE MATCHES ".*Rel.*")
     target_compile_options(pyyjson PRIVATE -Werror -pedantic -pedantic-errors)
 else()
     target_compile_options(pyyjson PRIVATE -O0)
-    target_link_libraries(pyyjson PRIVATE /lib64/libasan.so)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
+    # target_link_libraries(pyyjson PRIVATE /lib64/libasan.so)
+    # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
     # message("Debug mode, enabling debug symbols")
 endif ()
 
@@ -205,6 +205,9 @@ else()
 endif()
 
 # TODO remove this
+# target_compile_options(pyyjson PRIVATE -mavx512f -mavx512bw)
+# target_compile_options(pyyjson PRIVATE -mavx2)
+# target_compile_options(pyyjson PRIVATE -msse4.1 -msse4.2)
 target_compile_options(pyyjson PRIVATE)
 
 # ------------------------------------------------------------------------------
