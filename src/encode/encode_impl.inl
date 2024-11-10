@@ -1001,13 +1001,6 @@ success:;
     assert(stack_vars->cur_nested_depth == 0);
     // remove trailing comma
     VEC_BACK1(stack_vars->vec);
-    // resize
-    // obj_viewer->m_unicode_count--;
-    // write an empty view obj
-    // if (unlikely(!write_obj_view(obj_viewer, (u32) ViewObjType_Done))) {
-    //     goto fail;
-    // }
-    // TODO
 
 #if COMPILE_UCS_LEVEL == 4
     ucs2_elevate4(stack_vars);
