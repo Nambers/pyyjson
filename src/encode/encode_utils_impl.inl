@@ -49,6 +49,9 @@ force_inline UnicodeVector *VEC_RESERVE(StackVars *stack_vars, Py_ssize_t size) 
         vec = (UnicodeVector *) new_ptr;
         GET_VEC(stack_vars) = vec;
         vec_set_rwptr_and_size(vec, w_diff, target_size);
+#ifndef NDEBUG
+        memset((void *) _WRITER(vec), 0, (char *) VEC_END(vec) - (char *) _WRITER(vec));
+#endif
     }
     return vec;
 }

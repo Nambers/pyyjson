@@ -208,6 +208,15 @@ force_inline void _long_back_elevate_1_2_small_tail_1(u8 **read_end_addr, u16 **
     elevated = elevate_1_2_to_128(x_read);
     write_128((void *) *write_end_addr, elevated);
 }
+
+force_inline void _long_back_elevate_2_4_small_tail_1(u16 **read_end_addr, u32 **write_end_addr) {
+    SIMD_128 x_read, elevated;
+    *read_end_addr -= 4;
+    *write_end_addr -= 4;
+    x_read = broadcast_64_128(*(i64 *) *read_end_addr);
+    elevated = elevate_2_4_to_128(x_read);
+    write_128((void *) *write_end_addr, elevated);
+}
 #endif // SIMD_BIT_SIZE
 
 force_inline void long_back_elevate_1_2(u16 *restrict write_start, u8 *restrict read_start, Py_ssize_t len) {
@@ -268,7 +277,6 @@ elevate_both_not_aligned:;
     _long_back_elevate_1_2_loop_impl(read_start, read_end, write_end, read_once_count, load_half, write_simd);
     return;
 #else // SIMD_BIT_SIZE == 128
-
     SIMD_128 x_read;
     SIMD_128 x;
     // 16 bytes as a block.
@@ -538,7 +546,34 @@ elevate_both_not_aligned:;
     _long_back_elevate_2_4_loop_impl(read_start, read_end, write_end, read_once_count, load_half, write_simd);
     return;
 #else // SIMD_BIT_SIZE == 128
-// TODO
+    SIMD_128 x_read;
+    SIMD_128 x;
+    // 16 bytes as a block. i.e. 8 WORDs
+    Py_ssize_t tail_len = len & (Py_ssize_t) 7;
+    if (tail_len) {
+        usize tail_parts = (usize) tail_len >> 2;
+        usize small_tail_len = (usize) tail_len & 3;
+        for (usize i = 0; i < small_tail_len; ++i) {
+            *--write_end = *--read_end;
+        }
+        if (tail_parts) {
+            // 64 -> 128.
+            _long_back_elevate_2_4_small_tail_1(&read_end, &write_end);
+        }
+        len &= ~(Py_ssize_t) 7;
+    }
+    read_end -= 8;
+    write_end -= 8;
+    while (read_end >= read_start) {
+        x_read = load_128((const void *) read_end);
+        x = elevate_2_4_to_128(x_read);
+        write_128((void *) write_end, x);
+        x_read = unpack_hi_64_128(x_read, x_read);
+        x = elevate_2_4_to_128(x_read);
+        write_128((void *) (write_end + 4), x);
+        read_end -= 8;
+        write_end -= 8;
+    }
 #endif
 }
 
@@ -601,6 +636,9 @@ force_inline bool init_stack_vars(StackVars *stack_vars, PyObject *in_obj) {
     }
     memset(&stack_vars->unicode_info, 0, sizeof(UnicodeInfo));
     GET_VEC(stack_vars) = PyObject_Malloc(PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
+#ifndef NDEBUG
+    memset(GET_VEC(stack_vars), 0, PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
+#endif
     if (likely(GET_VEC(stack_vars))) {
         GET_VEC(stack_vars)->head.write_u8 = (u8 *) (((PyASCIIObject *) GET_VEC(stack_vars)) + 1);
         GET_VEC(stack_vars)->head.write_end = (void *) ((u8 *) (GET_VEC(stack_vars)) + PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
