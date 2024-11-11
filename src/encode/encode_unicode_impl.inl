@@ -346,6 +346,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
 #else
         MASK_ELEVATE_WRITE_512(_WRITER(vec), z, len);
 #endif
+        _WRITER(vec) += len;
     } else {
 #if COMPILE_READ_UCS_LEVEL == 1
         usize tzcnt = (usize) tzcnt_u64(tail_mask);
