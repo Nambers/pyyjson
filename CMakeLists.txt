@@ -29,6 +29,7 @@ endif()
 
 # ------------------------------------------------------------------------------
 # Build Options for tests and docs
+option(ASAN_ENABLED "Build with asan" OFF)
 # option(YYJSON_BUILD_TESTS "Build all tests" OFF)
 # option(YYJSON_BUILD_FUZZER "Build fuzzer" OFF)
 # option(YYJSON_BUILD_MISC "Build misc" OFF)
@@ -172,8 +173,11 @@ elseif (CMAKE_BUILD_TYPE MATCHES ".*Rel.*")
     target_compile_options(pyyjson PRIVATE -Werror -pedantic -pedantic-errors -O3)
 else()
     target_compile_options(pyyjson PRIVATE -O0)
-    # target_link_libraries(pyyjson PRIVATE /lib64/libasan.so)
-    # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
+    if (ASAN_ENABLED)
+        message("ENABLE ASAN")
+        target_link_libraries(pyyjson PRIVATE asan)
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
+    endif()
     message("Debug mode, enabling debug symbols")
 endif ()
 
