@@ -1,4 +1,4 @@
-name: "Automated update"
+name: "Flake Automated Update"
 on:
   workflow_dispatch:
   schedule:

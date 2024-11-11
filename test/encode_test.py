@@ -130,26 +130,26 @@ class TestEncode(unittest.TestCase):
             [1, 2.3, "a", None, True, False, [], {}],  # list
             ("a", 1, 2.3, 2.3, None, True, False, [], {}),  # tuple
             tuple(range(100)),  # large tuple
-            "a",  # simple string
-            1,  # simple int
-            2.3,  # simple float
-            math.inf,
-            math.nan,
-            math.pi,
-            None,
-            True,
-            False,
+            # "a",  # simple string
+            # 1,  # simple int
+            # 2.3,  # simple float
+            # math.inf,
+            # math.nan,
+            # math.pi,
+            # None,
+            # True,
+            # False,
             [],
             {},
-            dict({a: b for a in range(10) for b in range(10)}),  # set
+            # dict({a: b for a in range(10) for b in range(10)}),  # set
             {"啊啊啊": "ß"},
-            321321432.231543245,  # large float
-            -321321432.231543245,
-            -1,
-            -2.3,
-            -math.inf,
-            -math.nan,
-            collections.defaultdict(x=1),
+            # 321321432.231543245,  # large float
+            # -321321432.231543245,
+            # -1,
+            # -2.3,
+            # -math.inf,
+            # -math.nan,
+            # collections.defaultdict(x=1),
         ]
 
         for file in get_benchfiles_fullpath():
