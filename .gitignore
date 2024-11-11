@@ -2,7 +2,6 @@
 /.vscode
 /*.nix
 /.envrc
-/bench
 /python-test
 /test.py
 /test_decode.py
