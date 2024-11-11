@@ -404,7 +404,12 @@ force_noinline u32 tzcnt_u32(u32 x) {
     // never pass a zero here.
     assert(x);
 #if __BMI__
-    return _mm_tzcnt_32(x);
+    // real gcc check from yyjson
+    #if !defined(__clang__) && !defined(__INTEL_COMPILER) && !defined(__ICC) && defined(__GNUC__)
+        return __tzcnt_u32(x);
+    #else
+        return _mm_tzcnt_32(x);
+    #endif
 #else
     return 31 - (((x & -x) & 0x0000FFFF) ? 16 : 0) - (((x & -x) & 0x00FF00FF) ? 8 : 0) - (((x & -x) & 0x0F0F0F0F) ? 4 : 0) - (((x & -x) & 0x33333333) ? 2 : 0) - (((x & -x) & 0x55555555) ? 1 : 0);
 #endif
@@ -414,7 +419,12 @@ force_noinline u64 tzcnt_u64(u64 x) {
     // never pass a zero here.
     assert(x);
 #if __BMI__
-    return _mm_tzcnt_64(x);
+    // same as above
+    #if !defined(__clang__) && !defined(__INTEL_COMPILER) && !defined(__ICC) && defined(__GNUC__)
+        return __tzcnt_u64(x);
+    #else
+        return _mm_tzcnt_64(x);
+    #endif
 #else
     return 63 - (((x & -x) & 0x00000000FFFFFFFFULL) ? 32 : 0) - (((x & -x) & 0x0000FFFF0000FFFFULL) ? 16 : 0) - (((x & -x) & 0x00FF00FF00FF00FFULL) ? 8 : 0) - (((x & -x) & 0x0F0F0F0F0F0F0F0FULL) ? 4 : 0) - (((x & -x) & 0x3333333333333333ULL) ? 2 : 0) - (((x & -x) & 0x5555555555555555ULL) ? 1 : 0);
 #endif
