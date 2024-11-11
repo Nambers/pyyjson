@@ -5,6 +5,15 @@ import unittest
 # download bench folder from https://github.com/0ph1uch1/pycjson/tree/main/bench
 
 class TestBenchmark(unittest.TestCase):
+    BENCHMARK_REPEAT_SETTING = {
+        "apache.json": 10000,
+        "tweet.json": 200000,
+        "MotionsQuestionsAnswersQuestions2016.json": 100,
+        "canada.json": 250,
+        "truenull.json":50000,
+        "github.json":50000,
+    }
+    DEFAULT_REPEAT = 1000
     def setUp(self):
         try:
             import orjson
@@ -25,6 +34,10 @@ class TestBenchmark(unittest.TestCase):
     def time_benchmark(self, repeat_time, func, *args, **kwargs):
         import time
 
+        # warm up
+        for _ in range(10):
+            func(*args, **kwargs)
+
         time_0 = time.time()
         for _ in range(repeat_time):
             func(*args, **kwargs)
@@ -34,8 +47,8 @@ class TestBenchmark(unittest.TestCase):
     def _run_test_setup(self, calling_setups, data, base_name, test_name):
         for setup in calling_setups:
             name, func, kwargs = setup
-            self.time_benchmark(10, func, data, **kwargs)
-            time_ = self.time_benchmark(1000, func, data, **kwargs)
+            repeat_times = self.BENCHMARK_REPEAT_SETTING.get(base_name, self.DEFAULT_REPEAT)
+            time_ = self.time_benchmark(repeat_times, func, data, **kwargs)
             print(f"test {test_name}, file: {base_name}, time_{name}\t: {time_}")
 
     def test_benchmark_encode(self):
@@ -53,11 +66,11 @@ class TestBenchmark(unittest.TestCase):
 
         calling_setups = [std_json_setup, pyyjson_setup]
         if self._orjson is not None:
-            orjson_setup = ("orjson", self._orjson.dumps, {})
+            orjson = self._orjson
+            def ordump(x):
+                return orjson.dumps(x, option=orjson.OPT_INDENT_2).decode()
+            orjson_setup = ("orjson", ordump, {})
             calling_setups.append(orjson_setup)
-        # if self._ujson is not None:
-        #     ujson_setup = ('ujson', self._ujson.dumps, {})
-        #     calling_setups.append(ujson_setup)
 
         for filename in bench_files:
             base_name = os.path.basename(filename)

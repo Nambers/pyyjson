@@ -16,7 +16,7 @@ class TestEncode(unittest.TestCase):
             pass
 
         # TypeError
-        test_cases = {TypeError: [A(), 1 + 1j]}
+        test_cases = {pyyjson.JSONEncodeError: [A(), 1 + 1j]}
 
         for err, case in test_cases.items():
             with self.subTest(msg=f"encoding_fail_test(case={case})"):
