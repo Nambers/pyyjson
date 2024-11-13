@@ -76,9 +76,7 @@ static yyjson_inline void Py_Immortal_IncRef(PyObject *op) {
 #if SIZEOF_VOID_P > 4
     // Portable saturated add, branching on the carry flag and set low bits
 #ifndef NDEBUG
-    PY_UINT32_T cur_refcnt = op->ob_refcnt_split[PY_BIG_ENDIAN];
-    PY_UINT32_T new_refcnt = cur_refcnt + 1;
-    assert(new_refcnt == 0);
+    assert(0 > (int32_t) op->ob_refcnt_split[PY_BIG_ENDIAN]);
 #endif // NDEBUG
 #else  // SIZEOF_VOID_P > 4
     // Explicitly check immortality against the immortal value

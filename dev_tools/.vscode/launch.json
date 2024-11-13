@@ -45,15 +45,17 @@
             "name": "(gdb) Launch test.py",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/.nix-pyenv/bin/python",
+            "program": "/usr/bin/env",
             "args": [
-                "${workspaceFolder}/test.py"
+                "-S",
+                "bash",
+                "${workspaceFolder}/dev_tools/run_tests.sh"
             ],
             "sourceFileMap": {
                 "/build": "${workspaceFolder}/debug_source"
             },
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/build",
+            "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",

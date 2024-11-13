@@ -3,7 +3,6 @@
         {
             "name": "Linux",
             "includePath": [
-                "${workspaceFolder}/**"
             ],
             "defines": [],
             "compilerPath": ".nix-pyenv/bin/clang",
