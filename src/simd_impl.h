@@ -187,7 +187,7 @@ force_inline SIMD_128 broadcast_64_128(i64 v) {
     return _mm_set1_epi64((__m64) v);
 }
 
-force_inline SIMD_128 set_32_128(i32 a, i32 b, i32 c, i32 d) {
+force_inline SIMD_128 set_32_128(i32 d, i32 c, i32 b, i32 a) {
     return _mm_set_epi32(a, b, c, d);
 }
 
