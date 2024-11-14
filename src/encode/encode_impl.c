@@ -650,13 +650,17 @@ force_inline bool init_stack_vars(StackVars *stack_vars, PyObject *in_obj) {
     return false;
 }
 
-force_inline bool vector_resize_to_fit(StackVars *stack_vars, Py_ssize_t len, int ucs_type) {
-    assert(get_cur_ucs_type(stack_vars) == ucs_type);
+force_inline bool vector_resize_to_fit(UnicodeVector **restrict vec_addr, Py_ssize_t len, int ucs_type) {
     Py_ssize_t char_size = ucs_type ? ucs_type : 1;
     Py_ssize_t struct_size = ucs_type ? sizeof(PyCompactUnicodeObject) : sizeof(PyASCIIObject);
     assert(len <= ((PY_SSIZE_T_MAX - struct_size) / char_size - 1));
-    stack_vars->vec = (UnicodeVector *) PyObject_Realloc(stack_vars->vec, struct_size + (len + 1) * char_size);
-    return NULL != stack_vars->vec;
+    // Resizes to a smaller size. It *should* always success
+    UnicodeVector *new_vec = (UnicodeVector *) PyObject_Realloc(*vec_addr, struct_size + (len + 1) * char_size);
+    if (likely(new_vec)) {
+        *vec_addr = new_vec;
+        return true;
+    }
+    return false;
 }
 
 // _PyUnicode_CheckConsistency is hidden in Python 3.13
@@ -664,13 +668,12 @@ force_inline bool vector_resize_to_fit(StackVars *stack_vars, Py_ssize_t len, in
 extern int _PyUnicode_CheckConsistency(PyObject *op, int check_content);
 #endif
 
-force_inline void init_py_unicode(StackVars *stack_vars, Py_ssize_t size, int kind) {
-    assert(kind == get_cur_ucs_type(stack_vars));
-    UnicodeVector *vec = GET_VEC(stack_vars);
+force_inline void init_py_unicode(UnicodeVector **restrict vec_addr, Py_ssize_t size, int kind) {
+    UnicodeVector *vec = *vec_addr;
     PyCompactUnicodeObject *unicode = &vec->unicode_rep.compact_obj;
     PyASCIIObject *ascii = &vec->unicode_rep.ascii_rep.ascii_obj;
     PyObject_Init((PyObject *) unicode, &PyUnicode_Type);
-    void *data = kind ? GET_VEC_COMPACT_START(stack_vars->vec) : GET_VEC_ASCII_START(stack_vars->vec);
+    void *data = kind ? GET_VEC_COMPACT_START(vec) : GET_VEC_ASCII_START(vec);
     //
     ascii->length = size;
     ascii->hash = -1;
@@ -783,8 +786,8 @@ force_inline PyFastTypes fast_type_check(PyObject *val) {
 
 #define TAIL_PADDING (512 / 8)
 
-force_inline Py_ssize_t get_indent_char_count(StackVars *stack_vars, Py_ssize_t indent_level) {
-    return indent_level ? (indent_level * stack_vars->cur_nested_depth + 1) : 0;
+force_inline Py_ssize_t get_indent_char_count(Py_ssize_t cur_nested_depth, Py_ssize_t indent_level) {
+    return indent_level ? (indent_level * cur_nested_depth + 1) : 0;
 }
 
 force_inline void vec_set_rwptr_and_size(UnicodeVector *vec, Py_ssize_t rw_diff, Py_ssize_t target_size) {
@@ -808,26 +811,133 @@ force_inline bool vec_in_boundary(UnicodeVector *vec) {
 
 #include "encode_impl_wrap.inl"
 
+
+force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {
+    UnicodeVector *vec = PyObject_Malloc(PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
+    if (unlikely(!vec)) {
+        return PyErr_NoMemory();
+    }
+    Py_ssize_t len = PyUnicode_GET_LENGTH(unicode);
+    int unicode_kind = PyUnicode_KIND(unicode);
+    bool is_ascii = PyUnicode_IS_ASCII(unicode);
+    if (is_ascii) {
+        U8_WRITER(vec) = (u8 *) (((PyASCIIObject *) vec) + 1);
+    } else {
+        U8_WRITER(vec) = (u8 *) (((PyCompactUnicodeObject *) vec) + 1);
+    }
+    void *write_start = (void *) U8_WRITER(vec);
+    vec->head.write_end = (void *) ((u8 *) vec + PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
+    bool success;
+    switch (unicode_kind) {
+        // pass is_in_obj = true to avoid unwanted indent check
+        case 1: {
+            success = vec_write_str_0_1_1(unicode, len, &vec, true, 0);
+            if (success) vec_back1_1(vec);
+            break;
+        }
+        case 2: {
+            success = vec_write_str_0_2_2(unicode, len, &vec, true, 0);
+            if (success) vec_back1_2(vec);
+            break;
+        }
+        case 4: {
+            success = vec_write_str_0_4_4(unicode, len, &vec, true, 0);
+            if (success) vec_back1_4(vec);
+            break;
+        }
+        default: {
+            Py_UNREACHABLE();
+            assert(false);
+        }
+    }
+    if (unlikely(!success)) {
+        PyObject_Free(vec);
+        return NULL;
+    }
+    Py_ssize_t written_len = (Py_ssize_t) U8_WRITER(vec) - (Py_ssize_t) write_start;
+    written_len /= unicode_kind;
+    assert(written_len >= 2);
+    success = vector_resize_to_fit(&vec, written_len, is_ascii ? 0 : unicode_kind);
+    if (unlikely(!success)) {
+        PyObject_Free(vec);
+        return NULL;
+    }
+    init_py_unicode(&vec, written_len, is_ascii ? 0 : unicode_kind);
+    return (PyObject *) vec;
+}
+
 force_noinline PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject *kwargs) {
     PyObject *obj;
     int option_digit = 0;
+    usize indent = 0;
+    PyObject *ret;
     static const char *kwlist[] = {"obj", "options", NULL};
-    // DumpOption options = {IndentLevel::NONE};
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|i", (char **) kwlist, &obj, &option_digit)) {
         PyErr_SetString(PyExc_TypeError, "Invalid argument");
-        return NULL;
+        goto fail;
     }
+
+    assert(obj);
+
+    PyFastTypes fast_type = fast_type_check(obj);
+
+    switch (fast_type) {
+        case T_List:
+        case T_Dict:
+        case T_Tuple: {
+            goto dumps_container;
+        }
+        case T_Unicode: {
+            goto dumps_unicode;
+        }
+        case T_Long: {
+            goto dumps_long;
+        }
+        case T_False:
+        case T_True:
+        case T_None: {
+            goto dumps_constant;
+        }
+        case T_Float: {
+            goto dumps_float;
+        }
+        default: {
+            PyErr_SetString(JSONEncodeError, "Unsupported type to encode");
+            goto fail;
+        }
+    }
+
+
+dumps_container:;
     if (option_digit & 1) {
         if (option_digit & 2) {
             PyErr_SetString(PyExc_ValueError, "Cannot mix indent options");
-            return NULL;
+            goto fail;
         }
-        // options.indent_level = IndentLevel::INDENT_2;
+        indent = 2;
     } else if (option_digit & 2) {
-        // options.indent_level = IndentLevel::INDENT_4;
+        indent = 4;
     }
 
-    PyObject *ret = pyyjson_dumps_obj_2_0(obj);
+
+    switch (indent) {
+        case 0: {
+            ret = pyyjson_dumps_obj_0_0(obj);
+            break;
+        }
+        case 2: {
+            ret = pyyjson_dumps_obj_2_0(obj);
+            break;
+        }
+        case 4: {
+            ret = pyyjson_dumps_obj_4_0(obj);
+            break;
+        }
+        default: {
+            Py_UNREACHABLE();
+            assert(false);
+        }
+    }
 
     if (unlikely(!ret)) {
         if (!PyErr_Occurred()) {
@@ -835,6 +945,18 @@ force_noinline PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject
         }
     }
 
+    assert(!ret || ret->ob_refcnt == 1);
+
+    goto success;
+
+dumps_unicode:;
+    return pyyjson_dumps_single_unicode(obj);
+dumps_long:;
+dumps_constant:;
+dumps_float:;
+    goto fail; // TODO
+success:;
     return ret;
-    // return pyyjson_dumps_obj_4_0(obj);
+fail:;
+    return NULL;
 }

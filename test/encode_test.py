@@ -130,7 +130,7 @@ class TestEncode(unittest.TestCase):
             [1, 2.3, "a", None, True, False, [], {}],  # list
             ("a", 1, 2.3, 2.3, None, True, False, [], {}),  # tuple
             tuple(range(100)),  # large tuple
-            # "a",  # simple string
+            "a",  # simple string
             # 1,  # simple int
             # 2.3,  # simple float
             # math.inf,
@@ -150,6 +150,17 @@ class TestEncode(unittest.TestCase):
             # -math.inf,
             # -math.nan,
             # collections.defaultdict(x=1),
+            "RandomText1",
+            "RandomTèxt1",
+            "测试字符串",
+            "😅😅😅😅😅",
+            {
+                "AnswerText1": "Following the landslip on 30 December 2015, existing mitigation measures were effective in ensuring that the majority of the landslip material was prevented from reaching the A83. \r\nExtensive monitoring of the hillside was undertaken and a 150 tonne boulder was identified as a potential risk to the A83 and the Old Military Road. Consequently, the A83 was closed on the evening of the 4 January 2016 and traffic was diverted via Dalmally. For safety reasons, ongoing visual monitoring of the slope was necessary, and the Old Military Road diversion was made available during the daylight hours when this monitoring was possible.\r\nWorks to make safe the boulder took place on 5 and 6 January 2016 and following the geotechnical checks on 7 January 2016, the A83 reopened at the earliest opportunity. Temporary traffic lights were erected to protect staff working to clear the debris nets.\r\nOur operating company, BEAR Scotland, kept stakeholders, local communities and businesses and the print and broadcast media updated throughout this period. They also issued updates via social media and through travel information websites such as Traffic Scotland.\r\nThe Scottish Government, working closely with our stakeholder partners, has already invested £9 million towards reducing the risk of impacts from landslides at the Rest and Be Thankful and also the establishment of the local diversion route. The taskforce group will reconvene on 25 January 2016.\r\nThe socio-economic impact assessment undertaken as part of the 2013 Route Study assessed the impact of closures at the Rest and Be Thankful due to landslides I can confirm that this was reviewed in 2015.",
+                "测试字符串1": "abcdabcdabcdabcdabcdabcdabcdabcd,aaaaaaaaaaaaaaaaaaaaaa",
+                "😅😅😅😅😅": "abcdabcdabcdabcdabcdabcdabcdabcd,aaaaaaaaaaaaaaaaaaaaaa",
+                "测试字符串2": "abcdabcdabcdabcdabcdabcdabcdabcd,aaaaaaaaaaaaaaaaaaaaaa",
+                "AnswerText2": "Following the landslip on 30 December 2015, existing mitigation measures were effective in ensuring that the majority of the landslip material was prevented from reaching the A83. \r\nExtensive monitoring of the hillside was undertaken and a 150 tonne boulder was identified as a potential risk to the A83 and the Old Military Road. Consequently, the A83 was closed on the evening of the 4 January 2016 and traffic was diverted via Dalmally. For safety reasons, ongoing visual monitoring of the slope was necessary, and the Old Military Road diversion was made available during the daylight hours when this monitoring was possible.\r\nWorks to make safe the boulder took place on 5 and 6 January 2016 and following the geotechnical checks on 7 January 2016, the A83 reopened at the earliest opportunity. Temporary traffic lights were erected to protect staff working to clear the debris nets.\r\nOur operating company, BEAR Scotland, kept stakeholders, local communities and businesses and the print and broadcast media updated throughout this period. They also issued updates via social media and through travel information websites such as Traffic Scotland.\r\nThe Scottish Government, working closely with our stakeholder partners, has already invested £9 million towards reducing the risk of impacts from landslides at the Rest and Be Thankful and also the establishment of the local diversion route. The taskforce group will reconvene on 25 January 2016.\r\nThe socio-economic impact assessment undertaken as part of the 2013 Route Study assessed the impact of closures at the Rest and Be Thankful due to landslides I can confirm that this was reviewed in 2015."
+            }
         ]
 
         for file in get_benchfiles_fullpath():

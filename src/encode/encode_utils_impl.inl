@@ -24,8 +24,9 @@
 /*
  * Reserve space for the vector.
  */
-force_inline UnicodeVector *VEC_RESERVE(StackVars *stack_vars, Py_ssize_t size) {
-    UnicodeVector *vec = GET_VEC(stack_vars);
+force_inline UnicodeVector *VEC_RESERVE(UnicodeVector **vec_addr, Py_ssize_t size) {
+    assert(vec_addr);
+    UnicodeVector *vec = *vec_addr;
     _TARGET_TYPE *target_ptr = _WRITER(vec) + size;
     if (unlikely(target_ptr > (_TARGET_TYPE *) VEC_END(vec))) {
         Py_ssize_t u8_diff = VEC_MEM_U8_DIFF(vec, target_ptr);
@@ -47,7 +48,7 @@ force_inline UnicodeVector *VEC_RESERVE(StackVars *stack_vars, Py_ssize_t size) 
             return NULL;
         }
         vec = (UnicodeVector *) new_ptr;
-        GET_VEC(stack_vars) = vec;
+        *vec_addr = vec;
         vec_set_rwptr_and_size(vec, w_diff, target_size);
 #ifndef NDEBUG
         memset((void *) _WRITER(vec), 0, (char *) VEC_END(vec) - (char *) _WRITER(vec));

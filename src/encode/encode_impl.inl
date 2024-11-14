@@ -37,11 +37,11 @@ force_inline UnicodeVector *_INDENT_WRITER(StackVars *stack_vars, bool is_in_obj
     // #pragma GCC diagnostic ignored "-Wconstant-logical-operand"
     if (!is_in_obj && COMPILE_INDENT_LEVEL) {
         // #pragma GCC diagnostic pop
-        vec = VEC_RESERVE(stack_vars, get_indent_char_count(stack_vars, COMPILE_INDENT_LEVEL) + additional_reserve_count);
+        vec = VEC_RESERVE(&GET_VEC(stack_vars), get_indent_char_count(stack_vars->cur_nested_depth, COMPILE_INDENT_LEVEL) + additional_reserve_count);
         RETURN_ON_UNLIKELY_ERR(!vec);
-        VECTOR_WRITE_INDENT(stack_vars);
+        VECTOR_WRITE_INDENT(&GET_VEC(stack_vars), stack_vars->cur_nested_depth);
     } else {
-        vec = VEC_RESERVE(stack_vars, additional_reserve_count);
+        vec = VEC_RESERVE(&GET_VEC(stack_vars), additional_reserve_count);
         RETURN_ON_UNLIKELY_ERR(!vec);
     }
     return vec;
@@ -193,7 +193,7 @@ force_inline bool VECTOR_APPEND_STR(UnicodeVector *vec, PyObject *val, StackVars
 #endif
 #if COMPILE_UCS_LEVEL < 2
         case 1: {
-            _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 1, 1)(val, len, stack_vars, is_in_obj);
+            _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 1, 1)(val, len, &GET_VEC(stack_vars), is_in_obj, stack_vars->cur_nested_depth);
             RETURN_ON_UNLIKELY_ERR(!_c);
             break;
         }
@@ -202,11 +202,11 @@ force_inline bool VECTOR_APPEND_STR(UnicodeVector *vec, PyObject *val, StackVars
         case 2: {
             switch (kind) {
                 case 1: {
-                    _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 1, 2)(val, len, stack_vars, is_in_obj);
+                    _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 1, 2)(val, len, &GET_VEC(stack_vars), is_in_obj, stack_vars->cur_nested_depth);
                     break;
                 }
                 case 2: {
-                    _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 2, 2)(val, len, stack_vars, is_in_obj);
+                    _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 2, 2)(val, len, &GET_VEC(stack_vars), is_in_obj, stack_vars->cur_nested_depth);
                     break;
                 }
                 default: {
@@ -221,15 +221,15 @@ force_inline bool VECTOR_APPEND_STR(UnicodeVector *vec, PyObject *val, StackVars
         case 4: {
             switch (kind) {
                 case 1: {
-                    _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 1, 4)(val, len, stack_vars, is_in_obj);
+                    _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 1, 4)(val, len, &GET_VEC(stack_vars), is_in_obj, stack_vars->cur_nested_depth);
                     break;
                 }
                 case 2: {
-                    _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 2, 4)(val, len, stack_vars, is_in_obj);
+                    _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 2, 4)(val, len, &GET_VEC(stack_vars), is_in_obj, stack_vars->cur_nested_depth);
                     break;
                 }
                 case 4: {
-                    _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 4, 4)(val, len, stack_vars, is_in_obj);
+                    _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 4, 4)(val, len, &GET_VEC(stack_vars), is_in_obj, stack_vars->cur_nested_depth);
                     break;
                 }
                 default: {
@@ -1014,21 +1014,16 @@ success:;
 #if COMPILE_UCS_LEVEL == 1
     ascii_elevate1(stack_vars);
 #endif
+    assert(get_cur_ucs_type(stack_vars) == COMPILE_UCS_LEVEL);
     Py_ssize_t final_len = GET_VECTOR_FINAL_LEN(GET_VEC(stack_vars));
-    bool _c = vector_resize_to_fit(stack_vars, final_len, COMPILE_UCS_LEVEL);
+    bool _c = vector_resize_to_fit(&GET_VEC(stack_vars), final_len, COMPILE_UCS_LEVEL);
     GOTO_FAIL_ON_UNLIKELY_ERR(!_c);
-    init_py_unicode(stack_vars, final_len, COMPILE_UCS_LEVEL);
-    // if (stack_vars->ctn_stack) {
-    //     free(stack_vars->ctn_stack);
-    // }
+    init_py_unicode(&GET_VEC(stack_vars), final_len, COMPILE_UCS_LEVEL);
     return (PyObject *) GET_VEC(stack_vars);
 fail:;
-    if (stack_vars->vec) {
-        PyObject_Free(stack_vars->vec);
+    if (GET_VEC(stack_vars)) {
+        PyObject_Free(GET_VEC(stack_vars));
     }
-    // if (stack_vars->ctn_stack) {
-    //     free(stack_vars->ctn_stack);
-    // }
     return NULL;
 fail_ctntype:;
     PyErr_SetString(JSONEncodeError, "Unsupported type");

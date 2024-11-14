@@ -23,14 +23,6 @@ class TestBenchmark(unittest.TestCase):
             print("orjson is not installed")
             self._orjson = None
 
-        try:
-            import ujson
-
-            self._ujson = ujson
-        except ImportError:
-            print("ujson is not installed")
-            self._ujson = None
-
     def time_benchmark(self, repeat_time, func, *args, **kwargs):
         import time
 
@@ -93,9 +85,6 @@ class TestBenchmark(unittest.TestCase):
         if self._orjson is not None:
             orjson_setup = ("orjson", self._orjson.loads, {})
             calling_setups.append(orjson_setup)
-        # if self._ujson is not None:
-        #     ujson_setup = ('ujson', self._ujson.loads, {})
-        #     calling_setups.append(ujson_setup)
 
         for filename in bench_files:
             base_name = os.path.basename(filename)
