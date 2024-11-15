@@ -73,9 +73,9 @@ in
       if command -v nix > /dev/null 2>&1; then
           TEMP_NIX_COMMAND=nix
       else
-          TEMP_NIX_COMMAND=/run/current-system/sw/bin/nix-build
+          TEMP_NIX_COMMAND=/run/current-system/sw/bin/nix
       fi
-      $TEMP_NIX_COMMAND build .#default.inputDerivation -o ${nix_pyenv_directory}/.nix-shell-inputs
+      $TEMP_NIX_COMMAND build .#devShells.${pkgs.hostPlatform.system}.default.inputDerivation -o ${nix_pyenv_directory}/.nix-shell-inputs
       unset TEMP_NIX_COMMAND
   fi
 

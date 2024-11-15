@@ -1,6 +1,5 @@
 .nix-pyenv/
 /.vscode
-/*.nix
 /.envrc
 /python-test
 /test.py
