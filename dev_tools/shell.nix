@@ -5,19 +5,6 @@ let
   python314 =
     (pkgs.python313.override (oldAttr: {
       self = python314;
-      packageOverrides = (
-        self: super: rec {
-          flit = super.flit.overridePythonAttrs (superAttr: rec {
-            version = "3.10.1";
-            src = pkgs.fetchFromGitHub {
-              owner = "pypa";
-              repo = "flit";
-              rev = "refs/tags/${version}";
-              hash = "sha256-GOup/iiR0zKM07dFiTFNzBEVBwzNp4ERWp1l4w9hOME=";
-            };
-          });
-        }
-      );
       noldconfigPatch = "${pkgs.path}/pkgs/development/interpreters/python/cpython/3.13/no-ldconfig.patch";
       sourceVersion = {
         major = "3";
