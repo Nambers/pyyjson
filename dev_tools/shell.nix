@@ -72,7 +72,7 @@ let
   #
   nix_pyenv_directory = ".nix-pyenv";
   # define version
-  use_minor_ver = 12;
+  use_minor_ver = import ./pyver.nix;
   using_python = builtins.elemAt using_pythons (use_minor_ver - 9);
   pyenv = builtins.elemAt pyenvs (use_minor_ver - 9);
 in
