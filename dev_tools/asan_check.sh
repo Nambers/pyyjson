@@ -14,4 +14,6 @@ fi
 cmake --build . --config Debug
 cd ..
 set +e
-LD_PRELOAD=$SRC_ROOT/.nix-pyenv/lib/libasan.so PYTHONPATH=$SRC_ROOT/build $SRC_ROOT/.nix-pyenv/bin/python test/all_test.py --ignore bench
+export LD_PRELOAD=$SRC_ROOT/.nix-pyenv/lib/libasan.so
+export PYTHONPATH=$SRC_ROOT/build
+exec $SRC_ROOT/.nix-pyenv/bin/python test/all_test.py --ignore bench file

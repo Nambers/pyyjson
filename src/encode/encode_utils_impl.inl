@@ -29,12 +29,17 @@ force_inline UnicodeVector *VEC_RESERVE(UnicodeVector **vec_addr, Py_ssize_t siz
     UnicodeVector *vec = *vec_addr;
     _TARGET_TYPE *target_ptr = _WRITER(vec) + size;
     if (unlikely(target_ptr > (_TARGET_TYPE *) VEC_END(vec))) {
-        Py_ssize_t u8_diff = VEC_MEM_U8_DIFF(vec, target_ptr);
+        const Py_ssize_t u8_diff = VEC_MEM_U8_DIFF(vec, target_ptr);
         assert(u8_diff >= 0);
         // Py_ssize_t target_size = u8_diff;
         Py_ssize_t target_size = VEC_MEM_U8_DIFF(vec, VEC_END(vec));
         assert(target_size >= 0);
+#if PYYJSON_ASAN_CHECK
+        // for sanitize=address build, only resize to the *just enough* size.
+        Py_ssize_t inc_size = 0;
+#else
         Py_ssize_t inc_size = target_size;
+#endif
         if (unlikely(target_size > (PY_SSIZE_T_MAX - inc_size))) {
             PyErr_NoMemory();
             return NULL;
