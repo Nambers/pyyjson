@@ -334,8 +334,8 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
 #define _MASKZ_LOADU _mm512_maskz_loadu_epi16
 #define _MASK_STOREU _mm512_mask_storeu_epi16
 #else // COMPILE_READ_UCS_LEVEL == 4
-#define _MASKZ_LOADU _mm512_maskz_loadu_epi16
-#define _MASK_STOREU _mm512_mask_storeu_epi16
+#define _MASKZ_LOADU _mm512_maskz_loadu_epi32
+#define _MASK_STOREU _mm512_mask_storeu_epi32
 #endif
     CHECK_MASK_TYPE rw_mask, tail_mask;
     rw_mask = ((CHECK_MASK_TYPE) 1 << (usize) len) - 1;
