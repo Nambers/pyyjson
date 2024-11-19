@@ -42,7 +42,7 @@
             "preLaunchTask": "CMake: build with last config"
         },
         {
-            "name": "(gdb) Launch test.py",
+            "name": "(gdb) Launch test/all_test.py",
             "type": "cppdbg",
             "request": "launch",
             "program": "/usr/bin/env",
