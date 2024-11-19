@@ -8,6 +8,9 @@
 let
   path_concate = x: builtins.toString "${x}";
   env_concate = builtins.map path_concate pyenvs;
+  link_python_cmd = python_env: ''
+
+  '';
 in
 ''
   _SOURCE_ROOT=$(readlink -f ${builtins.toString ./.}/..)
