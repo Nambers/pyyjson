@@ -109,11 +109,11 @@ force_inline void _PREPARE_UNICODE_WRITE(PyObject *obj, UnicodeVector *restrict 
 
 #define VECTOR_APPEND_KEY PYYJSON_CONCAT3(vector_append_key, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline bool VECTOR_APPEND_KEY(PyObject *key, StackVars *stack_vars) {
+force_inline bool VECTOR_APPEND_KEY(PyObject *key, UnicodeVector **restrict vec_addr, UnicodeInfo *unicode_info, Py_ssize_t cur_nested_depth) {
     Py_ssize_t len;
     int kind, write_kind;
     bool _c;
-    _PREPARE_UNICODE_WRITE(key, GET_VEC(stack_vars), &stack_vars->unicode_info, &len, &kind, &write_kind);
+    _PREPARE_UNICODE_WRITE(key, *vec_addr, unicode_info, &len, &kind, &write_kind);
 
     switch (write_kind) {
 #if COMPILE_UCS_LEVEL < 1
@@ -121,7 +121,7 @@ force_inline bool VECTOR_APPEND_KEY(PyObject *key, StackVars *stack_vars) {
 #endif
 #if COMPILE_UCS_LEVEL < 2
         case 1: {
-            _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 1, 1)(key, len, &GET_VEC(stack_vars), stack_vars->cur_nested_depth);
+            _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 1, 1)(key, len, vec_addr, cur_nested_depth);
             RETURN_ON_UNLIKELY_ERR(!_c);
             break;
         }
@@ -130,11 +130,11 @@ force_inline bool VECTOR_APPEND_KEY(PyObject *key, StackVars *stack_vars) {
         case 2: {
             switch (kind) {
                 case 1: {
-                    _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 1, 2)(key, len, &GET_VEC(stack_vars), stack_vars->cur_nested_depth);
+                    _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 1, 2)(key, len, vec_addr, cur_nested_depth);
                     break;
                 }
                 case 2: {
-                    _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 2, 2)(key, len, &GET_VEC(stack_vars), stack_vars->cur_nested_depth);
+                    _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 2, 2)(key, len, vec_addr, cur_nested_depth);
                     break;
                 }
                 default: {
@@ -149,15 +149,15 @@ force_inline bool VECTOR_APPEND_KEY(PyObject *key, StackVars *stack_vars) {
         case 4: {
             switch (kind) {
                 case 1: {
-                    _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 1, 4)(key, len, &GET_VEC(stack_vars), stack_vars->cur_nested_depth);
+                    _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 1, 4)(key, len, vec_addr, cur_nested_depth);
                     break;
                 }
                 case 2: {
-                    _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 2, 4)(key, len, &GET_VEC(stack_vars), stack_vars->cur_nested_depth);
+                    _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 2, 4)(key, len, vec_addr, cur_nested_depth);
                     break;
                 }
                 case 4: {
-                    _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 4, 4)(key, len, &GET_VEC(stack_vars), stack_vars->cur_nested_depth);
+                    _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 4, 4)(key, len, vec_addr, cur_nested_depth);
                     break;
                 }
                 default: {
@@ -179,18 +179,18 @@ force_inline bool VECTOR_APPEND_KEY(PyObject *key, StackVars *stack_vars) {
 
 #define VECTOR_APPEND_STR PYYJSON_CONCAT3(vector_append_str, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline bool VECTOR_APPEND_STR(UnicodeVector *vec, PyObject *val, StackVars *stack_vars, bool is_in_obj) {
+force_inline bool VECTOR_APPEND_STR(PyObject *val, UnicodeVector **restrict vec_addr, UnicodeInfo *unicode_info, Py_ssize_t cur_nested_depth, bool is_in_obj) {
     Py_ssize_t len;
     int kind, write_kind;
     bool _c;
-    _PREPARE_UNICODE_WRITE(val, GET_VEC(stack_vars), &stack_vars->unicode_info, &len, &kind, &write_kind);
+    _PREPARE_UNICODE_WRITE(val, *vec_addr, unicode_info, &len, &kind, &write_kind);
     switch (write_kind) {
 #if COMPILE_UCS_LEVEL < 1
         case 0:
 #endif
 #if COMPILE_UCS_LEVEL < 2
         case 1: {
-            _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 1, 1)(val, len, &GET_VEC(stack_vars), is_in_obj, stack_vars->cur_nested_depth);
+            _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 1, 1)(val, len, vec_addr, cur_nested_depth, is_in_obj);
             RETURN_ON_UNLIKELY_ERR(!_c);
             break;
         }
@@ -199,11 +199,11 @@ force_inline bool VECTOR_APPEND_STR(UnicodeVector *vec, PyObject *val, StackVars
         case 2: {
             switch (kind) {
                 case 1: {
-                    _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 1, 2)(val, len, &GET_VEC(stack_vars), is_in_obj, stack_vars->cur_nested_depth);
+                    _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 1, 2)(val, len, vec_addr, cur_nested_depth, is_in_obj);
                     break;
                 }
                 case 2: {
-                    _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 2, 2)(val, len, &GET_VEC(stack_vars), is_in_obj, stack_vars->cur_nested_depth);
+                    _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 2, 2)(val, len, vec_addr, cur_nested_depth, is_in_obj);
                     break;
                 }
                 default: {
@@ -218,15 +218,15 @@ force_inline bool VECTOR_APPEND_STR(UnicodeVector *vec, PyObject *val, StackVars
         case 4: {
             switch (kind) {
                 case 1: {
-                    _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 1, 4)(val, len, &GET_VEC(stack_vars), is_in_obj, stack_vars->cur_nested_depth);
+                    _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 1, 4)(val, len, vec_addr, cur_nested_depth, is_in_obj);
                     break;
                 }
                 case 2: {
-                    _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 2, 4)(val, len, &GET_VEC(stack_vars), is_in_obj, stack_vars->cur_nested_depth);
+                    _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 2, 4)(val, len, vec_addr, cur_nested_depth, is_in_obj);
                     break;
                 }
                 case 4: {
-                    _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 4, 4)(val, len, &GET_VEC(stack_vars), is_in_obj, stack_vars->cur_nested_depth);
+                    _c = PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, 4, 4)(val, len, vec_addr, cur_nested_depth, is_in_obj);
                     break;
                 }
                 default: {
@@ -526,7 +526,7 @@ force_inline EncodeValJumpFlag ENCODE_PROCESS_VAL(
 
     switch (fast_type) {
         case T_Unicode: {
-            _c = VECTOR_APPEND_STR(vec, val, stack_vars, is_in_obj);
+            _c = VECTOR_APPEND_STR(val, &GET_VEC(stack_vars), &stack_vars->unicode_info, stack_vars->cur_nested_depth, is_in_obj);
             RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
 #if COMPILE_UCS_LEVEL < 1
             if (unlikely(stack_vars->unicode_info.cur_ucs_type == 1)) return is_in_obj ? JumpFlag_Elevate1_ObjVal : JumpFlag_Elevate1_ArrVal;
@@ -755,7 +755,7 @@ dict_pair_begin:;
             goto fail_keytype;
         }
         // view_update_str_info(obj_viewer, key);
-        bool _c = VECTOR_APPEND_KEY(stack_vars->key, stack_vars);
+        bool _c = VECTOR_APPEND_KEY(stack_vars->key, &GET_VEC(stack_vars), &stack_vars->unicode_info, stack_vars->cur_nested_depth);
         GOTO_FAIL_ON_UNLIKELY_ERR(!_c);
         {
 #if COMPILE_UCS_LEVEL < 1

@@ -553,7 +553,7 @@ force_inline bool PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, COMPILE_R
     return true;
 }
 
-force_inline bool PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)(PyObject *restrict str, Py_ssize_t len, UnicodeVector **restrict vec_addr, bool is_in_obj, Py_ssize_t cur_nested_depth) {
+force_inline bool PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)(PyObject *restrict str, Py_ssize_t len, UnicodeVector **restrict vec_addr, Py_ssize_t cur_nested_depth, bool is_in_obj) {
     static_assert(COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL, "COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL");
     assert(vec_addr);
     UnicodeVector *vec = *vec_addr;
