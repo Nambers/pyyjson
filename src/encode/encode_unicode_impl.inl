@@ -509,10 +509,8 @@ done:;
 
 // avoid compile again
 #if COMPILE_READ_UCS_LEVEL == 1
-force_inline void VECTOR_WRITE_INDENT(UnicodeVector **restrict vec_addr, Py_ssize_t _cur_nested_depth) {
-    assert(vec_addr);
+force_inline void VECTOR_WRITE_INDENT(UnicodeVector *restrict vec, Py_ssize_t _cur_nested_depth) {
 #if COMPILE_INDENT_LEVEL > 0
-    UnicodeVector *vec = *vec_addr;
     _TARGET_TYPE *writer = _WRITER(vec);
     *writer++ = '\n';
     usize cur_nested_depth = (usize) _cur_nested_depth;
@@ -522,24 +520,24 @@ force_inline void VECTOR_WRITE_INDENT(UnicodeVector **restrict vec_addr, Py_ssiz
 #if COMPILE_INDENT_LEVEL == 4
         *writer++ = ' ';
         *writer++ = ' ';
-#endif
+#endif // COMPILE_INDENT_LEVEL == 4
     }
     _WRITER(vec) += COMPILE_INDENT_LEVEL * cur_nested_depth + 1;
-#endif
+#endif // COMPILE_INDENT_LEVEL > 0
 }
 #endif // COMPILE_READ_UCS_LEVEL == 1
 
-force_inline bool PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)(PyObject *key, Py_ssize_t len, StackVars *stack_vars) {
+force_inline bool PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)(PyObject *key, Py_ssize_t len, UnicodeVector **restrict vec_addr, Py_ssize_t cur_nested_depth) {
     static_assert(COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL, "COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL");
-    UnicodeVector *vec = GET_VEC(stack_vars);
+    UnicodeVector *vec = *vec_addr;
     assert(PyUnicode_GET_LENGTH(key) == len);
-    vec = VEC_RESERVE(&GET_VEC(stack_vars), get_indent_char_count(stack_vars->cur_nested_depth, COMPILE_INDENT_LEVEL) + 4 + len + TAIL_PADDING);
+    vec = VEC_RESERVE(vec_addr, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 4 + len + TAIL_PADDING);
     RETURN_ON_UNLIKELY_ERR(!vec);
-    VECTOR_WRITE_INDENT(&GET_VEC(stack_vars), stack_vars->cur_nested_depth);
+    VECTOR_WRITE_INDENT(vec, cur_nested_depth);
     *_WRITER(vec)++ = '"';
-    vec = VECTOR_WRITE_UNICODE_IMPL(&GET_VEC(stack_vars), (_FROM_TYPE *) get_unicode_data(key), len);
+    vec = VECTOR_WRITE_UNICODE_IMPL(vec_addr, (_FROM_TYPE *) get_unicode_data(key), len);
     RETURN_ON_UNLIKELY_ERR(!vec);
-    vec = VEC_RESERVE(&GET_VEC(stack_vars), 3 + TAIL_PADDING);
+    vec = VEC_RESERVE(vec_addr, 3 + TAIL_PADDING);
     RETURN_ON_UNLIKELY_ERR(!vec);
     _TARGET_TYPE *writer = _WRITER(vec);
     *writer++ = '"';
@@ -566,7 +564,7 @@ force_inline bool PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, COMPILE_R
     } else {
         vec = VEC_RESERVE(vec_addr, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 3 + len + TAIL_PADDING);
         RETURN_ON_UNLIKELY_ERR(!vec);
-        VECTOR_WRITE_INDENT(vec_addr, cur_nested_depth);
+        VECTOR_WRITE_INDENT(vec, cur_nested_depth);
     }
     *_WRITER(vec)++ = '"';
     vec = VECTOR_WRITE_UNICODE_IMPL(vec_addr, (_FROM_TYPE *) get_unicode_data(str), len);

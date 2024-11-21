@@ -36,7 +36,7 @@ force_inline UnicodeVector *_INDENT_WRITER(UnicodeVector **vec_addr, Py_ssize_t 
     if (!is_in_obj && COMPILE_INDENT_LEVEL) {
         vec = VEC_RESERVE(vec_addr, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + additional_reserve_count);
         RETURN_ON_UNLIKELY_ERR(!vec);
-        VECTOR_WRITE_INDENT(vec_addr, cur_nested_depth);
+        VECTOR_WRITE_INDENT(vec, cur_nested_depth);
     } else {
         vec = VEC_RESERVE(vec_addr, additional_reserve_count);
         RETURN_ON_UNLIKELY_ERR(!vec);
@@ -121,7 +121,7 @@ force_inline bool VECTOR_APPEND_KEY(PyObject *key, StackVars *stack_vars) {
 #endif
 #if COMPILE_UCS_LEVEL < 2
         case 1: {
-            _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 1, 1)(key, len, stack_vars);
+            _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 1, 1)(key, len, &GET_VEC(stack_vars), stack_vars->cur_nested_depth);
             RETURN_ON_UNLIKELY_ERR(!_c);
             break;
         }
@@ -130,11 +130,11 @@ force_inline bool VECTOR_APPEND_KEY(PyObject *key, StackVars *stack_vars) {
         case 2: {
             switch (kind) {
                 case 1: {
-                    _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 1, 2)(key, len, stack_vars);
+                    _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 1, 2)(key, len, &GET_VEC(stack_vars), stack_vars->cur_nested_depth);
                     break;
                 }
                 case 2: {
-                    _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 2, 2)(key, len, stack_vars);
+                    _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 2, 2)(key, len, &GET_VEC(stack_vars), stack_vars->cur_nested_depth);
                     break;
                 }
                 default: {
@@ -149,15 +149,15 @@ force_inline bool VECTOR_APPEND_KEY(PyObject *key, StackVars *stack_vars) {
         case 4: {
             switch (kind) {
                 case 1: {
-                    _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 1, 4)(key, len, stack_vars);
+                    _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 1, 4)(key, len, &GET_VEC(stack_vars), stack_vars->cur_nested_depth);
                     break;
                 }
                 case 2: {
-                    _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 2, 4)(key, len, stack_vars);
+                    _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 2, 4)(key, len, &GET_VEC(stack_vars), stack_vars->cur_nested_depth);
                     break;
                 }
                 case 4: {
-                    _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 4, 4)(key, len, stack_vars);
+                    _c = PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, 4, 4)(key, len, &GET_VEC(stack_vars), stack_vars->cur_nested_depth);
                     break;
                 }
                 default: {
