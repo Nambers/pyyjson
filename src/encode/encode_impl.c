@@ -115,74 +115,65 @@ typedef struct StackVars {
 
 #define GET_VEC(stack_vars) ((stack_vars)->vec)
 
-force_inline int get_cur_ucs_type(StackVars *stack_vars) {
-    return stack_vars->unicode_info.cur_ucs_type;
-}
 
-force_inline void memorize_ascii_to_ucs4(StackVars *stack_vars) {
-    UnicodeVector *vec = GET_VEC(stack_vars);
+force_inline void memorize_ascii_to_ucs4(UnicodeVector *vec, UnicodeInfo *unicode_info) {
     Py_ssize_t len = vec->head.write_u8 - (u8 *) GET_VEC_ASCII_START(vec);
-    stack_vars->unicode_info.ascii_size = len;
+    unicode_info->ascii_size = len;
     u32 *new_write_ptr = ((u32 *) GET_VEC_COMPACT_START(vec)) + len;
     vec->head.write_u32 = new_write_ptr;
-    assert(get_cur_ucs_type(stack_vars) == 0);
-    stack_vars->unicode_info.cur_ucs_type = 4;
+    assert(unicode_info->cur_ucs_type == 0);
+    unicode_info->cur_ucs_type = 4;
 }
 
-force_inline void memorize_ascii_to_ucs2(StackVars *stack_vars) {
-    UnicodeVector *vec = GET_VEC(stack_vars);
+force_inline void memorize_ascii_to_ucs2(UnicodeVector *vec, UnicodeInfo *unicode_info) {
     Py_ssize_t len = vec->head.write_u8 - (u8 *) GET_VEC_ASCII_START(vec);
-    stack_vars->unicode_info.ascii_size = len;
+    unicode_info->ascii_size = len;
     u16 *new_write_ptr = ((u16 *) GET_VEC_COMPACT_START(vec)) + len;
     vec->head.write_u16 = new_write_ptr;
-    assert(get_cur_ucs_type(stack_vars) == 0);
-    stack_vars->unicode_info.cur_ucs_type = 2;
+    assert(unicode_info->cur_ucs_type == 0);
+    unicode_info->cur_ucs_type = 2;
 }
 
-force_inline void memorize_ascii_to_ucs1(StackVars *stack_vars) {
-    UnicodeVector *vec = GET_VEC(stack_vars);
+force_inline void memorize_ascii_to_ucs1(UnicodeVector *vec, UnicodeInfo *unicode_info) {
     Py_ssize_t len = vec->head.write_u8 - (u8 *) GET_VEC_ASCII_START(vec);
-    stack_vars->unicode_info.ascii_size = len;
+    unicode_info->ascii_size = len;
     u8 *new_write_ptr = ((u8 *) GET_VEC_COMPACT_START(vec)) + len;
     vec->head.write_u8 = new_write_ptr;
-    assert(get_cur_ucs_type(stack_vars) == 0);
-    stack_vars->unicode_info.cur_ucs_type = 1;
+    assert(unicode_info->cur_ucs_type == 0);
+    unicode_info->cur_ucs_type = 1;
 }
 
-force_inline void memorize_ucs1_to_ucs2(StackVars *stack_vars) {
-    UnicodeVector *vec = GET_VEC(stack_vars);
+force_inline void memorize_ucs1_to_ucs2(UnicodeVector *vec, UnicodeInfo *unicode_info) {
     Py_ssize_t diff = vec->head.write_u8 - (u8 *) GET_VEC_COMPACT_START(vec);
-    Py_ssize_t len = diff - stack_vars->unicode_info.ascii_size;
+    Py_ssize_t len = diff - unicode_info->ascii_size;
     assert(len >= 0);
-    stack_vars->unicode_info.u8_size = len;
+    unicode_info->u8_size = len;
     u16 *new_write_ptr = ((u16 *) GET_VEC_COMPACT_START(vec)) + diff;
     vec->head.write_u16 = new_write_ptr;
-    assert(get_cur_ucs_type(stack_vars) == 1);
-    stack_vars->unicode_info.cur_ucs_type = 2;
+    assert(unicode_info->cur_ucs_type == 1);
+    unicode_info->cur_ucs_type = 2;
 }
 
-force_inline void memorize_ucs1_to_ucs4(StackVars *stack_vars) {
-    UnicodeVector *vec = GET_VEC(stack_vars);
+force_inline void memorize_ucs1_to_ucs4(UnicodeVector *vec, UnicodeInfo *unicode_info) {
     Py_ssize_t diff = vec->head.write_u8 - (u8 *) GET_VEC_COMPACT_START(vec);
-    Py_ssize_t len = diff - stack_vars->unicode_info.ascii_size;
+    Py_ssize_t len = diff - unicode_info->ascii_size;
     assert(len >= 0);
-    stack_vars->unicode_info.u8_size = len;
+    unicode_info->u8_size = len;
     u32 *new_write_ptr = ((u32 *) GET_VEC_COMPACT_START(vec)) + diff;
     vec->head.write_u32 = new_write_ptr;
-    assert(get_cur_ucs_type(stack_vars) == 1);
-    stack_vars->unicode_info.cur_ucs_type = 4;
+    assert(unicode_info->cur_ucs_type == 1);
+    unicode_info->cur_ucs_type = 4;
 }
 
-force_inline void memorize_ucs2_to_ucs4(StackVars *stack_vars) {
-    UnicodeVector *vec = GET_VEC(stack_vars);
+force_inline void memorize_ucs2_to_ucs4(UnicodeVector *vec, UnicodeInfo *unicode_info) {
     Py_ssize_t diff = vec->head.write_u16 - (u16 *) GET_VEC_COMPACT_START(vec);
-    Py_ssize_t len = diff - stack_vars->unicode_info.ascii_size - stack_vars->unicode_info.u8_size;
+    Py_ssize_t len = diff - unicode_info->ascii_size - unicode_info->u8_size;
     assert(len >= 0);
-    stack_vars->unicode_info.u16_size = len;
+    unicode_info->u16_size = len;
     u32 *new_write_ptr = ((u32 *) GET_VEC_COMPACT_START(vec)) + diff;
     vec->head.write_u32 = new_write_ptr;
-    assert(get_cur_ucs_type(stack_vars) == 2);
-    stack_vars->unicode_info.cur_ucs_type = 4;
+    assert(unicode_info->cur_ucs_type == 2);
+    unicode_info->cur_ucs_type = 4;
 }
 
 #if SIMD_BIT_SIZE > 128

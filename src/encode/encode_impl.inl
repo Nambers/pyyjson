@@ -31,27 +31,24 @@
 
 #if COMPILE_UCS_LEVEL > 0
 // avoid compile again
-force_inline UnicodeVector *_INDENT_WRITER(StackVars *stack_vars, bool is_in_obj, Py_ssize_t additional_reserve_count) {
+force_inline UnicodeVector *_INDENT_WRITER(UnicodeVector **vec_addr, Py_ssize_t cur_nested_depth, bool is_in_obj, Py_ssize_t additional_reserve_count) {
     UnicodeVector *vec;
-    // #pragma GCC diagnostic push
-    // #pragma GCC diagnostic ignored "-Wconstant-logical-operand"
     if (!is_in_obj && COMPILE_INDENT_LEVEL) {
-        // #pragma GCC diagnostic pop
-        vec = VEC_RESERVE(&GET_VEC(stack_vars), get_indent_char_count(stack_vars->cur_nested_depth, COMPILE_INDENT_LEVEL) + additional_reserve_count);
+        vec = VEC_RESERVE(vec_addr, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + additional_reserve_count);
         RETURN_ON_UNLIKELY_ERR(!vec);
-        VECTOR_WRITE_INDENT(&GET_VEC(stack_vars), stack_vars->cur_nested_depth);
+        VECTOR_WRITE_INDENT(vec_addr, cur_nested_depth);
     } else {
-        vec = VEC_RESERVE(&GET_VEC(stack_vars), additional_reserve_count);
+        vec = VEC_RESERVE(vec_addr, additional_reserve_count);
         RETURN_ON_UNLIKELY_ERR(!vec);
     }
     return vec;
 }
 #endif
 
-#define WRITE_INDENT_RETURN_IF_FAIL(_stack_vars, _is_in_obj, _additional_reserve_count) \
-    do {                                                                                \
-        vec = _INDENT_WRITER(_stack_vars, _is_in_obj, _additional_reserve_count);       \
-        if (unlikely(!vec)) return false;                                               \
+#define WRITE_INDENT_RETURN_IF_FAIL(vec_addr, cur_nested_depth, _is_in_obj, _additional_reserve_count) \
+    do {                                                                                               \
+        vec = _INDENT_WRITER(vec_addr, cur_nested_depth, _is_in_obj, _additional_reserve_count);       \
+        if (unlikely(!vec)) return false;                                                              \
     } while (0)
 
 
@@ -72,7 +69,7 @@ force_inline void VEC_BACK1(UnicodeVector *vec) {
 
 #define _PREPARE_UNICODE_WRITE PYYJSON_CONCAT3(prepare_unicode_write, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline void _PREPARE_UNICODE_WRITE(PyObject *obj, StackVars *stack_vars, Py_ssize_t *out_len, int *read_kind, int *write_kind) {
+force_inline void _PREPARE_UNICODE_WRITE(PyObject *obj, UnicodeVector *restrict vec, UnicodeInfo *restrict unicode_info, Py_ssize_t *out_len, int *read_kind, int *write_kind) {
     Py_ssize_t out_len_val = PyUnicode_GET_LENGTH(obj);
     *out_len = out_len_val;
     int read_kind_val = PyUnicode_KIND(obj);
@@ -83,28 +80,28 @@ force_inline void _PREPARE_UNICODE_WRITE(PyObject *obj, StackVars *stack_vars, P
 #elif COMPILE_UCS_LEVEL == 2
     *write_kind = 2;
     if (unlikely(read_kind_val == 4)) {
-        memorize_ucs2_to_ucs4(stack_vars);
+        memorize_ucs2_to_ucs4(vec, unicode_info);
         *write_kind = 4;
     }
 #elif COMPILE_UCS_LEVEL == 1
     *write_kind = 1;
     if (unlikely(read_kind_val == 2)) {
-        memorize_ucs1_to_ucs2(stack_vars);
+        memorize_ucs1_to_ucs2(vec, unicode_info);
         *write_kind = 2;
     } else if (unlikely(read_kind_val == 4)) {
-        memorize_ucs1_to_ucs4(stack_vars);
+        memorize_ucs1_to_ucs4(vec, unicode_info);
         *write_kind = 4;
     }
 #elif COMPILE_UCS_LEVEL == 0
     *write_kind = 0;
     if (unlikely(read_kind_val == 2)) {
-        memorize_ascii_to_ucs2(stack_vars);
+        memorize_ascii_to_ucs2(vec, unicode_info);
         *write_kind = 2;
     } else if (unlikely(read_kind_val == 4)) {
-        memorize_ascii_to_ucs4(stack_vars);
+        memorize_ascii_to_ucs4(vec, unicode_info);
         *write_kind = 4;
     } else if (unlikely(!PyUnicode_IS_ASCII(obj))) {
-        memorize_ascii_to_ucs1(stack_vars);
+        memorize_ascii_to_ucs1(vec, unicode_info);
         *write_kind = 1;
     }
 #endif
@@ -116,7 +113,7 @@ force_inline bool VECTOR_APPEND_KEY(PyObject *key, StackVars *stack_vars) {
     Py_ssize_t len;
     int kind, write_kind;
     bool _c;
-    _PREPARE_UNICODE_WRITE(key, stack_vars, &len, &kind, &write_kind);
+    _PREPARE_UNICODE_WRITE(key, GET_VEC(stack_vars), &stack_vars->unicode_info, &len, &kind, &write_kind);
 
     switch (write_kind) {
 #if COMPILE_UCS_LEVEL < 1
@@ -186,7 +183,7 @@ force_inline bool VECTOR_APPEND_STR(UnicodeVector *vec, PyObject *val, StackVars
     Py_ssize_t len;
     int kind, write_kind;
     bool _c;
-    _PREPARE_UNICODE_WRITE(val, stack_vars, &len, &kind, &write_kind);
+    _PREPARE_UNICODE_WRITE(val, GET_VEC(stack_vars), &stack_vars->unicode_info, &len, &kind, &write_kind);
     switch (write_kind) {
 #if COMPILE_UCS_LEVEL < 1
         case 0:
@@ -250,10 +247,11 @@ force_inline bool VECTOR_APPEND_STR(UnicodeVector *vec, PyObject *val, StackVars
 
 #define VECTOR_APPEND_LONG PYYJSON_CONCAT3(vector_append_long, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline bool VECTOR_APPEND_LONG(UnicodeVector *vec, PyObject *val, StackVars *stack_vars, bool is_in_obj) {
+force_inline bool VECTOR_APPEND_LONG(UnicodeVector **restrict vec_addr, Py_ssize_t cur_nested_depth, PyObject *val, StackVars *stack_vars, bool is_in_obj) {
     assert(PyLong_CheckExact(val));
     // 32 < TAIL_PADDING == 64 so this is enough
-    WRITE_INDENT_RETURN_IF_FAIL(stack_vars, is_in_obj, TAIL_PADDING);
+    UnicodeVector *vec = *vec_addr;
+    WRITE_INDENT_RETURN_IF_FAIL(vec_addr, cur_nested_depth, is_in_obj, TAIL_PADDING);
 
     if (pylong_is_zero(val)) {
         _TARGET_TYPE *writer = _WRITER(vec);
@@ -267,23 +265,16 @@ force_inline bool VECTOR_APPEND_LONG(UnicodeVector *vec, PyObject *val, StackVar
         if (pylong_is_unsigned(val)) {
             bool _c = pylong_value_unsigned(val, &v);
             RETURN_ON_UNLIKELY_ERR(!_c);
-            // if (unlikely(!buffer || !_c)) {
-            //     return false;
-            // }
             sign = 0;
         } else {
             i64 v2;
             bool _c = pylong_value_signed(val, &v2);
             RETURN_ON_UNLIKELY_ERR(!_c);
-            // if (unlikely(!buffer || !_c)) {
-            //     return false;
-            // }
             assert(v2 <= 0);
             v = -v2;
             sign = 1;
-            // *buffer = '-';
         }
-        VEC_WRITE_U64(stack_vars, v, sign);
+        VEC_WRITE_U64(vec, v, sign);
         *_WRITER(vec)++ = ',';
     }
     assert(vec_in_boundary(vec));
@@ -292,9 +283,9 @@ force_inline bool VECTOR_APPEND_LONG(UnicodeVector *vec, PyObject *val, StackVar
 
 #define VECTOR_APPEND_FALSE PYYJSON_CONCAT3(vector_append_false, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline bool VECTOR_APPEND_FALSE(StackVars *stack_vars, bool is_in_obj) {
-    UnicodeVector *vec = GET_VEC(stack_vars);
-    WRITE_INDENT_RETURN_IF_FAIL(stack_vars, is_in_obj, TAIL_PADDING);
+force_inline bool VECTOR_APPEND_FALSE(UnicodeVector **restrict vec_addr, Py_ssize_t cur_nested_depth, bool is_in_obj) {
+    UnicodeVector *vec = *vec_addr;
+    WRITE_INDENT_RETURN_IF_FAIL(vec_addr, cur_nested_depth, is_in_obj, TAIL_PADDING);
     _TARGET_TYPE *writer = _WRITER(vec);
     //   6,12,24
     //-> 8,16,24/32 (64)
@@ -325,9 +316,9 @@ force_inline bool VECTOR_APPEND_FALSE(StackVars *stack_vars, bool is_in_obj) {
 
 #define VECTOR_APPEND_TRUE PYYJSON_CONCAT3(vector_append_true, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline bool VECTOR_APPEND_TRUE(StackVars *stack_vars, bool is_in_obj) {
-    UnicodeVector *vec = GET_VEC(stack_vars);
-    WRITE_INDENT_RETURN_IF_FAIL(stack_vars, is_in_obj, TAIL_PADDING);
+force_inline bool VECTOR_APPEND_TRUE(UnicodeVector **restrict vec_addr, Py_ssize_t cur_nested_depth, bool is_in_obj) {
+    UnicodeVector *vec = *vec_addr;
+    WRITE_INDENT_RETURN_IF_FAIL(vec_addr, cur_nested_depth, is_in_obj, TAIL_PADDING);
     _TARGET_TYPE *writer = _WRITER(vec);
     //   5,10,20
     //-> 8,16,24/32 (64)
@@ -362,9 +353,9 @@ force_inline bool VECTOR_APPEND_TRUE(StackVars *stack_vars, bool is_in_obj) {
 
 #define VECTOR_APPEND_NULL PYYJSON_CONCAT3(vector_append_null, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline bool VECTOR_APPEND_NULL(StackVars *stack_vars, bool is_in_obj) {
-    UnicodeVector *vec = GET_VEC(stack_vars);
-    WRITE_INDENT_RETURN_IF_FAIL(stack_vars, is_in_obj, TAIL_PADDING);
+force_inline bool VECTOR_APPEND_NULL(UnicodeVector **restrict vec_addr, Py_ssize_t cur_nested_depth, bool is_in_obj) {
+    UnicodeVector *vec = *vec_addr;
+    WRITE_INDENT_RETURN_IF_FAIL(vec_addr, cur_nested_depth, is_in_obj, TAIL_PADDING);
     _TARGET_TYPE *writer = _WRITER(vec);
     //   5,10,20
     //-> 8,16,24/32 (64)
@@ -399,22 +390,22 @@ force_inline bool VECTOR_APPEND_NULL(StackVars *stack_vars, bool is_in_obj) {
 
 #define VECTOR_APPEND_FLOAT PYYJSON_CONCAT3(vector_append_float, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline bool VECTOR_APPEND_FLOAT(StackVars *stack_vars, PyObject *val, bool is_in_obj) {
-    UnicodeVector *vec = GET_VEC(stack_vars);
-    WRITE_INDENT_RETURN_IF_FAIL(stack_vars, is_in_obj, TAIL_PADDING);
+force_inline bool VECTOR_APPEND_FLOAT(UnicodeVector **restrict vec_addr, Py_ssize_t cur_nested_depth, PyObject *val, bool is_in_obj) {
+    UnicodeVector *vec = *vec_addr;
+    WRITE_INDENT_RETURN_IF_FAIL(vec_addr, cur_nested_depth, is_in_obj, TAIL_PADDING);
     double v = PyFloat_AS_DOUBLE(val);
     // u8 *const buffer = (u8 *) reserve_view_data_buffer<u8[32]>(viewer);
     u64 *raw = (u64 *) &v;
-    VEC_WRITE_F64(stack_vars, *raw);
+    VEC_WRITE_F64(vec, *raw);
     *_WRITER(vec)++ = ',';
     return true;
 }
 
 #define VECTOR_APPEND_EMPTY_ARR PYYJSON_CONCAT3(vector_append_empty_arr, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline bool VECTOR_APPEND_EMPTY_ARR(StackVars *stack_vars, bool is_in_obj) {
-    UnicodeVector *vec = GET_VEC(stack_vars);
-    WRITE_INDENT_RETURN_IF_FAIL(stack_vars, is_in_obj, TAIL_PADDING);
+force_inline bool VECTOR_APPEND_EMPTY_ARR(UnicodeVector **restrict vec_addr, Py_ssize_t cur_nested_depth, bool is_in_obj) {
+    UnicodeVector *vec = *vec_addr;
+    WRITE_INDENT_RETURN_IF_FAIL(vec_addr, cur_nested_depth, is_in_obj, TAIL_PADDING);
     _TARGET_TYPE *writer = _WRITER(vec);
     //   3,6,12
     //-> 4,8,16 (64)
@@ -431,18 +422,18 @@ force_inline bool VECTOR_APPEND_EMPTY_ARR(StackVars *stack_vars, bool is_in_obj)
 
 #define VECTOR_APPEND_ARR_BEGIN PYYJSON_CONCAT3(vector_append_arr_begin, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline bool VECTOR_APPEND_ARR_BEGIN(StackVars *stack_vars, bool is_in_obj) {
-    UnicodeVector *vec = GET_VEC(stack_vars);
-    WRITE_INDENT_RETURN_IF_FAIL(stack_vars, is_in_obj, TAIL_PADDING);
+force_inline bool VECTOR_APPEND_ARR_BEGIN(UnicodeVector **restrict vec_addr, Py_ssize_t cur_nested_depth, bool is_in_obj) {
+    UnicodeVector *vec = *vec_addr;
+    WRITE_INDENT_RETURN_IF_FAIL(vec_addr, cur_nested_depth, is_in_obj, TAIL_PADDING);
     *_WRITER(vec)++ = '[';
     return true;
 }
 
 #define VECTOR_APPEND_EMPTY_OBJ PYYJSON_CONCAT3(vector_append_empty_obj, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline bool VECTOR_APPEND_EMPTY_OBJ(StackVars *stack_vars, bool is_in_obj) {
-    UnicodeVector *vec = GET_VEC(stack_vars);
-    WRITE_INDENT_RETURN_IF_FAIL(stack_vars, is_in_obj, TAIL_PADDING);
+force_inline bool VECTOR_APPEND_EMPTY_OBJ(UnicodeVector **restrict vec_addr, Py_ssize_t cur_nested_depth, bool is_in_obj) {
+    UnicodeVector *vec = *vec_addr;
+    WRITE_INDENT_RETURN_IF_FAIL(vec_addr, cur_nested_depth, is_in_obj, TAIL_PADDING);
     _TARGET_TYPE *writer = _WRITER(vec);
     //   3,6,12
     //-> 4,8,16 (64)
@@ -459,21 +450,21 @@ force_inline bool VECTOR_APPEND_EMPTY_OBJ(StackVars *stack_vars, bool is_in_obj)
 
 #define VECTOR_APPEND_OBJ_BEGIN PYYJSON_CONCAT3(vector_append_obj_begin, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline bool VECTOR_APPEND_OBJ_BEGIN(StackVars *stack_vars, bool is_in_obj) {
-    UnicodeVector *vec = GET_VEC(stack_vars);
-    WRITE_INDENT_RETURN_IF_FAIL(stack_vars, is_in_obj, TAIL_PADDING);
+force_inline bool VECTOR_APPEND_OBJ_BEGIN(UnicodeVector **restrict vec_addr, Py_ssize_t cur_nested_depth, bool is_in_obj) {
+    UnicodeVector *vec = *vec_addr;
+    WRITE_INDENT_RETURN_IF_FAIL(vec_addr, cur_nested_depth, is_in_obj, TAIL_PADDING);
     *_WRITER(vec)++ = '{';
     return true;
 }
 
 #define VECTOR_APPEND_OBJ_END PYYJSON_CONCAT3(vector_append_obj_end, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline bool VECTOR_APPEND_OBJ_END(StackVars *stack_vars) {
-    UnicodeVector *vec = GET_VEC(stack_vars);
+force_inline bool VECTOR_APPEND_OBJ_END(UnicodeVector **restrict vec_addr, Py_ssize_t cur_nested_depth) {
+    UnicodeVector *vec = *vec_addr;
     // remove last comma
     VEC_BACK1(vec);
     // this is not a *value*, the indent is always needed. i.e. `is_in_obj` should always pass false
-    WRITE_INDENT_RETURN_IF_FAIL(stack_vars, false, TAIL_PADDING);
+    WRITE_INDENT_RETURN_IF_FAIL(vec_addr, cur_nested_depth, false, TAIL_PADDING);
     _TARGET_TYPE *writer = _WRITER(vec);
     *writer++ = '}';
     *writer++ = ',';
@@ -483,12 +474,12 @@ force_inline bool VECTOR_APPEND_OBJ_END(StackVars *stack_vars) {
 
 #define VECTOR_APPEND_ARR_END PYYJSON_CONCAT3(vector_append_arr_end, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline bool VECTOR_APPEND_ARR_END(StackVars *stack_vars) {
-    UnicodeVector *vec = GET_VEC(stack_vars);
+force_inline bool VECTOR_APPEND_ARR_END(UnicodeVector **restrict vec_addr, Py_ssize_t cur_nested_depth) {
+    UnicodeVector *vec = *vec_addr;
     // remove last comma
     VEC_BACK1(vec);
     // this is not a *value*, the indent is always needed. i.e. `is_in_obj` should always pass false
-    WRITE_INDENT_RETURN_IF_FAIL(stack_vars, false, TAIL_PADDING);
+    WRITE_INDENT_RETURN_IF_FAIL(vec_addr, cur_nested_depth, false, TAIL_PADDING);
     _TARGET_TYPE *writer = _WRITER(vec);
     *writer++ = ']';
     *writer++ = ',';
@@ -516,7 +507,7 @@ force_inline Py_ssize_t GET_VECTOR_FINAL_LEN(UnicodeVector *vec) {
 
 force_inline EncodeValJumpFlag ENCODE_PROCESS_VAL(
         PyObject *val,
-        StackVars *stack_vars, bool is_in_obj) {
+        StackVars *restrict stack_vars, bool is_in_obj) {
 #define CTN_SIZE_GROW()                                                               \
     do {                                                                              \
         if (unlikely(stack_vars->cur_nested_depth == PYYJSON_ENCODE_MAX_RECURSION)) { \
@@ -538,48 +529,48 @@ force_inline EncodeValJumpFlag ENCODE_PROCESS_VAL(
             _c = VECTOR_APPEND_STR(vec, val, stack_vars, is_in_obj);
             RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
 #if COMPILE_UCS_LEVEL < 1
-            if (unlikely(get_cur_ucs_type(stack_vars) == 1)) return is_in_obj ? JumpFlag_Elevate1_ObjVal : JumpFlag_Elevate1_ArrVal;
+            if (unlikely(stack_vars->unicode_info.cur_ucs_type == 1)) return is_in_obj ? JumpFlag_Elevate1_ObjVal : JumpFlag_Elevate1_ArrVal;
 #endif
 #if COMPILE_UCS_LEVEL < 2
-            if (unlikely(get_cur_ucs_type(stack_vars) == 2)) return is_in_obj ? JumpFlag_Elevate2_ObjVal : JumpFlag_Elevate2_ArrVal;
+            if (unlikely(stack_vars->unicode_info.cur_ucs_type == 2)) return is_in_obj ? JumpFlag_Elevate2_ObjVal : JumpFlag_Elevate2_ArrVal;
 #endif
 #if COMPILE_UCS_LEVEL < 4
-            if (unlikely(get_cur_ucs_type(stack_vars) == 4)) return is_in_obj ? JumpFlag_Elevate4_ObjVal : JumpFlag_Elevate4_ArrVal;
+            if (unlikely(stack_vars->unicode_info.cur_ucs_type == 4)) return is_in_obj ? JumpFlag_Elevate4_ObjVal : JumpFlag_Elevate4_ArrVal;
 #endif
             break;
         }
         case T_Long: {
-            _c = VECTOR_APPEND_LONG(vec, val, stack_vars, is_in_obj);
+            _c = VECTOR_APPEND_LONG(&GET_VEC(stack_vars), stack_vars->cur_nested_depth, val, stack_vars, is_in_obj);
             RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
             break;
         }
         case T_False: {
-            _c = VECTOR_APPEND_FALSE(stack_vars, is_in_obj);
+            _c = VECTOR_APPEND_FALSE(&GET_VEC(stack_vars), stack_vars->cur_nested_depth, is_in_obj);
             RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
             break;
         }
         case T_True: {
-            _c = VECTOR_APPEND_TRUE(stack_vars, is_in_obj);
+            _c = VECTOR_APPEND_TRUE(&GET_VEC(stack_vars), stack_vars->cur_nested_depth, is_in_obj);
             RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
             break;
         }
         case T_None: {
-            _c = VECTOR_APPEND_NULL(stack_vars, is_in_obj);
+            _c = VECTOR_APPEND_NULL(&GET_VEC(stack_vars), stack_vars->cur_nested_depth, is_in_obj);
             RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
             break;
         }
         case T_Float: {
-            _c = VECTOR_APPEND_FLOAT(stack_vars, val, is_in_obj);
+            _c = VECTOR_APPEND_FLOAT(&GET_VEC(stack_vars), stack_vars->cur_nested_depth, val, is_in_obj);
             RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
             break;
         }
         case T_List: {
             Py_ssize_t this_list_size = PyList_GET_SIZE(val);
             if (unlikely(this_list_size == 0)) {
-                _c = VECTOR_APPEND_EMPTY_ARR(stack_vars, is_in_obj);
+                _c = VECTOR_APPEND_EMPTY_ARR(&GET_VEC(stack_vars), stack_vars->cur_nested_depth, is_in_obj);
                 RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
             } else {
-                _c = VECTOR_APPEND_ARR_BEGIN(stack_vars, is_in_obj);
+                _c = VECTOR_APPEND_ARR_BEGIN(&GET_VEC(stack_vars), stack_vars->cur_nested_depth, is_in_obj);
                 RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
                 CTN_SIZE_GROW();
                 CtnType *cur_write_ctn = _CTN_STACK(stack_vars) + (stack_vars->cur_nested_depth++);
@@ -594,10 +585,10 @@ force_inline EncodeValJumpFlag ENCODE_PROCESS_VAL(
         }
         case T_Dict: {
             if (unlikely(PyDict_GET_SIZE(val) == 0)) {
-                _c = VECTOR_APPEND_EMPTY_OBJ(stack_vars, is_in_obj);
+                _c = VECTOR_APPEND_EMPTY_OBJ(&GET_VEC(stack_vars), stack_vars->cur_nested_depth, is_in_obj);
                 RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
             } else {
-                _c = VECTOR_APPEND_OBJ_BEGIN(stack_vars, is_in_obj);
+                _c = VECTOR_APPEND_OBJ_BEGIN(&GET_VEC(stack_vars), stack_vars->cur_nested_depth, is_in_obj);
                 RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
                 CTN_SIZE_GROW();
                 CtnType *cur_write_ctn = _CTN_STACK(stack_vars) + (stack_vars->cur_nested_depth++);
@@ -612,10 +603,10 @@ force_inline EncodeValJumpFlag ENCODE_PROCESS_VAL(
         case T_Tuple: {
             Py_ssize_t this_list_size = PyTuple_Size(val);
             if (unlikely(this_list_size == 0)) {
-                bool _c = VECTOR_APPEND_EMPTY_ARR(stack_vars, is_in_obj);
+                bool _c = VECTOR_APPEND_EMPTY_ARR(&GET_VEC(stack_vars), stack_vars->cur_nested_depth, is_in_obj);
                 RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
             } else {
-                bool _c = VECTOR_APPEND_ARR_BEGIN(stack_vars, is_in_obj);
+                bool _c = VECTOR_APPEND_ARR_BEGIN(&GET_VEC(stack_vars), stack_vars->cur_nested_depth, is_in_obj);
                 RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
                 CTN_SIZE_GROW();
                 CtnType *cur_write_ctn = _CTN_STACK(stack_vars) + (stack_vars->cur_nested_depth++);
@@ -645,7 +636,7 @@ force_noinline PyObject *
 PYYJSON_DUMPS_OBJ(
 #if COMPILE_UCS_LEVEL > 0
         EncodeValJumpFlag jump_flag,
-        StackVars *stack_vars
+        StackVars *restrict stack_vars
 #else
         PyObject *in_obj
 #endif
@@ -656,7 +647,7 @@ PYYJSON_DUMPS_OBJ(
     } while (0)
 #if COMPILE_UCS_LEVEL == 0
     StackVars _stack_vars;
-    StackVars *stack_vars = &_stack_vars;
+    StackVars *restrict stack_vars = &_stack_vars;
     if (unlikely(!init_stack_vars(stack_vars, in_obj))) {
         goto fail;
     }
@@ -666,11 +657,11 @@ PYYJSON_DUMPS_OBJ(
     // so is_in_obj always pass true
     if (PyDict_CheckExact(stack_vars->cur_obj)) {
         if (unlikely(PyDict_GET_SIZE(stack_vars->cur_obj) == 0)) {
-            bool _c = VECTOR_APPEND_EMPTY_OBJ(stack_vars, true);
+            bool _c = VECTOR_APPEND_EMPTY_OBJ(&GET_VEC(stack_vars), stack_vars->cur_nested_depth, true);
             assert(_c);
             goto success;
         }
-        bool _c = VECTOR_APPEND_OBJ_BEGIN(stack_vars, true);
+        bool _c = VECTOR_APPEND_OBJ_BEGIN(&GET_VEC(stack_vars), stack_vars->cur_nested_depth, true);
         assert(_c);
         assert(!stack_vars->cur_nested_depth);
         stack_vars->cur_nested_depth = 1;
@@ -679,11 +670,11 @@ PYYJSON_DUMPS_OBJ(
     } else if (PyList_CheckExact(stack_vars->cur_obj)) {
         stack_vars->cur_list_size = PyList_GET_SIZE(stack_vars->cur_obj);
         if (unlikely(stack_vars->cur_list_size == 0)) {
-            bool _c = VECTOR_APPEND_EMPTY_ARR(stack_vars, true);
+            bool _c = VECTOR_APPEND_EMPTY_ARR(&GET_VEC(stack_vars), stack_vars->cur_nested_depth, true);
             assert(_c);
             goto success;
         }
-        bool _c = VECTOR_APPEND_ARR_BEGIN(stack_vars, true);
+        bool _c = VECTOR_APPEND_ARR_BEGIN(&GET_VEC(stack_vars), stack_vars->cur_nested_depth, true);
         assert(_c);
         assert(!stack_vars->cur_nested_depth);
         stack_vars->cur_nested_depth = 1;
@@ -695,11 +686,11 @@ PYYJSON_DUMPS_OBJ(
         }
         stack_vars->cur_list_size = PyTuple_GET_SIZE(stack_vars->cur_obj);
         if (unlikely(stack_vars->cur_list_size == 0)) {
-            bool _c = VECTOR_APPEND_EMPTY_ARR(stack_vars, true);
+            bool _c = VECTOR_APPEND_EMPTY_ARR(&GET_VEC(stack_vars), stack_vars->cur_nested_depth, true);
             assert(_c);
             goto success;
         }
-        bool _c = VECTOR_APPEND_ARR_BEGIN(stack_vars, true);
+        bool _c = VECTOR_APPEND_ARR_BEGIN(&GET_VEC(stack_vars), stack_vars->cur_nested_depth, true);
         assert(_c);
         assert(!stack_vars->cur_nested_depth);
         stack_vars->cur_nested_depth = 1;
@@ -768,17 +759,17 @@ dict_pair_begin:;
         GOTO_FAIL_ON_UNLIKELY_ERR(!_c);
         {
 #if COMPILE_UCS_LEVEL < 1
-            if (unlikely(get_cur_ucs_type(stack_vars) == 1)) {
+            if (unlikely(stack_vars->unicode_info.cur_ucs_type == 1)) {
                 return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(JumpFlag_Elevate1_Key, stack_vars);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 2
-            if (unlikely(get_cur_ucs_type(stack_vars) == 2)) {
+            if (unlikely(stack_vars->unicode_info.cur_ucs_type == 2)) {
                 return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(JumpFlag_Elevate2_Key, stack_vars);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 4
-            if (unlikely(get_cur_ucs_type(stack_vars) == 4)) {
+            if (unlikely(stack_vars->unicode_info.cur_ucs_type == 4)) {
                 return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(JumpFlag_Elevate4_Key, stack_vars);
             }
 #endif
@@ -827,7 +818,7 @@ dict_pair_begin:;
         assert(stack_vars->cur_nested_depth);
         CtnType *last_pos = _CTN_STACK(stack_vars) + (--stack_vars->cur_nested_depth);
 
-        bool _c = VECTOR_APPEND_OBJ_END(stack_vars);
+        bool _c = VECTOR_APPEND_OBJ_END(&GET_VEC(stack_vars), stack_vars->cur_nested_depth);
         GOTO_FAIL_ON_UNLIKELY_ERR(!_c);
         if (unlikely(stack_vars->cur_nested_depth == 0)) {
             goto success;
@@ -901,7 +892,7 @@ arr_val_begin:;
         assert(stack_vars->cur_nested_depth);
         CtnType *last_pos = _CTN_STACK(stack_vars) + (--stack_vars->cur_nested_depth);
 
-        bool _c = VECTOR_APPEND_ARR_END(stack_vars);
+        bool _c = VECTOR_APPEND_ARR_END(&GET_VEC(stack_vars), stack_vars->cur_nested_depth);
         GOTO_FAIL_ON_UNLIKELY_ERR(!_c);
         if (unlikely(stack_vars->cur_nested_depth == 0)) {
             goto success;
@@ -974,7 +965,7 @@ tuple_val_begin:;
         assert(stack_vars->cur_nested_depth);
         CtnType *last_pos = _CTN_STACK(stack_vars) + (--stack_vars->cur_nested_depth);
 
-        bool _c = VECTOR_APPEND_ARR_END(stack_vars);
+        bool _c = VECTOR_APPEND_ARR_END(&GET_VEC(stack_vars), stack_vars->cur_nested_depth);
         GOTO_FAIL_ON_UNLIKELY_ERR(!_c);
         if (unlikely(stack_vars->cur_nested_depth == 0)) {
             goto success;
@@ -1014,7 +1005,7 @@ success:;
 #if COMPILE_UCS_LEVEL == 1
     ascii_elevate1(stack_vars);
 #endif
-    assert(get_cur_ucs_type(stack_vars) == COMPILE_UCS_LEVEL);
+    assert(stack_vars->unicode_info.cur_ucs_type == COMPILE_UCS_LEVEL);
     Py_ssize_t final_len = GET_VECTOR_FINAL_LEN(GET_VEC(stack_vars));
     bool _c = vector_resize_to_fit(&GET_VEC(stack_vars), final_len, COMPILE_UCS_LEVEL);
     GOTO_FAIL_ON_UNLIKELY_ERR(!_c);

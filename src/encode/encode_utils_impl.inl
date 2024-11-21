@@ -123,9 +123,8 @@ force_inline void _ELEVATE_FROM_U8_NUM_BUFFER(UnicodeVector *vec, u8 *buffer, Py
  * Write a u64 number to the vector.
  * The space (32 * sizeof(_TARGET_TYPE)) must be reserved before calling this function.
  */
-force_inline void PYYJSON_CONCAT2(vec_write_u64, COMPILE_WRITE_UCS_LEVEL)(StackVars *stack_vars, u64 val, usize sign) {
+force_inline void PYYJSON_CONCAT2(vec_write_u64, COMPILE_WRITE_UCS_LEVEL)(UnicodeVector *vec, u64 val, usize sign) {
     assert(sign <= 1);
-    UnicodeVector *vec = GET_VEC(stack_vars);
 #if COMPILE_WRITE_UCS_LEVEL == 1
     u8 *buffer = _WRITER(vec);
 #else
@@ -147,8 +146,7 @@ force_inline void PYYJSON_CONCAT2(vec_write_u64, COMPILE_WRITE_UCS_LEVEL)(StackV
  * Write a f64 number to the vector.
  * The space (32 * sizeof(_TARGET_TYPE)) must be reserved before calling this function.
  */
-force_inline void PYYJSON_CONCAT2(vec_write_f64, COMPILE_WRITE_UCS_LEVEL)(StackVars *stack_vars, u64 val_u64_repr) {
-    UnicodeVector *vec = GET_VEC(stack_vars);
+force_inline void PYYJSON_CONCAT2(vec_write_f64, COMPILE_WRITE_UCS_LEVEL)(UnicodeVector *vec, u64 val_u64_repr) {
 #if COMPILE_WRITE_UCS_LEVEL == 1
     u8 *buffer = _WRITER(vec);
 #else
