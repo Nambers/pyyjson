@@ -994,16 +994,16 @@ success:;
     VEC_BACK1(stack_vars->vec);
 
 #if COMPILE_UCS_LEVEL == 4
-    ucs2_elevate4(stack_vars);
-    ucs1_elevate4(stack_vars);
-    ascii_elevate4(stack_vars);
+    ucs2_elevate4(GET_VEC(stack_vars), &stack_vars->unicode_info);
+    ucs1_elevate4(GET_VEC(stack_vars), &stack_vars->unicode_info);
+    ascii_elevate4(GET_VEC(stack_vars), &stack_vars->unicode_info);
 #endif
 #if COMPILE_UCS_LEVEL == 2
-    ucs1_elevate2(stack_vars);
-    ascii_elevate2(stack_vars);
+    ucs1_elevate2(GET_VEC(stack_vars), &stack_vars->unicode_info);
+    ascii_elevate2(GET_VEC(stack_vars), &stack_vars->unicode_info);
 #endif
 #if COMPILE_UCS_LEVEL == 1
-    ascii_elevate1(stack_vars);
+    ascii_elevate1(GET_VEC(stack_vars), &stack_vars->unicode_info);
 #endif
     assert(stack_vars->unicode_info.cur_ucs_type == COMPILE_UCS_LEVEL);
     Py_ssize_t final_len = GET_VECTOR_FINAL_LEN(GET_VEC(stack_vars));
