@@ -132,24 +132,22 @@ class TestEncode(unittest.TestCase):
             tuple(range(100)),  # large tuple
             "a",  # simple string
             # 1,  # simple int
-            # 2.3,  # simple float
-            # math.inf,
-            # math.nan,
-            # math.pi,
+            2.3,  # simple float
+            math.inf,
+            math.nan,
+            math.pi,
             # None,
             # True,
             # False,
             [],
             {},
-            # dict({a: b for a in range(10) for b in range(10)}),  # set
             {"啊啊啊": "ß"},
-            # 321321432.231543245,  # large float
-            # -321321432.231543245,
+            321321432.231543245,  # large float
+            -321321432.231543245,
             # -1,
-            # -2.3,
-            # -math.inf,
-            # -math.nan,
-            # collections.defaultdict(x=1),
+            -2.3,
+            -math.inf,
+            -math.nan,
             "RandomText1",
             "RandomTèxt1",
             "测试字符串",

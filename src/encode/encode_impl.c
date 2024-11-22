@@ -1,4 +1,3 @@
-// #include "cpy_utils.inl"
 #include "encode_shared.h"
 #include "simd_detect.h"
 #include "simd_impl.h"
@@ -602,7 +601,7 @@ force_inline void ucs2_elevate4(UnicodeVector *vec, UnicodeInfo *unicode_info) {
 }
 
 force_inline void ascii_elevate1(UnicodeVector *vec, UnicodeInfo *unicode_info) {
-    memmove(GET_VEC_COMPACT_START(vec), GET_VEC_ASCII_START(vec),  unicode_info->ascii_size);
+    memmove(GET_VEC_COMPACT_START(vec), GET_VEC_ASCII_START(vec), unicode_info->ascii_size);
 }
 
 thread_local CtnType __tls_ctn_stack[PYYJSON_ENCODE_MAX_RECURSION];
@@ -847,6 +846,21 @@ force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {
     return (PyObject *) vec;
 }
 
+force_inline PyObject *pyyjson_dumps_single_float(PyObject *val) {
+    u8 buffer[32];
+    double v = PyFloat_AS_DOUBLE(val);
+    u64 *raw = (u64 *) &v;
+    u8 *buffer_end = write_f64_raw(buffer, *raw);
+    size_t size = buffer_end - buffer;
+    PyObject *unicode = PyUnicode_New(size, 127);
+    if (unlikely(!unicode)) return NULL;
+    // assert(unicode);
+    char *write_pos = (char *) (((PyASCIIObject *) unicode) + 1);
+    memcpy((void *) write_pos, buffer, size);
+    write_pos[size] = 0;
+    return unicode;
+}
+
 force_noinline PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject *kwargs) {
     PyObject *obj;
     int option_digit = 0;
@@ -900,7 +914,6 @@ dumps_container:;
         indent = 4;
     }
 
-
     switch (indent) {
         case 0: {
             ret = pyyjson_dumps_obj_0_0(obj);
@@ -934,8 +947,9 @@ dumps_unicode:;
     return pyyjson_dumps_single_unicode(obj);
 dumps_long:;
 dumps_constant:;
-dumps_float:;
     goto fail; // TODO
+dumps_float:;
+    return pyyjson_dumps_single_float(obj);
 success:;
     return ret;
 fail:;
