@@ -30,6 +30,7 @@
 #define SIMD_MASK_TYPE SIMD_TYPE
 #define SIMD_SMALL_MASK_TYPE SIMD_TYPE
 #define SIMD_BIT_MASK_TYPE u16
+#define SIMD_HALF_TYPE SIMD_TYPE
 #endif
 
 /*==============================================================================
@@ -266,6 +267,24 @@ force_inline SIMD_128 elevate_2_4_to_128(SIMD_128 a) {
 #endif
 }
 
+force_inline void extract_128_two_parts(SIMD_128 x, SIMD_128 *restrict x1, SIMD_128 *restrict x2) {
+    *x1 = x;
+    *x2 = unpack_hi_64_128(x, x);
+}
+
+force_inline void extract_128_four_parts(SIMD_128 x, SIMD_128 *restrict x1, SIMD_128 *restrict x2, SIMD_128 *restrict x3, SIMD_128 *restrict x4) {
+#if __SSE3__
+#define MOVEHDUP(_x) (SIMD_128)_mm_movehdup_ps((__m128)(_x))
+#else
+#define MOVEHDUP(_x) _mm_bsrli_si128((_x), 4)
+#endif
+    *x1 = x;
+    *x2 = MOVEHDUP(x);
+    *x3 = unpack_hi_64_128(x, x);
+    *x4 = MOVEHDUP(*x3);
+#undef MOVEHDUP
+}
+
 /*==============================================================================
  * SSE4.1 only SIMD code
  *============================================================================*/
@@ -338,6 +357,17 @@ force_inline SIMD_256 cmpeq0_8_256(SIMD_256 a) {
 force_inline SIMD_256 blendv_256(SIMD_256 blend, SIMD_256 SIMD_VAR, SIMD_256 mask) {
     return _mm256_blendv_epi8(blend, SIMD_VAR, mask);
 }
+
+force_inline void extract_256_two_parts(SIMD_256 y, SIMD_128 *restrict x1, SIMD_128 *restrict x2) {
+    *x1 = _mm256_extracti128_si256(y, 0);
+    *x2 = _mm256_extracti128_si256(y, 1);
+}
+
+force_inline void extract_256_four_parts(SIMD_256 y, SIMD_128 *restrict x1, SIMD_128 *restrict x2, SIMD_128 *restrict x3, SIMD_128 *restrict x4) {
+    extract_256_two_parts(y, x1, x3);
+    *x2 = unpack_hi_64_128(*x1, *x1);
+    *x4 = unpack_hi_64_128(*x3, *x3);
+}
 #endif
 
 /*==============================================================================
@@ -360,12 +390,24 @@ force_inline void write_512_aligned(void *dst, SIMD_512 z) {
     _mm512_store_si512(dst, z);
 }
 
-force_inline SIMD_512 elevate_2_4_to_512(SIMD_256 y){
+force_inline SIMD_512 elevate_2_4_to_512(SIMD_256 y) {
     return _mm512_cvtepu16_epi32(y);
 }
 
-force_inline SIMD_512 elevate_1_4_to_512(SIMD_128 x){
+force_inline SIMD_512 elevate_1_4_to_512(SIMD_128 x) {
     return _mm512_cvtepu8_epi32(x);
+}
+
+force_inline void extract_512_two_parts(SIMD_512 z, SIMD_256 *restrict y1, SIMD_256 *restrict y2) {
+    *y1 = _mm512_extracti64x4_epi64(z, 0);
+    *y2 = _mm512_extracti64x4_epi64(z, 1);
+}
+
+force_inline void extract_512_four_parts(SIMD_512 z, SIMD_128 *restrict x1, SIMD_128 *restrict x2, SIMD_128 *restrict x3, SIMD_128 *restrict x4) {
+    *x1 = _mm512_extracti32x4_epi32(z, 0);
+    *x2 = _mm512_extracti32x4_epi32(z, 1);
+    *x3 = _mm512_extracti32x4_epi32(z, 2);
+    *x4 = _mm512_extracti32x4_epi32(z, 3);
 }
 #endif
 
@@ -373,7 +415,7 @@ force_inline SIMD_512 elevate_1_4_to_512(SIMD_128 x){
  * AVX512BW only SIMD code
  *============================================================================*/
 #if __AVX512BW__
-force_inline SIMD_512 elevate_1_2_to_512(SIMD_256 y){
+force_inline SIMD_512 elevate_1_2_to_512(SIMD_256 y) {
     return _mm512_cvtepu8_epi16(y);
 }
 #endif
@@ -382,7 +424,7 @@ force_inline SIMD_512 elevate_1_2_to_512(SIMD_256 y){
  * SIMD half related.
  * This does not have 128-bits version.
  *============================================================================*/
-#if defined(SIMD_HALF_TYPE)
+#if SIMD_BIT_SIZE > 128
 force_inline SIMD_HALF_TYPE load_aligned_half(const void *src) {
 #if SIMD_BIT_SIZE == 256
     return load_128_aligned(src);
@@ -399,7 +441,7 @@ force_inline SIMD_HALF_TYPE load_half(const void *src) {
 #endif
 }
 
-#endif // defined(SIMD_HALF_TYPE)
+#endif // SIMD_BIT_SIZE > 128
 
 /*==============================================================================
  * TZCNT.
@@ -408,12 +450,12 @@ force_noinline u32 tzcnt_u32(u32 x) {
     // never pass a zero here.
     assert(x);
 #if __BMI__
-    // real gcc check from yyjson
-    #if !defined(__clang__) && !defined(__INTEL_COMPILER) && !defined(__ICC) && defined(__GNUC__)
-        return __tzcnt_u32(x);
-    #else
-        return _mm_tzcnt_32(x);
-    #endif
+// real gcc check from yyjson
+#if !defined(__clang__) && !defined(__INTEL_COMPILER) && !defined(__ICC) && defined(__GNUC__)
+    return __tzcnt_u32(x);
+#else
+    return _mm_tzcnt_32(x);
+#endif
 #else
     return 31 - (((x & -x) & 0x0000FFFF) ? 16 : 0) - (((x & -x) & 0x00FF00FF) ? 8 : 0) - (((x & -x) & 0x0F0F0F0F) ? 4 : 0) - (((x & -x) & 0x33333333) ? 2 : 0) - (((x & -x) & 0x55555555) ? 1 : 0);
 #endif
@@ -423,12 +465,12 @@ force_noinline u64 tzcnt_u64(u64 x) {
     // never pass a zero here.
     assert(x);
 #if __BMI__
-    // same as above
-    #if !defined(__clang__) && !defined(__INTEL_COMPILER) && !defined(__ICC) && defined(__GNUC__)
-        return __tzcnt_u64(x);
-    #else
-        return _mm_tzcnt_64(x);
-    #endif
+// same as above
+#if !defined(__clang__) && !defined(__INTEL_COMPILER) && !defined(__ICC) && defined(__GNUC__)
+    return __tzcnt_u64(x);
+#else
+    return _mm_tzcnt_64(x);
+#endif
 #else
     return 63 - (((x & -x) & 0x00000000FFFFFFFFULL) ? 32 : 0) - (((x & -x) & 0x0000FFFF0000FFFFULL) ? 16 : 0) - (((x & -x) & 0x00FF00FF00FF00FFULL) ? 8 : 0) - (((x & -x) & 0x0F0F0F0F0F0F0F0FULL) ? 4 : 0) - (((x & -x) & 0x3333333333333333ULL) ? 2 : 0) - (((x & -x) & 0x5555555555555555ULL) ? 1 : 0);
 #endif

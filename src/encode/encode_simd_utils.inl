@@ -193,165 +193,39 @@ force_inline void WRITE_SIMD_IMPL(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR) {
     // write as it is
     write_simd((void *) dst, SIMD_VAR);
 #else
-#if COMPILE_READ_UCS_LEVEL == 2
-// 2->4
-#if SIMD_BIT_SIZE == 512
-    // 256->512
-    __m256i _y;
-    __m512i _z;
+#if COMPILE_READ_UCS_LEVEL == 1 && COMPILE_WRITE_UCS_LEVEL == 4
+#define EXTRACTOR PYYJSON_CONCAT3(extract, SIMD_BIT_SIZE, four_parts)
+#define ELEVATOR PYYJSON_CONCAT5(elevate, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL, to, SIMD_BIT_SIZE)
+    SIMD_128 x1, x2, x3, x4;
+    EXTRACTOR(SIMD_VAR, &x1, &x2, &x3, &x4);
     // 0
-    _y = SIMD_EXTRACT_HALF(SIMD_VAR, 0);
-    _z = elevate_2_4_to_512(_y);
-    write_512(dst, _z);
-    dst += CHECK_COUNT_MAX / 2;
-    // 1
-    _y = SIMD_EXTRACT_HALF(SIMD_VAR, 1);
-    _z = elevate_2_4_to_512(_y);
-    write_512(dst, _z);
-    dst += CHECK_COUNT_MAX / 2;
-#elif SIMD_BIT_SIZE == 256
-    // 128->256
-    __m128i _x;
-    __m256i _y;
-    // 0
-    _x = SIMD_EXTRACT_HALF(SIMD_VAR, 0);
-    _y = elevate_2_4_to_256(_x);
-    write_simd((void *) dst, _y);
-    dst += CHECK_COUNT_MAX / 2;
-    // 1
-    _x = SIMD_EXTRACT_HALF(SIMD_VAR, 1);
-    _y = elevate_2_4_to_256(_x);
-    write_simd((void *) dst, _y);
-    dst += CHECK_COUNT_MAX / 2;
-#else  // SIMD_BIT_SIZE == 128
-    // 64(128)->128
-    __m128i _x;
-    // 0
-    _x = elevate_2_4_to_128(SIMD_VAR);
-    write_simd((void *) dst, _x);
-    dst += CHECK_COUNT_MAX / 2;
-    // 1
-    RIGHT_SHIFT_128BITS(SIMD_VAR, 64, &SIMD_VAR);
-    _x = elevate_2_4_to_128(SIMD_VAR);
-    write_simd((void *) dst, _x);
-    dst += CHECK_COUNT_MAX / 2;
-#endif // SIMD_BIT_SIZE
-#else  // COMPILE_READ_UCS_LEVEL == 1
-#if COMPILE_WRITE_UCS_LEVEL == 2
-// 1->2
-#if SIMD_BIT_SIZE == 512
-    // 256->512
-    __m512i _z;
-    __m256i _y;
-    // 0
-    _y = SIMD_EXTRACT_HALF(SIMD_VAR, 0);
-    _z = elevate_1_2_to_512(_y);
-    write_512(dst, _z);
-    dst += CHECK_COUNT_MAX / 2;
-    // 1
-    _y = SIMD_EXTRACT_HALF(SIMD_VAR, 1);
-    _z = elevate_1_2_to_512(_y);
-    write_512(dst, _z);
-    dst += CHECK_COUNT_MAX / 2;
-#elif SIMD_BIT_SIZE == 256
-    // 128->256
-    __m128i _x;
-    __m256i _y;
-    _x = SIMD_EXTRACT_HALF(SIMD_VAR, 0);
-    _y = elevate_1_2_to_256(_x);
-    write_simd((void *) dst, _y);
-    dst += CHECK_COUNT_MAX / 2;
-    _x = SIMD_EXTRACT_HALF(SIMD_VAR, 1);
-    _y = elevate_1_2_to_256(_x);
-    write_simd((void *) dst, _y);
-    dst += CHECK_COUNT_MAX / 2;
-#else  // SIMD_BIT_SIZE == 128
-    // 64(128)->128
-    __m128i _x;
-    _x = elevate_1_2_to_128(SIMD_VAR);
-    write_simd((void *) dst, _x);
-    dst += CHECK_COUNT_MAX / 2;
-    RIGHT_SHIFT_128BITS(SIMD_VAR, 64, &SIMD_VAR);
-    _x = elevate_1_2_to_128(SIMD_VAR);
-    write_simd((void *) dst, _x);
-    dst += CHECK_COUNT_MAX / 2;
-#endif // SIMD_BIT_SIZE
-#else  // COMPILE_WRITE_UCS_LEVEL == 4
-// 1->4
-#if SIMD_BIT_SIZE == 512
-    // 128->512
-    __m512i _z;
-    __m128i _x;
-    // 0
-    _x = SIMD_EXTRACT_PART(SIMD_VAR, 0);
-    _z = elevate_1_4_to_512(_x);
-    write_512(dst, _z);
+    write_simd((void *) dst, ELEVATOR(x1));
     dst += CHECK_COUNT_MAX / 4;
     // 1
-    _x = SIMD_EXTRACT_PART(SIMD_VAR, 1);
-    _z = elevate_1_4_to_512(_x);
-    write_512(dst, _z);
+    write_simd((void *) dst, ELEVATOR(x2));
     dst += CHECK_COUNT_MAX / 4;
     // 2
-    _x = SIMD_EXTRACT_PART(SIMD_VAR, 2);
-    _z = elevate_1_4_to_512(_x);
-    write_512(dst, _z);
+    write_simd((void *) dst, ELEVATOR(x3));
     dst += CHECK_COUNT_MAX / 4;
     // 3
-    _x = SIMD_EXTRACT_PART(SIMD_VAR, 3);
-    _z = elevate_1_4_to_512(_x);
-    write_512(dst, _z);
+    write_simd((void *) dst, ELEVATOR(x4));
     dst += CHECK_COUNT_MAX / 4;
-#elif SIMD_BIT_SIZE == 256
-    // 64(128)->256
-    __m128i _x;
-    __m256i _y;
+#undef ELEVATOR
+#undef EXTRACTOR
+#else
+#define EXTRACTOR PYYJSON_CONCAT3(extract, SIMD_BIT_SIZE, two_parts)
+#define ELEVATOR PYYJSON_CONCAT5(elevate, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL, to, SIMD_BIT_SIZE)
+    SIMD_HALF_TYPE v1, v2;
+    EXTRACTOR(SIMD_VAR, &v1, &v2);
     // 0
-    _x = SIMD_EXTRACT_HALF(SIMD_VAR, 0);
-    _y = elevate_1_4_to_256(_x);
-    write_simd((void *) dst, _y);
-    dst += CHECK_COUNT_MAX / 4;
+    write_simd((void *) dst, ELEVATOR(v1));
+    dst += CHECK_COUNT_MAX / 2;
     // 1
-    RIGHT_SHIFT_128BITS(_x, 64, &_x);
-    _y = elevate_1_4_to_256(_x);
-    write_simd((void *) dst, _y);
-    dst += CHECK_COUNT_MAX / 4;
-    // 2
-    _x = SIMD_EXTRACT_HALF(SIMD_VAR, 1);
-    _y = elevate_1_4_to_256(_x);
-    write_simd((void *) dst, _y);
-    dst += CHECK_COUNT_MAX / 4;
-    // 3
-    RIGHT_SHIFT_128BITS(_x, 64, &_x);
-    _y = elevate_1_4_to_256(_x);
-    write_simd((void *) dst, _y);
-    dst += CHECK_COUNT_MAX / 4;
-#else  // SIMD_BIT_SIZE == 128
-    // 32(128)->128
-    // 0
-    __m128i _x;
-    _x = elevate_1_4_to_128(SIMD_VAR);
-    write_simd((void *) dst, _x);
-    dst += CHECK_COUNT_MAX / 4;
-    // 1
-    RIGHT_SHIFT_128BITS(SIMD_VAR, 32, &SIMD_VAR);
-    _x = elevate_1_4_to_128(SIMD_VAR);
-    write_simd((void *) dst, _x);
-    dst += CHECK_COUNT_MAX / 4;
-    // 2
-    RIGHT_SHIFT_128BITS(SIMD_VAR, 32, &SIMD_VAR);
-    _x = elevate_1_4_to_128(SIMD_VAR);
-    write_simd((void *) dst, _x);
-    dst += CHECK_COUNT_MAX / 4;
-    // 3
-    RIGHT_SHIFT_128BITS(SIMD_VAR, 32, &SIMD_VAR);
-    _x = elevate_1_4_to_128(SIMD_VAR);
-    write_simd((void *) dst, _x);
-    dst += CHECK_COUNT_MAX / 4;
-#endif // SIMD_BIT_SIZE
-#endif
-
-#endif
+    write_simd((void *) dst, ELEVATOR(v2));
+    dst += CHECK_COUNT_MAX / 2;
+#undef ELEVATOR
+#undef EXTRACTOR
+#endif // r->w == 1->4
 #endif
 }
 

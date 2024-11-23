@@ -12,6 +12,9 @@
 #define PYYJSON_CONCAT4_EX(a, b, c, d) a##_##b##_##c##_##d
 #define PYYJSON_CONCAT4(a, b, c, d) PYYJSON_CONCAT4_EX(a, b, c, d)
 
+#define PYYJSON_CONCAT5_EX(a, b, c, d, e) a##_##b##_##c##_##d##_##e
+#define PYYJSON_CONCAT5(a, b, c, d, e) PYYJSON_CONCAT5_EX(a, b, c, d, e)
+
 #define PYYJSON_SIMPLE_CONCAT2_EX(a, b) a##b
 #define PYYJSON_SIMPLE_CONCAT2(a, b) PYYJSON_SIMPLE_CONCAT2_EX(a, b)
 
