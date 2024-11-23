@@ -50,7 +50,6 @@
 #define CHECK_ESCAPE_IMPL_GET_MASK PYYJSON_CONCAT2(check_escape_impl_get_mask, COMPILE_READ_UCS_LEVEL)
 #define CHECK_MASK_ZERO PYYJSON_CONCAT2(check_mask_zero, COMPILE_READ_UCS_LEVEL)
 #define CHECK_MASK_ZERO_SMALL PYYJSON_CONCAT2(check_mask_zero_small, COMPILE_READ_UCS_LEVEL)
-#define MASK_RIGHT_SHIFT PYYJSON_CONCAT2(mask_right_shift, COMPILE_READ_UCS_LEVEL)
 #define CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512 PYYJSON_CONCAT2(check_escape_tail_impl_get_mask_512, COMPILE_READ_UCS_LEVEL)
 // write only or read-write
 #define WRITE_SIMD_IMPL PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
@@ -198,20 +197,6 @@ force_inline bool CHECK_MASK_ZERO(CHECK_MASK_TYPE SIMD_VAR) {
 #else
     return _mm_movemask_epi8(_mm_cmpeq_epi8(SIMD_VAR, _mm_setzero_si128())) == 0xFFFF;
 #endif
-#endif
-}
-#endif // COMPILE_WRITE_UCS_LEVEL == 4
-
-#if COMPILE_WRITE_UCS_LEVEL == 4
-force_inline void MASK_RIGHT_SHIFT(SIMD_MASK_TYPE mask, usize shift_count, SIMD_MASK_TYPE *write_mask) {
-#if SIMD_BIT_SIZE == 512
-    *write_mask = mask >> (shift_count * sizeof(_FROM_TYPE));
-#elif SIMD_BIT_SIZE == 256
-    _FROM_TYPE xbuf[2 * CHECK_COUNT_MAX] = {0};
-    _mm256_storeu_si256((__m256i_u *) (xbuf + CHECK_COUNT_MAX - shift_count), mask);
-    *write_mask = _mm256_loadu_si256((const __m256i_u *) (xbuf + CHECK_COUNT_MAX));
-#else
-
 #endif
 }
 #endif // COMPILE_WRITE_UCS_LEVEL == 4
@@ -501,7 +486,6 @@ force_inline void MASK_ELEVATE_WRITE_512(_TARGET_TYPE *dst, SIMD_512 z, Py_ssize
 #undef WRITE_SIMD_256_WITH_WRITEMASK
 #undef WRITE_SIMD_IMPL
 #undef CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512
-#undef MASK_RIGHT_SHIFT
 #undef CHECK_MASK_ZERO_SMALL
 #undef CHECK_MASK_ZERO
 #undef CHECK_ESCAPE_IMPL_GET_MASK
