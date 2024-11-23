@@ -12,6 +12,11 @@
 #define PYYJSON_CONCAT4_EX(a, b, c, d) a##_##b##_##c##_##d
 #define PYYJSON_CONCAT4(a, b, c, d) PYYJSON_CONCAT4_EX(a, b, c, d)
 
+#define PYYJSON_SIMPLE_CONCAT2_EX(a, b) a##b
+#define PYYJSON_SIMPLE_CONCAT2(a, b) PYYJSON_SIMPLE_CONCAT2_EX(a, b)
+
+#define PYYJSON_SIMPLE_CONCAT3_EX(a, b, c) a##b##c
+#define PYYJSON_SIMPLE_CONCAT3(a, b, c) PYYJSON_SIMPLE_CONCAT3_EX(a, b, c)
 
 typedef struct UnicodeVecHead {
     union {

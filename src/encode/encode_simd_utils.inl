@@ -26,12 +26,15 @@
 #if COMPILE_READ_UCS_LEVEL == 4
 #define CHECK_MASK_TYPE u16
 #define _FROM_TYPE u32
+#define READ_BIT_SIZE 32
 #elif COMPILE_READ_UCS_LEVEL == 2
 #define CHECK_MASK_TYPE u32
 #define _FROM_TYPE u16
+#define READ_BIT_SIZE 16
 #elif COMPILE_READ_UCS_LEVEL == 1
 #define CHECK_MASK_TYPE u64
 #define _FROM_TYPE u8
+#define READ_BIT_SIZE 8
 #else
 #error "COMPILE_READ_UCS_LEVEL must be 1, 2 or 4"
 #endif
@@ -214,35 +217,27 @@ force_inline void MASK_RIGHT_SHIFT(SIMD_MASK_TYPE mask, usize shift_count, SIMD_
 }
 #endif // COMPILE_WRITE_UCS_LEVEL == 4
 
+
 #if COMPILE_WRITE_UCS_LEVEL == 4
 #if SIMD_BIT_SIZE == 512
 CHECK_MASK_TYPE CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(SIMD_512 z, CHECK_MASK_TYPE rw_mask) {
-#if COMPILE_READ_UCS_LEVEL == 1
-    // *SIMD_VAR = load_512((const void *) src);
-    SIMD_512 t1 = load_512_aligned((const void *) _Quote_i8);
-    SIMD_512 t2 = load_512_aligned((const void *) _Slash_i8);
-    SIMD_512 t3 = load_512_aligned((const void *) _ControlMax_i8);
-    CHECK_MASK_TYPE m1 = _mm512_mask_cmpeq_epi8_mask(rw_mask, z, t1); // AVX512BW
-    CHECK_MASK_TYPE m2 = _mm512_mask_cmpeq_epi8_mask(rw_mask, z, t2); // AVX512BW
-    CHECK_MASK_TYPE m3 = _mm512_mask_cmplt_epu8_mask(rw_mask, z, t3); // AVX512BW
+#define CUR_QUOTE PYYJSON_SIMPLE_CONCAT2(_Quote_i, READ_BIT_SIZE)
+#define CUR_SLASH PYYJSON_SIMPLE_CONCAT2(_Slash_i, READ_BIT_SIZE)
+#define CUR_CONTROL_MAX PYYJSON_SIMPLE_CONCAT2(_ControlMax_i, READ_BIT_SIZE)
+#define CMPEQ PYYJSON_SIMPLE_CONCAT3(_mm512_mask_cmpeq_epi, READ_BIT_SIZE, _mask)
+#define CMPLT PYYJSON_SIMPLE_CONCAT3(_mm512_mask_cmplt_epu, READ_BIT_SIZE, _mask)
+    SIMD_512 t1 = load_512_aligned((const void *) CUR_QUOTE);
+    SIMD_512 t2 = load_512_aligned((const void *) CUR_SLASH);
+    SIMD_512 t3 = load_512_aligned((const void *) CUR_CONTROL_MAX);
+    CHECK_MASK_TYPE m1 = CMPEQ(rw_mask, z, t1); // AVX512BW / AVX512F
+    CHECK_MASK_TYPE m2 = CMPEQ(rw_mask, z, t2); // AVX512BW / AVX512F
+    CHECK_MASK_TYPE m3 = CMPLT(rw_mask, z, t3); // AVX512BW / AVX512F
     return m1 | m2 | m3;
-#elif COMPILE_READ_UCS_LEVEL == 2
-    SIMD_512 t1 = load_512_aligned((const void *) _Quote_i16);
-    SIMD_512 t2 = load_512_aligned((const void *) _Slash_i16);
-    SIMD_512 t3 = load_512_aligned((const void *) _ControlMax_i16);
-    CHECK_MASK_TYPE m1 = _mm512_mask_cmpeq_epi16_mask(rw_mask, z, t1); // AVX512BW
-    CHECK_MASK_TYPE m2 = _mm512_mask_cmpeq_epi16_mask(rw_mask, z, t2); // AVX512BW
-    CHECK_MASK_TYPE m3 = _mm512_mask_cmplt_epu16_mask(rw_mask, z, t3); // AVX512BW
-    return m1 | m2 | m3;
-#else
-    SIMD_512 t1 = load_512_aligned((const void *) _Quote_i32);
-    SIMD_512 t2 = load_512_aligned((const void *) _Slash_i32);
-    SIMD_512 t3 = load_512_aligned((const void *) _ControlMax_i32);
-    CHECK_MASK_TYPE m1 = _mm512_mask_cmpeq_epi32_mask(rw_mask, z, t1); // AVX512F
-    CHECK_MASK_TYPE m2 = _mm512_mask_cmpeq_epi32_mask(rw_mask, z, t2); // AVX512F
-    CHECK_MASK_TYPE m3 = _mm512_mask_cmplt_epu32_mask(rw_mask, z, t3); // AVX512F
-    return m1 | m2 | m3;
-#endif
+#undef CMPLT
+#undef CMPEQ
+#undef CUR_CONTROL_MAX
+#undef CUR_SLASH
+#undef CUR_QUOTE
 }
 #endif // SIMD_BIT_SIZE == 512
 #endif // COMPILE_WRITE_UCS_LEVEL == 4
@@ -522,6 +517,7 @@ force_inline void MASK_ELEVATE_WRITE_512(_TARGET_TYPE *dst, SIMD_512 z, Py_ssize
 #undef CHECK_MASK_ZERO
 #undef CHECK_ESCAPE_IMPL_GET_MASK
 #undef CHECK_COUNT_MAX
+#undef READ_BIT_SIZE
 #undef _FROM_TYPE
 #undef CHECK_MASK_TYPE
 #undef _TARGET_TYPE
