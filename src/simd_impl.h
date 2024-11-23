@@ -322,6 +322,10 @@ force_inline SIMD_256 simd_and_256(SIMD_256 a, SIMD_256 b) {
     return _mm256_and_si256(a, b);
 }
 
+force_inline SIMD_256 simd_or_256(SIMD_256 a, SIMD_256 b) {
+    return _mm256_or_si256(a, b);
+}
+
 force_inline u32 to_bitmask_256(SIMD_256 a) {
     int t = _mm256_movemask_epi8(a);
     return (u32) t;
