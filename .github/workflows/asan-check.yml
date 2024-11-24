@@ -16,6 +16,8 @@ jobs:
       uses: cachix/install-nix-action@master
     - name: Setup cachix
       uses: cachix/cachix-action@master
+      with:
+        name: antares0982
     - name: run asan_check.sh
       run: |
         nix develop -c dev_tools/asan_check.sh
