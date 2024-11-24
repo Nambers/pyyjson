@@ -20,4 +20,4 @@ jobs:
         name: antares0982
     - name: run asan_check.sh
       run: |
-        nix develop -c dev_tools/asan_check.sh
+        nix develop -c python ./dev_tools/automated_test.py --all-ver --asan
