@@ -7,6 +7,7 @@
 /debug_source
 /.direnv
 /dev_tools/.vscode/settings.json
+/build-*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

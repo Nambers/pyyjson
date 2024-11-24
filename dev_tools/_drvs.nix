@@ -2,6 +2,8 @@
   pkgs ? import <nixpkgs> { },
 }:
 let
+  lib = pkgs.lib;
+  supportedVers = lib.importJSON ./supported_versions.json;
   using_pythons_map =
     py:
     let
@@ -25,15 +27,9 @@ let
     x;
   using_pythons = (
     builtins.map using_pythons_map (
-      with pkgs;
-      [
-        python39
-        python310
-        python311
-        python312
-        python313
-        python314
-      ]
+      builtins.map (
+        supportedVer: builtins.getAttr ("python3" + (builtins.toString supportedVer)) pkgs
+      ) supportedVers
     )
   )
   # ++ [ python314 ]
