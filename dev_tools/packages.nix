@@ -6,6 +6,8 @@ let
   drvs = (import ./_drvs.nix { inherit pkgs; });
   pyenv = builtins.elemAt drvs.pyenvs (use_minor_ver - 9);
 in
+# this defines the order in PATH.
+# make sure pyenv selected by use_minor_ver is the first one
 [ pyenv ]
 ++ (with drvs; [
   cmake
@@ -15,4 +17,4 @@ in
   gcc
   python-launcher # use python-launcher to use other versions
 ])
-++ (if (use_minor_ver != 14) then drvs.pyenvs else [ (builtins.elemAt drvs.pyenvs (14 - 9)) ])
+++ drvs.pyenvs

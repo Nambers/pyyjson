@@ -28,8 +28,23 @@
             self',
             ...
           }:
+          let
+            defaultShell = import ./dev_tools/shell.nix { inherit pkgs; };
+            _drvs = import ./dev_tools/_drvs.nix { inherit pkgs; };
+            use_minor_ver = import ./dev_tools/pyver.nix;
+            inputDerivation = defaultShell.inputDerivation;
+          in
           {
-            devShells.default = import ./dev_tools/shell.nix { inherit pkgs; };
+            devShells.internal = defaultShell;
+            devShells.default = defaultShell.overrideAttrs {
+              shellHook = import ./dev_tools/shellhook.nix {
+                inherit inputDerivation pkgs;
+                nix_pyenv_directory = ".nix-pyenv";
+                pyenv = builtins.elemAt _drvs.pyenvs (use_minor_ver - 9);
+                using_python = builtins.elemAt _drvs.using_pythons (use_minor_ver - 9);
+                inherit (_drvs) pyenvs;
+              };
+            };
           };
       }
     );
