@@ -116,6 +116,44 @@ force_inline usize size_align_up(usize size, usize align) {
     }
 }
 
+/*
+ * Split tail length into multi parts.
+ */
+force_inline void split_tail_len_two_parts(Py_ssize_t tail_len, Py_ssize_t check_count, Py_ssize_t *restrict part1, Py_ssize_t *restrict part2) {
+    assert(tail_len > 0 && tail_len < check_count);
+    assert(check_count / 2 * 2 == check_count);
+    const Py_ssize_t check_half = check_count / 2;
+    Py_ssize_t p1, p2;
+    p2 = tail_len > check_half ? check_half : tail_len;
+    p1 = tail_len - p2;
+    assert(p1 >= 0 && p2 >= 0);
+    assert(p1 <= check_half && p2 <= check_half);
+    assert(p1 + p2 == tail_len);
+    *part2 = p2;
+    *part1 = p1;
+}
+
+force_inline void split_tail_len_four_parts(Py_ssize_t tail_len, Py_ssize_t check_count, Py_ssize_t *restrict part1, Py_ssize_t *restrict part2, Py_ssize_t *restrict part3, Py_ssize_t *restrict part4) {
+    assert(tail_len > 0 && tail_len < check_count);
+    assert(check_count / 4 * 4 == check_count);
+    Py_ssize_t check_quad = check_count / 4;
+    Py_ssize_t p1, p2, p3, p4;
+    p4 = tail_len > check_quad ? check_quad : tail_len;
+    tail_len -= p4;
+    p3 = tail_len > check_quad ? check_quad : tail_len;
+    tail_len -= p3;
+    p2 = tail_len > check_quad ? check_quad : tail_len;
+    tail_len -= p2;
+    p1 = tail_len;
+    assert(p1 >= 0 && p2 >= 0 && p3 >= 0 && p4 >= 0);
+    assert(p1 <= check_quad && p2 <= check_quad && p3 <= check_quad && p4 <= check_quad);
+    assert(p1 + p2 + p3 + p4 == tail_len);
+    *part4 = p4;
+    *part3 = p3;
+    *part2 = p2;
+    *part1 = p1;
+}
+
 /*==============================================================================
  * Python Utils
  *============================================================================*/

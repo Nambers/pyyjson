@@ -13,12 +13,15 @@
 #if COMPILE_WRITE_UCS_LEVEL == 4
 #define _WRITER U32_WRITER
 #define _TARGET_TYPE u32
+#define WRITE_BIT_SIZE 32
 #elif COMPILE_WRITE_UCS_LEVEL == 2
 #define _WRITER U16_WRITER
 #define _TARGET_TYPE u16
+#define WRITE_BIT_SIZE 16
 #elif COMPILE_WRITE_UCS_LEVEL == 1
 #define _WRITER U8_WRITER
 #define _TARGET_TYPE u8
+#define WRITE_BIT_SIZE 8
 #else
 #error "COMPILE_WRITE_UCS_LEVEL must be 1, 2 or 4"
 #endif
@@ -54,7 +57,7 @@
 // write only or read-write
 #define WRITE_SIMD_IMPL PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define WRITE_SIMD_256_WITH_WRITEMASK PYYJSON_CONCAT2(write_simd_256_with_writemask, COMPILE_WRITE_UCS_LEVEL)
-#define WRITE_SIMD_WITH_TAIL_LEN PYYJSON_CONCAT3(write_simd_with_tail_len, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
+#define BACK_WRITE_SIMD256_WITH_TAIL_LEN PYYJSON_CONCAT3(back_write_simd256_with_tail_len, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define MASK_ELEVATE_WRITE_512 PYYJSON_CONCAT3(mask_elevate_write_512, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 
 #if COMPILE_WRITE_UCS_LEVEL == 4
@@ -246,6 +249,58 @@ force_inline void WRITE_SIMD_256_WITH_WRITEMASK(_TARGET_TYPE *dst, SIMD_256 y, S
 }
 #endif // COMPILE_READ_UCS_LEVEL == 1 && SIMD_BIT_SIZE == 256
 
+#if SIMD_BIT_SIZE == 256 && COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
+force_inline void BACK_WRITE_SIMD256_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_256 y, Py_ssize_t len) {
+#define MASK_TABLE PYYJSON_CONCAT2(_MaskTable, WRITE_BIT_SIZE)
+#define MASK_WRITER PYYJSON_CONCAT2(write_simd_256_with_writemask, COMPILE_WRITE_UCS_LEVEL)
+#define ELEVATOR PYYJSON_CONCAT5(elevate, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL, to, SIMD_BIT_SIZE)
+#if COMPILE_READ_UCS_LEVEL == 1 && COMPILE_WRITE_UCS_LEVEL == 4
+    // 1->4
+    // 64(128)->256
+    SIMD_256 writemask;
+    Py_ssize_t part1, part2, part3, part4;
+    SIMD_128 x1, x2, x3, x4;
+    split_tail_len_four_parts(len, CHECK_COUNT_MAX, &part1, &part2, &part3, &part4);
+    extract_256_four_parts(SIMD_VAR, &x1, &x2, &x3, &x4);
+    // 0
+    writemask = load_256_aligned(&MASK_TABLE[(usize) (CHECK_COUNT_MAX / 4 - part1)][0]);
+    MASK_WRITER(dst, ELEVATOR(x1), writemask);
+    dst += CHECK_COUNT_MAX / 4;
+    // 1
+    writemask = load_256_aligned(&MASK_TABLE[(usize) (CHECK_COUNT_MAX / 4 - part2)][0]);
+    MASK_WRITER(dst, ELEVATOR(x2), writemask);
+    dst += CHECK_COUNT_MAX / 4;
+    // 2
+    writemask = load_256_aligned(&MASK_TABLE[(usize) (CHECK_COUNT_MAX / 4 - part3)][0]);
+    MASK_WRITER(dst, ELEVATOR(x3), writemask);
+    dst += CHECK_COUNT_MAX / 4;
+    // 3
+    writemask = load_256_aligned(&MASK_TABLE[(usize) (CHECK_COUNT_MAX / 4 - part4)][0]);
+    MASK_WRITER(dst, ELEVATOR(x4), writemask);
+    dst += CHECK_COUNT_MAX / 4;
+#else  // COMPILE_READ_UCS_LEVEL != 1 || COMPILE_WRITE_UCS_LEVEL != 4
+    // 128->256
+    SIMD_256 writemask;
+    Py_ssize_t part1, part2;
+    SIMD_128 x1, x2;
+    split_tail_len_two_parts(len, CHECK_COUNT_MAX, &part1, &part2);
+    extract_256_two_parts(y, &x1, &x2);
+    // 0
+    writemask = load_256_aligned(&MASK_TABLE[(usize) (CHECK_COUNT_MAX / 2 - part1)][0]);
+    MASK_WRITER(dst, ELEVATOR(x1), writemask);
+    dst += CHECK_COUNT_MAX / 2;
+    // 1
+    writemask = load_256_aligned(&MASK_TABLE[(usize) (CHECK_COUNT_MAX / 2 - part2)][0]);
+    MASK_WRITER(dst, ELEVATOR(x2), writemask);
+    dst += CHECK_COUNT_MAX / 2;
+#endif // COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL
+#undef ELEVATOR
+#undef MASK_WRITER
+#undef MASK_TABLE
+}
+#endif // SIMD_BIT_SIZE == 256 && COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
+
+
 #if SIMD_BIT_SIZE == 512 && COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
 force_inline void MASK_ELEVATE_WRITE_512(_TARGET_TYPE *dst, SIMD_512 z, Py_ssize_t len) {
 #if COMPILE_READ_UCS_LEVEL == 1 && COMPILE_WRITE_UCS_LEVEL == 4
@@ -317,7 +372,7 @@ force_inline void MASK_ELEVATE_WRITE_512(_TARGET_TYPE *dst, SIMD_512 z, Py_ssize
 
 
 #undef MASK_ELEVATE_WRITE_512
-#undef WRITE_SIMD_WITH_TAIL_LEN
+#undef BACK_WRITE_SIMD256_WITH_TAIL_LEN
 #undef WRITE_SIMD_256_WITH_WRITEMASK
 #undef WRITE_SIMD_IMPL
 #undef CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512
@@ -328,5 +383,6 @@ force_inline void MASK_ELEVATE_WRITE_512(_TARGET_TYPE *dst, SIMD_512 z, Py_ssize
 #undef READ_BIT_SIZE
 #undef _FROM_TYPE
 #undef CHECK_MASK_TYPE
+#undef WRITE_BIT_SIZE
 #undef _TARGET_TYPE
 #undef _WRITER

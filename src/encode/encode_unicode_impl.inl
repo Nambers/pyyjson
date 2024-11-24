@@ -50,7 +50,7 @@
 #define CHECK_MASK_ZERO PYYJSON_CONCAT2(check_mask_zero, COMPILE_READ_UCS_LEVEL)
 #define CHECK_MASK_ZERO_SMALL PYYJSON_CONCAT2(check_mask_zero_small, COMPILE_READ_UCS_LEVEL)
 #define WRITE_SIMD_256_WITH_WRITEMASK PYYJSON_CONCAT2(write_simd_256_with_writemask, COMPILE_WRITE_UCS_LEVEL)
-#define WRITE_SIMD_WITH_TAIL_LEN PYYJSON_CONCAT3(write_simd_with_tail_len, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
+#define BACK_WRITE_SIMD256_WITH_TAIL_LEN PYYJSON_CONCAT3(back_write_simd256_with_tail_len, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 // define here
 #define _CONTROL_SEQ_TABLE PYYJSON_CONCAT2(_ControlSeqTable, COMPILE_WRITE_UCS_LEVEL)
 // define here
@@ -160,166 +160,6 @@ force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(UnicodeVector **restrict 
     return vec;
 }
 
-#if SIMD_BIT_SIZE != 512 && COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL && COMPILE_INDENT_LEVEL == 0
-force_inline void WRITE_SIMD_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR, Py_ssize_t len) {
-#if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
-#error "Compiler unreachable code"
-#else
-#if COMPILE_READ_UCS_LEVEL == 2
-// 2->4
-#if SIMD_BIT_SIZE == 256
-    // 2 * CHECK_COUNT_MAX
-    // 128->256
-    __m128i _x;
-    __m256i _y;
-    __m256i writemask;
-    Py_ssize_t partlen;
-    // 0
-    partlen = len - CHECK_COUNT_MAX / 2;
-    partlen = partlen > 0 ? partlen : 0;
-    _x = SIMD_EXTRACT_HALF(SIMD_VAR, 0);
-    _y = elevate_2_4_to_256(_x);
-    writemask = load_256_aligned(&_MaskTable_32[(usize) (CHECK_COUNT_MAX / 2 - partlen)][0]);
-    write_simd_256_with_writemask_4(dst, _y, writemask);
-    // write_simd((void *) dst, _y);
-    dst += CHECK_COUNT_MAX / 2;
-    // 1
-    partlen = (len < CHECK_COUNT_MAX / 2) ? (len) : (CHECK_COUNT_MAX / 2);
-    _x = SIMD_EXTRACT_HALF(SIMD_VAR, 1);
-    _y = elevate_2_4_to_256(_x);
-    writemask = load_256_aligned(&_MaskTable_32[(usize) (CHECK_COUNT_MAX / 2 - partlen)][0]);
-    write_simd_256_with_writemask_4(dst, _y, writemask);
-    // write_simd((void *) dst, _y);
-    dst += CHECK_COUNT_MAX / 2;
-#else  // SIMD_BIT_SIZE == 128
-    // TODO check/impl this
-    assert(false);
-    // 64(128)->128
-    // __m128i _x;
-    // // 0
-    // _x = elevate_2_4_to_128(SIMD_VAR);
-// write_simd((void *) dst, _x);
-// dst += CHECK_COUNT_MAX / 2;
-// // 1
-// RIGHT_SHIFT_128BITS(SIMD_VAR, 64, &SIMD_VAR);
-// _x = elevate_2_4_to_128(SIMD_VAR);
-// write_simd((void *) dst, _x);
-// dst += CHECK_COUNT_MAX / 2;
-#endif // SIMD_BIT_SIZE
-#else  // COMPILE_READ_UCS_LEVEL == 1
-#if COMPILE_WRITE_UCS_LEVEL == 2
-// 1->2
-#if SIMD_BIT_SIZE == 256
-    // 128->256
-    __m128i _x;
-    __m256i _y;
-    __m256i writemask;
-    Py_ssize_t partlen;
-    // 0
-    partlen = len - CHECK_COUNT_MAX / 2;
-    partlen = partlen > 0 ? (partlen) : 0;
-    _x = SIMD_EXTRACT_HALF(SIMD_VAR, 0);
-    _y = elevate_1_2_to_256(_x);
-    writemask = load_256_aligned(&_MaskTable_16[(usize) (CHECK_COUNT_MAX / 2 - partlen)][0]);
-    write_simd_256_with_writemask_2(dst, _y, writemask);
-    // write_simd((void *) dst, _y);
-    dst += CHECK_COUNT_MAX / 2;
-    // 1
-    partlen = (len < CHECK_COUNT_MAX / 2) ? (len) : (CHECK_COUNT_MAX / 2);
-    _x = SIMD_EXTRACT_HALF(SIMD_VAR, 1);
-    _y = elevate_1_2_to_256(_x);
-    writemask = load_256_aligned(&_MaskTable_16[(usize) (CHECK_COUNT_MAX / 2 - partlen)][0]);
-    write_simd_256_with_writemask_2(dst, _y, writemask);
-    // write_simd((void *) dst, _y);
-    dst += CHECK_COUNT_MAX / 2;
-#else  // SIMD_BIT_SIZE == 128
-    // 64(128)->128
-    __m128i _x;
-    _x = elevate_1_2_to_128(SIMD_VAR);
-    write_simd((void *) dst, _x);
-    dst += CHECK_COUNT_MAX / 2;
-    RIGHT_SHIFT_128BITS(SIMD_VAR, 64, &SIMD_VAR);
-    _x = elevate_1_2_to_128(SIMD_VAR);
-    write_simd((void *) dst, _x);
-    dst += CHECK_COUNT_MAX / 2;
-#endif // SIMD_BIT_SIZE
-#else  // COMPILE_WRITE_UCS_LEVEL == 4
-// 1->4
-#if SIMD_BIT_SIZE == 256
-    // 64(128)->256
-    __m128i _x;
-    __m256i _y;
-    __m256i writemask;
-    Py_ssize_t partlen;
-    // 0
-    partlen = len - CHECK_COUNT_MAX * 3 / 4;
-    partlen = partlen > 0 ? partlen : 0;
-    _x = SIMD_EXTRACT_HALF(SIMD_VAR, 0);
-    _y = elevate_1_4_to_256(_x);
-    writemask = load_256_aligned(&_MaskTable_32[(usize) (CHECK_COUNT_MAX / 4 - partlen)][0]);
-    write_simd_256_with_writemask_4(dst, _y, writemask);
-    // write_simd((void *) dst, _y);
-    dst += CHECK_COUNT_MAX / 4;
-    // 1
-    partlen = len - CHECK_COUNT_MAX / 2;
-    partlen = partlen > 0 ? partlen : 0;
-    partlen = (partlen < CHECK_COUNT_MAX / 4) ? partlen : (CHECK_COUNT_MAX / 4);
-    RIGHT_SHIFT_128BITS(_x, 64, &_x);
-    _y = elevate_1_4_to_256(_x);
-    writemask = load_256_aligned(&_MaskTable_32[(usize) (CHECK_COUNT_MAX / 4 - partlen)][0]);
-    write_simd_256_with_writemask_4(dst, _y, writemask);
-    // write_simd((void *) dst, _y);
-    dst += CHECK_COUNT_MAX / 4;
-    // 2
-    partlen = len - CHECK_COUNT_MAX / 4;
-    partlen = partlen > 0 ? partlen : 0;
-    partlen = (partlen < CHECK_COUNT_MAX / 4) ? partlen : (CHECK_COUNT_MAX / 4);
-    _x = SIMD_EXTRACT_HALF(SIMD_VAR, 1);
-    _y = elevate_1_4_to_256(_x);
-    writemask = load_256_aligned(&_MaskTable_32[(usize) (CHECK_COUNT_MAX / 4 - partlen)][0]);
-    write_simd_256_with_writemask_4(dst, _y, writemask);
-    // write_simd((void *) dst, _y);
-    dst += CHECK_COUNT_MAX / 4;
-    // 3
-    partlen = len;
-    partlen = partlen < CHECK_COUNT_MAX / 4 ? partlen : (CHECK_COUNT_MAX / 4);
-    RIGHT_SHIFT_128BITS(_x, 64, &_x);
-    _y = elevate_1_4_to_256(_x);
-    writemask = load_256_aligned(&_MaskTable_32[(usize) (CHECK_COUNT_MAX / 4 - partlen)][0]);
-    write_simd_256_with_writemask_4(dst, _y, writemask);
-    // write_simd((void *) dst, _y);
-    dst += CHECK_COUNT_MAX / 4;
-#else  // SIMD_BIT_SIZE == 128
-    // 32(128)->128
-    // 0
-    __m128i _x;
-    _x = elevate_1_2_to_128(SIMD_VAR);
-    write_simd((void *) dst, _x);
-    dst += CHECK_COUNT_MAX / 2;
-    // 1
-    RIGHT_SHIFT_128BITS(SIMD_VAR, 32, &SIMD_VAR);
-    _x = elevate_1_2_to_128(SIMD_VAR);
-    write_simd((void *) dst, _x);
-    dst += CHECK_COUNT_MAX / 2;
-    // 2
-    RIGHT_SHIFT_128BITS(SIMD_VAR, 32, &SIMD_VAR);
-    _x = elevate_1_2_to_128(SIMD_VAR);
-    write_simd((void *) dst, _x);
-    dst += CHECK_COUNT_MAX / 2;
-    // 3
-    RIGHT_SHIFT_128BITS(SIMD_VAR, 32, &SIMD_VAR);
-    _x = elevate_1_2_to_128(SIMD_VAR);
-    write_simd((void *) dst, _x);
-    dst += CHECK_COUNT_MAX / 2;
-#endif // SIMD_BIT_SIZE
-#endif
-
-#endif
-#endif
-}
-#endif // SIMD_BIT_SIZE != 512 && COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL && COMPILE_INDENT_LEVEL == 0
-
-
 force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t len, UnicodeVector **vec_addr) {
     assert(vec_addr);
     UnicodeVector *vec = *vec_addr;
@@ -382,7 +222,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
 #if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
         WRITE_SIMD_256_WITH_WRITEMASK(store_start, y, mask);
 #else
-        WRITE_SIMD_WITH_TAIL_LEN(store_start, y, len);
+        BACK_WRITE_SIMD256_WITH_TAIL_LEN(store_start, y, len);
 #endif
         _WRITER(vec) += len;
     } else {
@@ -579,7 +419,7 @@ force_inline bool PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, COMPILE_R
 
 #undef MASK_ELEVATE_WRITE_512
 #undef WRITE_SIMD_IMPL
-#undef WRITE_SIMD_WITH_TAIL_LEN
+#undef BACK_WRITE_SIMD256_WITH_TAIL_LEN
 #undef WRITE_SIMD_256_WITH_WRITEMASK
 #undef CHECK_MASK_ZERO_SMALL
 #undef CHECK_MASK_ZERO
