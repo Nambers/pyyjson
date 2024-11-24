@@ -2,27 +2,6 @@
   pkgs ? import <nixpkgs> { },
 }:
 let
-  #   python314 =
-  #     (pkgs.python313.override (oldAttr: {
-  #       self = python314;
-  #       noldconfigPatch = "${pkgs.path}/pkgs/development/interpreters/python/cpython/3.13/no-ldconfig.patch";
-  #       sourceVersion = {
-  #         major = "3";
-  #         minor = "14";
-  #         patch = "0";
-  #         suffix = "a1";
-  #       };
-  #       pythonAttr = "python313";
-  #       hash = "sha256-PkZLDLt1NeLbNCYv0ZoKOT0OYr4PQ7FRPtmDebBU6tQ=";
-  #     })).overrideAttrs
-  #       (oldAttrs: {
-  #         src = pkgs.fetchFromGitHub {
-  #           owner = "python";
-  #           repo = "cpython";
-  #           rev = "v3.14.0a1";
-  #           hash = "sha256-6UnX96n5XTTrXgP0a7oRI6eunfdEJbtyN2e7m7bW2tI=";
-  #         };
-  #       });
   using_pythons_map =
     py:
     let
