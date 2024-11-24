@@ -18,6 +18,6 @@ jobs:
       uses: cachix/cachix-action@master
       with:
         name: antares0982
-    - name: run asan_check.sh
+    - name: Run asan check
       run: |
         nix develop -c python ./dev_tools/automated_test.py --all-ver --asan
