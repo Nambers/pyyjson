@@ -3,6 +3,10 @@
 
 #include "simd_detect.h"
 #include <immintrin.h>
+#if defined(_MSC_VER)
+#include <intrin.h>
+#endif
+
 
 #if SIMD_BIT_SIZE == 512
 #define SIMD_VAR z
@@ -56,7 +60,7 @@ force_inline void write_simd(void *dst, SIMD_TYPE SIMD_VAR) {
 #elif SIMD_BIT_SIZE == 256
     _mm256_storeu_si256((__m256i_u *) dst, SIMD_VAR);
 #else
-    _mm_storeu_si128((__m128i_u *) dst, SIMD_VAR);
+    _mm_storeu_si128((SIMD_128_IU *) dst, SIMD_VAR);
 #endif
 }
 
@@ -153,14 +157,14 @@ force_inline void write_aligned(void *dst, SIMD_TYPE SIMD_VAR) {
  * write memory with length sizeof(SIMD_TYPE) to dst.
  */
 force_inline void write_128(void *dst, SIMD_128 x) {
-    _mm_storeu_si128((__m128i_u *) dst, x);
+    _mm_storeu_si128((SIMD_128_IU *) dst, x);
 }
 
 force_inline SIMD_128 load_128(const void *src) {
 #if __SSE3__
-    return _mm_lddqu_si128((const __m128i_u *) src);
+    return _mm_lddqu_si128((const SIMD_128_IU *) src);
 #else
-    return _mm_loadu_si128((const __m128i_u *) src);
+    return _mm_loadu_si128((const SIMD_128_IU *) src);
 #endif
 }
 
@@ -185,7 +189,11 @@ force_inline SIMD_128 broadcast_32_128(i32 v) {
 }
 
 force_inline SIMD_128 broadcast_64_128(i64 v) {
+#if defined(_MSC_VER) && !defined(_M_IX86)
+    return _mm_set1_epi64x(v);
+#else
     return _mm_set1_epi64((__m64) v);
+#endif
 }
 
 force_inline SIMD_128 set_32_128(i32 d, i32 c, i32 b, i32 a) {

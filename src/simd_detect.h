@@ -15,6 +15,11 @@
 #define SIMD_32 __m128i
 #define SIMD_64 __m128i
 #define SIMD_128 __m128i
+#if defined(_MSC_VER)
+#define SIMD_128_IU __m128i
+#else
+#define SIMD_128_IU __m128i_u
+#endif
 #define SIMD_256 __m256i
 #define SIMD_512 __m512i
 #define HAS_SIMD 1
