@@ -205,13 +205,19 @@ elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
 else()
 endif()
 
-# TODO remove this
-# target_compile_options(pyyjson PRIVATE -march=native)
-# target_compile_options(pyyjson PRIVATE -mavx512f -mavx512bw)
-# target_compile_options(pyyjson PRIVATE -mavx2)
-# target_compile_options(pyyjson PRIVATE -msse4.1 -msse4.2)
-target_compile_options(pyyjson PRIVATE)
-
+if(MSVC)
+    # TODO remove this
+    # target_compile_options(pyyjson PRIVATE /arch:AVX512F /arch:AVX512BW)
+    # target_compile_options(pyyjson PRIVATE /arch:AVX2)
+    target_compile_options(pyyjson PRIVATE)
+else()
+    # TODO remove this
+    # target_compile_options(pyyjson PRIVATE -march=native)
+    # target_compile_options(pyyjson PRIVATE -mavx512f -mavx512bw)
+    # target_compile_options(pyyjson PRIVATE -mavx2)
+    # target_compile_options(pyyjson PRIVATE -msse4.1 -msse4.2)
+    target_compile_options(pyyjson PRIVATE)
+endif()
 # ------------------------------------------------------------------------------
 # Install
 if(APPLE)

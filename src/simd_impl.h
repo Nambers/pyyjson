@@ -58,7 +58,7 @@ force_inline void write_simd(void *dst, SIMD_TYPE SIMD_VAR) {
 #if SIMD_BIT_SIZE == 512
     _mm512_storeu_si512(dst, SIMD_VAR);
 #elif SIMD_BIT_SIZE == 256
-    _mm256_storeu_si256((__m256i_u *) dst, SIMD_VAR);
+    _mm256_storeu_si256((SIMD_256_IU *) dst, SIMD_VAR);
 #else
     _mm_storeu_si128((SIMD_128_IU *) dst, SIMD_VAR);
 #endif
@@ -313,7 +313,7 @@ force_inline SIMD_128 blendv_128(SIMD_128 blend, SIMD_128 x, SIMD_128 mask) {
  *============================================================================*/
 #if __AVX__
 force_inline SIMD_256 load_256(const void *src) {
-    return _mm256_lddqu_si256((const __m256i_u *) src);
+    return _mm256_lddqu_si256((const SIMD_256_IU *) src);
 }
 
 force_inline SIMD_256 load_256_aligned(const void *src) {
@@ -321,7 +321,7 @@ force_inline SIMD_256 load_256_aligned(const void *src) {
 }
 
 force_inline void write_256(void *dst, SIMD_256 y) {
-    _mm256_storeu_si256((__m256i_u *) dst, y);
+    _mm256_storeu_si256((SIMD_256_IU *) dst, y);
 }
 
 force_inline void write_256_aligned(void *dst, SIMD_256 y) {
