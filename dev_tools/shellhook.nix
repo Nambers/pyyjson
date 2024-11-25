@@ -7,6 +7,7 @@
   inputDerivation,
 }:
 let
+  debugSourceDir = "debug_source";
   path_concate = x: builtins.toString "${x}";
   env_concate = builtins.map path_concate pyenvs;
   link_python_cmd = python_env: ''
@@ -36,7 +37,20 @@ let
     # ensure the typing_extensions.py is not in the lib directory
     rm $NIX_LIB_DIR/typing_extensions.py > /dev/null 2>&1
     unset NIX_LIB_DIR
+
+    mkdir -p ${debugSourceDir}
+    if [[ ! -d ${debugSourceDir}/Python-${python_env.python.version} ]]; then
+      tar xvf ${python_env.python.src} -C ${debugSourceDir} > /dev/null 2>&1
+      chmod -R 700 ${debugSourceDir}/Python-${python_env.python.version}
+    fi
   '';
+  orjsonSource =
+    if using_python.sourceVersion.minor != "14" then
+      (builtins.elemAt (builtins.filter (x: x.pname == "orjson") (
+        import ./py_requirements.nix using_python.pkgs
+      )) 0).src
+    else
+      "";
 in
 ''
   _SOURCE_ROOT=$(readlink -f ${builtins.toString ./.}/..)
@@ -82,28 +96,13 @@ in
   # clang -print-file-name will give wrong asan path, use gcc version
   ensure_symlink "${nix_pyenv_directory}/lib/libasan.so" $(readlink -f $(gcc -print-file-name=libasan.so))
 
-  # unzip the source
-  mkdir -p debug_source
-  cd debug_source
-  if [[ ! -d Python-${using_python.version}  ]]; then
-      tar xvf ${using_python.src} > /dev/null 2>&1
-      chmod -R 700 Python-${using_python.version}
-  fi
-  if [[ ! -d orjson && ${using_python.sourceVersion.minor} != "14" ]]; then
+  # unzip orjson source
+  mkdir -p ${debugSourceDir}
+  if [[ ! -d ${debugSourceDir}/orjson && ${using_python.sourceVersion.minor} != "14" ]]; then
       # this is a directory, not a tarball
-      _ORJSON_SOURCE=${
-        if using_python.sourceVersion.minor != "14" then
-          (builtins.elemAt (builtins.filter (x: x.pname == "orjson") (
-            import ./py_requirements.nix using_python.pkgs
-          )) 0).src
-        else
-          ""
-      }
-      cp -r $_ORJSON_SOURCE orjson
-      chmod -R 700 orjson
-      echo "orjson source copied: $_ORJSON_SOURCE"
+      cp -r ${orjsonSource} ${debugSourceDir}/orjson
+      chmod -R 700 ${debugSourceDir}/orjson
   fi
-  cd ..
 
   # save env for external use
   echo "PATH=$PATH" > ${nix_pyenv_directory}/.shell-env
