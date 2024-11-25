@@ -138,6 +138,25 @@ elseif(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|Intel")
         set(YYJSON_FLAGS "-ffast-math")
     endif()
 
+    if(CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
+        message("Release mode with debug info, enabling maximal optimization and debug symbols")
+        target_compile_options(pyyjson PRIVATE -Werror -pedantic -pedantic-errors -O3)
+    elseif(CMAKE_BUILD_TYPE MATCHES ".*Rel.*")
+        message("Release mode, enabling maximal optimization")
+        target_compile_options(pyyjson PRIVATE -Werror -pedantic -pedantic-errors -O3)
+    else()
+        target_compile_options(pyyjson PRIVATE -O0)
+
+        if(ASAN_ENABLED)
+            message("ENABLE ASAN")
+            target_link_libraries(pyyjson PRIVATE asan)
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
+            target_compile_definitions(pyyjson PRIVATE PYYJSON_ASAN_CHECK=1)
+        endif()
+
+        message("Debug mode, enabling debug symbols")
+    endif()
+
     target_compile_options(pyyjson PRIVATE $<$<COMPILE_LANGUAGE:C>:${YYJSON_FLAGS}>)
     target_compile_options(pyyjson PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${YYJSON_FLAGS}>)
 endif()
@@ -160,24 +179,7 @@ message("CMAKE_C_COMPILER_ID = ${CMAKE_C_COMPILER_ID}")
 # TODO move this to GNU|Clang
 message("CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 
-if(CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
-    message("Release mode with debug info, enabling maximal optimization and debug symbols")
-    target_compile_options(pyyjson PRIVATE -Werror -pedantic -pedantic-errors -O3)
-elseif(CMAKE_BUILD_TYPE MATCHES ".*Rel.*")
-    message("Release mode, enabling maximal optimization")
-    target_compile_options(pyyjson PRIVATE -Werror -pedantic -pedantic-errors -O3)
-else()
-    target_compile_options(pyyjson PRIVATE -O0)
 
-    if(ASAN_ENABLED)
-        message("ENABLE ASAN")
-        target_link_libraries(pyyjson PRIVATE asan)
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
-        target_compile_definitions(pyyjson PRIVATE PYYJSON_ASAN_CHECK=1)
-    endif()
-
-    message("Debug mode, enabling debug symbols")
-endif()
 
 message("CMAKE_SYSTEM_PROCESSOR = ${CMAKE_SYSTEM_PROCESSOR}")
 
@@ -203,13 +205,19 @@ elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
 else()
 endif()
 
-# TODO remove this
-# target_compile_options(pyyjson PRIVATE -march=native)
-# target_compile_options(pyyjson PRIVATE -mavx512f -mavx512bw)
-# target_compile_options(pyyjson PRIVATE -mavx2)
-# target_compile_options(pyyjson PRIVATE -msse4.1 -msse4.2)
-target_compile_options(pyyjson PRIVATE)
-
+if(MSVC)
+    # TODO remove this
+    # target_compile_options(pyyjson PRIVATE /arch:AVX512F /arch:AVX512BW)
+    # target_compile_options(pyyjson PRIVATE /arch:AVX2)
+    target_compile_options(pyyjson PRIVATE)
+else()
+    # TODO remove this
+    # target_compile_options(pyyjson PRIVATE -march=native)
+    # target_compile_options(pyyjson PRIVATE -mavx512f -mavx512bw)
+    # target_compile_options(pyyjson PRIVATE -mavx2)
+    # target_compile_options(pyyjson PRIVATE -msse4.1 -msse4.2)
+    target_compile_options(pyyjson PRIVATE)
+endif()
 # ------------------------------------------------------------------------------
 # Install
 if(APPLE)
