@@ -1,14 +1,19 @@
-name: "ASAN Check"
+name: "Build Check"
 on:
   workflow_dispatch:
-  # pull_request:
-  #   paths:
-  #     - "src/**"
-  #     - "test/**"
-  #     - "CMakeLists.txt"
+  push:
+    paths:
+      - "src/**"
+      - "test/**"
+      - "CMakeLists.txt"
+  pull_request:
+    paths:
+      - "src/**"
+      - "test/**"
+      - "CMakeLists.txt"
 
 jobs:
-  ASAN-CHECK:
+  BUILD-CHECK:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -23,6 +28,6 @@ jobs:
       uses: cachix/cachix-action@master
       with:
         name: antares0982
-    - name: Run asan check
+    - name: Run build
       run: |
-        nix develop -c python ./dev_tools/automated_test.py --pyver ${{ matrix.pyver }} --asan
+        nix develop -c python ./dev_tools/automated_test.py --pyver ${{ matrix.pyver }} --build-only
