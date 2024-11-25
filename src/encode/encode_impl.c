@@ -802,9 +802,7 @@ force_inline bool vec_in_boundary(UnicodeVector *vec) {
 
 force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {
     UnicodeVector *vec = PyObject_Malloc(PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
-    if (unlikely(!vec)) {
-        return NULL;
-    }
+    RETURN_ON_UNLIKELY_ERR(!vec);
     Py_ssize_t len = PyUnicode_GET_LENGTH(unicode);
     int unicode_kind = PyUnicode_KIND(unicode);
     bool is_ascii = PyUnicode_IS_ASCII(unicode);
