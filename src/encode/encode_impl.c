@@ -854,6 +854,41 @@ force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {
     return (PyObject *) vec;
 }
 
+force_inline PyObject *pyyjson_dumps_single_long(PyObject *val) {
+    PyObject *ret;
+    if (pylong_is_zero(val)) {
+        ret = PyUnicode_New(1, 127);
+        RETURN_ON_UNLIKELY_ERR(!ret);
+        u8 *writer = (u8 *) (((PyASCIIObject *) ret) + 1);
+        writer[0] = '0';
+        writer[1] = 0;
+    } else {
+        u64 v;
+        usize sign;
+        if (pylong_is_unsigned(val)) {
+            bool _c = pylong_value_unsigned(val, &v);
+            RETURN_ON_UNLIKELY_ERR(!_c);
+            sign = 0;
+        } else {
+            i64 v2;
+            bool _c = pylong_value_signed(val, &v2);
+            RETURN_ON_UNLIKELY_ERR(!_c);
+            assert(v2 <= 0);
+            v = -v2;
+            sign = 1;
+        }
+        u8 buffer[64];
+        if (sign) *buffer = '-';
+        u8 *buffer_end = write_u64(v, buffer + sign);
+        ret = PyUnicode_New(buffer_end - buffer, 127);
+        RETURN_ON_UNLIKELY_ERR(!ret);
+        u8 *writer = (u8 *) (((PyASCIIObject *) ret) + 1);
+        memcpy(writer, buffer, buffer_end - buffer);
+        writer[buffer_end - buffer] = 0;
+    }
+    return ret;
+}
+
 force_inline PyObject *pyyjson_dumps_single_float(PyObject *val) {
     u8 buffer[32];
     double v = PyFloat_AS_DOUBLE(val);
@@ -954,6 +989,7 @@ dumps_container:;
 dumps_unicode:;
     return pyyjson_dumps_single_unicode(obj);
 dumps_long:;
+    return pyyjson_dumps_single_long(obj);
 dumps_constant:;
     goto fail; // TODO
 dumps_float:;

@@ -16,23 +16,14 @@ class TestEncode(unittest.TestCase):
             pass
 
         # TypeError
-        test_cases = {pyyjson.JSONEncodeError: [A(), 1 + 1j]}
+        test_cases = [(pyyjson.JSONEncodeError, [A(), 1 + 1j]),
+                      (OverflowError, 18446744073709551615 + 1),
+                      (OverflowError, -9223372036854775808 - 1), ]
 
-        for err, case in test_cases.items():
+        for err, case in test_cases:
             with self.subTest(msg=f"encoding_fail_test(case={case})"):
                 with self.assertRaises(err):
                     pyyjson.dumps(case)
-
-        # TODO uncomment this later
-        # # MemoryError
-        # test_cases = [
-        #     [1] * 2147483648
-        # ]
-
-        # for case in test_cases:
-        #     with self.subTest(msg=f'encoding_fail_test(case={case})'):
-        #         with self.assertRaises(MemoryError):
-        #             pyyjson.dumps(case)
 
     # def test_default(self):
     #     import pyyjson
@@ -121,9 +112,8 @@ class TestEncode(unittest.TestCase):
         import json
         import math
 
-        from test_utils import get_benchfiles_fullpath
-
         import pyyjson
+        from test_utils import get_benchfiles_fullpath
 
         test_cases = [
             [1, 2, 3, 4],  # simple list
@@ -131,7 +121,8 @@ class TestEncode(unittest.TestCase):
             ("a", 1, 2.3, 2.3, None, True, False, [], {}),  # tuple
             tuple(range(100)),  # large tuple
             "a",  # simple string
-            # 1,  # simple int
+            0,  # simple int
+            1,  # simple int
             2.3,  # simple float
             math.inf,
             math.nan,
@@ -144,8 +135,14 @@ class TestEncode(unittest.TestCase):
             {"啊啊啊": "ß"},
             321321432.231543245,  # large float
             -321321432.231543245,
-            # -1,
+            -1,
             -2.3,
+            -2147483648,
+            2147483647,
+            9223372036854775807,
+            -9223372036854775808,
+            18446744073709551615,  # u64 max
+            -9223372036854775808,  # i64 min
             -math.inf,
             -math.nan,
             "RandomText1",
