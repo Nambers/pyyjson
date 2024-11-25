@@ -803,7 +803,7 @@ force_inline bool vec_in_boundary(UnicodeVector *vec) {
 force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {
     UnicodeVector *vec = PyObject_Malloc(PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
     if (unlikely(!vec)) {
-        return PyErr_NoMemory();
+        return NULL;
     }
     Py_ssize_t len = PyUnicode_GET_LENGTH(unicode);
     int unicode_kind = PyUnicode_KIND(unicode);
@@ -817,7 +817,7 @@ force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {
     vec->head.write_end = (void *) ((u8 *) vec + PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
     bool success;
     switch (unicode_kind) {
-        // pass is_in_obj = true to avoid unwanted indent check
+        // pass `is_in_obj = true` to avoid unwanted indent check
         case 1: {
             success = vec_write_str_0_1_1(unicode, len, &vec, true, 0);
             if (success) vec_back1_1(vec);
