@@ -1,4 +1,4 @@
-name: "Build Check"
+name: "Run Test"
 on:
   workflow_dispatch:
   push:
@@ -13,7 +13,7 @@ on:
       - "CMakeLists.txt"
 
 jobs:
-  BUILD-CHECK:
+  RUN-TEST:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -30,4 +30,4 @@ jobs:
         name: antares0982
     - name: Run build
       run: |
-        nix develop -c python ./dev_tools/automated_test.py --pyver ${{ matrix.pyver }} --build-only
+        nix develop -c python ./dev_tools/automated_test.py --pyver ${{ matrix.pyver }} --ignore bench
