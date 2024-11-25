@@ -789,17 +789,39 @@ force_inline bool vec_in_boundary(UnicodeVector *vec) {
 
 /* 
  * Some utility functions only related to *write*, like vector reserve, writing number
- * need macro: COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4
+ * need macro: COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4.
  */
 #include "encode_utils_impl_wrap.inl"
 
+/* 
+ * Some utility functions related to SIMD, like getting escape mask,
+ * elevating ucs level, read/write simd vars.
+ * need macro:
+ *      COMPILE_READ_UCS_LEVEL, value: 1, 2, or 4.
+ *      COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4.
+ */
 #include "encode_simd_utils_wrap.inl"
 
+/* 
+ * Some functions for writing the unicode vector, like writing key, writing value str.
+ * need macro:
+ *      COMPILE_READ_UCS_LEVEL, value: 1, 2, or 4.
+ *      COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4.
+ */
 #include "encode_unicode_impl_wrap.inl"
 
+/* 
+ * Top-level encode functions, like encode list, encode dict, encode single unicode.
+ * need macro:
+ *      COMPILE_UCS_LEVEL, value: 0, 1, 2, or 4. COMPILE_UCS_LEVEL is the current writing level.
+ *          This differs from COMPILE_WRITE_UCS_LEVEL: `0` stands for ascii. Since we always start from
+ *          writing ascii, `0` also defines the entrance of encoding. See `PYYJSON_DUMPS_OBJ` for more
+ *          details.
+ *      COMPILE_INDENT_LEVEL, value: 0, 2, or 4.
+ */
 #include "encode_impl_wrap.inl"
 
-
+/* Encodes non-container types. */
 force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {
     UnicodeVector *vec = PyObject_Malloc(PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
     RETURN_ON_UNLIKELY_ERR(!vec);
@@ -812,7 +834,7 @@ force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {
         U8_WRITER(vec) = (u8 *) (((PyCompactUnicodeObject *) vec) + 1);
     }
     void *write_start = (void *) U8_WRITER(vec);
-    vec->head.write_end = (void *) ((u8 *) vec + PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
+    vec->head.write_end = (void *) (((u8 *) vec) + PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
     bool success;
     switch (unicode_kind) {
         // pass `is_in_obj = true` to avoid unwanted indent check
@@ -902,6 +924,7 @@ force_inline PyObject *pyyjson_dumps_single_float(PyObject *val) {
     return unicode;
 }
 
+/* Entrance for python code. */
 force_noinline PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject *kwargs) {
     PyObject *obj;
     int option_digit = 0;
