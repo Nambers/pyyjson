@@ -791,7 +791,7 @@ force_inline bool vec_in_boundary(UnicodeVector *vec) {
  * Some utility functions only related to *write*, like vector reserve, writing number
  * need macro: COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4.
  */
-#include "encode_utils_impl_wrap.inl"
+#include "encode_utils_impl_wrap.inl.h"
 
 /* 
  * Some utility functions related to SIMD, like getting escape mask,
@@ -800,7 +800,7 @@ force_inline bool vec_in_boundary(UnicodeVector *vec) {
  *      COMPILE_READ_UCS_LEVEL, value: 1, 2, or 4.
  *      COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4.
  */
-#include "encode_simd_utils_wrap.inl"
+#include "encode_simd_utils_wrap.inl.h"
 
 /* 
  * Some functions for writing the unicode vector, like writing key, writing value str.
@@ -808,7 +808,7 @@ force_inline bool vec_in_boundary(UnicodeVector *vec) {
  *      COMPILE_READ_UCS_LEVEL, value: 1, 2, or 4.
  *      COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4.
  */
-#include "encode_unicode_impl_wrap.inl"
+#include "encode_unicode_impl_wrap.inl.h"
 
 /* 
  * Top-level encode functions, like encode list, encode dict, encode single unicode.
@@ -819,7 +819,7 @@ force_inline bool vec_in_boundary(UnicodeVector *vec) {
  *          details.
  *      COMPILE_INDENT_LEVEL, value: 0, 2, or 4.
  */
-#include "encode_impl_wrap.inl"
+#include "encode_impl_wrap.inl.h"
 
 /* Encodes non-container types. */
 force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {

@@ -1,4 +1,4 @@
-#include "encode_float.inl"
+#include "encode_float.inl.h"
 #include "simd_impl.h"
 
 #ifndef COMPILE_WRITE_UCS_LEVEL
