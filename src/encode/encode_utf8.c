@@ -141,4 +141,115 @@ force_inline void ucs2_encode_3bytes_utf8(const uint16_t *reader, uint8_t *write
     }
 }
 
+#elif __SSSE3__
+
+/* read: 16 bytes, write: 24 bytes, reserve: 28 bytes */
+void ucs2_encode_3bytes_utf8(const uint16_t *reader, uint8_t *writer) {
+    __m128i x[2];
+    x[0] = _mm_loadu_si128((const __m128i_u *) reader);
+    x[1] = _mm_unpackhi_epi64(x[0], x[0]);
+    uint8_t t1[16] = {
+            0x80,
+            0x80,
+            0,
+            0x80,
+            0x80,
+            2,
+            0x80,
+            0x80,
+            4,
+            0x80,
+            0x80,
+            6,
+            0x80,
+            0x80,
+            0x80,
+            0x80,
+    };
+    uint8_t t2[16] = {
+            0x80,
+            0,
+            0x80,
+            0x80,
+            2,
+            0x80,
+            0x80,
+            4,
+            0x80,
+            0x80,
+            6,
+            0x80,
+            0x80,
+            0x80,
+            0x80,
+            0x80,
+    };
+    uint8_t t3[16] = {0, 0x80, 0x80,
+                      2, 0x80, 0x80,
+                      4, 0x80, 0x80,
+                      6, 0x80, 0x80,
+                      0x80, 0x80, 0x80,
+                      0x80};
+    uint8_t m1[16] = {
+            0b11111111,
+            0b00111111,
+            0b00111111,
+            0b11111111,
+            0b00111111,
+            0b00111111,
+            0b11111111,
+            0b00111111,
+            0b00111111,
+            0b11111111,
+            0b00111111,
+            0b00111111,
+            0b00000000,
+            0b00000000,
+            0b00000000,
+            0b00000000,
+    };
+    uint8_t m2[16] = {
+            0b11100000,
+            0b10000000,
+            0b10000000,
+            0b11100000,
+            0b10000000,
+            0b10000000,
+            0b11100000,
+            0b10000000,
+            0b10000000,
+            0b11100000,
+            0b10000000,
+            0b10000000,
+            0b00000000,
+            0b00000000,
+            0b00000000,
+            0b00000000,
+    };
+    for (int i = 0; i < 2; ++i) {
+        __m128i x0 = x[i];
+        __m128i x1, x2, x3;
+        /*x1 = 00000000|00000000|abcdefgh */
+        x1 = _mm_shuffle_epi8(x0, _mm_loadu_si128(t1));
+        /*x2 = gh123456|78000000 */
+        x2 = _mm_srli_epi16(x0, 6);
+        /*x2 = 00000000|gh123456|00000000 */
+        x2 = _mm_shuffle_epi8(x2, _mm_loadu_si128(t2));
+        /*x3 = 56780000|00000000 */
+        x3 = _mm_srli_epi16(x0, 12);
+        /*x3 = 56780000|00000000|00000000 */
+        x3 = _mm_shuffle_epi8(x3, _mm_loadu_si128(t3));
+        /*x0 = 56780000|gh123456|abcdefgh */
+        x0 = _mm_or_si128(x1, _mm_or_si128(x2, x3));
+        /*x0 = 56780000|gh123400|abcdef00 */
+        x0 = _mm_and_si128(x0, _mm_loadu_si128(m1));
+        // 5678[mmmm]|gh1234[mm]|abcdef[mm]
+        x0 = _mm_or_si128(x0, _mm_loadu_si128(m2));
+        _mm_storeu_si128((__m128i_u *) writer, x0);
+        writer += 12;
+    }
+}
+
+#else
+
 #endif
