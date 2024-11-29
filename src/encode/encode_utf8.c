@@ -252,4 +252,180 @@ void ucs2_encode_3bytes_utf8(const uint16_t *reader, uint8_t *writer) {
 
 #else
 
+/* read: 16 bytes, write: 24 bytes, reserve: 24 bytes */
+void ucs2_encode_3bytes_utf8(const uint16_t *reader, uint8_t *writer) {
+    for (usize i = 0; i < 8; ++i) {
+        uint16_t c = *reader;
+        if (unlikely(c <= 0x7ff)) {
+            break;
+        }
+        writer[0] = (uint8_t) (0xE0 | (c >> 12));
+        writer[1] = (uint8_t) (0x80 | ((c >> 6) & 0x3F));
+        writer[2] = (uint8_t) (0x80 | (c & 0x3F));
+        reader++;
+        writer += 3;
+    }
+}
+
 #endif
+
+
+#if __AVX2__
+
+/* read: 32 bytes, write: 32 bytes, reserve: 32 bytes */
+force_inline void ucs2_encode_2bytes_utf8(const uint16_t *reader, uint8_t *writer) {
+    /* y1 = abcdefgh|12300000 */
+    __m256i y = _mm256_loadu_si256((const void *) reader);
+    /* y2 = gh123000|00000000 */
+    __m256i y2 = _mm256_srli_epi16(y, 6);
+    /* y3 = 00000000|abcdefgh */
+    __m256i y3 = _mm256_slli_epi16(y, 8);
+    /* y = gh123000|abcdefgh */
+    y = _mm256_or_si256(y2, y3);
+    uint16_t m1[16] = {
+            0b0011111111111111,
+            0b0011111111111111,
+            0b0011111111111111,
+            0b0011111111111111,
+            0b0011111111111111,
+            0b0011111111111111,
+            0b0011111111111111,
+            0b0011111111111111,
+            0b0011111111111111,
+            0b0011111111111111,
+            0b0011111111111111,
+            0b0011111111111111,
+            0b0011111111111111,
+            0b0011111111111111,
+            0b0011111111111111,
+            0b0011111111111111,
+    };
+    uint16_t m2[16] = {
+            0b1000000011000000,
+            0b1000000011000000,
+            0b1000000011000000,
+            0b1000000011000000,
+            0b1000000011000000,
+            0b1000000011000000,
+            0b1000000011000000,
+            0b1000000011000000,
+            0b1000000011000000,
+            0b1000000011000000,
+            0b1000000011000000,
+            0b1000000011000000,
+            0b1000000011000000,
+            0b1000000011000000,
+            0b1000000011000000,
+            0b1000000011000000,
+    };
+    /* y = gh123000|abcdef00 */
+    y = _mm256_and_si256(y, _mm256_load_si256(m1));
+    /* y = gh123[mmm]|abcdef[mm] */
+    y = _mm256_or_si256(y, _mm256_load_si256(m2));
+    _mm256_storeu_si256((void *) writer, y);
+}
+
+#else
+
+/* read: 16 bytes, write: 16 bytes, reserve: 16 bytes */
+void ucs2_encode_2bytes_utf8(const uint16_t *reader, uint8_t *writer) {
+    /* x = abcdefgh|12300000 */
+    __m128i x = _mm_loadu_si128((const void *) reader);
+    /* x2 = gh123000|00000000 */
+    __m128i x2 = _mm_srli_epi16(x, 6);
+    /* x3 = 00000000|abcdefgh */
+    __m128i x3 = _mm_slli_epi16(x, 8);
+    /* x = gh123000|abcdefgh */
+    x = _mm_or_si128(x2, x3);
+    uint16_t m1[8] = {
+            0b0011111111111111,
+            0b0011111111111111,
+            0b0011111111111111,
+            0b0011111111111111,
+            0b0011111111111111,
+            0b0011111111111111,
+            0b0011111111111111,
+            0b0011111111111111,
+    };
+    uint16_t m2[8] = {
+            0b1000000011000000,
+            0b1000000011000000,
+            0b1000000011000000,
+            0b1000000011000000,
+            0b1000000011000000,
+            0b1000000011000000,
+            0b1000000011000000,
+            0b1000000011000000,
+    };
+    /* x = gh123000|abcdef00 */
+    x = _mm_and_si128(x, _mm_load_si128(m1));
+    /* x = gh123[mmm]|abcdef[mm] */
+    x = _mm_or_si128(x, _mm_load_si128(m2));
+    _mm_storeu_si128((void *) writer, x);
+}
+
+#endif
+
+#if __AVX2__
+
+/* read: 32 bytes, write: 16 bytes, reserve: 32 bytes */
+void ucs2_encode_1bytes_utf8(const uint16_t *reader, uint8_t *writer) {
+    __m256i y = _mm256_loadu_si256((const void *) reader);
+    __m256i y2 = _mm256_set_m128i(_mm_undefined_si128(), _mm256_extracti128_si256(y, 1));
+    y = _mm256_packs_epi16(y, y2);
+    _mm256_storeu_si256((void *) writer, y);
+}
+
+#else
+
+/* read: 16 bytes, write: 8 bytes, reserve: 16 bytes */
+void ucs2_encode_1bytes_utf8(const uint16_t *reader, uint8_t *writer) {
+    __m128i x = _mm_loadu_si128((const void *) reader);
+    x = _mm_packs_epi16(x, x);
+    _mm_storeu_si128((void *) writer, x);
+}
+
+#endif
+
+void ucs2_encode_utf8(const uint16_t *restrict reader, uint8_t *restrict writer, Py_ssize_t read_size) {
+    const usize CHECK_COUNT = SIMD_BIT_SIZE / 16;
+    const uint16_t *read_end = reader + read_size;
+    const uint16_t *check_end = read_end - CHECK_COUNT;
+    while (reader <= check_end) {
+        uint16_t first = *reader;
+        SIMD_TYPE mask = get_mask(reader);
+        UTF8_BytesType bytes_type = check_byte_type(first);
+        switch (bytes_type) {
+            case UTF8_1Byte: {
+                // ASCII case
+                do_reserve();
+                ucs2_encode_1bytes_utf8(reader, writer);
+                // TODO consider escape, handle the move ptr logic here
+                continue;
+            }
+            case UTF8_2Bytes: {
+                do_reserve();
+                ucs2_encode_2bytes_utf8(reader, writer);
+                break;
+            }
+            case UTF8_3Bytes: {
+                do_reserve();
+                ucs2_encode_3bytes_utf8(reader, writer);
+                break;
+            }
+        }
+        assert(bytes_type != UTF8_1Byte);
+        Py_ssize_t move_size = check_mask_move_size(mask, bytes_type);
+        assert(move_size);
+        reader += move_size;
+        writer += move_size * bytes_type;
+        if (unlikely(move_size < CHECK_COUNT)) {
+            // encode only one
+            writer += encode_single_ucs2(*reader, writer);
+            reader++;
+        }
+    }
+    if (reader == read_end) return;
+    Py_ssize_t tail_len = read_end - reader;
+    // TODO
+}
