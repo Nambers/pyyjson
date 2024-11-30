@@ -21,6 +21,7 @@
 #define VEC_RESERVE PYYJSON_CONCAT2(vec_reserve, COMPILE_WRITE_UCS_LEVEL)
 #define _ELEVATE_FROM_U8_NUM_BUFFER PYYJSON_CONCAT2(_elevate_u8_copy, COMPILE_WRITE_UCS_LEVEL)
 
+
 /*
  * Reserve space for the vector.
  */
@@ -29,35 +30,9 @@ force_inline UnicodeVector *VEC_RESERVE(UnicodeVector **vec_addr, Py_ssize_t siz
     UnicodeVector *vec = *vec_addr;
     _TARGET_TYPE *target_ptr = _WRITER(vec) + size;
     if (unlikely(target_ptr > (_TARGET_TYPE *) VEC_END(vec))) {
-        const Py_ssize_t u8_diff = VEC_MEM_U8_DIFF(vec, target_ptr);
-        assert(u8_diff >= 0);
-        // Py_ssize_t target_size = u8_diff;
-        Py_ssize_t target_size = VEC_MEM_U8_DIFF(vec, VEC_END(vec));
-        assert(target_size >= 0);
-#if PYYJSON_ASAN_CHECK
-        // for sanitize=address build, only resize to the *just enough* size.
-        Py_ssize_t inc_size = 0;
-#else
-        Py_ssize_t inc_size = target_size;
-#endif
-        if (unlikely(target_size > (PY_SSIZE_T_MAX - inc_size))) {
-            PyErr_NoMemory();
-            return NULL;
-        }
-        target_size = target_size + inc_size;
-        target_size = (target_size > u8_diff) ? target_size : u8_diff;
-        Py_ssize_t w_diff = VEC_MEM_U8_DIFF(vec, _WRITER(vec));
-        void *new_ptr = PyObject_Realloc((void *) vec, (size_t) target_size);
-        if (unlikely(!new_ptr)) {
-            PyErr_NoMemory();
-            return NULL;
-        }
-        vec = (UnicodeVector *) new_ptr;
-        *vec_addr = vec;
-        vec_set_rwptr_and_size(vec, w_diff, target_size);
-#ifndef NDEBUG
-        memset((void *) _WRITER(vec), 0, (char *) VEC_END(vec) - (char *) _WRITER(vec));
-#endif
+        UnicodeVector *new_vec = unicode_vec_reserve(vec, (void *) target_ptr);
+        vec = new_vec;
+        if (new_vec) *vec_addr = new_vec;
     }
     return vec;
 }

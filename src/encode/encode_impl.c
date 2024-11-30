@@ -787,6 +787,38 @@ force_inline bool vec_in_boundary(UnicodeVector *vec) {
     return vec->head.write_u8 <= (u8 *) vec->head.write_end && vec->head.write_u8 >= (u8 *) GET_VEC_ASCII_START(vec);
 }
 
+force_noinline UnicodeVector *unicode_vec_reserve(UnicodeVector *vec, void *target_ptr) {
+    const Py_ssize_t u8_diff = VEC_MEM_U8_DIFF(vec, target_ptr);
+    assert(u8_diff >= 0);
+    // Py_ssize_t target_size = u8_diff;
+    Py_ssize_t target_size = VEC_MEM_U8_DIFF(vec, VEC_END(vec));
+    assert(target_size >= 0);
+#if PYYJSON_ASAN_CHECK
+    // for sanitize=address build, only resize to the *just enough* size.
+    Py_ssize_t inc_size = 0;
+#else
+    Py_ssize_t inc_size = target_size;
+#endif
+    if (unlikely(target_size > (PY_SSIZE_T_MAX - inc_size))) {
+        PyErr_NoMemory();
+        return NULL;
+    }
+    target_size = target_size + inc_size;
+    target_size = (target_size > u8_diff) ? target_size : u8_diff;
+    Py_ssize_t w_diff = VEC_MEM_U8_DIFF(vec, vec->head.write_u8);
+    void *new_ptr = PyObject_Realloc((void *) vec, (size_t) target_size);
+    if (unlikely(!new_ptr)) {
+        PyErr_NoMemory();
+        return NULL;
+    }
+    vec = (UnicodeVector *) new_ptr;
+    vec_set_rwptr_and_size(vec, w_diff, target_size);
+#ifndef NDEBUG
+    memset((void *) vec->head.write_u8, 0, (usize) ((u8 *) VEC_END(vec) - vec->head.write_u8));
+#endif
+    return vec;
+}
+
 /* 
  * Some utility functions only related to *write*, like vector reserve, writing number
  * need macro: COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4.
