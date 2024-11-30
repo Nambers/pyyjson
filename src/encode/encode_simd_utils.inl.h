@@ -1,58 +1,14 @@
+#include "simd/mask_table.h"
 #include "simd_detect.h"
 #include <immintrin.h>
 
-#ifndef COMPILE_READ_UCS_LEVEL
-#error "COMPILE_READ_UCS_LEVEL is not defined"
-#endif
+#include "commondef/r_in.inl.h"
+#include "commondef/w_in.inl.h"
 
-#ifndef COMPILE_WRITE_UCS_LEVEL
-#error "COMPILE_WRITE_UCS_LEVEL is not defined"
-#endif
-
-
-#if COMPILE_WRITE_UCS_LEVEL == 4
-#define _WRITER U32_WRITER
-#define _TARGET_TYPE u32
-#define WRITE_BIT_SIZE 32
-#elif COMPILE_WRITE_UCS_LEVEL == 2
-#define _WRITER U16_WRITER
-#define _TARGET_TYPE u16
-#define WRITE_BIT_SIZE 16
-#elif COMPILE_WRITE_UCS_LEVEL == 1
-#define _WRITER U8_WRITER
-#define _TARGET_TYPE u8
-#define WRITE_BIT_SIZE 8
-#else
-#error "COMPILE_WRITE_UCS_LEVEL must be 1, 2 or 4"
-#endif
-
-#if COMPILE_READ_UCS_LEVEL == 4
-#define CHECK_MASK_TYPE u16
-#define _FROM_TYPE u32
-#define READ_BIT_SIZE 32
-#elif COMPILE_READ_UCS_LEVEL == 2
-#define CHECK_MASK_TYPE u32
-#define _FROM_TYPE u16
-#define READ_BIT_SIZE 16
-#elif COMPILE_READ_UCS_LEVEL == 1
-#define CHECK_MASK_TYPE u64
-#define _FROM_TYPE u8
-#define READ_BIT_SIZE 8
-#else
-#error "COMPILE_READ_UCS_LEVEL must be 1, 2 or 4"
-#endif
-
-#if SIMD_BIT_SIZE < 512
-#undef CHECK_MASK_TYPE
-#define CHECK_MASK_TYPE SIMD_MASK_TYPE
-#endif
-
-#define CHECK_COUNT_MAX (SIMD_BIT_SIZE / 8 / sizeof(_FROM_TYPE))
 
 // read only
 #define CHECK_ESCAPE_IMPL_GET_MASK PYYJSON_CONCAT2(check_escape_impl_get_mask, COMPILE_READ_UCS_LEVEL)
 #define CHECK_MASK_ZERO PYYJSON_CONCAT2(check_mask_zero, COMPILE_READ_UCS_LEVEL)
-#define CHECK_MASK_ZERO_SMALL PYYJSON_CONCAT2(check_mask_zero_small, COMPILE_READ_UCS_LEVEL)
 #define CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512 PYYJSON_CONCAT2(check_escape_tail_impl_get_mask_512, COMPILE_READ_UCS_LEVEL)
 // write only or read-write
 #define WRITE_SIMD_IMPL PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
@@ -61,23 +17,7 @@
 #define MASK_ELEVATE_WRITE_512 PYYJSON_CONCAT3(mask_elevate_write_512, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 
 #if COMPILE_WRITE_UCS_LEVEL == 4
-force_inline bool CHECK_MASK_ZERO_SMALL(SIMD_SMALL_MASK_TYPE small_mask) {
-#if SIMD_BIT_SIZE == 512
-    return small_mask == 0;
-#elif SIMD_BIT_SIZE == 256
-    return (bool) _mm_testz_si128(small_mask, small_mask); // ptest, sse4.1
-#else
-#if defined(__SSE4_1__)
-    return (bool) _mm_testz_si128(small_mask, small_mask); // ptest, sse4.1
-#else
-    return _mm_movemask_epi8(_mm_cmpeq_epi8(small_mask, _mm_setzero_si128())) == 0xFFFF;
-#endif
-#endif
-}
-#endif // COMPILE_WRITE_UCS_LEVEL == 1
-
-#if COMPILE_WRITE_UCS_LEVEL == 4
-force_inline CHECK_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *src, SIMD_TYPE *restrict SIMD_VAR) {
+force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *src, SIMD_TYPE *restrict SIMD_VAR) {
 #if SIMD_BIT_SIZE == 512
 #define CUR_QUOTE PYYJSON_SIMPLE_CONCAT2(_Quote_i, READ_BIT_SIZE)
 #define CUR_SLASH PYYJSON_SIMPLE_CONCAT2(_Slash_i, READ_BIT_SIZE)
@@ -88,9 +28,9 @@ force_inline CHECK_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *src, S
     SIMD_512 t1 = load_512_aligned((const void *) CUR_QUOTE);
     SIMD_512 t2 = load_512_aligned((const void *) CUR_SLASH);
     SIMD_512 t3 = load_512_aligned((const void *) CUR_CONTROL_MAX);
-    CHECK_MASK_TYPE m1 = CMPEQ(*z, t1); // AVX512BW, AVX512F
-    CHECK_MASK_TYPE m2 = CMPEQ(*z, t2); // AVX512BW, AVX512F
-    CHECK_MASK_TYPE m3 = CMPLT(*z, t3); // AVX512BW, AVX512F
+    SIMD_MASK_TYPE m1 = CMPEQ(*z, t1); // AVX512BW, AVX512F
+    SIMD_MASK_TYPE m2 = CMPEQ(*z, t2); // AVX512BW, AVX512F
+    SIMD_MASK_TYPE m3 = CMPLT(*z, t3); // AVX512BW, AVX512F
     return m1 | m2 | m3;
 #undef CMPLT
 #undef CMPEQ
@@ -150,16 +90,16 @@ force_inline CHECK_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *src, S
 #endif // COMPILE_WRITE_UCS_LEVEL == 1
 
 #if COMPILE_WRITE_UCS_LEVEL == 4
-force_inline bool CHECK_MASK_ZERO(CHECK_MASK_TYPE SIMD_VAR) {
+force_inline bool CHECK_MASK_ZERO(SIMD_MASK_TYPE mask) {
 #if SIMD_BIT_SIZE == 512
-    return SIMD_VAR == 0;
+    return mask == 0;
 #elif SIMD_BIT_SIZE == 256
-    return (bool) _mm256_testz_si256(SIMD_VAR, SIMD_VAR);
+    return (bool) _mm256_testz_si256(mask, mask);
 #else
 #if defined(__SSE4_1__)
-    return (bool) _mm_testz_si128(SIMD_VAR, SIMD_VAR); // ptest, sse4.1
+    return (bool) _mm_testz_si128(mask, mask); // ptest, sse4.1
 #else
-    return _mm_movemask_epi8(_mm_cmpeq_epi8(SIMD_VAR, _mm_setzero_si128())) == 0xFFFF;
+    return _mm_movemask_epi8(_mm_cmpeq_epi8(mask, _mm_setzero_si128())) == 0xFFFF;
 #endif
 #endif
 }
@@ -168,7 +108,7 @@ force_inline bool CHECK_MASK_ZERO(CHECK_MASK_TYPE SIMD_VAR) {
 
 #if COMPILE_WRITE_UCS_LEVEL == 4
 #if SIMD_BIT_SIZE == 512
-CHECK_MASK_TYPE CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(SIMD_512 z, CHECK_MASK_TYPE rw_mask) {
+SIMD_MASK_TYPE CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(SIMD_512 z, SIMD_MASK_TYPE rw_mask) {
 #define CUR_QUOTE PYYJSON_SIMPLE_CONCAT2(_Quote_i, READ_BIT_SIZE)
 #define CUR_SLASH PYYJSON_SIMPLE_CONCAT2(_Slash_i, READ_BIT_SIZE)
 #define CUR_CONTROL_MAX PYYJSON_SIMPLE_CONCAT2(_ControlMax_i, READ_BIT_SIZE)
@@ -177,9 +117,9 @@ CHECK_MASK_TYPE CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(SIMD_512 z, CHECK_MASK_TYPE 
     SIMD_512 t1 = load_512_aligned((const void *) CUR_QUOTE);
     SIMD_512 t2 = load_512_aligned((const void *) CUR_SLASH);
     SIMD_512 t3 = load_512_aligned((const void *) CUR_CONTROL_MAX);
-    CHECK_MASK_TYPE m1 = CMPEQ(rw_mask, z, t1); // AVX512BW / AVX512F
-    CHECK_MASK_TYPE m2 = CMPEQ(rw_mask, z, t2); // AVX512BW / AVX512F
-    CHECK_MASK_TYPE m3 = CMPLT(rw_mask, z, t3); // AVX512BW / AVX512F
+    SIMD_MASK_TYPE m1 = CMPEQ(rw_mask, z, t1); // AVX512BW / AVX512F
+    SIMD_MASK_TYPE m2 = CMPEQ(rw_mask, z, t2); // AVX512BW / AVX512F
+    SIMD_MASK_TYPE m3 = CMPLT(rw_mask, z, t3); // AVX512BW / AVX512F
     return m1 | m2 | m3;
 #undef CMPLT
 #undef CMPEQ
@@ -251,7 +191,7 @@ force_inline void WRITE_SIMD_256_WITH_WRITEMASK(_TARGET_TYPE *dst, SIMD_256 y, S
 
 #if SIMD_BIT_SIZE == 256 && COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
 force_inline void BACK_WRITE_SIMD256_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_256 y, Py_ssize_t len) {
-#define MASK_TABLE PYYJSON_CONCAT2(_MaskTable, WRITE_BIT_SIZE)
+#define MASK_TABLE_READ PYYJSON_CONCAT2(mask_table_read, WRITE_BIT_SIZE)
 #define MASK_WRITER PYYJSON_CONCAT2(write_simd_256_with_writemask, COMPILE_WRITE_UCS_LEVEL)
 #define ELEVATOR PYYJSON_CONCAT5(elevate, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL, to, SIMD_BIT_SIZE)
 #if COMPILE_READ_UCS_LEVEL == 1 && COMPILE_WRITE_UCS_LEVEL == 4
@@ -263,19 +203,20 @@ force_inline void BACK_WRITE_SIMD256_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_256 y
     split_tail_len_four_parts(len, CHECK_COUNT_MAX, &part1, &part2, &part3, &part4);
     extract_256_four_parts(SIMD_VAR, &x1, &x2, &x3, &x4);
     // 0
-    writemask = load_256_aligned(&MASK_TABLE[(usize) (CHECK_COUNT_MAX / 4 - part1)][0]);
+    ;
+    writemask = load_256_aligned(MASK_TABLE_READ(CHECK_COUNT_MAX / 4 - part1));
     MASK_WRITER(dst, ELEVATOR(x1), writemask);
     dst += CHECK_COUNT_MAX / 4;
     // 1
-    writemask = load_256_aligned(&MASK_TABLE[(usize) (CHECK_COUNT_MAX / 4 - part2)][0]);
+    writemask = load_256_aligned(MASK_TABLE_READ(CHECK_COUNT_MAX / 4 - part2));
     MASK_WRITER(dst, ELEVATOR(x2), writemask);
     dst += CHECK_COUNT_MAX / 4;
     // 2
-    writemask = load_256_aligned(&MASK_TABLE[(usize) (CHECK_COUNT_MAX / 4 - part3)][0]);
+    writemask = load_256_aligned(MASK_TABLE_READ(CHECK_COUNT_MAX / 4 - part3));
     MASK_WRITER(dst, ELEVATOR(x3), writemask);
     dst += CHECK_COUNT_MAX / 4;
     // 3
-    writemask = load_256_aligned(&MASK_TABLE[(usize) (CHECK_COUNT_MAX / 4 - part4)][0]);
+    writemask = load_256_aligned(MASK_TABLE_READ(CHECK_COUNT_MAX / 4 - part4));
     MASK_WRITER(dst, ELEVATOR(x4), writemask);
     dst += CHECK_COUNT_MAX / 4;
 #else  // COMPILE_READ_UCS_LEVEL != 1 || COMPILE_WRITE_UCS_LEVEL != 4
@@ -286,17 +227,18 @@ force_inline void BACK_WRITE_SIMD256_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_256 y
     split_tail_len_two_parts(len, CHECK_COUNT_MAX, &part1, &part2);
     extract_256_two_parts(y, &x1, &x2);
     // 0
-    writemask = load_256_aligned(&MASK_TABLE[(usize) (CHECK_COUNT_MAX / 2 - part1)][0]);
+
+    writemask = load_256_aligned(MASK_TABLE_READ(CHECK_COUNT_MAX / 2 - part1));
     MASK_WRITER(dst, ELEVATOR(x1), writemask);
     dst += CHECK_COUNT_MAX / 2;
     // 1
-    writemask = load_256_aligned(&MASK_TABLE[(usize) (CHECK_COUNT_MAX / 2 - part2)][0]);
+    writemask = load_256_aligned(MASK_TABLE_READ(CHECK_COUNT_MAX / 2 - part2));
     MASK_WRITER(dst, ELEVATOR(x2), writemask);
     dst += CHECK_COUNT_MAX / 2;
 #endif // COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL
 #undef ELEVATOR
+#undef MASK_TABLE_READ
 #undef MASK_WRITER
-#undef MASK_TABLE
 }
 #endif // SIMD_BIT_SIZE == 256 && COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
 
@@ -311,22 +253,22 @@ force_inline void MASK_ELEVATE_WRITE_512(_TARGET_TYPE *dst, SIMD_512 z, Py_ssize
     SIMD_512 to_write;
     switch (parts) {
         case 4: {
-            x = SIMD_EXTRACT_PART(z, 3);
+            x = SIMD_EXTRACT_QUARTER(z, 3);
             to_write = elevate_1_4_to_512(x);
             write_512((void *) (dst + (CHECK_COUNT_MAX / 4) * 3), to_write);
         }
         case 3: {
-            x = SIMD_EXTRACT_PART(z, 2);
+            x = SIMD_EXTRACT_QUARTER(z, 2);
             to_write = elevate_1_4_to_512(x);
             write_512((void *) (dst + (CHECK_COUNT_MAX / 4) * 2), to_write);
         }
         case 2: {
-            x = SIMD_EXTRACT_PART(z, 1);
+            x = SIMD_EXTRACT_QUARTER(z, 1);
             to_write = elevate_1_4_to_512(x);
             write_512((void *) (dst + (CHECK_COUNT_MAX / 4) * 1), to_write);
         }
         case 1: {
-            x = SIMD_EXTRACT_PART(z, 0);
+            x = SIMD_EXTRACT_QUARTER(z, 0);
             to_write = elevate_1_4_to_512(x);
             write_512((void *) dst, to_write);
             break;
@@ -370,19 +312,13 @@ force_inline void MASK_ELEVATE_WRITE_512(_TARGET_TYPE *dst, SIMD_512 z, Py_ssize
 }
 #endif // SIMD_BIT_SIZE == 512 && COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
 
-
+// #include "commondef/r_out.inl.h"
+// #include "commondef/w_out.inl.h"
 #undef MASK_ELEVATE_WRITE_512
 #undef BACK_WRITE_SIMD256_WITH_TAIL_LEN
 #undef WRITE_SIMD_256_WITH_WRITEMASK
 #undef WRITE_SIMD_IMPL
 #undef CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512
-#undef CHECK_MASK_ZERO_SMALL
 #undef CHECK_MASK_ZERO
 #undef CHECK_ESCAPE_IMPL_GET_MASK
 #undef CHECK_COUNT_MAX
-#undef READ_BIT_SIZE
-#undef _FROM_TYPE
-#undef CHECK_MASK_TYPE
-#undef WRITE_BIT_SIZE
-#undef _TARGET_TYPE
-#undef _WRITER

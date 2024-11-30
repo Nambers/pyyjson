@@ -1,41 +1,15 @@
 #include "encode_float.inl.h"
-#include "simd_impl.h"
+#include "simd/simd_impl.h"
 
 #ifndef COMPILE_WRITE_UCS_LEVEL
 #error "COMPILE_WRITE_UCS_LEVEL is not defined"
 #endif
 
-#if COMPILE_WRITE_UCS_LEVEL == 4
-#define _WRITER U32_WRITER
-#define _TARGET_TYPE u32
-#elif COMPILE_WRITE_UCS_LEVEL == 2
-#define _WRITER U16_WRITER
-#define _TARGET_TYPE u16
-#elif COMPILE_WRITE_UCS_LEVEL == 1
-#define _WRITER U8_WRITER
-#define _TARGET_TYPE u8
-#else
-#error "COMPILE_WRITE_UCS_LEVEL must be 1, 2 or 4"
-#endif
+#include "commondef/w_in.inl.h"
+#include "unicode/include/reserve.h"
 
-#define VEC_RESERVE PYYJSON_CONCAT2(vec_reserve, COMPILE_WRITE_UCS_LEVEL)
 #define _ELEVATE_FROM_U8_NUM_BUFFER PYYJSON_CONCAT2(_elevate_u8_copy, COMPILE_WRITE_UCS_LEVEL)
 
-
-/*
- * Reserve space for the vector.
- */
-force_inline UnicodeVector *VEC_RESERVE(UnicodeVector **vec_addr, Py_ssize_t size) {
-    assert(vec_addr);
-    UnicodeVector *vec = *vec_addr;
-    _TARGET_TYPE *target_ptr = _WRITER(vec) + size;
-    if (unlikely(target_ptr > (_TARGET_TYPE *) VEC_END(vec))) {
-        UnicodeVector *new_vec = unicode_vec_reserve(vec, (void *) target_ptr);
-        vec = new_vec;
-        if (new_vec) *vec_addr = new_vec;
-    }
-    return vec;
-}
 
 /*
  * (PRIVATE)
@@ -136,8 +110,7 @@ force_inline void PYYJSON_CONCAT2(vec_write_f64, COMPILE_WRITE_UCS_LEVEL)(Unicod
     _ELEVATE_FROM_U8_NUM_BUFFER(vec, buffer, write_len);
 #endif
 }
+#include "commondef/w_out.inl.h"
 
 #undef _ELEVATE_FROM_U8_NUM_BUFFER
 #undef VEC_RESERVE
-#undef _TARGET_TYPE
-#undef _WRITER

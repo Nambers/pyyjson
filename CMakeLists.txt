@@ -86,6 +86,9 @@ add_library(pyyjson SHARED
     src/decode/decode.c
     src/pyyjson.c
     src/encode/encode_impl.c
+    src/unicode/utils.c
+    src/simd/cvt.c
+    src/simd/mask_table.c
 )
 target_include_directories(pyyjson PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src> ${Python3_INCLUDE_DIRS})
 

@@ -7,47 +7,23 @@
 #endif
 
 #if COMPILE_UCS_LEVEL <= 1
-#define VEC_RESERVE PYYJSON_CONCAT2(vec_reserve, 1)
-#define VECTOR_WRITE_INDENT PYYJSON_CONCAT3(vector_write_indent, COMPILE_INDENT_LEVEL, 1)
-#define _WRITER U8_WRITER
-#define _TARGET_TYPE u8
-#define VEC_WRITE_U64 PYYJSON_CONCAT2(vec_write_u64, 1)
-#define VEC_WRITE_F64 PYYJSON_CONCAT2(vec_write_f64, 1)
-#define _INDENT_WRITER PYYJSON_CONCAT3(indent_writer, COMPILE_INDENT_LEVEL, 1)
+#define COMPILE_READ_UCS_LEVEL 1
+#define COMPILE_WRITE_UCS_LEVEL 1
 #else
-#define VEC_RESERVE PYYJSON_CONCAT2(vec_reserve, COMPILE_UCS_LEVEL)
-#define VECTOR_WRITE_INDENT PYYJSON_CONCAT3(vector_write_indent, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
-#if COMPILE_UCS_LEVEL == 2
-#define _WRITER U16_WRITER
-#define _TARGET_TYPE u16
-#else
-#define _WRITER U32_WRITER
-#define _TARGET_TYPE u32
-#endif
-#define VEC_WRITE_U64 PYYJSON_CONCAT2(vec_write_u64, COMPILE_UCS_LEVEL)
-#define VEC_WRITE_F64 PYYJSON_CONCAT2(vec_write_f64, COMPILE_UCS_LEVEL)
-#define _INDENT_WRITER PYYJSON_CONCAT3(indent_writer, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
+#define COMPILE_READ_UCS_LEVEL COMPILE_UCS_LEVEL
+#define COMPILE_WRITE_UCS_LEVEL COMPILE_UCS_LEVEL
 #endif
 
-#if COMPILE_UCS_LEVEL > 0
-// avoid compile again
-force_inline UnicodeVector *_INDENT_WRITER(UnicodeVector **vec_addr, Py_ssize_t cur_nested_depth, bool is_in_obj, Py_ssize_t additional_reserve_count) {
-    UnicodeVector *vec;
-    if (!is_in_obj && COMPILE_INDENT_LEVEL) {
-        vec = VEC_RESERVE(vec_addr, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + additional_reserve_count);
-        RETURN_ON_UNLIKELY_ERR(!vec);
-        VECTOR_WRITE_INDENT(vec, cur_nested_depth);
-    } else {
-        vec = VEC_RESERVE(vec_addr, additional_reserve_count);
-        RETURN_ON_UNLIKELY_ERR(!vec);
-    }
-    return vec;
-}
-#endif
+#include "commondef/w_in.inl.h"
+#include "unicode/include/indent.h"
+
+#define VEC_WRITE_U64 PYYJSON_CONCAT2(vec_write_u64, COMPILE_WRITE_UCS_LEVEL)
+#define VEC_WRITE_F64 PYYJSON_CONCAT2(vec_write_f64, COMPILE_WRITE_UCS_LEVEL)
+
 
 #define WRITE_INDENT_RETURN_IF_FAIL(vec_addr, cur_nested_depth, _is_in_obj, _additional_reserve_count) \
     do {                                                                                               \
-        vec = _INDENT_WRITER(vec_addr, cur_nested_depth, _is_in_obj, _additional_reserve_count);       \
+        vec = INDENT_WRITER(vec_addr, cur_nested_depth, _is_in_obj, _additional_reserve_count);        \
         if (unlikely(!vec)) return false;                                                              \
     } while (0)
 
@@ -56,13 +32,7 @@ force_inline UnicodeVector *_INDENT_WRITER(UnicodeVector **vec_addr, Py_ssize_t 
 #if COMPILE_INDENT_LEVEL == 0
 // avoid compile again
 force_inline void VEC_BACK1(UnicodeVector *vec) {
-#if COMPILE_UCS_LEVEL <= 1
-    vec->head.write_u8--;
-#elif COMPILE_UCS_LEVEL == 2
-    vec->head.write_u16--;
-#elif COMPILE_UCS_LEVEL == 4
-    vec->head.write_u32--;
-#endif
+    (_WRITER(vec))--;
 }
 #endif
 
@@ -1025,6 +995,8 @@ fail_keytype:;
 }
 
 
+#include "commondef/w_out.inl.h"
+
 #undef PYYJSON_DUMPS_OBJ
 #undef ENCODE_PROCESS_VAL
 #undef GET_VECTOR_FINAL_LEN
@@ -1044,10 +1016,7 @@ fail_keytype:;
 #undef _PREPARE_UNICODE_WRITE
 #undef VEC_BACK1
 #undef WRITE_INDENT_RETURN_IF_FAIL
-#undef _INDENT_WRITER
 #undef VEC_WRITE_F64
 #undef VEC_WRITE_U64
-#undef _TARGET_TYPE
-#undef _WRITER
-#undef VECTOR_WRITE_INDENT
-#undef VEC_RESERVE
+#undef COMPILE_WRITE_UCS_LEVEL
+#undef COMPILE_READ_UCS_LEVEL

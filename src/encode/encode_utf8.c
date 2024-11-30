@@ -4,7 +4,7 @@ DRAFT utf-8 encoding.
 
 
 #include "encode_shared.h"
-#include "simd_impl.h"
+#include "simd/simd_impl.h"
 
 #if __AVX2__
 

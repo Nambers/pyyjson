@@ -1,0 +1,3 @@
+#undef CHECK_COUNT_MAX
+#undef READ_BIT_SIZE
+#undef _FROM_TYPE

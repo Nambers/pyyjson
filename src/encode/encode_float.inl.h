@@ -54,7 +54,7 @@
 #define U64(hi, lo) ((((u64)hi##UL) << 32U) + lo##UL)
 
 /** Digit table from 00 to 99. */
-yyjson_align(2)
+pyyjson_align(2)
 static const char digit_table[200] = {
     '0', '0', '0', '1', '0', '2', '0', '3', '0', '4',
     '0', '5', '0', '6', '0', '7', '0', '8', '0', '9',

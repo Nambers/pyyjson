@@ -1,6 +1,7 @@
 #ifndef ENCODE_SIMD_IMPL_H
 #define ENCODE_SIMD_IMPL_H
 
+#include "pyyjson.h"
 #include "simd_detect.h"
 #include <immintrin.h>
 #if defined(_MSC_VER)
@@ -15,8 +16,7 @@
 #define SIMD_SMALL_MASK_TYPE u16
 #define SIMD_BIT_MASK_TYPE u64
 #define SIMD_HALF_TYPE __m256i
-#define SIMD_EXTRACT_PART _mm512_extracti32x4_epi32
-#define SIMD_MASK_EXTRACT_PART(m, i) (u16)((m >> (i * 16)) & 0xFFFF)
+#define SIMD_EXTRACT_QUARTER _mm512_extracti32x4_epi32
 #define SIMD_EXTRACT_HALF _mm512_extracti64x4_epi64
 #elif SIMD_BIT_SIZE == 256
 #define SIMD_VAR y
@@ -25,9 +25,7 @@
 #define SIMD_SMALL_MASK_TYPE __m128i
 #define SIMD_BIT_MASK_TYPE u32
 #define SIMD_HALF_TYPE __m128i
-#define SIMD_EXTRACT_PART _mm256_extracti128_si256
-#define SIMD_MASK_EXTRACT_PART SIMD_EXTRACT_PART
-#define SIMD_EXTRACT_HALF SIMD_EXTRACT_PART
+#define SIMD_EXTRACT_HALF _mm256_extracti128_si256
 #else
 #define SIMD_VAR x
 #define SIMD_TYPE __m128i
@@ -282,7 +280,7 @@ force_inline void extract_128_two_parts(SIMD_128 x, SIMD_128 *restrict x1, SIMD_
 
 force_inline void extract_128_four_parts(SIMD_128 x, SIMD_128 *restrict x1, SIMD_128 *restrict x2, SIMD_128 *restrict x3, SIMD_128 *restrict x4) {
 #if __SSE3__
-#define MOVEHDUP(_x) (SIMD_128)_mm_movehdup_ps((__m128)(_x))
+#define MOVEHDUP(_x) (SIMD_128) _mm_movehdup_ps((__m128) (_x))
 #else
 #define MOVEHDUP(_x) _mm_bsrli_si128((_x), 4)
 #endif
@@ -454,7 +452,7 @@ force_inline SIMD_HALF_TYPE load_half(const void *src) {
 /*==============================================================================
  * TZCNT.
  *============================================================================*/
-force_noinline u32 tzcnt_u32(u32 x) {
+force_inline u32 tzcnt_u32(u32 x) {
     // never pass a zero here.
     assert(x);
 #if __BMI__
@@ -469,7 +467,7 @@ force_noinline u32 tzcnt_u32(u32 x) {
 #endif
 }
 
-force_noinline u64 tzcnt_u64(u64 x) {
+force_inline u64 tzcnt_u64(u64 x) {
     // never pass a zero here.
     assert(x);
 #if __BMI__

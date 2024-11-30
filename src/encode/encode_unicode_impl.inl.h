@@ -1,54 +1,15 @@
+#include "commondef/i_in.inl.h"
+#include "commondef/r_in.inl.h"
+#include "commondef/w_in.inl.h"
+#include "simd/simd_impl.h"
 #include "simd_detect.h"
-#include "simd_impl.h"
+#include "unicode/include/indent.h"
+#include "unicode/include/reserve.h"
 #include <immintrin.h>
 
-#ifndef COMPILE_READ_UCS_LEVEL
-#error "COMPILE_READ_UCS_LEVEL is not defined"
-#endif
-
-#ifndef COMPILE_WRITE_UCS_LEVEL
-#error "COMPILE_WRITE_UCS_LEVEL is not defined"
-#endif
-
-#ifndef COMPILE_INDENT_LEVEL
-#error "COMPILE_INDENT_LEVEL is not defined"
-#endif
-
-#if COMPILE_WRITE_UCS_LEVEL == 4
-#define _WRITER U32_WRITER
-#define _TARGET_TYPE u32
-#elif COMPILE_WRITE_UCS_LEVEL == 2
-#define _WRITER U16_WRITER
-#define _TARGET_TYPE u16
-#elif COMPILE_WRITE_UCS_LEVEL == 1
-#define _WRITER U8_WRITER
-#define _TARGET_TYPE u8
-#else
-#error "COMPILE_WRITE_UCS_LEVEL must be 1, 2 or 4"
-#endif
-
-#if COMPILE_READ_UCS_LEVEL == 4
-#define CHECK_MASK_TYPE u16
-#define _FROM_TYPE u32
-#elif COMPILE_READ_UCS_LEVEL == 2
-#define CHECK_MASK_TYPE u32
-#define _FROM_TYPE u16
-#elif COMPILE_READ_UCS_LEVEL == 1
-#define CHECK_MASK_TYPE u64
-#define _FROM_TYPE u8
-#else
-#error "COMPILE_READ_UCS_LEVEL must be 1, 2 or 4"
-#endif
-
-
-#define CHECK_COUNT_MAX (SIMD_BIT_SIZE / 8 / sizeof(_FROM_TYPE))
-
-// encode_utils_impl.inl
-#define VEC_RESERVE PYYJSON_CONCAT2(vec_reserve, COMPILE_WRITE_UCS_LEVEL)
 // encode_simd_utils.inl
 #define CHECK_ESCAPE_IMPL_GET_MASK PYYJSON_CONCAT2(check_escape_impl_get_mask, COMPILE_READ_UCS_LEVEL)
 #define CHECK_MASK_ZERO PYYJSON_CONCAT2(check_mask_zero, COMPILE_READ_UCS_LEVEL)
-#define CHECK_MASK_ZERO_SMALL PYYJSON_CONCAT2(check_mask_zero_small, COMPILE_READ_UCS_LEVEL)
 #define WRITE_SIMD_256_WITH_WRITEMASK PYYJSON_CONCAT2(write_simd_256_with_writemask, COMPILE_WRITE_UCS_LEVEL)
 #define BACK_WRITE_SIMD256_WITH_TAIL_LEN PYYJSON_CONCAT3(back_write_simd256_with_tail_len, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 // define here
@@ -57,7 +18,6 @@
 #define VECTOR_WRITE_UNICODE_IMPL PYYJSON_CONCAT4(vector_write_unicode_impl, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define VECTOR_WRITE_UNICODE_TRAILING_IMPL PYYJSON_CONCAT4(vector_write_unicode_trailing_impl, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define VECTOR_WRITE_ESCAPE_IMPL PYYJSON_CONCAT4(vector_write_escape_impl, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
-#define VECTOR_WRITE_INDENT PYYJSON_CONCAT3(vector_write_indent, COMPILE_INDENT_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512 PYYJSON_CONCAT2(check_escape_tail_impl_get_mask_512, COMPILE_READ_UCS_LEVEL)
 #define WRITE_SIMD_IMPL PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define MASK_ELEVATE_WRITE_512 PYYJSON_CONCAT3(mask_elevate_write_512, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
@@ -105,19 +65,6 @@ static _TARGET_TYPE _CONTROL_SEQ_TABLE[(_Slash + 1) * 8] = {
         '\\', '\\'                                                       // 92
 };
 #endif // COMPILE_READ_UCS_LEVEL == 1 && COMPILE_INDENT_LEVEL == 0
-
-
-// define: SIMD_EXTRACT_PART, SIMD_MASK_EXTRACT_PART
-#if SIMD_BIT_SIZE == 512
-#define SIMD_EXTRACT_PART _mm512_extracti32x4_epi32
-#define SIMD_MASK_EXTRACT_PART(m, i) (u16)((m >> (i * 16)) & 0xFFFF)
-#elif SIMD_BIT_SIZE == 256
-#define SIMD_EXTRACT_PART _mm256_extracti128_si256
-#define SIMD_MASK_EXTRACT_PART SIMD_EXTRACT_PART
-#else
-#define SIMD_EXTRACT_PART assert(false)
-#define SIMD_MASK_EXTRACT_PART assert(false)
-#endif
 
 
 force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(UnicodeVector **restrict vec_addr, const _FROM_TYPE *restrict src, Py_ssize_t len, Py_ssize_t additional_len) {
@@ -175,8 +122,8 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
 #define _MASKZ_LOADU _mm512_maskz_loadu_epi32
 #define _MASK_STOREU _mm512_mask_storeu_epi32
 #endif
-    CHECK_MASK_TYPE rw_mask, tail_mask;
-    rw_mask = ((CHECK_MASK_TYPE) 1 << (usize) len) - 1;
+    u64 rw_mask, tail_mask;
+    rw_mask = ((u64) 1 << (usize) len) - 1;
     z = _MASKZ_LOADU(rw_mask, (const void *) src);
     tail_mask = CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(z, rw_mask);
     if (likely(CHECK_MASK_ZERO(tail_mask))) {
@@ -194,7 +141,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
 #endif
         assert(tzcnt < (usize) len);
 #if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
-        _MASK_STOREU((void *) _WRITER(vec), ((CHECK_MASK_TYPE) 1 << tzcnt) - 1, z);
+        _MASK_STOREU((void *) _WRITER(vec), ((u64) 1 << tzcnt) - 1, z);
 #else
         if (tzcnt) MASK_ELEVATE_WRITE_512(_WRITER(vec), z, tzcnt);
 #endif
@@ -209,13 +156,9 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
     const _FROM_TYPE *load_start = src + len - CHECK_COUNT_MAX;
     _TARGET_TYPE *store_start = _WRITER(vec) + len - CHECK_COUNT_MAX;
     __m256i mask, check_mask;
-#if COMPILE_READ_UCS_LEVEL == 1
-    mask = load_256_aligned((void *) &_MaskTable_8[(usize) (CHECK_COUNT_MAX - len)][0]);
-#elif COMPILE_READ_UCS_LEVEL == 2
-    mask = load_256_aligned((void *) &_MaskTable_16[(usize) (CHECK_COUNT_MAX - len)][0]);
-#else
-    mask = load_256_aligned((void *) &_MaskTable_32[(usize) (CHECK_COUNT_MAX - len)][0]);
-#endif
+#define MASK_READER PYYJSON_CONCAT2(mask_table_read, READ_BIT_SIZE)
+    mask = load_256_aligned(MASK_READER(CHECK_COUNT_MAX - len));
+#undef MASK_READER
     check_mask = CHECK_ESCAPE_IMPL_GET_MASK(load_start, &y);
     check_mask = simd_and_256(check_mask, mask);
     if (likely(CHECK_MASK_ZERO(check_mask))) {
@@ -235,13 +178,9 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
     SIMD_128 x, mask, check_mask;
     const _FROM_TYPE *load_start = src + len - CHECK_COUNT_MAX;
     _TARGET_TYPE *store_start = _WRITER(vec) + len - CHECK_COUNT_MAX;
-#if COMPILE_READ_UCS_LEVEL == 1
-    mask = load_128_aligned((const void *) &_MaskTable_8[(usize) (CHECK_COUNT_MAX - len)][0]);
-#elif COMPILE_READ_UCS_LEVEL == 2
-    mask = load_128_aligned((const void *) &_MaskTable_16[(usize) (CHECK_COUNT_MAX - len)][0]);
-#else
-    mask = load_128_aligned((const void *) &_MaskTable_32[(usize) (CHECK_COUNT_MAX - len)][0]);
-#endif
+#define MASK_TABLE_READ PYYJSON_CONCAT2(mask_table_read, READ_BIT_SIZE)
+    mask = load_128_aligned(MASK_TABLE_READ(CHECK_COUNT_MAX - len));
+#undef MASK_TABLE_READ
     check_mask = CHECK_ESCAPE_IMPL_GET_MASK(load_start, &x);
     check_mask = simd_and_128(check_mask, mask);
     if (likely(CHECK_MASK_ZERO(check_mask))) {
@@ -283,7 +222,6 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_IMPL(UnicodeVector **restrict v
     __m512i z;
 #endif
     SIMD_MASK_TYPE mask;
-    SIMD_SMALL_MASK_TYPE small_mask;
     SIMD_BIT_MASK_TYPE bit_mask;
     bool _c;
     while (len >= CHECK_COUNT_MAX) {
@@ -345,26 +283,6 @@ done:;
     // #undef SIMD_VAR
 }
 
-// avoid compile again
-#if COMPILE_READ_UCS_LEVEL == 1
-force_inline void VECTOR_WRITE_INDENT(UnicodeVector *restrict vec, Py_ssize_t _cur_nested_depth) {
-#if COMPILE_INDENT_LEVEL > 0
-    _TARGET_TYPE *writer = _WRITER(vec);
-    *writer++ = '\n';
-    usize cur_nested_depth = (usize) _cur_nested_depth;
-    for (usize i = 0; i < cur_nested_depth; i++) {
-        *writer++ = ' ';
-        *writer++ = ' ';
-#if COMPILE_INDENT_LEVEL == 4
-        *writer++ = ' ';
-        *writer++ = ' ';
-#endif // COMPILE_INDENT_LEVEL == 4
-    }
-    _WRITER(vec) += COMPILE_INDENT_LEVEL * cur_nested_depth + 1;
-#endif // COMPILE_INDENT_LEVEL > 0
-}
-#endif // COMPILE_READ_UCS_LEVEL == 1
-
 force_inline bool PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)(PyObject *key, Py_ssize_t len, UnicodeVector **restrict vec_addr, Py_ssize_t cur_nested_depth) {
     static_assert(COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL, "COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL");
     UnicodeVector *vec = *vec_addr;
@@ -417,22 +335,20 @@ force_inline bool PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, COMPILE_R
     return true;
 }
 
+#include "commondef/i_out.inl.h"
+#include "commondef/r_out.inl.h"
+#include "commondef/w_out.inl.h"
+
 #undef MASK_ELEVATE_WRITE_512
 #undef WRITE_SIMD_IMPL
 #undef BACK_WRITE_SIMD256_WITH_TAIL_LEN
 #undef WRITE_SIMD_256_WITH_WRITEMASK
-#undef CHECK_MASK_ZERO_SMALL
 #undef CHECK_MASK_ZERO
 #undef CHECK_ESCAPE_IMPL_GET_MASK
-#undef CHECK_COUNT_MAX
 #undef _CONTROL_SEQ_TABLE
 #undef CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512
-#undef VECTOR_WRITE_INDENT
-#undef VEC_RESERVE
 #undef VECTOR_WRITE_ESCAPE_IMPL
 #undef VECTOR_WRITE_UNICODE_TRAILING_IMPL
 #undef VECTOR_WRITE_UNICODE_IMPL
-#undef _FROM_TYPE
-#undef CHECK_MASK_TYPE
 #undef _TARGET_TYPE
 #undef _WRITER
