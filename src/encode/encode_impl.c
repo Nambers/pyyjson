@@ -924,6 +924,38 @@ force_inline PyObject *pyyjson_dumps_single_float(PyObject *val) {
     return unicode;
 }
 
+force_inline PyObject *pyyjson_dumps_single_constant(PyFastTypes py_type) {
+    PyObject *ret;
+    switch (py_type) {
+        case T_True: {
+            ret = PyUnicode_New(4, 127);
+            RETURN_ON_UNLIKELY_ERR(!ret);
+            u8 *writer = (u8 *) (((PyASCIIObject *) ret) + 1);
+            strcpy((char *) writer, "true");
+            break;
+        }
+        case T_False: {
+            ret = PyUnicode_New(5, 127);
+            RETURN_ON_UNLIKELY_ERR(!ret);
+            u8 *writer = (u8 *) (((PyASCIIObject *) ret) + 1);
+            strcpy((char *) writer, "false");
+            break;
+        }
+        case T_None: {
+            ret = PyUnicode_New(4, 127);
+            RETURN_ON_UNLIKELY_ERR(!ret);
+            u8 *writer = (u8 *) (((PyASCIIObject *) ret) + 1);
+            strcpy((char *) writer, "null");
+            break;
+        }
+        default: {
+            ret = NULL;
+            break;
+        }
+    }
+    return ret;
+}
+
 /* Entrance for python code. */
 force_noinline PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject *kwargs) {
     PyObject *obj;
@@ -1012,7 +1044,7 @@ dumps_unicode:;
 dumps_long:;
     return pyyjson_dumps_single_long(obj);
 dumps_constant:;
-    goto fail; // TODO
+    return pyyjson_dumps_single_constant(fast_type);
 dumps_float:;
     return pyyjson_dumps_single_float(obj);
 success:;
