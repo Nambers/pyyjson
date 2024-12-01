@@ -1,8 +1,9 @@
 import json
-import subprocess
 import os
+import subprocess
 import sys
 import tempfile
+
 CUR_FILE = os.path.abspath(__file__)
 CUR_DIR = os.path.dirname(CUR_FILE)
 
@@ -16,7 +17,7 @@ class MockArgs(dict):
 
 
 def run_all_versions_test(args) -> int:
-    with open("./dev_tools/supported_versions.json", "r") as f:
+    with open("./dev_tools/supported_versions.json", "rb") as f:
         vers: list[int] = json.loads(f.read())
     exec_command_str = f"""
 import importlib.util
@@ -37,7 +38,7 @@ mod.run_test(args)
     for ver in vers:
         exec_command = exec_command_str.replace("$TO_INSERT", str(ver))
         file = tempfile.mktemp()
-        with open(file, "w") as f:
+        with open(file, "w", encoding="utf-8") as f:
             f.write(exec_command)
         tempfiles.append(file)
 
