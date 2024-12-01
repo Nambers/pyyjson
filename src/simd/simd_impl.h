@@ -2,7 +2,7 @@
 #define ENCODE_SIMD_IMPL_H
 
 #include "pyyjson.h"
-#include "simd_detect.h"
+#include "simd/simd_detect.h"
 #include <immintrin.h>
 #if defined(_MSC_VER)
 #include <intrin.h>

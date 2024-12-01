@@ -1,7 +1,7 @@
 #include "encode_shared.h"
 #include "simd/cvt.h"
+#include "simd/simd_detect.h"
 #include "simd/simd_impl.h"
-#include "simd_detect.h"
 #include "unicode/uvector.h"
 #include <threads.h>
 

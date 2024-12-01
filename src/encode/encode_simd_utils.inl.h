@@ -1,5 +1,5 @@
 #include "simd/mask_table.h"
-#include "simd_detect.h"
+#include "simd/simd_detect.h"
 #include <immintrin.h>
 
 #include "commondef/r_in.inl.h"

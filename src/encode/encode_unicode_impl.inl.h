@@ -1,8 +1,8 @@
 #include "commondef/i_in.inl.h"
 #include "commondef/r_in.inl.h"
 #include "commondef/w_in.inl.h"
+#include "simd/simd_detect.h"
 #include "simd/simd_impl.h"
-#include "simd_detect.h"
 #include "unicode/include/indent.h"
 #include "unicode/include/reserve.h"
 #include <immintrin.h>
