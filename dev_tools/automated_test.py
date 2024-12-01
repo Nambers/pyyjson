@@ -91,6 +91,9 @@ def run_test(args):
                 envs["IGNORES"] = " ".join(args.ignore)
             if args.build_only:
                 envs["SKIP_TEST"] = "1"
+        if "IN_NIX_SHELL" in os.environ:
+            print("Already in nix shell")
+            os.execvpe("bash", ["bash", test_entrance], envs)
         os.execvpe("nix", ["nix", "develop", "--command", test_entrance], envs)
     else:
         pass

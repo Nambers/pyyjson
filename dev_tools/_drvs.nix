@@ -32,7 +32,6 @@ let
       ) supportedVers
     )
   )
-  # ++ [ python314 ]
   ;
   # import required python packages
   required_python_packages = import ./py_requirements.nix;
