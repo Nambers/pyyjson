@@ -193,86 +193,6 @@ force_inline bool init_stack_vars(StackVars *stack_vars, PyObject *in_obj) {
     return false;
 }
 
-force_inline bool vector_resize_to_fit(UnicodeVector **restrict vec_addr, Py_ssize_t len, int ucs_type) {
-    Py_ssize_t char_size = ucs_type ? ucs_type : 1;
-    Py_ssize_t struct_size = ucs_type ? sizeof(PyCompactUnicodeObject) : sizeof(PyASCIIObject);
-    assert(len <= ((PY_SSIZE_T_MAX - struct_size) / char_size - 1));
-    // Resizes to a smaller size. It *should* always success
-    UnicodeVector *new_vec = (UnicodeVector *) PyObject_Realloc(*vec_addr, struct_size + (len + 1) * char_size);
-    if (likely(new_vec)) {
-        *vec_addr = new_vec;
-        return true;
-    }
-    return false;
-}
-
-// _PyUnicode_CheckConsistency is hidden in Python 3.13
-#if PY_MINOR_VERSION >= 13
-extern int _PyUnicode_CheckConsistency(PyObject *op, int check_content);
-#endif
-
-force_inline void init_py_unicode(UnicodeVector **restrict vec_addr, Py_ssize_t size, int kind) {
-    UnicodeVector *vec = *vec_addr;
-    PyCompactUnicodeObject *unicode = &vec->unicode_rep.compact_obj;
-    PyASCIIObject *ascii = &vec->unicode_rep.ascii_rep.ascii_obj;
-    PyObject_Init((PyObject *) unicode, &PyUnicode_Type);
-    void *data = kind ? GET_VEC_COMPACT_START(vec) : GET_VEC_ASCII_START(vec);
-    //
-    ascii->length = size;
-    ascii->hash = -1;
-    ascii->state.interned = 0;
-    ascii->state.kind = kind ? kind : 1;
-    ascii->state.compact = 1;
-    ascii->state.ascii = kind ? 0 : 1;
-
-#if PY_MINOR_VERSION >= 12
-    // statically_allocated appears in 3.12
-    ascii->state.statically_allocated = 0;
-#else
-    bool is_sharing = false;
-    // ready is dropped in 3.12
-    ascii->state.ready = 1;
-#endif
-
-    if (kind <= 1) {
-        ((u8 *) data)[size] = 0;
-    } else if (kind == 2) {
-        ((u16 *) data)[size] = 0;
-#if PY_MINOR_VERSION < 12
-        is_sharing = sizeof(wchar_t) == 2;
-#endif
-    } else if (kind == 4) {
-        ((u32 *) data)[size] = 0;
-#if PY_MINOR_VERSION < 12
-        is_sharing = sizeof(wchar_t) == 4;
-#endif
-    } else {
-        assert(false);
-        Py_UNREACHABLE();
-    }
-    if (kind) {
-        unicode->utf8 = NULL;
-        unicode->utf8_length = 0;
-    }
-#if PY_MINOR_VERSION < 12
-    if (kind > 1) {
-        if (is_sharing) {
-            unicode->wstr_length = size;
-            ascii->wstr = (wchar_t *) data;
-        } else {
-            unicode->wstr_length = 0;
-            ascii->wstr = NULL;
-        }
-    } else {
-        ascii->wstr = NULL;
-        if (kind) unicode->wstr_length = 0;
-    }
-#endif
-    assert(_PyUnicode_CheckConsistency((PyObject *) unicode, 0));
-    assert(ascii->ob_base.ob_refcnt == 1);
-}
-
-#define _CTN_STACK(stack_vars) ((void) 0, stack_vars->ctn_stack)
 
 #if PY_MINOR_VERSION >= 13
 // _PyNone_Type is hidden in Python 3.13
@@ -284,6 +204,7 @@ void _init_PyNone_Type(PyTypeObject *none_type) {
 #define PyNone_Type &_PyNone_Type
 #endif
 
+/* Get the value type as fast as possible. */
 force_inline PyFastTypes fast_type_check(PyObject *val) {
     PyTypeObject *type = Py_TYPE(val);
     if (type == &PyUnicode_Type) {
@@ -321,25 +242,6 @@ force_inline PyFastTypes fast_type_check(PyObject *val) {
 
 #define TAIL_PADDING (512 / 8)
 
-force_inline Py_ssize_t get_indent_char_count(Py_ssize_t cur_nested_depth, Py_ssize_t indent_level) {
-    return indent_level ? (indent_level * cur_nested_depth + 1) : 0;
-}
-
-
-// /*
-//  * Some unicode vector utility functions only related to write
-//  * need macro: COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4.
-//  */
-// #include "unicode/_include_helper/w_wrap.inl.h"
-
-// /*
-//  * Some unicode vector utility functions related to write and indent
-//  * need macro: COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4.
-//  * need macro: COMPILE_INDENT_LEVEL, value: 0, 2, or 4.
-//  */
-// #include "unicode/_include_helper/w_i_wrap.inl.h"
-#include "unicode/_include_helper/indent_wrap.h"
-#include "unicode/_include_helper/reserve_wrap.h"
 
 /* 
  * Some utility functions only related to *write*, like vector reserve, writing number
@@ -365,12 +267,12 @@ force_inline Py_ssize_t get_indent_char_count(Py_ssize_t cur_nested_depth, Py_ss
 #include "encode_unicode_impl_wrap.inl.h"
 
 /* 
- * Top-level encode functions, like encode list, encode dict, encode single unicode.
+ * Top-level encode functions for encoding container types: dict, list and tuple.
  * need macro:
  *      COMPILE_UCS_LEVEL, value: 0, 1, 2, or 4. COMPILE_UCS_LEVEL is the current writing level.
  *          This differs from COMPILE_WRITE_UCS_LEVEL: `0` stands for ascii. Since we always start from
- *          writing ascii, `0` also defines the entrance of encoding. See `PYYJSON_DUMPS_OBJ` for more
- *          details.
+ *          writing ascii, `0` also defines the entrance of encoding containers. See `PYYJSON_DUMPS_OBJ`
+ *          for more details.
  *      COMPILE_INDENT_LEVEL, value: 0, 2, or 4.
  */
 #include "encode_impl_wrap.inl.h"
@@ -424,7 +326,7 @@ force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {
         PyObject_Free(vec);
         return NULL;
     }
-    init_py_unicode(&vec, written_len, is_ascii ? 0 : unicode_kind);
+    init_py_unicode(vec, written_len, is_ascii ? 0 : unicode_kind);
     return (PyObject *) vec;
 }
 
@@ -552,7 +454,6 @@ force_noinline PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject
         }
     }
 
-
 dumps_container:;
     if (option_digit & 1) {
         if (option_digit & 2) {
@@ -606,3 +507,8 @@ success:;
 fail:;
     return NULL;
 }
+
+
+/* Implmentations of some inline functions used in current scope */
+#include "unicode/_include_helper/indent_wrap.h"
+#include "unicode/_include_helper/reserve_wrap.h"

@@ -27,6 +27,7 @@
         if (unlikely(!vec)) return false;                                                              \
     } while (0)
 
+#define _CTN_STACK(stack_vars) ((void) 0, stack_vars->ctn_stack)
 
 #define VEC_BACK1 PYYJSON_CONCAT2(vec_back1, COMPILE_UCS_LEVEL)
 #if COMPILE_INDENT_LEVEL == 0
@@ -979,7 +980,7 @@ success:;
     Py_ssize_t final_len = GET_VECTOR_FINAL_LEN(GET_VEC(stack_vars));
     bool _c = vector_resize_to_fit(&GET_VEC(stack_vars), final_len, COMPILE_UCS_LEVEL);
     GOTO_FAIL_ON_UNLIKELY_ERR(!_c);
-    init_py_unicode(&GET_VEC(stack_vars), final_len, COMPILE_UCS_LEVEL);
+    init_py_unicode(GET_VEC(stack_vars), final_len, COMPILE_UCS_LEVEL);
     return (PyObject *) GET_VEC(stack_vars);
 fail:;
     if (GET_VEC(stack_vars)) {
@@ -1015,6 +1016,7 @@ fail_keytype:;
 #undef VECTOR_APPEND_KEY
 #undef _PREPARE_UNICODE_WRITE
 #undef VEC_BACK1
+#undef _CTN_STACK
 #undef WRITE_INDENT_RETURN_IF_FAIL
 #undef VEC_WRITE_F64
 #undef VEC_WRITE_U64

@@ -60,9 +60,22 @@ typedef struct UnicodeVector {
 force_noinline UnicodeVector *unicode_vec_reserve(UnicodeVector *vec, void *target_ptr);
 
 
+force_noinline void init_py_unicode(UnicodeVector *restrict vec_addr, Py_ssize_t size, int kind);
+
+
 force_inline bool vec_in_boundary(UnicodeVector *vec) {
     return vec->head.write_u8 <= (u8 *) vec->head.write_end && vec->head.write_u8 >= (u8 *) GET_VEC_ASCII_START(vec);
 }
+
+/* Resize the vector pointed by `vec_addr`.
+ * If resize succeed, the vector will be updated to the new address and return true.
+ * Otherwise, `vec_addr` left unchanged and returns false.
+ * Args:
+ *     vec_addr: The address of the vector.
+ *     len: Count of valid unicode points in the vector.
+ *     ucs_type: The unicode type of the vector (0 stands for ascii).
+ */
+force_noinline bool vector_resize_to_fit(UnicodeVector **restrict vec_addr, Py_ssize_t len, int ucs_type);
 
 
 #endif

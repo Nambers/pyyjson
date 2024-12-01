@@ -127,6 +127,10 @@ force_inline void split_tail_len_four_parts(Py_ssize_t tail_len, Py_ssize_t chec
     *part1 = p1;
 }
 
+force_inline Py_ssize_t get_indent_char_count(Py_ssize_t cur_nested_depth, Py_ssize_t indent_level) {
+    return indent_level ? (indent_level * cur_nested_depth + 1) : 0;
+}
+
 /*==============================================================================
  * Python Utils
  *============================================================================*/
