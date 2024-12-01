@@ -38,7 +38,7 @@ thread_local PyObject *pyobject_stack_buffer[PYYJSON_OBJSTACK_BUFFER_SIZE];
 
 #if PYYJSON_ENABLE_TRACE
 Py_ssize_t max_str_len = 0;
-int __count_trace[PYYJSON_OP_COUNT_MAX] = {0};
+int __count_trace[PYYJSON_OP_BITCOUNT_MAX] = {0};
 int __hash_trace[PYYJSON_KEY_CACHE_SIZE] = {0};
 size_t __hash_hit_counter = 0;
 size_t __hash_add_key_call_count = 0;
@@ -121,23 +121,19 @@ static yyjson_inline PyObject *make_string(const char *utf8_str, Py_ssize_t len,
     size_t real_len;
     XXH64_hash_t hash;
 
-    switch (flag & PYYJSON_STRING_FLAG_UCS_TYPE_MASK) {
-        case PYYJSON_STRING_FLAG_ASCII:
-            max_char = 0x7f;
-            real_len = len;
-            break;
-        case PYYJSON_STRING_FLAG_LATIN1:
-            max_char = 0xff;
-            real_len = len;
-            break;
-        case PYYJSON_STRING_FLAG_UCS2:
-            max_char = 0xffff;
-            real_len = len * 2;
-            break;
-        case PYYJSON_STRING_FLAG_UCS4:
-            max_char = 0x10ffff;
-            real_len = len * 4;
-            break;
+    switch (PYYJSON_GET_FLAG(flag, PYYJSON_STRING_FLAG_UCS_TYPE_MASK)) {
+        PYYJSON_MATCH_FLAG(PYYJSON_STRING_FLAG_ASCII) : max_char = 0x7f;
+        real_len = len;
+        break;
+        PYYJSON_MATCH_FLAG(PYYJSON_STRING_FLAG_LATIN1) : max_char = 0xff;
+        real_len = len;
+        break;
+        PYYJSON_MATCH_FLAG(PYYJSON_STRING_FLAG_UCS2) : max_char = 0xffff;
+        real_len = len * 2;
+        break;
+        PYYJSON_MATCH_FLAG(PYYJSON_STRING_FLAG_UCS4) : max_char = 0x10ffff;
+        real_len = len * 4;
+        break;
         default:
             assert(false);
             Py_UNREACHABLE();
@@ -172,22 +168,22 @@ success:
     return obj;
 }
 
-PyObject *pyyjson_op_loads(pyyjson_op *op_head, size_t obj_stack_maxsize) {
+PyObject *pyyjson_op_loads(pyyjson_op *restrict op_head, size_t obj_stack_maxsize) {
 #if PYYJSON_ENABLE_TRACE
     size_t __op_counter = 0;
-#define PYYJSON_TRACE_OP(x)                              \
-    do {                                                 \
-        for (int i = 0; i < PYYJSON_OP_COUNT_MAX; i++) { \
-            if (x & (1 << i)) {                          \
-                __count_trace[i]++;                      \
-                break;                                   \
-            }                                            \
-        }                                                \
-        __op_counter++;                                  \
+#define PYYJSON_TRACE_OP(x)                                 \
+    do {                                                    \
+        for (int i = 0; i < PYYJSON_OP_BITCOUNT_MAX; i++) { \
+            if (x & (1 << i)) {                             \
+                __count_trace[i]++;                         \
+                break;                                      \
+            }                                               \
+        }                                                   \
+        __op_counter++;                                     \
     } while (0)
 #define PYYJSON_SHOW_OP_TRACE()                                   \
     do {                                                          \
-        for (int i = 0; i < PYYJSON_OP_COUNT_MAX; i++) {          \
+        for (int i = 0; i < PYYJSON_OP_BITCOUNT_MAX; i++) {       \
             if (__count_trace[i] > 0) {                           \
                 printf("op %d: %d\n", i, __count_trace[i]);       \
             }                                                     \
@@ -274,16 +270,16 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head, size_t obj_stack_maxsize) {
             case PYYJSON_OP_NUMBER: {
                 PYYJSON_TRACE_OP(PYYJSON_OP_NUMBER);
                 pyyjson_number_op *op_num = (pyyjson_number_op *) op;
-                switch (PYYJSON_READ_OP(op) & PYYJSON_NUM_FLAG_MASK) {
-                    case PYYJSON_NUM_FLAG_FLOAT: {
+                switch (PYYJSON_GET_FLAG(PYYJSON_READ_OP(op), PYYJSON_NUM_FLAG_MASK)) {
+                    PYYJSON_MATCH_FLAG(PYYJSON_NUM_FLAG_FLOAT) : {
                         PYYJSON_PUSH_STACK(PyFloat_FromDouble(op_num->data.f));
                         break;
                     }
-                    case PYYJSON_NUM_FLAG_INT: {
+                    PYYJSON_MATCH_FLAG(PYYJSON_NUM_FLAG_INT) : {
                         PYYJSON_PUSH_STACK(PyLong_FromLongLong(op_num->data.i));
                         break;
                     }
-                    case PYYJSON_NUM_FLAG_UINT: {
+                    PYYJSON_MATCH_FLAG(PYYJSON_NUM_FLAG_UINT) : {
                         PYYJSON_PUSH_STACK(PyLong_FromUnsignedLongLong(op_num->data.u));
                         break;
                     }
@@ -297,11 +293,11 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head, size_t obj_stack_maxsize) {
             }
             case PYYJSON_OP_CONTAINER: {
                 PYYJSON_TRACE_OP(PYYJSON_OP_CONTAINER);
-                switch (PYYJSON_READ_OP(op) & PYYJSON_CONTAINER_FLAG_MASK) {
-                    case PYYJSON_CONTAINER_FLAG_ARRAY: {
+                switch (PYYJSON_GET_FLAG(PYYJSON_READ_OP(op), PYYJSON_CONTAINER_FLAG_MASK)) {
+                    PYYJSON_MATCH_FLAG(PYYJSON_CONTAINER_FLAG_ARRAY) : {
                         goto container_array;
                     }
-                    case PYYJSON_CONTAINER_FLAG_DICT: {
+                    PYYJSON_MATCH_FLAG(PYYJSON_CONTAINER_FLAG_DICT) : {
                         goto container_dict;
                     }
                     default:
@@ -375,22 +371,25 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head, size_t obj_stack_maxsize) {
             }
             case PYYJSON_OP_CONSTANTS: {
                 PYYJSON_TRACE_OP(PYYJSON_OP_CONSTANTS);
-                switch (PYYJSON_READ_OP(op) & PYYJSON_CONSTANTS_FLAG_MASK) {
-                    case PYYJSON_CONSTANTS_FLAG_NULL:
+                switch (PYYJSON_GET_FLAG(PYYJSON_READ_OP(op), PYYJSON_CONSTANTS_FLAG_MASK)) {
+                    PYYJSON_MATCH_FLAG(PYYJSON_CONSTANTS_FLAG_NULL) : {
                         Py_Immortal_IncRef(Py_None);
                         PYYJSON_PUSH_STACK(Py_None);
                         op++;
                         break;
-                    case PYYJSON_CONSTANTS_FLAG_FALSE:
+                    }
+                    PYYJSON_MATCH_FLAG(PYYJSON_CONSTANTS_FLAG_FALSE) : {
                         Py_Immortal_IncRef(Py_False);
                         PYYJSON_PUSH_STACK(Py_False);
                         op++;
                         break;
-                    case PYYJSON_CONSTANTS_FLAG_TRUE:
+                    }
+                    PYYJSON_MATCH_FLAG(PYYJSON_CONSTANTS_FLAG_TRUE) : {
                         Py_Immortal_IncRef(Py_True);
                         PYYJSON_PUSH_STACK(Py_True);
                         op++;
                         break;
+                    }
                     default:
                         assert(false);
                         Py_UNREACHABLE();
@@ -400,19 +399,17 @@ PyObject *pyyjson_op_loads(pyyjson_op *op_head, size_t obj_stack_maxsize) {
             }
             case PYYJSON_OP_NAN_INF: {
                 PYYJSON_TRACE_OP(PYYJSON_OP_NAN_INF);
-                switch (PYYJSON_READ_OP(op) & PYYJSON_NAN_INF_FLAG_MASK_WITHOUT_SIGNED) {
-                    case PYYJSON_NAN_INF_FLAG_NAN: {
-                        bool sign = (PYYJSON_READ_OP(op) & PYYJSON_NAN_INF_FLAG_SIGNED) != 0;
-                        double val = sign ? -fabs(Py_NAN) : fabs(Py_NAN);
+                switch (PYYJSON_GET_FLAG(PYYJSON_READ_OP(op), PYYJSON_NAN_INF_FLAG_MASK_WITHOUT_SIGNED)) {
+                    PYYJSON_MATCH_FLAG(PYYJSON_NAN_INF_FLAG_NAN) : {
+                        double val = (PYYJSON_READ_OP(op) & PYYJSON_NAN_INF_FLAG_SIGNED) ? -fabs(Py_NAN) : fabs(Py_NAN);
                         PyObject *o = PyFloat_FromDouble(val);
                         assert(o);
                         PYYJSON_PUSH_STACK(o);
                         op++;
                         break;
                     }
-                    case PYYJSON_NAN_INF_FLAG_INF: {
-                        bool sign = (PYYJSON_READ_OP(op) & PYYJSON_NAN_INF_FLAG_SIGNED) != 0;
-                        double val = sign ? -Py_HUGE_VAL : Py_HUGE_VAL;
+                    PYYJSON_MATCH_FLAG(PYYJSON_NAN_INF_FLAG_INF) : {
+                        double val = (PYYJSON_READ_OP(op) & PYYJSON_NAN_INF_FLAG_SIGNED) ? -Py_HUGE_VAL : Py_HUGE_VAL;
                         PyObject *o = PyFloat_FromDouble(val);
                         assert(o);
                         PYYJSON_PUSH_STACK(o);

@@ -2,7 +2,6 @@
 #define PYYJSON_ENCODE_SHARED_H
 
 #include "encode.h"
-// #include "yyjson.h"
 #include "pyyjson.h"
 #include <stddef.h>
 
@@ -11,32 +10,6 @@
 #define _Slash (92)
 #define _MinusOne (-1)
 #define ControlMax (32)
-
-
-/*==============================================================================
- * Types
- *============================================================================*/
-
-enum IndentLevel {
-    NONE = 0,
-    INDENT_2 = 2,
-    INDENT_4 = 4,
-};
-
-enum UCSKind {
-    UCS1 = 1,
-    UCS2 = 2,
-    UCS4 = 4,
-};
-
-enum X86SIMDLevel {
-    SSE2,
-    SSE3,
-    SSE4,
-    AVX,
-    AVX2,
-    AVX512,
-};
 
 
 #define CONTROL_SEQ_ESCAPE_PREFIX _Slash, 'u', '0', '0'
@@ -58,10 +31,6 @@ static Py_ssize_t _ControlJump[_Slash + 1] = {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2           // 80-92
 };
 
-// static i32 _ControlLengthAdd[ControlMax] = {
-//         5, 5, 5, 5, 5, 5, 5, 5, 1, 1, 1, 5, 1, 1, 5, 5, // 0-15
-//         5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, // 16-31
-// };
 
 /*==============================================================================
  * Buffer

@@ -91,6 +91,10 @@ class TestDecode(unittest.TestCase):
 
         test_cases = [
             json.dumps(case, ensure_ascii=False) for case in test_cases_origin
+        ] + [
+            '{"a":"a", "a":"ab"}',  # repeated key
+            '{"a":1, "b":[1.234]}',
+            '["a", 1,null, "ab", 1.234, NaN, Infinity]',
         ]
         for bench_file in bench_files:
             with open(bench_file, "r", encoding="utf-8") as f:
