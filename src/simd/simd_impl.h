@@ -463,7 +463,13 @@ force_inline u32 tzcnt_u32(u32 x) {
     return _mm_tzcnt_32(x);
 #endif
 #else
-    return 31 - (((x & -x) & 0x0000FFFF) ? 16 : 0) - (((x & -x) & 0x00FF00FF) ? 8 : 0) - (((x & -x) & 0x0F0F0F0F) ? 4 : 0) - (((x & -x) & 0x33333333) ? 2 : 0) - (((x & -x) & 0x55555555) ? 1 : 0);
+    #if defined(_MSC_VER)
+        unsigned long index = 0;
+        _BitScanForward(&index, x);
+        return index
+    #else
+        return __builtin_ctz(x);
+    #endif
 #endif
 }
 
@@ -478,7 +484,13 @@ force_inline u64 tzcnt_u64(u64 x) {
     return _mm_tzcnt_64(x);
 #endif
 #else
-    return 63 - (((x & -x) & 0x00000000FFFFFFFFULL) ? 32 : 0) - (((x & -x) & 0x0000FFFF0000FFFFULL) ? 16 : 0) - (((x & -x) & 0x00FF00FF00FF00FFULL) ? 8 : 0) - (((x & -x) & 0x0F0F0F0F0F0F0F0FULL) ? 4 : 0) - (((x & -x) & 0x3333333333333333ULL) ? 2 : 0) - (((x & -x) & 0x5555555555555555ULL) ? 1 : 0);
+    #if defined(_MSC_VER)
+        unsigned long index = 0;
+        _BitScanForward64(&index, x);
+        return index;
+    #else
+        return __builtin_ctzll(x);
+    #endif
 #endif
 }
 
