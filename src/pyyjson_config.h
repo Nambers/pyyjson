@@ -38,6 +38,10 @@
 #define PYYJSON_OBJSTACK_BUFFER_SIZE (1024)
 #endif
 
+#ifndef YYJSON_READER_ESTIMATED_PRETTY_RATIO
+#define YYJSON_READER_ESTIMATED_PRETTY_RATIO 16
+#endif
+
 /*
  Init buffer size for dst buffer. Must be multiple of 64.
  Cost: PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE bytes per thread.

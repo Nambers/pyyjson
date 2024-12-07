@@ -44,7 +44,7 @@ static_assert((PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE % 64) == 0, "(PYYJSON_ENCODE_
  *============================================================================*/
 
 /** Returns whether the size is power of 2 (size should not be 0). */
-static_inline bool size_is_pow2(usize size) {
+force_inline bool size_is_pow2(usize size) {
     return (size & (size - 1)) == 0;
 }
 

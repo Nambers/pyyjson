@@ -752,20 +752,20 @@ static const u64 pow10_sig_table[] = {
     U64(0x9E19DB92, 0xB4E31BA9), U64(0x6C07A2C2, 0x6A8346D1)  /* ~= 10^324 */
 };
 
-static_inline void byte_copy_2(void *dst, const void *src) {
+force_inline void byte_copy_2(void *dst, const void *src) {
     memcpy(dst, src, 2);
 }
 
-static_inline void byte_copy_4(void *dst, const void *src) {
+force_inline void byte_copy_4(void *dst, const void *src) {
     memcpy(dst, src, 4);
 }
 
-static_inline void byte_copy_8(void *dst, const void *src) {
+force_inline void byte_copy_8(void *dst, const void *src) {
     memcpy(dst, src, 8);
 }
 
 /** Returns the number of trailing 0-bits in value (input should not be 0). */
-static_inline u32 u64_tz_bits(u64 v) {
+force_inline u32 u64_tz_bits(u64 v) {
 #if GCC_HAS_CTZLL
     return (u32)__builtin_ctzll(v);
 #elif MSC_HAS_BIT_SCAN_64
@@ -801,7 +801,7 @@ static_inline u32 u64_tz_bits(u64 v) {
 
 /** Multiplies two 64-bit unsigned integers (a * b),
     returns the 128-bit result as 'hi' and 'lo'. */
-static_inline void u128_mul(u64 a, u64 b, u64 *hi, u64 *lo) {
+force_inline void u128_mul(u64 a, u64 b, u64 *hi, u64 *lo) {
 #if YYJSON_HAS_INT128
     u128 m = (u128)a * b;
     *hi = (u64)(m >> 64);
@@ -824,7 +824,7 @@ static_inline void u128_mul(u64 a, u64 b, u64 *hi, u64 *lo) {
 
 /** Multiplies two 64-bit unsigned integers and add a value (a * b + c),
     returns the 128-bit result as 'hi' and 'lo'. */
-static_inline void u128_mul_add(u64 a, u64 b, u64 c, u64 *hi, u64 *lo) {
+force_inline void u128_mul_add(u64 a, u64 b, u64 c, u64 *hi, u64 *lo) {
 #if YYJSON_HAS_INT128
     u128 m = (u128)a * b + c;
     *hi = (u64)(m >> 64);
@@ -846,7 +846,7 @@ static_inline void u128_mul_add(u64 a, u64 b, u64 c, u64 *hi, u64 *lo) {
  @param hi    The highest 64 bits of pow(10, e).
  @param lo    The lower 64 bits after `hi`.
  */
-static_inline void pow10_table_get_sig(i32 exp10, u64 *hi, u64 *lo) {
+force_inline void pow10_table_get_sig(i32 exp10, u64 *hi, u64 *lo) {
     i32 idx = exp10 - (POW10_SIG_TABLE_MIN_EXP);
     *hi = pow10_sig_table[idx * 2];
     *lo = pow10_sig_table[idx * 2 + 1];
@@ -869,7 +869,7 @@ static_inline void pow10_table_get_sig(i32 exp10, u64 *hi, u64 *lo) {
  * https://gmplib.org/~tege/division-paper.pdf
  *============================================================================*/
 
-static_inline u8 *write_u32_len_8(u32 val, u8 *buf) {
+force_inline u8 *write_u32_len_8(u32 val, u8 *buf) {
     u32 aa, bb, cc, dd, aabb, ccdd;                 /* 8 digits: aabbccdd */
     aabb = (u32)(((u64)val * 109951163) >> 40);     /* (val / 10000) */
     ccdd = val - aabb * 10000;                      /* (val % 10000) */
@@ -884,7 +884,7 @@ static_inline u8 *write_u32_len_8(u32 val, u8 *buf) {
     return buf + 8;
 }
 
-static_inline u8 *write_u32_len_4(u32 val, u8 *buf) {
+force_inline u8 *write_u32_len_4(u32 val, u8 *buf) {
     u32 aa, bb;                                     /* 4 digits: aabb */
     aa = (val * 5243) >> 19;                        /* (val / 100) */
     bb = val - aa * 100;                            /* (val % 100) */
@@ -893,7 +893,7 @@ static_inline u8 *write_u32_len_4(u32 val, u8 *buf) {
     return buf + 4;
 }
 
-static_inline u8 *write_u32_len_1_8(u32 val, u8 *buf) {
+force_inline u8 *write_u32_len_1_8(u32 val, u8 *buf) {
     u32 aa, bb, cc, dd, aabb, bbcc, ccdd, lz;
     
     if (val < 100) {                                /* 1-2 digits: aa */
@@ -940,7 +940,7 @@ static_inline u8 *write_u32_len_1_8(u32 val, u8 *buf) {
     }
 }
 
-static_inline u8 *write_u64_len_5_8(u32 val, u8 *buf) {
+force_inline u8 *write_u64_len_5_8(u32 val, u8 *buf) {
     u32 aa, bb, cc, dd, aabb, bbcc, ccdd, lz;
     
     if (val < 1000000) {                            /* 5-6 digits: aabbcc */
@@ -972,7 +972,7 @@ static_inline u8 *write_u64_len_5_8(u32 val, u8 *buf) {
     }
 }
 
-static_inline u8 *write_u64(u64 val, u8 *buf) {
+force_inline u8 *write_u64(u64 val, u8 *buf) {
     u64 tmp, hgh;
     u32 mid, low;
     
@@ -1022,7 +1022,7 @@ static const u8 dec_trailing_zero_table[] = {
 };
 
 /** Write an unsigned integer with a length of 1 to 16. */
-static_inline u8 *write_u64_len_1_to_16(u64 val, u8 *buf) {
+force_inline u8 *write_u64_len_1_to_16(u64 val, u8 *buf) {
     u64 hgh;
     u32 low;
     if (val < 100000000) {                          /* 1-8 digits */
@@ -1038,7 +1038,7 @@ static_inline u8 *write_u64_len_1_to_16(u64 val, u8 *buf) {
 }
 
 /** Write an unsigned integer with a length of 1 to 17. */
-static_inline u8 *write_u64_len_1_to_17(u64 val, u8 *buf) {
+force_inline u8 *write_u64_len_1_to_17(u64 val, u8 *buf) {
     u64 hgh;
     u32 mid, low, one;
     if (val >= (u64)100000000 * 10000000) {         /* len: 16 to 17 */
@@ -1068,7 +1068,7 @@ static_inline u8 *write_u64_len_1_to_17(u64 val, u8 *buf) {
  These digits are named as "aabbccddeeffgghhii" here.
  For example, input 1234567890123000, output "1234567890123".
  */
-static_inline u8 *write_u64_len_15_to_17_trim(u8 *buf, u64 sig) {
+force_inline u8 *write_u64_len_15_to_17_trim(u8 *buf, u64 sig) {
     bool lz;                                        /* leading zero */
     u32 tz1, tz2, tz;                               /* trailing zero */
     
@@ -1139,7 +1139,7 @@ static_inline u8 *write_u64_len_15_to_17_trim(u8 *buf, u64 sig) {
 }
 
 /** Write a signed integer in the range -324 to 308. */
-static_inline u8 *write_f64_exp(i32 exp, u8 *buf) {
+force_inline u8 *write_f64_exp(i32 exp, u8 *buf) {
     buf[0] = '-';
     buf += exp < 0;
     exp = exp < 0 ? -exp : exp;
@@ -1157,7 +1157,7 @@ static_inline u8 *write_f64_exp(i32 exp, u8 *buf) {
 }
 
 /** Multiplies 128-bit integer and returns highest 64-bit rounded value. */
-static_inline u64 round_to_odd(u64 hi, u64 lo, u64 cp) {
+force_inline u64 round_to_odd(u64 hi, u64 lo, u64 cp) {
     u64 x_hi, x_lo, y_hi, y_lo;
     u128_mul(cp, lo, &x_hi, &x_lo);
     u128_mul_add(cp, hi, x_hi, &y_hi, &y_lo);
@@ -1188,7 +1188,7 @@ static_inline u64 round_to_odd(u64 hi, u64 lo, u64 cp) {
  @param exp_dec The output value of exponent in decimal.
  @warning The input double number should not be 0, inf, nan.
  */
-static_inline void f64_bin_to_dec(u64 sig_raw, u32 exp_raw,
+force_inline void f64_bin_to_dec(u64 sig_raw, u32 exp_raw,
                                   u64 sig_bin, i32 exp_bin,
                                   u64 *sig_dec, i32 *exp_dec) {
     
@@ -1257,7 +1257,7 @@ static_inline void f64_bin_to_dec(u64 sig_raw, u32 exp_raw,
  2. Keep decimal point to indicate the number is floating point.
  3. Remove positive sign of exponent part.
  */
-static_inline u8 *write_f64_raw(u8 *buf, u64 raw) {
+force_inline u8 *write_f64_raw(u8 *buf, u64 raw) {
     u64 sig_bin, sig_dec, sig_raw;
     i32 exp_bin, exp_dec, sig_len, dot_pos, i, max;
     u32 exp_raw, hi, lo;
@@ -1402,7 +1402,7 @@ static_inline u8 *write_f64_raw(u8 *buf, u64 raw) {
 
 
 /** Write a double number (requires 32 bytes buffer). */
-static_inline u8 *write_f64_raw(u8 *buf, u64 raw) {
+force_inline u8 *write_f64_raw(u8 *buf, u64 raw) {
     /*
      For IEEE 754, `DBL_DECIMAL_DIG` is 17 for round-trip.
      For non-IEEE formats, 17 is used to avoid buffer overflow,

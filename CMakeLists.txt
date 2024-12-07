@@ -82,7 +82,6 @@ add_definitions(-DYYJSON_DISABLE_UTILS=1)
 # ------------------------------------------------------------------------------
 # Library
 add_library(pyyjson SHARED
-    src/decode/yyjson.c
     src/decode/decode.c
     src/pyyjson.c
     src/encode/encode_impl.c

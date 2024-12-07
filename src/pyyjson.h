@@ -102,7 +102,6 @@
 #endif
 #endif
 
-#define static_inline static pyyjson_inline
 #define force_inline static pyyjson_inline
 // #define force_inline force_noinline
 #define force_noinline pyyjson_noinline
@@ -117,6 +116,28 @@
 #define REPEAT_16(x) REPEAT_8(x) REPEAT_8(x)
 #define REPEAT_32(x) REPEAT_16(x) REPEAT_16(x)
 #define REPEAT_64(x) REPEAT_32(x) REPEAT_32(x)
+
+
+/*==============================================================================
+ * Macros
+ *============================================================================*/
+
+/* Macros used for loop unrolling and other purpose. */
+// #define repeat2(x)  { x x }
+// #define repeat3(x)  { x x x }
+#define REPEAT_CALL_4(x)  { x x x x }
+// #define repeat8(x)  { x x x x x x x x }
+#define REPEAT_CALL_16(x) { x x x x x x x x x x x x x x x x }
+
+// #define repeat2_incr(x)   { x(0)  x(1) }
+// #define repeat4_incr(x)   { x(0)  x(1)  x(2)  x(3) }
+// #define repeat8_incr(x)   { x(0)  x(1)  x(2)  x(3)  x(4)  x(5)  x(6)  x(7)  }
+#define REPEAT_INCR_16(x)  { x(0)  x(1)  x(2)  x(3)  x(4)  x(5)  x(6)  x(7)  \
+                            x(8)  x(9)  x(10) x(11) x(12) x(13) x(14) x(15) }
+
+#define REPEAT_INCR_IN_1_18(x) { x(1)  x(2)  x(3)  x(4)  x(5)  x(6)  x(7)  x(8)  \
+                            x(9)  x(10) x(11) x(12) x(13) x(14) x(15) x(16) \
+                            x(17) x(18) }
 
 
 /** align for compiler */
@@ -152,5 +173,6 @@
 #define PYYJSON_SIMPLE_CONCAT3_EX(a, b, c) a##b##c
 #define PYYJSON_SIMPLE_CONCAT3(a, b, c) PYYJSON_SIMPLE_CONCAT3_EX(a, b, c)
 
+#define PYYJSON_MAX(x, y) ((x) > (y) ? (x) : (y))
 
 #endif // PYYJSON_H
