@@ -16,19 +16,42 @@
 #endif
 #endif
 
+
+/** compiler builtin check (since gcc 10.0, clang 2.6, icc 2021) */
+#ifndef pyyjson_has_builtin
+#ifdef __has_builtin
+#define pyyjson_has_builtin(x) __has_builtin(x)
+#else
+#define pyyjson_has_builtin(x) 0
+#endif
+#endif
+
 /** compiler version (GCC) */
 #ifdef __GNUC__
 #define PYYJSON_GCC_VER __GNUC__
 #if defined(__GNUC_PATCHLEVEL__)
-#define yyjson_gcc_available(major, minor, patch) \
+#define pyyjson_gcc_available(major, minor, patch) \
     ((__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__) >= (major * 10000 + minor * 100 + patch))
 #else
-#define yyjson_gcc_available(major, minor, patch) \
+#define pyyjson_gcc_available(major, minor, patch) \
     ((__GNUC__ * 10000 + __GNUC_MINOR__ * 100) >= (major * 10000 + minor * 100 + patch))
 #endif
 #else
 #define PYYJSON_GCC_VER 0
-#define yyjson_gcc_available(major, minor, patch) 0
+#define pyyjson_gcc_available(major, minor, patch) 0
+#endif
+
+/* gcc builtin */
+#if pyyjson_has_builtin(__builtin_clzll) || pyyjson_gcc_available(3, 4, 0)
+#   define GCC_HAS_CLZLL 1
+#else
+#   define GCC_HAS_CLZLL 0
+#endif
+
+#if pyyjson_has_builtin(__builtin_ctzll) || pyyjson_gcc_available(3, 4, 0)
+#   define GCC_HAS_CTZLL 1
+#else
+#   define GCC_HAS_CTZLL 0
 #endif
 
 /** C version (STDC) */
@@ -62,9 +85,47 @@
 #endif
 #endif
 
+/** compiler version (MSVC) */
+#ifdef _MSC_VER
+#   define PYYJSON_MSC_VER _MSC_VER
+#else
+#   define PYYJSON_MSC_VER 0
+#endif
+
+
+/* msvc intrinsic */
+#if PYYJSON_MSC_VER >= 1400
+#   include <intrin.h>
+#   if defined(_M_AMD64) || defined(_M_ARM64)
+#       define MSC_HAS_BIT_SCAN_64 1
+#       pragma intrinsic(_BitScanForward64)
+#       pragma intrinsic(_BitScanReverse64)
+#   else
+#       define MSC_HAS_BIT_SCAN_64 0
+#   endif
+#   if defined(_M_AMD64) || defined(_M_ARM64) || \
+        defined(_M_IX86) || defined(_M_ARM)
+#       define MSC_HAS_BIT_SCAN 1
+#       pragma intrinsic(_BitScanForward)
+#       pragma intrinsic(_BitScanReverse)
+#   else
+#       define MSC_HAS_BIT_SCAN 0
+#   endif
+#   if defined(_M_AMD64)
+#       define MSC_HAS_UMUL128 1
+#       pragma intrinsic(_umul128)
+#   else
+#       define MSC_HAS_UMUL128 0
+#   endif
+#else
+#   define MSC_HAS_BIT_SCAN_64 0
+#   define MSC_HAS_BIT_SCAN 0
+#   define MSC_HAS_UMUL128 0
+#endif
+
 /** noinline for compiler */
 #ifndef pyyjson_noinline
-#if YYJSON_MSC_VER >= 1400
+#if PYYJSON_MSC_VER >= 1400
 #define pyyjson_noinline __declspec(noinline)
 #elif pyyjson_has_attribute(noinline) || PYYJSON_GCC_VER >= 4
 #define pyyjson_noinline __attribute__((noinline))
@@ -73,13 +134,12 @@
 #endif
 #endif
 
-/** compiler builtin check (since gcc 10.0, clang 2.6, icc 2021) */
-#ifndef pyyjson_has_builtin
-#ifdef __has_builtin
-#define pyyjson_has_builtin(x) __has_builtin(x)
+/** real gcc check */
+#if !defined(__clang__) && !defined(__INTEL_COMPILER) && !defined(__ICC) && \
+    defined(__GNUC__)
+#   define PYYJSON_IS_REAL_GCC 1
 #else
-#define pyyjson_has_builtin(x) 0
-#endif
+#   define PYYJSON_IS_REAL_GCC 0
 #endif
 
 /** likely for compiler */

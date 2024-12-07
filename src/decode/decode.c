@@ -614,7 +614,7 @@ force_inline bool read_string(u8 **ptr, pyyjson_op **op, char **buffer) {
      bit pattern   [11110... 10...... 10...... 10......] (F0 80 80 80)
      ---------------------------------------------------
      */
-#if YYJSON_ENDIAN == YYJSON_BIG_ENDIAN
+#if PY_BIG_ENDIAN
     const u32 b1_mask = 0x80000000UL;
     const u32 b1_patt = 0x00000000UL;
     const u32 b2_mask = 0xE0C00000UL;
@@ -629,7 +629,7 @@ force_inline bool read_string(u8 **ptr, pyyjson_op **op, char **buffer) {
     const u32 b4_requ = 0x07300000UL;
     const u32 b4_err0 = 0x04000000UL;
     const u32 b4_err1 = 0x03300000UL;
-#elif YYJSON_ENDIAN == YYJSON_LITTLE_ENDIAN
+#else
     const u32 b1_mask = 0x00000080UL;
     const u32 b1_patt = 0x00000000UL;
     const u32 b2_mask = 0x0000C0E0UL;
@@ -644,36 +644,6 @@ force_inline bool read_string(u8 **ptr, pyyjson_op **op, char **buffer) {
     const u32 b4_requ = 0x00003007UL;
     const u32 b4_err0 = 0x00000004UL;
     const u32 b4_err1 = 0x00003003UL;
-#else
-    /* this should be evaluated at compile-time */
-    v32_uni b1_mask_uni = {{ 0x80, 0x00, 0x00, 0x00 }};
-    v32_uni b1_patt_uni = {{ 0x00, 0x00, 0x00, 0x00 }};
-    v32_uni b2_mask_uni = {{ 0xE0, 0xC0, 0x00, 0x00 }};
-    v32_uni b2_patt_uni = {{ 0xC0, 0x80, 0x00, 0x00 }};
-    v32_uni b2_requ_uni = {{ 0x1E, 0x00, 0x00, 0x00 }};
-    v32_uni b3_mask_uni = {{ 0xF0, 0xC0, 0xC0, 0x00 }};
-    v32_uni b3_patt_uni = {{ 0xE0, 0x80, 0x80, 0x00 }};
-    v32_uni b3_requ_uni = {{ 0x0F, 0x20, 0x00, 0x00 }};
-    v32_uni b3_erro_uni = {{ 0x0D, 0x20, 0x00, 0x00 }};
-    v32_uni b4_mask_uni = {{ 0xF8, 0xC0, 0xC0, 0xC0 }};
-    v32_uni b4_patt_uni = {{ 0xF0, 0x80, 0x80, 0x80 }};
-    v32_uni b4_requ_uni = {{ 0x07, 0x30, 0x00, 0x00 }};
-    v32_uni b4_err0_uni = {{ 0x04, 0x00, 0x00, 0x00 }};
-    v32_uni b4_err1_uni = {{ 0x03, 0x30, 0x00, 0x00 }};
-    u32 b1_mask = b1_mask_uni.u;
-    u32 b1_patt = b1_patt_uni.u;
-    u32 b2_mask = b2_mask_uni.u;
-    u32 b2_patt = b2_patt_uni.u;
-    u32 b2_requ = b2_requ_uni.u;
-    u32 b3_mask = b3_mask_uni.u;
-    u32 b3_patt = b3_patt_uni.u;
-    u32 b3_requ = b3_requ_uni.u;
-    u32 b3_erro = b3_erro_uni.u;
-    u32 b4_mask = b4_mask_uni.u;
-    u32 b4_patt = b4_patt_uni.u;
-    u32 b4_requ = b4_requ_uni.u;
-    u32 b4_err0 = b4_err0_uni.u;
-    u32 b4_err1 = b4_err1_uni.u;
 #endif
     
 #define is_valid_seq_1(uni) ( \
@@ -770,7 +740,7 @@ skip_ascii_end:
      
      MSVC, Clang, ICC can generate expected instructions without this hint.
      */
-#if YYJSON_IS_REAL_GCC
+#if PYYJSON_IS_REAL_GCC
     __asm__ volatile("":"=m"(*src));
 #endif
     if (likely(*src == '"')) {
@@ -784,12 +754,7 @@ skip_ascii_end:
         *op = (pyyjson_op*)(string_op + 1);
         // buffer unchanged
         return true;
-        // val->tag = ((u64)(src - cur) << YYJSON_TAG_BIT) |
-        //             (u64)(YYJSON_TYPE_STR | YYJSON_SUBTYPE_NOESC);
-        // val->uni.str = (const char *)cur;
-        // *src = '\0';
-        // *end = src + 1;
-        // return true;
+        
     } else if(src != src_start){
         memcpy(temp_string_buf, src_start, src - src_start);
         len_ucs1 = src - src_start;
@@ -922,11 +887,7 @@ copy_escape_ucs1:
         /* modified BEGIN */
     } else if (likely(*src == '"')) {
         goto read_finalize;
-        // val->tag = ((u64)(dst - cur) << YYJSON_TAG_BIT) | YYJSON_TYPE_STR;
-        // val->uni.str = (const char *)cur;
-        // *dst = '\0';
-        // *end = src + 1;
-        // return true;
+        
         /* modified END */
     } else {
         /* modified BEGIN */
@@ -950,7 +911,7 @@ copy_ascii_ucs1:
             *dst++ = *src++;
          })
      */
-#if YYJSON_IS_REAL_GCC
+#if PYYJSON_IS_REAL_GCC
     /* modified BEGIN */
 #   define expr_jump(i) \
     if (likely(!(char_is_ascii_stop(src[i])))) {} \
@@ -1275,11 +1236,7 @@ copy_escape_ucs2:
         /* modified BEGIN */
     } else if (likely(*src == '"')) {
         goto read_finalize;
-        // val->tag = ((u64)(dst - cur) << YYJSON_TAG_BIT) | YYJSON_TYPE_STR;
-        // val->uni.str = (const char *)cur;
-        // *dst = '\0';
-        // *end = src + 1;
-        // return true;
+        
         /* modified END */
     } else {
         /* modified BEGIN */
@@ -1466,11 +1423,7 @@ copy_escape_ucs4:
         /* modified BEGIN */
     } else if (likely(*src == '"')) {
         goto read_finalize;
-        // val->tag = ((u64)(dst - cur) << YYJSON_TAG_BIT) | YYJSON_TYPE_STR;
-        // val->uni.str = (const char *)cur;
-        // *dst = '\0';
-        // *end = src + 1;
-        // return true;
+        
         /* modified END */
     } else {
         /* modified BEGIN */
@@ -1671,7 +1624,7 @@ force_inline PyObject *read_root_pretty(const char *dat, usize len) {
 
     usize required_len = PYYJSON_MAX(
             OP_BUFFER_INIT_SIZE,
-            (len / YYJSON_READER_ESTIMATED_PRETTY_RATIO) * COMMON_OPSIZE_RATIO);
+            (len / PYYJSON_READER_ESTIMATED_PRETTY_RATIO) * COMMON_OPSIZE_RATIO);
 
     // py_operations ptr
     pyyjson_op *py_operations_end;
@@ -1817,7 +1770,7 @@ arr_begin:
     if (*cur == '\n') cur++;
 
 arr_val_begin:
-#if YYJSON_IS_REAL_GCC
+#if PYYJSON_IS_REAL_GCC
     while (true) REPEAT_CALL_16({
         if (byte_match_2((void *) cur, "  ")) cur += 2;
         else
@@ -1972,7 +1925,7 @@ obj_begin:
     if (*cur == '\n') cur++;
 
 obj_key_begin:
-#if YYJSON_IS_REAL_GCC
+#if PYYJSON_IS_REAL_GCC
     while (true) REPEAT_CALL_16({
         if (byte_match_2((void *) cur, "  ")) cur += 2;
         else
