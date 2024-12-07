@@ -4,16 +4,18 @@ import unittest
 
 # download bench folder from https://github.com/0ph1uch1/pycjson/tree/main/bench
 
+
 class TestBenchmark(unittest.TestCase):
     BENCHMARK_REPEAT_SETTING = {
         "apache.json": 10000,
         "tweet.json": 200000,
         "MotionsQuestionsAnswersQuestions2016.json": 100,
         "canada.json": 250,
-        "truenull.json":50000,
-        "github.json":50000,
+        "truenull.json": 50000,
+        "github.json": 50000,
     }
     DEFAULT_REPEAT = 1000
+
     def setUp(self):
         try:
             import orjson
@@ -59,8 +61,9 @@ class TestBenchmark(unittest.TestCase):
         calling_setups = [std_json_setup, pyyjson_setup]
         if self._orjson is not None:
             orjson = self._orjson
+
             def ordump(x):
-                return orjson.dumps(x, option=orjson.OPT_INDENT_2).decode()
+                return orjson.dumps(x).decode()
             orjson_setup = ("orjson", ordump, {})
             calling_setups.append(orjson_setup)
 
