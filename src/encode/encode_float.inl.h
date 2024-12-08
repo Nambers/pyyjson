@@ -5,18 +5,6 @@
 
 /* These codes are modified from yyjson. */
 
-/* IEEE 754 floating-point binary representation */
-#ifndef HAS_IEEE_754
-#if defined(__STDC_IEC_559__) || defined(__STDC_IEC_60559_BFP__)
-#   define HAS_IEEE_754 1
-#elif (FLT_RADIX == 2) && (DBL_MANT_DIG == 53) && (DBL_DIG == 15) && \
-     (DBL_MIN_EXP == -1021) && (DBL_MAX_EXP == 1024) && \
-     (DBL_MIN_10_EXP == -307) && (DBL_MAX_10_EXP == 308)
-#   define HAS_IEEE_754 1
-#else
-#   define HAS_IEEE_754 0
-#endif
-#endif
 
 
 /** Minimum decimal exponent in pow10_sig_table. */
@@ -793,6 +781,18 @@ force_inline u32 u64_tz_bits(u64 v) {
 #endif
 }
 
+/*==============================================================================
+ * Number Utils
+ * These functions are used to detect and convert NaN and Inf numbers.
+ *============================================================================*/
+
+/** Convert raw binary to double. */
+force_inline f64 f64_from_raw(u64 u) {
+    /* use memcpy to avoid violating the strict aliasing rule */
+    f64 f;
+    memcpy(&f, &u, 8);
+    return f;
+}
 
 /*==============================================================================
  * 128-bit Integer Utils
@@ -1004,7 +1004,7 @@ force_inline u8 *write_u64(u64 val, u8 *buf) {
  * Float Writer
  *============================================================================*/
 
-#if HAS_IEEE_754
+#if PYYJSON_HAS_IEEE_754
 
 /** Trailing zero count table for number 0 to 99.
     (generate with misc/make_tables.c) */

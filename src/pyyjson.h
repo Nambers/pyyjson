@@ -235,4 +235,123 @@
 
 #define PYYJSON_MAX(x, y) ((x) > (y) ? (x) : (y))
 
+/* IEEE 754 floating-point binary representation */
+#if defined(DOUBLE_IS_LITTLE_ENDIAN_IEEE754) || defined(DOUBLE_IS_BIG_ENDIAN_IEEE754) || defined(DOUBLE_IS_ARM_MIXED_ENDIAN_IEEE754)
+#   define PYYJSON_HAS_IEEE_754 1
+#elif (FLT_RADIX == 2) && (DBL_MANT_DIG == 53) && (DBL_DIG == 15) && \
+     (DBL_MIN_EXP == -1021) && (DBL_MAX_EXP == 1024) && \
+     (DBL_MIN_10_EXP == -307) && (DBL_MAX_10_EXP == 308)
+#   define PYYJSON_HAS_IEEE_754 1
+#else
+#   define PYYJSON_HAS_IEEE_754 0
+static_assert(false, "false");
+#endif
+
+/*==============================================================================
+ * Digit Character Matcher
+ *============================================================================*/
+
+/** Digit type */
+typedef u8 digi_type;
+
+/** Digit: '0'. */
+static const digi_type DIGI_TYPE_ZERO       = 1 << 0;
+
+/** Digit: [1-9]. */
+static const digi_type DIGI_TYPE_NONZERO    = 1 << 1;
+
+/** Plus sign (positive): '+'. */
+static const digi_type DIGI_TYPE_POS        = 1 << 2;
+
+/** Minus sign (negative): '-'. */
+static const digi_type DIGI_TYPE_NEG        = 1 << 3;
+
+/** Decimal point: '.' */
+static const digi_type DIGI_TYPE_DOT        = 1 << 4;
+
+/** Exponent sign: 'e, 'E'. */
+static const digi_type DIGI_TYPE_EXP        = 1 << 5;
+
+
+/** Whitespace character: ' ', '\\t', '\\n', '\\r'. */
+static const u8 CHAR_TYPE_SPACE      = 1 << 0;
+
+/** Number character: '-', [0-9]. */
+static const u8 CHAR_TYPE_NUMBER     = 1 << 1;
+
+/** JSON Escaped character: '"', '\', [0x00-0x1F]. */
+static const u8 CHAR_TYPE_ESC_ASCII  = 1 << 2;
+
+/** Non-ASCII character: [0x80-0xFF]. */
+static const u8 CHAR_TYPE_NON_ASCII  = 1 << 3;
+
+/** JSON container character: '{', '['. */
+static const u8 CHAR_TYPE_CONTAINER  = 1 << 4;
+
+/** Comment character: '/'. */
+static const u8 CHAR_TYPE_COMMENT    = 1 << 5;
+
+/** Line end character: '\\n', '\\r', '\0'. */
+static const u8 CHAR_TYPE_LINE_END   = 1 << 6;
+
+/** Hexadecimal numeric character: [0-9a-fA-F]. */
+static const u8 CHAR_TYPE_HEX        = 1 << 7;
+
+
+/** Digit type table (generate with misc/make_tables.c) */
+static const u8 digi_table[256] = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x04, 0x00, 0x08, 0x10, 0x00,
+    0x01, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+    0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+
+/** Match a character with specified type. */
+force_inline bool digi_is_type(u8 d, u8 type) {
+    return (digi_table[d] & type) != 0;
+}
+
+/** Match a sign: '+', '-' */
+force_inline bool digi_is_sign(u8 d) {
+    return digi_is_type(d, (u8)(DIGI_TYPE_POS | DIGI_TYPE_NEG));
+}
+
+/** Match a none zero digit: [1-9] */
+force_inline bool digi_is_nonzero(u8 d) {
+    return digi_is_type(d, (u8)DIGI_TYPE_NONZERO);
+}
+
+/** Match a digit: [0-9] */
+force_inline bool digi_is_digit(u8 d) {
+    return digi_is_type(d, (u8)(DIGI_TYPE_ZERO | DIGI_TYPE_NONZERO));
+}
+
+/** Match an exponent sign: 'e', 'E'. */
+force_inline bool digi_is_exp(u8 d) {
+    return digi_is_type(d, (u8)DIGI_TYPE_EXP);
+}
+
+/** Match a floating point indicator: '.', 'e', 'E'. */
+force_inline bool digi_is_fp(u8 d) {
+    return digi_is_type(d, (u8)(DIGI_TYPE_DOT | DIGI_TYPE_EXP));
+}
+
+/** Match a digit or floating point indicator: [0-9], '.', 'e', 'E'. */
+force_inline bool digi_is_digit_or_fp(u8 d) {
+    return digi_is_type(d, (u8)(DIGI_TYPE_ZERO | DIGI_TYPE_NONZERO |
+                                       DIGI_TYPE_DOT | DIGI_TYPE_EXP));
+}
+
 #endif // PYYJSON_H

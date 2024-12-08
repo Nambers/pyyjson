@@ -1,18 +1,6 @@
 #include "decode.h"
 
 
-/* IEEE 754 floating-point binary representation */
-#ifndef HAS_IEEE_754
-#if defined(__STDC_IEC_559__) || defined(__STDC_IEC_60559_BFP__)
-#   define HAS_IEEE_754 1
-#elif (FLT_RADIX == 2) && (DBL_MANT_DIG == 53) && (DBL_DIG == 15) && \
-     (DBL_MIN_EXP == -1021) && (DBL_MAX_EXP == 1024) && \
-     (DBL_MIN_10_EXP == -307) && (DBL_MAX_10_EXP == 308)
-#   define HAS_IEEE_754 1
-#else
-#   define HAS_IEEE_754 0
-#endif
-#endif
 
 /**
  Microsoft Visual C++ 6.0 doesn't support converting number from u64 to f64:
@@ -155,8 +143,7 @@ force_inline void u128_mul_add(u64 a, u64 b, u64 c, u64 *hi, u64 *lo) {
 }
 
 
-
-#if HAS_IEEE_754
+#if PYYJSON_HAS_IEEE_754
 
 /*==============================================================================
  * BigInt For Floating Point Number Reader
