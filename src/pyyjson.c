@@ -1,6 +1,5 @@
 #define PY_SSIZE_T_CLEAN
 #include "decode/decode.h"
-#include "yyjson.h"
 
 #if defined(_MSC_VER)
 #include <intrin.h>
@@ -14,6 +13,8 @@ void cpuid(int info[4], int x) {
 
 #define MODULE_STATE(o) ((modulestate *) PyModule_GetState(o))
 
+
+PyObject *yyjson_read_opts(const char *dat, size_t len);
 // bool is_lzcnt_supported(void);
 
 PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject *kwargs);
@@ -100,7 +101,7 @@ PyMODINIT_FUNC PyInit_pyyjson(void) {
         return NULL;
     }
 
-    PyModule_AddStringConstant(module, "__version__", YYJSON_VERSION_STRING);
+    PyModule_AddStringConstant(module, "__version__", PYYJSON_VERSION_STRING);
 
     JSONDecodeError = PyErr_NewException("pyyjson.JSONDecodeError", PyExc_ValueError, NULL);
     Py_XINCREF(JSONDecodeError);
@@ -143,7 +144,7 @@ PyObject *pyyjson_Decode(PyObject *self, PyObject *args, PyObject *kwargs) {
     }
 
     PyObject *root = yyjson_read_opts(string, len);
-    if (yyjson_unlikely(!root)) {
+    if (unlikely(!root)) {
         if (!PyErr_Occurred()) {
             PyErr_SetString(JSONDecodeError, "Failed to decode JSON: unknown error");
         }

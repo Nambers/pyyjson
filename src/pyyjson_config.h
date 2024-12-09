@@ -13,6 +13,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define PYYJSON_VERSION_STRING "0.0.1"
 
 // feature checks
 #if INTPTR_MAX == INT64_MAX
