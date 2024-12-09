@@ -218,7 +218,7 @@ force_inline bool VECTOR_APPEND_STR(PyObject *val, UnicodeVector **restrict vec_
 
 #define VECTOR_APPEND_LONG PYYJSON_CONCAT3(vector_append_long, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline bool VECTOR_APPEND_LONG(UnicodeVector **restrict vec_addr, Py_ssize_t cur_nested_depth, PyObject *val, StackVars *stack_vars, bool is_in_obj) {
+force_inline bool VECTOR_APPEND_LONG(UnicodeVector **restrict vec_addr, Py_ssize_t cur_nested_depth, PyObject *val, EncodeStackVars *stack_vars, bool is_in_obj) {
     assert(PyLong_CheckExact(val));
     // 32 < TAIL_PADDING == 64 so this is enough
     UnicodeVector *vec = *vec_addr;
@@ -478,7 +478,7 @@ force_inline Py_ssize_t GET_VECTOR_FINAL_LEN(UnicodeVector *vec) {
 
 force_inline EncodeValJumpFlag ENCODE_PROCESS_VAL(
         PyObject *val,
-        StackVars *restrict stack_vars, bool is_in_obj) {
+        EncodeStackVars *restrict stack_vars, bool is_in_obj) {
 #define CTN_SIZE_GROW()                                                               \
     do {                                                                              \
         if (unlikely(stack_vars->cur_nested_depth == PYYJSON_ENCODE_MAX_RECURSION)) { \
@@ -607,7 +607,7 @@ force_noinline PyObject *
 PYYJSON_DUMPS_OBJ(
 #if COMPILE_UCS_LEVEL > 0
         EncodeValJumpFlag jump_flag,
-        StackVars *restrict stack_vars
+        EncodeStackVars *restrict stack_vars
 #else
         PyObject *in_obj
 #endif
@@ -617,8 +617,8 @@ PYYJSON_DUMPS_OBJ(
         if (unlikely(_condition)) goto fail;  \
     } while (0)
 #if COMPILE_UCS_LEVEL == 0
-    StackVars _stack_vars;
-    StackVars *restrict stack_vars = &_stack_vars;
+    EncodeStackVars _stack_vars;
+    EncodeStackVars *restrict stack_vars = &_stack_vars;
     if (unlikely(!init_stack_vars(stack_vars, in_obj))) {
         goto fail;
     }

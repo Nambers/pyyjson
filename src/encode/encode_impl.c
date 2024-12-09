@@ -52,7 +52,7 @@ typedef struct CtnType {
 } CtnType;
 
 
-typedef struct StackVars {
+typedef struct EncodeStackVars {
     // cache
     UnicodeVector *vec;
     PyObject *key, *val;
@@ -63,7 +63,7 @@ typedef struct StackVars {
     // alias thread local buffer
     CtnType *ctn_stack; //= obj_viewer->ctn_stack;
     UnicodeInfo unicode_info;
-} StackVars;
+} EncodeStackVars;
 
 
 #define GET_VEC(stack_vars) ((stack_vars)->vec)
@@ -169,7 +169,7 @@ force_inline void ascii_elevate1(UnicodeVector *vec, UnicodeInfo *unicode_info) 
 
 thread_local CtnType __tls_ctn_stack[PYYJSON_ENCODE_MAX_RECURSION];
 
-force_inline bool init_stack_vars(StackVars *stack_vars, PyObject *in_obj) {
+force_inline bool init_stack_vars(EncodeStackVars *stack_vars, PyObject *in_obj) {
     stack_vars->cur_obj = in_obj;
     stack_vars->cur_pos = 0;
     stack_vars->cur_nested_depth = 0;
