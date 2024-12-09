@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
         os: ["windows-latest"]
 
     steps:
@@ -32,7 +32,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install py-cjson
+      - name: Install pyyjson
         run: |
           mkdir build
           cd build
