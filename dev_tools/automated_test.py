@@ -97,8 +97,28 @@ def run_test(args):
             os.execvpe("bash", ["bash", test_entrance], envs)
         os.execvpe("nix", ["nix", "develop", "--command", test_entrance], envs)
     else:
-        pass
-
+        # Windows: not support --all-ver, use current python version
+        import shutil
+        from os.path import dirname
+        from sysconfig import get_config_h_filename, get_config_var
+        os.environ["Python3_EXECUTABLE"] = sys.executable
+        os.environ["Python3_INCLUDE_DIR"] = dirname(get_config_h_filename())
+        os.environ["Python3_LIBRARY"] = get_config_var("prefix") + os.path.sep + get_config_var("LDLIBRARY")
+        if os.path.exists("build"):
+            shutil.rmtree("build")
+        os.makedirs("build")
+        subprocess.run(["cmake", "-S", ".", "-B", "build", "-DCMAKE_BUILD_TYPE=" + args.build_type], check=True)
+        subprocess.run(["cmake", "--build", "build", "--config", args.build_type], check=True)
+        if args.build_only:
+            return 0
+        exe_base_name = os.path.basename(sys.executable)
+        cmd = [exe_base_name, "test/all_test.py"]
+        if args.ignore:
+            cmd += ["--ignore"] + args.ignore
+        target_file = f"build/{args.build_type}/pyyjson.dll"
+        os.rename(target_file, "build/pyyjson.pyd")
+        os.environ["PYTHONPATH"] = "build"
+        subprocess.run(cmd, check=True)
     return 0
 
 
