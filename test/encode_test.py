@@ -111,6 +111,7 @@ class TestEncode(unittest.TestCase):
         import collections
         import json
         import math
+        import concurrent.futures
 
         import pyyjson
         from test_utils import get_benchfiles_fullpath
@@ -162,16 +163,23 @@ class TestEncode(unittest.TestCase):
             with open(file, "r", encoding="utf-8") as f:
                 test_cases.append(json.load(f))
 
-        for case in test_cases:
-            result_json = json.dumps(
-                case, indent=None, separators=(",", ":"), ensure_ascii=False
-            )
-            result_loadback_json = json.loads(result_json)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            def do_case(_case):
+                result_json = json.dumps(
+                    _case, indent=None, separators=(",", ":"), ensure_ascii=False
+                )
+                result_loadback_json = json.loads(result_json)
 
-            with self.subTest(msg=f"encoding_test(case={case})"):
-                result_pyyjson = pyyjson.dumps(case)
-                result_loadback_pyyjson = json.loads(result_pyyjson)
-                self._check_obj_same(result_loadback_json, result_loadback_pyyjson)
+                with self.subTest(msg=f"encoding_test(case={_case})"):
+                    result_pyyjson = pyyjson.dumps(_case)
+                    result_loadback_pyyjson = json.loads(result_pyyjson)
+                    self._check_obj_same(result_loadback_json, result_loadback_pyyjson)
+            futures = []
+            for case in test_cases:
+                futures.append(executor.submit(do_case, case))
+
+            for future in futures:
+                future.result()
 
 
 if __name__ == "__main__":

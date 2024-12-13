@@ -3,7 +3,7 @@
 #include "simd/simd_detect.h"
 #include "simd/simd_impl.h"
 #include "unicode/uvector.h"
-#include <threads.h>
+#include "tls.h"
 
 
 typedef enum EncodeValJumpFlag {
@@ -46,10 +46,7 @@ typedef struct UnicodeInfo {
     int cur_ucs_type;
 } UnicodeInfo;
 
-typedef struct CtnType {
-    PyObject *ctn;
-    Py_ssize_t index;
-} CtnType;
+
 
 
 typedef struct EncodeStackVars {
@@ -167,13 +164,11 @@ force_inline void ascii_elevate1(UnicodeVector *vec, UnicodeInfo *unicode_info) 
     memmove(GET_VEC_COMPACT_START(vec), GET_VEC_ASCII_START(vec), unicode_info->ascii_size);
 }
 
-thread_local CtnType __tls_ctn_stack[PYYJSON_ENCODE_MAX_RECURSION];
-
 force_inline bool init_stack_vars(EncodeStackVars *stack_vars, PyObject *in_obj) {
     stack_vars->cur_obj = in_obj;
     stack_vars->cur_pos = 0;
     stack_vars->cur_nested_depth = 0;
-    stack_vars->ctn_stack = __tls_ctn_stack;
+    stack_vars->ctn_stack = get_encode_obj_stack_buffer();
     if (unlikely(!stack_vars->ctn_stack)) {
         stack_vars->vec = NULL; // avoid freeing a wild pointer
         PyErr_NoMemory();

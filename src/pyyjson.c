@@ -1,4 +1,6 @@
 #define PY_SSIZE_T_CLEAN
+#include "pyyjson.h"
+#include "tls.h"
 #include "decode/decode.h"
 
 #if defined(_MSC_VER)
@@ -73,6 +75,11 @@ static void module_free(void *m) {
     for (size_t i = 0; i < PYYJSON_KEY_CACHE_SIZE; i++) {
         Py_XDECREF(AssociativeKeyCache[i]);
     }
+
+    if(unlikely(!pyyjson_tls_free())){
+        // critical
+        printf("pyyjson: failed to free TLS\n");
+    }
 #if PYYJSON_ENABLE_TRACE
     size_t cached = 0;
     for (size_t i = 0; i < PYYJSON_KEY_CACHE_SIZE; i++) {
@@ -115,6 +122,15 @@ PyMODINIT_FUNC PyInit_pyyjson(void) {
     JSONEncodeError = PyErr_NewException("pyyjson.JSONEncodeError", PyExc_ValueError, NULL);
     Py_XINCREF(JSONEncodeError);
     if (PyModule_AddObject(module, "JSONEncodeError", JSONEncodeError) < 0) {
+        Py_XDECREF(JSONEncodeError);
+        Py_CLEAR(JSONEncodeError);
+        Py_DECREF(module);
+        return NULL;
+    }
+
+    // TLS init.
+    if(unlikely(!pyyjson_tls_init())){
+        PyErr_SetString(PyExc_RuntimeError, "Failed to initialize TLS");
         Py_XDECREF(JSONEncodeError);
         Py_CLEAR(JSONEncodeError);
         Py_DECREF(module);
