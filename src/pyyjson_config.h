@@ -1,7 +1,6 @@
 #ifndef PYYJSON_CONFIG_H
 #define PYYJSON_CONFIG_H
 
-
 #ifdef _DEBUG
 #undef _DEBUG
 #include <Python.h>
@@ -12,6 +11,16 @@
 #include <stdalign.h>
 #include <stdbool.h>
 #include <stdint.h>
+#if defined(_POSIX_THREADS)
+#include <pthread.h>
+#define TLS_KEY_TYPE pthread_key_t
+#elif defined(NT_THREADS)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#define TLS_KEY_TYPE DWORD
+#else
+#error "Unknown thread model"
+#endif
 
 #define PYYJSON_VERSION_STRING "0.0.1"
 

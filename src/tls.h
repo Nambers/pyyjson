@@ -4,15 +4,6 @@
 #include "pyyjson.h"
 #include <threads.h>
 
-#if defined(_POSIX_THREADS)
-#include <pthread.h>
-#define TLS_KEY_TYPE pthread_key_t
-#elif defined(NT_THREADS)
-#include <fibersapi.h>
-#define TLS_KEY_TYPE DWORD
-#else
-#error "Unknown thread model"
-#endif
 
 /*==============================================================================
  * TLS related API
