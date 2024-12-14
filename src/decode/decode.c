@@ -1677,7 +1677,8 @@ force_inline PyObject *read_root_pretty(const char *dat, usize len) {
 #define COMMON_OPSIZE_RATIO (sizeof(pyyjson_string_op) / sizeof(pyyjson_op))
 #define OP_BUFFER_INIT_SIZE (STACK_BUFFER_SIZE * COMMON_OPSIZE_RATIO)
     // stack buffer
-    DecodeCtnWithSize __stack_ctn_buffer[STACK_BUFFER_SIZE];
+    DecodeCtnWithSize *const __stack_ctn_buffer = get_decode_obj_stack_buffer();
+    assert(__stack_ctn_buffer);
     pyyjson_op pyobject_stack_buffer[OP_BUFFER_INIT_SIZE];
     // buffer start pointer
     pyyjson_op *py_operations;
@@ -1747,7 +1748,7 @@ force_inline PyObject *read_root_pretty(const char *dat, usize len) {
     } while (0)
 
     // container ptr
-    DecodeCtnWithSize *ctn_end = __stack_ctn_buffer + STACK_BUFFER_SIZE;
+    DecodeCtnWithSize *ctn_end = __stack_ctn_buffer + PYYJSON_DECODE_CONTAINER_BUFFER_INIT_SIZE;
     DecodeCtnWithSize *ctn = ctn_start;
 
     // container buffer grow macros
@@ -1758,25 +1759,25 @@ force_inline PyObject *read_root_pretty(const char *dat, usize len) {
             goto fail_alloc;         \
         }                            \
     } while (0)
-#define CTN_BUFFER_GROW()                                                                                     \
-    do {                                                                                                      \
-        if (unlikely(ctn + 1 >= ctn_end)) {                                                                   \
-            size_t old_capacity = ctn_end - ctn_start;                                                        \
-            size_t new_capacity = old_capacity + old_capacity / 2;                                            \
-            DecodeCtnWithSize *new_ctn_start;                                                                    \
-            if (likely(ctn_start == __stack_ctn_buffer)) {                                                    \
+#define CTN_BUFFER_GROW()                                                                                           \
+    do {                                                                                                            \
+        if (unlikely(ctn + 1 >= ctn_end)) {                                                                         \
+            size_t old_capacity = ctn_end - ctn_start;                                                              \
+            size_t new_capacity = old_capacity << 1;                                                                \
+            DecodeCtnWithSize *new_ctn_start;                                                                       \
+            if (likely(old_capacity == PYYJSON_DECODE_CONTAINER_BUFFER_INIT_SIZE)) {                                \
                 new_ctn_start = (DecodeCtnWithSize *) malloc(new_capacity * sizeof(DecodeCtnWithSize));             \
-                CTN_REALLOC_CHECK();                                                                          \
-                memcpy(new_ctn_start, ctn_start, old_capacity * sizeof(DecodeCtnWithSize));                      \
-            } else {                                                                                          \
+                CTN_REALLOC_CHECK();                                                                                \
+                memcpy(new_ctn_start, ctn_start, old_capacity * sizeof(DecodeCtnWithSize));                         \
+            } else {                                                                                                \
                 new_ctn_start = (DecodeCtnWithSize *) realloc(ctn_start, new_capacity * sizeof(DecodeCtnWithSize)); \
-                CTN_REALLOC_CHECK();                                                                          \
-            }                                                                                                 \
-            ctn_start = new_ctn_start;                                                                        \
-            ctn = new_ctn_start + old_capacity;                                                               \
-            ctn_end = new_ctn_start + new_capacity;                                                           \
-        }                                                                                                     \
-        ctn++;                                                                                                \
+                CTN_REALLOC_CHECK();                                                                                \
+            }                                                                                                       \
+            ctn_start = new_ctn_start;                                                                              \
+            ctn = new_ctn_start + old_capacity;                                                                     \
+            ctn_end = new_ctn_start + new_capacity;                                                                 \
+        }                                                                                                           \
+        ctn++;                                                                                                      \
     } while (0)
 #ifdef NDEBUG
 #define CHECK_STRING_BUFFER_OVERFLOW() ((void) 0)
