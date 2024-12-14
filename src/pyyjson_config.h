@@ -53,6 +53,14 @@
 #endif
 
 /*
+ Init buffer size for decode container buffer.
+ Cost: PYYJSON_DECODE_CONTAINER_BUFFER_INIT_SIZE * sizeof(Py_ssize_t) bytes per thread.
+ */
+#ifndef PYYJSON_DECODE_CONTAINER_BUFFER_INIT_SIZE
+#define PYYJSON_DECODE_CONTAINER_BUFFER_INIT_SIZE (1024)
+#endif
+
+/*
  Init buffer size for dst buffer. Must be multiple of 64.
  Cost: PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE bytes per thread.
  */

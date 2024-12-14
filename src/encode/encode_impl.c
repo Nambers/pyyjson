@@ -58,7 +58,7 @@ typedef struct EncodeStackVars {
     Py_ssize_t cur_nested_depth; //= 0;
     Py_ssize_t cur_list_size;
     // alias thread local buffer
-    CtnType *ctn_stack; //= obj_viewer->ctn_stack;
+    EncodeCtnWithIndex *ctn_stack; //= obj_viewer->ctn_stack;
     UnicodeInfo unicode_info;
 } EncodeStackVars;
 

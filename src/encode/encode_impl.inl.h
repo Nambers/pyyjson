@@ -544,7 +544,7 @@ force_inline EncodeValJumpFlag ENCODE_PROCESS_VAL(
                 _c = VECTOR_APPEND_ARR_BEGIN(&GET_VEC(stack_vars), stack_vars->cur_nested_depth, is_in_obj);
                 RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
                 CTN_SIZE_GROW();
-                CtnType *cur_write_ctn = _CTN_STACK(stack_vars) + (stack_vars->cur_nested_depth++);
+                EncodeCtnWithIndex *cur_write_ctn = _CTN_STACK(stack_vars) + (stack_vars->cur_nested_depth++);
                 cur_write_ctn->ctn = stack_vars->cur_obj;
                 cur_write_ctn->index = stack_vars->cur_pos;
                 stack_vars->cur_obj = val;
@@ -562,7 +562,7 @@ force_inline EncodeValJumpFlag ENCODE_PROCESS_VAL(
                 _c = VECTOR_APPEND_OBJ_BEGIN(&GET_VEC(stack_vars), stack_vars->cur_nested_depth, is_in_obj);
                 RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
                 CTN_SIZE_GROW();
-                CtnType *cur_write_ctn = _CTN_STACK(stack_vars) + (stack_vars->cur_nested_depth++);
+                EncodeCtnWithIndex *cur_write_ctn = _CTN_STACK(stack_vars) + (stack_vars->cur_nested_depth++);
                 cur_write_ctn->ctn = stack_vars->cur_obj;
                 cur_write_ctn->index = stack_vars->cur_pos;
                 stack_vars->cur_obj = val;
@@ -580,7 +580,7 @@ force_inline EncodeValJumpFlag ENCODE_PROCESS_VAL(
                 bool _c = VECTOR_APPEND_ARR_BEGIN(&GET_VEC(stack_vars), stack_vars->cur_nested_depth, is_in_obj);
                 RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!_c);
                 CTN_SIZE_GROW();
-                CtnType *cur_write_ctn = _CTN_STACK(stack_vars) + (stack_vars->cur_nested_depth++);
+                EncodeCtnWithIndex *cur_write_ctn = _CTN_STACK(stack_vars) + (stack_vars->cur_nested_depth++);
                 cur_write_ctn->ctn = stack_vars->cur_obj;
                 cur_write_ctn->index = stack_vars->cur_pos;
                 stack_vars->cur_obj = val;
@@ -787,7 +787,7 @@ dict_pair_begin:;
     } else {
         // dict end
         assert(stack_vars->cur_nested_depth);
-        CtnType *last_pos = _CTN_STACK(stack_vars) + (--stack_vars->cur_nested_depth);
+        EncodeCtnWithIndex *last_pos = _CTN_STACK(stack_vars) + (--stack_vars->cur_nested_depth);
 
         bool _c = VECTOR_APPEND_OBJ_END(&GET_VEC(stack_vars), stack_vars->cur_nested_depth);
         GOTO_FAIL_ON_UNLIKELY_ERR(!_c);
@@ -861,7 +861,7 @@ arr_val_begin:;
     } else {
         // list end
         assert(stack_vars->cur_nested_depth);
-        CtnType *last_pos = _CTN_STACK(stack_vars) + (--stack_vars->cur_nested_depth);
+        EncodeCtnWithIndex *last_pos = _CTN_STACK(stack_vars) + (--stack_vars->cur_nested_depth);
 
         bool _c = VECTOR_APPEND_ARR_END(&GET_VEC(stack_vars), stack_vars->cur_nested_depth);
         GOTO_FAIL_ON_UNLIKELY_ERR(!_c);
@@ -934,7 +934,7 @@ tuple_val_begin:;
     } else {
         // list end
         assert(stack_vars->cur_nested_depth);
-        CtnType *last_pos = _CTN_STACK(stack_vars) + (--stack_vars->cur_nested_depth);
+        EncodeCtnWithIndex *last_pos = _CTN_STACK(stack_vars) + (--stack_vars->cur_nested_depth);
 
         bool _c = VECTOR_APPEND_ARR_END(&GET_VEC(stack_vars), stack_vars->cur_nested_depth);
         GOTO_FAIL_ON_UNLIKELY_ERR(!_c);

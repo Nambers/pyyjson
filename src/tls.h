@@ -4,6 +4,28 @@
 #include "pyyjson.h"
 #include <threads.h>
 
+/*==============================================================================
+ * TLS related macros
+ *============================================================================*/
+#if defined(_POSIX_THREADS)
+#define PYYJSON_DECLARE_TLS_GETTER(_key, _getter_name) \
+    force_inline void *_getter_name(void) {            \
+        return pthread_getspecific((_key));            \
+    }
+#define PYYJSON_DECLARE_TLS_SETTER(_key, _setter_name) \
+    force_inline bool _setter_name(void *ptr) {        \
+        return 0 == pthread_setspecific(_key, ptr);    \
+    }
+#else
+#define PYYJSON_DECLARE_TLS_GETTER(_key, _getter_name) \
+    force_inline void *_getter_name(void) {            \
+        return FlsGetValue((_key));                    \
+    }
+#define PYYJSON_DECLARE_TLS_SETTER(_key, _setter_name) \
+    force_inline bool _setter_name(void *ptr) {        \
+        return FlsSetValue(_key, ptr);                 \
+    }
+#endif
 
 /*==============================================================================
  * TLS related API
@@ -19,31 +41,19 @@ bool pyyjson_tls_free(void);
 extern TLS_KEY_TYPE _EncodeObjStackBuffer_Key;
 
 /* The underlying data type to be stored. */
-typedef struct CtnType {
+typedef struct EncodeCtnWithIndex {
     PyObject *ctn;
     Py_ssize_t index;
-} CtnType;
+} EncodeCtnWithIndex;
 
-force_inline void *_get_encode_obj_stack_buffer_pointer(void) {
-#if defined(_POSIX_THREADS)
-    return pthread_getspecific(_EncodeObjStackBuffer_Key);
-#else
-    return FlsGetValue(_EncodeObjStackBuffer_Key);
-#endif
-}
+PYYJSON_DECLARE_TLS_GETTER(_EncodeObjStackBuffer_Key, _get_encode_obj_stack_buffer_pointer)
+PYYJSON_DECLARE_TLS_SETTER(_EncodeObjStackBuffer_Key, _set_encode_obj_stack_buffer_pointer)
 
-force_inline bool _set_encode_obj_stack_buffer_pointer(void *ptr) {
-#if defined(_POSIX_THREADS)
-    return 0 == pthread_setspecific(_EncodeObjStackBuffer_Key, ptr);
-#else
-    return FlsSetValue(_EncodeObjStackBuffer_Key, ptr);
-#endif
-}
 
-force_inline CtnType *get_encode_obj_stack_buffer(void) {
+force_inline EncodeCtnWithIndex *get_encode_obj_stack_buffer(void) {
     void *value = _get_encode_obj_stack_buffer_pointer();
     if (unlikely(value == NULL)) {
-        value = malloc(PYYJSON_ENCODE_MAX_RECURSION * sizeof(CtnType));
+        value = malloc(PYYJSON_ENCODE_MAX_RECURSION * sizeof(EncodeCtnWithIndex));
         if (unlikely(value == NULL)) return NULL;
         bool succ = _set_encode_obj_stack_buffer_pointer(value);
         if (unlikely(!succ)) {
@@ -51,8 +61,34 @@ force_inline CtnType *get_encode_obj_stack_buffer(void) {
             return NULL;
         }
     }
-    return (CtnType *) value;
+    return (EncodeCtnWithIndex *) value;
 }
 
+/*==============================================================================
+ * Thread Local Decode buffer
+ *============================================================================*/
+/* Decode TLS buffer key. */
+extern TLS_KEY_TYPE _DecodeObjStackBuffer_Key;
+
+typedef struct DecodeCtnWithSize {
+    Py_ssize_t raw;
+} DecodeCtnWithSize;
+
+PYYJSON_DECLARE_TLS_GETTER(_DecodeObjStackBuffer_Key, _get_decode_obj_stack_buffer_pointer)
+PYYJSON_DECLARE_TLS_SETTER(_DecodeObjStackBuffer_Key, _set_decode_obj_stack_buffer_pointer)
+
+force_inline DecodeCtnWithSize *get_decode_obj_stack_buffer(void) {
+    void *value = _get_decode_obj_stack_buffer_pointer();
+    if (unlikely(value == NULL)) {
+        value = malloc(PYYJSON_DECODE_CONTAINER_BUFFER_INIT_SIZE * sizeof(DecodeCtnWithSize));
+        if (unlikely(value == NULL)) return NULL;
+        bool succ = _set_decode_obj_stack_buffer_pointer(value);
+        if (unlikely(!succ)) {
+            free(value);
+            return NULL;
+        }
+    }
+    return (DecodeCtnWithSize *) value;
+}
 
 #endif // PYYJSON_TLS_H
