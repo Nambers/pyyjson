@@ -3,6 +3,14 @@
 #include "pyyjson.h"
 #include <assert.h>
 
+#define PYYJSON_STRING_TYPE_ASCII 0
+#define PYYJSON_STRING_TYPE_LATIN1 1
+#define PYYJSON_STRING_TYPE_UCS2 2
+#define PYYJSON_STRING_TYPE_UCS4 3
+
+#define PYYJSON_NUM_TYPE_FLOAT 0
+#define PYYJSON_NUM_TYPE_INT 1
+#define PYYJSON_NUM_TYPE_UINT 2
 // hot spot:
 // string -> float,int->array,dict->null,false,true. least: uint, nan, inf
 #define PYYJSON_NO_OP (0)
@@ -18,17 +26,17 @@
 // higher start: 8
 #define PYYJSON_OP_HIGHER_START (1 << PYYJSON_OP_BITCOUNT_MAX)
 //string flags ~~
-#define PYYJSON_STRING_FLAG_ASCII (0 << PYYJSON_OP_BITCOUNT_MAX)
-#define PYYJSON_STRING_FLAG_LATIN1 (1 << PYYJSON_OP_BITCOUNT_MAX)
-#define PYYJSON_STRING_FLAG_UCS2 (2 << PYYJSON_OP_BITCOUNT_MAX)
-#define PYYJSON_STRING_FLAG_UCS4 (3 << PYYJSON_OP_BITCOUNT_MAX)
+#define PYYJSON_STRING_FLAG_ASCII (PYYJSON_STRING_TYPE_ASCII << PYYJSON_OP_BITCOUNT_MAX)
+#define PYYJSON_STRING_FLAG_LATIN1 (PYYJSON_STRING_TYPE_LATIN1 << PYYJSON_OP_BITCOUNT_MAX)
+#define PYYJSON_STRING_FLAG_UCS2 (PYYJSON_STRING_TYPE_UCS2 << PYYJSON_OP_BITCOUNT_MAX)
+#define PYYJSON_STRING_FLAG_UCS4 (PYYJSON_STRING_TYPE_UCS4 << PYYJSON_OP_BITCOUNT_MAX)
 #define PYYJSON_STRING_FLAG_UCS_TYPE_MASK (3 << PYYJSON_OP_BITCOUNT_MAX)
 // is key ~~
 #define PYYJSON_STRING_FLAG_OBJ_KEY (4 << PYYJSON_OP_BITCOUNT_MAX)
 // num flags ~~
 #define PYYJSON_NUM_FLAG_FLOAT (0 << PYYJSON_OP_BITCOUNT_MAX)
 #define PYYJSON_NUM_FLAG_INT (1 << PYYJSON_OP_BITCOUNT_MAX)
-#define PYYJSON_NUM_FLAG_UINT (2 << PYYJSON_OP_BITCOUNT_MAX)
+// #define PYYJSON_NUM_FLAG_UINT (2 << PYYJSON_OP_BITCOUNT_MAX)
 #define PYYJSON_NUM_FLAG_MASK (3 << PYYJSON_OP_BITCOUNT_MAX)
 // container flags ~~
 #define PYYJSON_CONTAINER_FLAG_ARRAY (0 << PYYJSON_OP_BITCOUNT_MAX)
@@ -74,6 +82,12 @@ typedef struct pyyjson_op {
     PYYJSON_OP_PADDING
 } pyyjson_op;
 
+typedef union {
+    int64_t i;
+    uint64_t u;
+    double f;
+} num_data;
+
 // size = 12 / 16
 typedef struct pyyjson_number_op {
     PYYJSON_OP_HEAD
@@ -109,12 +123,28 @@ typedef union v32_uni { v32 v; u32 u; } v32_uni;
 typedef union v64_uni { v64 v; u64 u; } v64_uni;
 
 
+typedef struct DecodeObjStackInfo {
+    // pyyjson_op *op;
+    PyObject **cur_write_result_addr;
+    PyObject **result_stack;
+    // pyyjson_container_op *op_container;
+    PyObject **result_stack_end;
+} DecodeObjStackInfo;
+
+typedef struct DecodeCtnWithSize DecodeCtnWithSize;
+
+typedef struct DecodeCtnStackInfo {
+    DecodeCtnWithSize *ctn;
+    DecodeCtnWithSize *ctn_start;
+    DecodeCtnWithSize *ctn_end;
+} DecodeCtnStackInfo;
+
+
 PyObject *pyyjson_op_loads(pyyjson_op *op_sequence, size_t obj_stack_maxsize);
 
 extern PyObject *JSONDecodeError;
 
 typedef PyObject *pyyjson_cache_type;
-extern pyyjson_cache_type AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
 
 // static assertions
 static_assert((sizeof(pyyjson_number_op) % sizeof(pyyjson_op)) == 0, "size of pyyjson_number_op  must be multiple of size of pyyjson_op");
@@ -326,8 +356,12 @@ force_inline u32 byte_load_4(const void *src) {
  * These functions are used by JSON reader to read literals and comments.
  *============================================================================*/
 
+force_inline bool pyyjson_decode_inf(DecodeObjStackInfo *restrict decode_obj_stack_info, bool is_signed);
+
+force_inline bool pyyjson_decode_nan(DecodeObjStackInfo *restrict decode_obj_stack_info, bool is_signed);
+
 /** Read 'true' literal, '*cur' should be 't'. */
-force_inline bool read_true(u8 **ptr) {
+force_inline bool _read_true(u8 **ptr) {
     u8 *cur = (u8 *)*ptr;
     u8 **end = (u8 **)ptr;
     if (likely(byte_match_4(cur, "true"))) {
@@ -339,7 +373,7 @@ force_inline bool read_true(u8 **ptr) {
 }
 
 /** Read 'false' literal, '*cur' should be 'f'. */
-force_inline bool read_false(u8 **ptr) {
+force_inline bool _read_false(u8 **ptr) {
     u8 *cur = (u8 *)*ptr;
     u8 **end = (u8 **)ptr;
     if (likely(byte_match_4(cur + 1, "alse"))) {
@@ -351,7 +385,7 @@ force_inline bool read_false(u8 **ptr) {
 }
 
 /** Read 'null' literal, '*cur' should be 'n'. */
-force_inline bool read_null(u8 **ptr) {
+force_inline bool _read_null(u8 **ptr) {
     u8 *cur = (u8 *)*ptr;
     u8 **end = (u8 **)ptr;
     if (likely(byte_match_4(cur, "null"))) {
@@ -363,7 +397,7 @@ force_inline bool read_null(u8 **ptr) {
 }
 
 /** Read 'Inf' or 'Infinity' literal (ignoring case). */
-force_inline bool read_inf(bool sign, u8 **ptr, pyyjson_op **op) {
+force_inline bool _read_inf(bool sign, u8 **ptr) {
     u8 *hdr = (u8 *)(*ptr - sign);
     u8 *cur = (u8 *)*ptr;
     u8 **end = (u8 **)ptr;
@@ -390,16 +424,16 @@ force_inline bool read_inf(bool sign, u8 **ptr, pyyjson_op **op) {
         //     val->tag = YYJSON_TYPE_NUM | YYJSON_SUBTYPE_REAL;
         //     val->uni.u64 = f64_raw_get_inf(sign);
         // }
-        pyyjson_op* op_inf = *op;
-        PYYJSON_WRITE_OP(op_inf, PYYJSON_OP_NAN_INF | PYYJSON_NAN_INF_FLAG_INF | (sign ? PYYJSON_NAN_INF_FLAG_SIGNED : 0));
-        *op = (op_inf + 1);
+        // pyyjson_op* op_inf = *op;
+        // PYYJSON_WRITE_OP(op_inf, PYYJSON_OP_NAN_INF | PYYJSON_NAN_INF_FLAG_INF | (sign ? PYYJSON_NAN_INF_FLAG_SIGNED : 0));
+        // *op = (op_inf + 1);
         return true;
     }
     return false;
 }
 
 /** Read 'NaN' literal (ignoring case). */
-force_inline bool read_nan(bool sign, u8 **ptr, pyyjson_op **op) {
+force_inline bool _read_nan(bool sign, u8 **ptr) {
     u8 *hdr = (u8 *)(*ptr - sign);
     u8 *cur = (u8 *)*ptr;
     u8 **end = (u8 **)ptr;
@@ -418,18 +452,22 @@ force_inline bool read_nan(bool sign, u8 **ptr, pyyjson_op **op) {
         //     val->tag = YYJSON_TYPE_NUM | YYJSON_SUBTYPE_REAL;
         //     val->uni.u64 = f64_raw_get_nan(sign);
         // }
-        pyyjson_op* op_nan = *op;
-        PYYJSON_WRITE_OP(op_nan, PYYJSON_OP_NAN_INF | PYYJSON_NAN_INF_FLAG_NAN | (sign ? PYYJSON_NAN_INF_FLAG_SIGNED : 0));
-        *op = (op_nan + 1);
+        // pyyjson_op* op_nan = *op;
+        // PYYJSON_WRITE_OP(op_nan, PYYJSON_OP_NAN_INF | PYYJSON_NAN_INF_FLAG_NAN | (sign ? PYYJSON_NAN_INF_FLAG_SIGNED : 0));
+        // *op = (op_nan + 1);
         return true;
     }
     return false;
 }
 
 /** Read 'Inf', 'Infinity' or 'NaN' literal (ignoring case). */
-force_inline bool read_inf_or_nan(bool sign, u8 **ptr, pyyjson_op **op) {
-    if (read_inf(sign, ptr, op)) return true;
-    if (read_nan(sign, ptr, op)) return true;
+force_inline bool read_inf_or_nan(DecodeObjStackInfo *decode_obj_stack_info, bool sign, u8 **ptr) {
+    if (_read_inf(sign, ptr)) {
+        return pyyjson_decode_inf(decode_obj_stack_info, sign);
+    }
+    if (_read_nan(sign, ptr)) {
+        return pyyjson_decode_nan(decode_obj_stack_info, sign);
+    }
     return false;
 }
 

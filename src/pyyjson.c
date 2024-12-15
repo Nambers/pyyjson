@@ -1,7 +1,6 @@
 #define PY_SSIZE_T_CLEAN
 #include "pyyjson.h"
 #include "tls.h"
-#include "decode/decode.h"
 
 #if defined(_MSC_VER)
 #include <intrin.h>
@@ -15,6 +14,9 @@ void cpuid(int info[4], int x) {
 
 #define MODULE_STATE(o) ((modulestate *) PyModule_GetState(o))
 
+typedef PyObject *pyyjson_cache_type;
+
+extern pyyjson_cache_type AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
 
 PyObject *yyjson_read_opts(const char *dat, size_t len);
 // bool is_lzcnt_supported(void);

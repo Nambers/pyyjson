@@ -13,7 +13,7 @@ set(PYYJSON_SOVERSION 0)
 # Search Python Package
 find_package(Python3 COMPONENTS Development)
 
-# check for python3
+# check for python3ss
 if((NOT Python3_INCLUDE_DIRS) OR (NOT Python3_LIBRARIES))
     message(FATAL_ERROR "Python3 not found")
 endif()

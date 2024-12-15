@@ -1,7 +1,6 @@
 #include "decode.h"
 
 
-
 /**
  Microsoft Visual C++ 6.0 doesn't support converting number from u64 to f64:
  error C2520: conversion from unsigned __int64 to double not implemented.
@@ -95,7 +94,9 @@ force_inline f64 normalized_u64_to_f64(u64 val) {
 #endif
 }
 
+force_inline bool pyyjson_decode_double(DecodeObjStackInfo* restrict decode_obj_stack_info, double val);
 
+force_inline bool pyyjson_decode_longlong(DecodeObjStackInfo* restrict decode_obj_stack_info, i64 val);
 
 /*==============================================================================
  * 128-bit Integer Utils
@@ -427,7 +428,7 @@ static const f64 f64_pow10_table[] = {
     number is infinite, the return value is based on flag.
  3. This function (with inline attribute) may generate a lot of instructions.
  */
-force_inline bool read_number(u8 **ptr, pyyjson_op **op) {
+force_inline bool read_number(DecodeObjStackInfo *decode_obj_stack_info, u8 **ptr) {
 
 #define return_err(_end, _msg)                                                  \
     do {                                                                        \
@@ -435,36 +436,57 @@ force_inline bool read_number(u8 **ptr, pyyjson_op **op) {
         return false;                                                           \
     } while (0)
 
+// #define return_0() do { \
+//     pyyjson_number_op* op_int = (pyyjson_number_op*)*op; \
+//     PYYJSON_WRITE_OP(op_int, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_INT); \
+//     op_int->data.i = 0; \
+//     *op = (pyyjson_op*)(op_int + 1); \
+//     *end = cur; return true; \
+// } while (false)
+
 #define return_0() do { \
-    pyyjson_number_op* op_int = (pyyjson_number_op*)*op; \
-    PYYJSON_WRITE_OP(op_int, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_INT); \
-    op_int->data.i = 0; \
-    *op = (pyyjson_op*)(op_int + 1); \
-    *end = cur; return true; \
+    *end = cur; \
+    return pyyjson_decode_longlong(decode_obj_stack_info, 0); \
 } while (false)
+
+// #define return_i64(_v) do { \
+//     pyyjson_number_op* op_int = (pyyjson_number_op*)*op; \
+//     PYYJSON_WRITE_OP(op_int, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_INT); \
+//     op_int->data.u = (u64)(sign ? (u64)(~(_v) + 1) : (u64)(_v)); \
+//     *op = (pyyjson_op*)(op_int + 1); \
+//     *end = cur; return true; \
+// } while (false)
 
 #define return_i64(_v) do { \
-    pyyjson_number_op* op_int = (pyyjson_number_op*)*op; \
-    PYYJSON_WRITE_OP(op_int, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_INT); \
-    op_int->data.u = (u64)(sign ? (u64)(~(_v) + 1) : (u64)(_v)); \
-    *op = (pyyjson_op*)(op_int + 1); \
-    *end = cur; return true; \
-} while (false)
-    
-#define return_f64(_v) do { \
-    pyyjson_number_op* op_float = (pyyjson_number_op*)*op; \
-    PYYJSON_WRITE_OP(op_float, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_FLOAT); \
-    op_float->data.f = sign ? -(f64)(_v) : (f64)(_v); \
-    *op = (pyyjson_op*)(op_float + 1); \
-    *end = cur; return true; \
+    *end = cur; \
+    return pyyjson_decode_longlong(decode_obj_stack_info, (i64)(sign ? (u64)(~(_v) + 1) : (u64)(_v))); \
 } while (false)
 
+// #define return_f64(_v) do { \
+//     pyyjson_number_op* op_float = (pyyjson_number_op*)*op; \
+//     PYYJSON_WRITE_OP(op_float, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_FLOAT); \
+//     op_float->data.f = sign ? -(f64)(_v) : (f64)(_v); \
+//     *op = (pyyjson_op*)(op_float + 1); \
+//     *end = cur; return true; \
+// } while (false)
+
+#define return_f64(_v) do { \
+    *end = cur; \
+    return pyyjson_decode_double(decode_obj_stack_info, sign ? -(f64)(_v) : (f64)(_v)); \
+} while (false)
+
+// #define return_f64_bin(_v) do { \
+//     pyyjson_number_op* op_float = (pyyjson_number_op*)*op; \
+//     PYYJSON_WRITE_OP(op_float, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_FLOAT); \
+//     op_float->data.u = ((u64)sign << 63) | (u64)(_v); \
+//     *op = (pyyjson_op*)(op_float + 1); \
+//     *end = cur; return true; \
+// } while (false)
+
 #define return_f64_bin(_v) do { \
-    pyyjson_number_op* op_float = (pyyjson_number_op*)*op; \
-    PYYJSON_WRITE_OP(op_float, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_FLOAT); \
-    op_float->data.u = ((u64)sign << 63) | (u64)(_v); \
-    *op = (pyyjson_op*)(op_float + 1); \
-    *end = cur; return true; \
+    *end = cur; \
+    u64 temp = ((u64)sign << 63) | (u64)(_v); \
+    return pyyjson_decode_double(decode_obj_stack_info, *(double *)&temp); \
 } while (false)
 
 #define return_inf() do { \
@@ -508,12 +530,15 @@ force_inline bool read_number(u8 **ptr, pyyjson_op **op) {
     if (unlikely(!digi_is_nonzero(*cur))) { /* 0 or non-digit char */
         if (unlikely(*cur != '0')) { /* non-digit char */
             //if (has_read_flag(ALLOW_INF_AND_NAN)) {
-            if (read_inf_or_nan(sign, &cur, op)) {
+            if (read_inf_or_nan(decode_obj_stack_info, sign, &cur)) {
                 *end = cur;
                 return true;
             }
             //}
-            return_err(cur, "no digit after minus sign");
+            if(unlikely(!PyErr_Occurred())){
+                return_err(cur, "no digit after minus sign");
+            }
+            return false;
         }
         /* begin with 0 */
         if (likely(!digi_is_digit_or_fp(*++cur))) return_0();
@@ -1041,7 +1066,7 @@ digi_finish:
  This is a fallback function if the custom number reader is disabled.
  This function use libc's strtod() to read floating-point number.
  */
-force_inline bool read_number(u8 **ptr, pyyjson_op **op) {
+force_inline bool read_number(DecodeObjStackInfo *decode_obj_stack_info, u8 **ptr) {
 
 #define return_err(_end, _msg)                                                  \
     do {                                                                        \
@@ -1049,36 +1074,57 @@ force_inline bool read_number(u8 **ptr, pyyjson_op **op) {
         return false;                                                           \
     } while (0)
 
+// #define return_0() do { \
+//     pyyjson_number_op* op_int = (pyyjson_number_op*)*op; \
+//     PYYJSON_WRITE_OP(op_int, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_INT); \
+//     op_int->data.i = 0; \
+//     *op = (pyyjson_op*)(op_int + 1); \
+//     *end = cur; return true; \
+// } while (false)
+
 #define return_0() do { \
-    pyyjson_number_op* op_int = (pyyjson_number_op*)*op; \
-    PYYJSON_WRITE_OP(op_int, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_INT); \
-    op_int->data.i = 0; \
-    *op = (pyyjson_op*)(op_int + 1); \
-    *end = cur; return true; \
+    *end = cur; \
+    return pyyjson_decode_longlong(decode_obj_stack_info, 0); \
 } while (false)
+
+// #define return_i64(_v) do { \
+//     pyyjson_number_op* op_int = (pyyjson_number_op*)*op; \
+//     PYYJSON_WRITE_OP(op_int, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_INT); \
+//     op_int->data.u = (u64)(sign ? (u64)(~(_v) + 1) : (u64)(_v)); \
+//     *op = (pyyjson_op*)(op_int + 1); \
+//     *end = cur; return true; \
+// } while (false)
 
 #define return_i64(_v) do { \
-    pyyjson_number_op* op_int = (pyyjson_number_op*)*op; \
-    PYYJSON_WRITE_OP(op_int, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_INT); \
-    op_int->data.u = (u64)(sign ? (u64)(~(_v) + 1) : (u64)(_v)); \
-    *op = (pyyjson_op*)(op_int + 1); \
-    *end = cur; return true; \
-} while (false)
-    
-#define return_f64(_v) do { \
-    pyyjson_number_op* op_float = (pyyjson_number_op*)*op; \
-    PYYJSON_WRITE_OP(op_float, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_FLOAT); \
-    op_float->data.f = sign ? -(f64)(_v) : (f64)(_v); \
-    *op = (pyyjson_op*)(op_float + 1); \
-    *end = cur; return true; \
+    *end = cur; \
+    return pyyjson_decode_longlong(decode_obj_stack_info, (i64)(sign ? (u64)(~(_v) + 1) : (u64)(_v))); \
 } while (false)
 
+// #define return_f64(_v) do { \
+//     pyyjson_number_op* op_float = (pyyjson_number_op*)*op; \
+//     PYYJSON_WRITE_OP(op_float, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_FLOAT); \
+//     op_float->data.f = sign ? -(f64)(_v) : (f64)(_v); \
+//     *op = (pyyjson_op*)(op_float + 1); \
+//     *end = cur; return true; \
+// } while (false)
+
+#define return_f64(_v) do { \
+    *end = cur; \
+    return pyyjson_decode_double(decode_obj_stack_info, sign ? -(f64)(_v) : (f64)(_v)); \
+} while (false)
+
+// #define return_f64_bin(_v) do { \
+//     pyyjson_number_op* op_float = (pyyjson_number_op*)*op; \
+//     PYYJSON_WRITE_OP(op_float, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_FLOAT); \
+//     op_float->data.u = ((u64)sign << 63) | (u64)(_v); \
+//     *op = (pyyjson_op*)(op_float + 1); \
+//     *end = cur; return true; \
+// } while (false)
+
 #define return_f64_bin(_v) do { \
-    pyyjson_number_op* op_float = (pyyjson_number_op*)*op; \
-    PYYJSON_WRITE_OP(op_float, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_FLOAT); \
-    op_float->data.u = ((u64)sign << 63) | (u64)(_v); \
-    *op = (pyyjson_op*)(op_float + 1); \
-    *end = cur; return true; \
+    *end = cur; \
+    u64 temp = ((u64)sign << 63) | (u64)(_v); \
+    return pyyjson_decode_double(decode_obj_stack_info, *(double *)&temp); \
 } while (false)
 
 #define return_inf() do { \
@@ -1100,12 +1146,15 @@ force_inline bool read_number(u8 **ptr, pyyjson_op **op) {
     /* read first digit, check leading zero */
     if (unlikely(!digi_is_digit(*cur))) {
         // if (has_read_flag(ALLOW_INF_AND_NAN)) {
-        if (read_inf_or_nan(sign, &cur, op)) {
+        if (read_inf_or_nan(decode_obj_stack_info, sign, &cur)) {
             *end = cur;
             return true;
         }
         // }
-        return_err(cur, "no digit after minus sign");
+        if(unlikely(!PyErr_Occurred())){
+            return_err(cur, "no digit after minus sign");
+        }
+        return false;
     }
     if (*cur == '0') {
         cur++;
@@ -1189,14 +1238,15 @@ read_double:
      Here strtod() is called twice for different locales, but if another thread
      happens calls setlocale() between two strtod(), parsing may still fail.
      */
-    pyyjson_number_op* op_float_final = (pyyjson_number_op*)*op;
-    op_float_final->data.f = strtod((const char *)hdr, (char **)&f64_end);
+    // pyyjson_number_op* op_float_final = (pyyjson_number_op*)*op;
+    double f = strtod((const char *)hdr, (char **)&f64_end);
     if (unlikely(f64_end != cur)) {
         /* replace '.' with ',' for locale */
         bool cut = (*cur == ',');
         if (cut) *cur = ' ';
         if (dot) *dot = ',';
-        op_float_final->data.f = strtod((const char *)hdr, (char **)&f64_end);
+        // op_float_final->data.
+        f = strtod((const char *)hdr, (char **)&f64_end);
         /* restore ',' to '.' */
         if (cut) *cur = ',';
         if (dot) *dot = '.';
@@ -1204,13 +1254,15 @@ read_double:
             return_err(hdr, "strtod() failed to parse the number");
         }
     }
-    if (unlikely(op_float_final->data.f >= HUGE_VAL || op_float_final->data.f <= -HUGE_VAL)) {
+    if (unlikely(f >= HUGE_VAL || f <= -HUGE_VAL)) {
         return_inf();
     }
-    PYYJSON_WRITE_OP(op_float_final, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_FLOAT);
-    *op = (pyyjson_op*)(op_float_final + 1);
+    
+    // PYYJSON_WRITE_OP(op_float_final, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_FLOAT);
+    // *op = (pyyjson_op*)(op_float_final + 1);
     // val->tag = YYJSON_TYPE_NUM | YYJSON_SUBTYPE_REAL;
     *end = cur;
+    return pyyjson_decode_double(decode_obj_stack_info, f);
     return true;
     
 #undef return_err

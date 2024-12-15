@@ -43,21 +43,29 @@
 #define PYYJSON_KEY_CACHE_SIZE (1 << 11)
 #endif
 
-/* Stack buffer for PyObject*. Default cost: 8 * 1024 = 8kb (per thread). */
-#ifndef PYYJSON_OBJSTACK_BUFFER_SIZE
-#define PYYJSON_OBJSTACK_BUFFER_SIZE (1024)
-#endif
+// /* Stack buffer for PyObject*. Default cost: 8 * 1024 = 8kb (per thread). */
+// #ifndef PYYJSON_DECODE_OBJSTACK_BUFFER_SIZE
+// #define PYYJSON_DECODE_OBJSTACK_BUFFER_SIZE (1024)
+// #endif
 
 #ifndef PYYJSON_READER_ESTIMATED_PRETTY_RATIO
 #define PYYJSON_READER_ESTIMATED_PRETTY_RATIO 16
 #endif
 
 /*
- Init buffer size for decode container buffer.
+ Init buffer size for decode object buffer.
+ Cost: PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE * sizeof(void*) bytes per thread.
+ */
+#ifndef PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE
+#define PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE (1024)
+#endif
+
+/*
+ Buffer size for decode container buffer.
  Cost: PYYJSON_DECODE_CONTAINER_BUFFER_INIT_SIZE * sizeof(Py_ssize_t) bytes per thread.
  */
-#ifndef PYYJSON_DECODE_CONTAINER_BUFFER_INIT_SIZE
-#define PYYJSON_DECODE_CONTAINER_BUFFER_INIT_SIZE (1024)
+#ifndef PYYJSON_DECODE_MAX_RECURSION
+#define PYYJSON_DECODE_MAX_RECURSION (1024)
 #endif
 
 /*

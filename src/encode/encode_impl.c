@@ -228,12 +228,7 @@ force_inline PyFastTypes fast_type_check(PyObject *val) {
     }
 }
 
-#define RETURN_ON_UNLIKELY_ERR(x) \
-    do {                          \
-        if (unlikely((x))) {      \
-            return false;         \
-        }                         \
-    } while (0)
+
 
 #define TAIL_PADDING (512 / 8)
 

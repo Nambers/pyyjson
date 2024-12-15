@@ -247,6 +247,14 @@
 static_assert(false, "false");
 #endif
 
+/* Helper for quickly write an err handle. */
+#define RETURN_ON_UNLIKELY_ERR(x) \
+    do {                          \
+        if (unlikely((x))) {      \
+            return false;         \
+        }                         \
+    } while (0)
+
 /*==============================================================================
  * Digit Character Matcher
  *============================================================================*/
