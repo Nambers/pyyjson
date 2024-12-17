@@ -278,7 +278,8 @@ force_inline bool init_decode_ctn_stack_info(DecodeCtnStackInfo *restrict decode
         PUSH_STACK_NO_CHECK(obj);    \
     } while (0)
 
-bool pyyjson_push_stack(DecodeObjStackInfo *restrict decode_obj_stack_info, PyObject *obj) {
+
+force_inline bool pyyjson_push_stack(DecodeObjStackInfo *restrict decode_obj_stack_info, PyObject *obj) {
     static_assert((PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE << 1) > 0, "(PYYJSON_DECODE_OBJSTACK_BUFFER_SIZE << 1) > 0");
     if (unlikely(decode_obj_stack_info->cur_write_result_addr >= decode_obj_stack_info->result_stack_end)) {
         // resize
@@ -313,7 +314,7 @@ bool pyyjson_push_stack(DecodeObjStackInfo *restrict decode_obj_stack_info, PyOb
     return true;
 }
 
-bool pyyjson_decode_string(DecodeObjStackInfo* restrict decode_obj_stack_info, const u8 *utf8_str, Py_ssize_t len, int type_flag, bool is_key) {
+force_inline bool pyyjson_decode_string(DecodeObjStackInfo* restrict decode_obj_stack_info, const u8 *utf8_str, Py_ssize_t len, int type_flag, bool is_key) {
     PYYJSON_TRACE_OP(PYYJSON_OP_STRING);
     // pyyjson_string_op *op_str = (pyyjson_string_op *) decode_obj_stack_info->op;
     PyObject *new_val = make_string(utf8_str, len, type_flag, is_key);
@@ -331,21 +332,21 @@ force_inline bool pyyjson_decode_double(DecodeObjStackInfo* restrict decode_obj_
     return pyyjson_push_stack(decode_obj_stack_info, obj);
 }
 
-bool pyyjson_decode_longlong(DecodeObjStackInfo* restrict decode_obj_stack_info, i64 val) {
+force_inline bool pyyjson_decode_longlong(DecodeObjStackInfo* restrict decode_obj_stack_info, i64 val) {
     PYYJSON_TRACE_OP(PYYJSON_OP_NUMBER);
     PyObject* obj = PyLong_FromLongLong(val);
     RETURN_ON_UNLIKELY_ERR(!obj);
     return pyyjson_push_stack(decode_obj_stack_info, obj);
 }
 
-bool pyyjson_decode_unsignedlonglong(DecodeObjStackInfo* restrict decode_obj_stack_info, u64 val) {
+force_inline bool pyyjson_decode_unsignedlonglong(DecodeObjStackInfo* restrict decode_obj_stack_info, u64 val) {
     PYYJSON_TRACE_OP(PYYJSON_OP_NUMBER);
     PyObject* obj = PyLong_FromUnsignedLongLong(val);
     RETURN_ON_UNLIKELY_ERR(!obj);
     return pyyjson_push_stack(decode_obj_stack_info, obj);
 }
 
-bool pyyjson_decode_arr(DecodeObjStackInfo *restrict decode_obj_stack_info, Py_ssize_t arr_len) {
+force_inline bool pyyjson_decode_arr(DecodeObjStackInfo *restrict decode_obj_stack_info, Py_ssize_t arr_len) {
     assert(arr_len >= 0);
     // pyyjson_container_op* op_container;
     //decode_obj_stack_info->
@@ -376,7 +377,7 @@ bool pyyjson_decode_arr(DecodeObjStackInfo *restrict decode_obj_stack_info, Py_s
     // return true;
 }
 
-bool pyyjson_decode_obj(DecodeObjStackInfo *restrict decode_obj_stack_info, Py_ssize_t dict_len) {
+force_inline bool pyyjson_decode_obj(DecodeObjStackInfo *restrict decode_obj_stack_info, Py_ssize_t dict_len) {
     // pyyjson_container_op* op_container;
     // //decode_obj_stack_info->
     // op_container = (pyyjson_container_op *) decode_obj_stack_info->op;
@@ -424,19 +425,19 @@ bool pyyjson_decode_obj(DecodeObjStackInfo *restrict decode_obj_stack_info, Py_s
     // return true;
 }
 
-bool pyyjson_decode_null(DecodeObjStackInfo *restrict decode_obj_stack_info) {
+force_inline bool pyyjson_decode_null(DecodeObjStackInfo *restrict decode_obj_stack_info) {
     PYYJSON_TRACE_OP(PYYJSON_OP_CONSTANTS);
     Py_Immortal_IncRef(Py_None);
     return pyyjson_push_stack(decode_obj_stack_info, Py_None);
 }
 
-bool pyyjson_decode_false(DecodeObjStackInfo *restrict decode_obj_stack_info) {
+force_inline bool pyyjson_decode_false(DecodeObjStackInfo *restrict decode_obj_stack_info) {
     PYYJSON_TRACE_OP(PYYJSON_OP_CONSTANTS);
     Py_Immortal_IncRef(Py_False);
     return pyyjson_push_stack(decode_obj_stack_info, Py_False);
 }
 
-bool pyyjson_decode_true(DecodeObjStackInfo *restrict decode_obj_stack_info) {
+force_inline bool pyyjson_decode_true(DecodeObjStackInfo *restrict decode_obj_stack_info) {
     PYYJSON_TRACE_OP(PYYJSON_OP_CONSTANTS);
     Py_Immortal_IncRef(Py_True);
     return pyyjson_push_stack(decode_obj_stack_info, Py_True);
