@@ -56,60 +56,6 @@
 #define PYYJSON_MATCH_FLAG(x) case ((x) >> PYYJSON_OP_BITCOUNT_MAX)
 #define PYYJSON_GET_FLAG(x, mask) (((x) & (mask)) >> PYYJSON_OP_BITCOUNT_MAX)
 // end flags
-typedef uint32_t op_type;
-#define PYYJSON_OP_HEAD pyyjson_op_base op_base;
-#define PYYJSON_READ_OP(_op) (((pyyjson_op_base *) (_op))->op)
-#define PYYJSON_WRITE_OP(_ptr, _code)               \
-    do {                                            \
-        ((pyyjson_op_base *) (_ptr))->op = (_code); \
-    } while (0)
-
-
-#ifdef PYYJSON_64BIT
-#define PYYJSON_OP_PADDING char pad[4];
-#else
-#define PYYJSON_OP_PADDING
-#endif
-
-// size = 4. This should not be used directly
-typedef struct pyyjson_op_base {
-    op_type op;
-} pyyjson_op_base;
-
-// size = 4 / 8
-typedef struct pyyjson_op {
-    PYYJSON_OP_HEAD
-    PYYJSON_OP_PADDING
-} pyyjson_op;
-
-typedef union {
-    int64_t i;
-    uint64_t u;
-    double f;
-} num_data;
-
-// size = 12 / 16
-typedef struct pyyjson_number_op {
-    PYYJSON_OP_HEAD
-    union {
-        int64_t i;
-        uint64_t u;
-        double f;
-    } data;
-} pyyjson_number_op;
-
-// size = 12 / 24
-typedef struct pyyjson_string_op {
-    PYYJSON_OP_HEAD
-    char *data;
-    Py_ssize_t len;
-} pyyjson_string_op;
-
-// size = 8 / 16
-typedef struct pyyjson_container_op {
-    PYYJSON_OP_HEAD
-    Py_ssize_t len;
-} pyyjson_container_op;
 
 
 /** 16/32/64-bit vector */
@@ -124,10 +70,8 @@ typedef union v64_uni { v64 v; u64 u; } v64_uni;
 
 
 typedef struct DecodeObjStackInfo {
-    // pyyjson_op *op;
     PyObject **cur_write_result_addr;
     PyObject **result_stack;
-    // pyyjson_container_op *op_container;
     PyObject **result_stack_end;
 } DecodeObjStackInfo;
 
@@ -140,21 +84,9 @@ typedef struct DecodeCtnStackInfo {
 } DecodeCtnStackInfo;
 
 
-PyObject *pyyjson_op_loads(pyyjson_op *op_sequence, size_t obj_stack_maxsize);
-
 extern PyObject *JSONDecodeError;
 
 typedef PyObject *pyyjson_cache_type;
-
-// static assertions
-static_assert((sizeof(pyyjson_number_op) % sizeof(pyyjson_op)) == 0, "size of pyyjson_number_op  must be multiple of size of pyyjson_op");
-static_assert((sizeof(pyyjson_string_op) % sizeof(pyyjson_op)) == 0, "size of pyyjson_string_op  must be multiple of size of pyyjson_op");
-static_assert((sizeof(pyyjson_container_op) % sizeof(pyyjson_op)) == 0, "size of pyyjson_container_op  must be multiple of size of pyyjson_op");
-static_assert(sizeof(long long) == 8, "size of long long must be 8 bytes");
-static_assert(sizeof(unsigned long long) == 8, "size of unsigned long long must be 8 bytes");
-static_assert(sizeof(double) == 8, "size of double must be 8 bytes");
-
-
 
 
 /*==============================================================================
@@ -424,9 +356,6 @@ force_inline bool _read_inf(bool sign, u8 **ptr) {
         //     val->tag = YYJSON_TYPE_NUM | YYJSON_SUBTYPE_REAL;
         //     val->uni.u64 = f64_raw_get_inf(sign);
         // }
-        // pyyjson_op* op_inf = *op;
-        // PYYJSON_WRITE_OP(op_inf, PYYJSON_OP_NAN_INF | PYYJSON_NAN_INF_FLAG_INF | (sign ? PYYJSON_NAN_INF_FLAG_SIGNED : 0));
-        // *op = (op_inf + 1);
         return true;
     }
     return false;
@@ -452,9 +381,6 @@ force_inline bool _read_nan(bool sign, u8 **ptr) {
         //     val->tag = YYJSON_TYPE_NUM | YYJSON_SUBTYPE_REAL;
         //     val->uni.u64 = f64_raw_get_nan(sign);
         // }
-        // pyyjson_op* op_nan = *op;
-        // PYYJSON_WRITE_OP(op_nan, PYYJSON_OP_NAN_INF | PYYJSON_NAN_INF_FLAG_NAN | (sign ? PYYJSON_NAN_INF_FLAG_SIGNED : 0));
-        // *op = (op_nan + 1);
         return true;
     }
     return false;
