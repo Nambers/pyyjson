@@ -436,52 +436,20 @@ force_inline bool read_number(DecodeObjStackInfo *decode_obj_stack_info, u8 **pt
         return false;                                                           \
     } while (0)
 
-// #define return_0() do { \
-//     pyyjson_number_op* op_int = (pyyjson_number_op*)*op; \
-//     PYYJSON_WRITE_OP(op_int, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_INT); \
-//     op_int->data.i = 0; \
-//     *op = (pyyjson_op*)(op_int + 1); \
-//     *end = cur; return true; \
-// } while (false)
-
 #define return_0() do { \
     *end = cur; \
     return pyyjson_decode_longlong(decode_obj_stack_info, 0); \
 } while (false)
-
-// #define return_i64(_v) do { \
-//     pyyjson_number_op* op_int = (pyyjson_number_op*)*op; \
-//     PYYJSON_WRITE_OP(op_int, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_INT); \
-//     op_int->data.u = (u64)(sign ? (u64)(~(_v) + 1) : (u64)(_v)); \
-//     *op = (pyyjson_op*)(op_int + 1); \
-//     *end = cur; return true; \
-// } while (false)
 
 #define return_i64(_v) do { \
     *end = cur; \
     return pyyjson_decode_longlong(decode_obj_stack_info, (i64)(sign ? (u64)(~(_v) + 1) : (u64)(_v))); \
 } while (false)
 
-// #define return_f64(_v) do { \
-//     pyyjson_number_op* op_float = (pyyjson_number_op*)*op; \
-//     PYYJSON_WRITE_OP(op_float, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_FLOAT); \
-//     op_float->data.f = sign ? -(f64)(_v) : (f64)(_v); \
-//     *op = (pyyjson_op*)(op_float + 1); \
-//     *end = cur; return true; \
-// } while (false)
-
 #define return_f64(_v) do { \
     *end = cur; \
     return pyyjson_decode_double(decode_obj_stack_info, sign ? -(f64)(_v) : (f64)(_v)); \
 } while (false)
-
-// #define return_f64_bin(_v) do { \
-//     pyyjson_number_op* op_float = (pyyjson_number_op*)*op; \
-//     PYYJSON_WRITE_OP(op_float, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_FLOAT); \
-//     op_float->data.u = ((u64)sign << 63) | (u64)(_v); \
-//     *op = (pyyjson_op*)(op_float + 1); \
-//     *end = cur; return true; \
-// } while (false)
 
 #define return_f64_bin(_v) do { \
     *end = cur; \
@@ -493,13 +461,6 @@ force_inline bool read_number(DecodeObjStackInfo *decode_obj_stack_info, u8 **pt
     return_f64_bin(F64_RAW_INF); \
 } while (false)
 
-// #define return_raw() do { \
-//     if (*pre) **pre = '\0'; /* add null-terminator for previous raw string */ \
-//     val->tag = ((u64)(cur - hdr) << YYJSON_TAG_BIT) | YYJSON_TYPE_RAW; \
-//     val->uni.str = (const char *)hdr; \
-//     *pre = cur; *end = cur; return true; \
-// } while (false)
-    
     u8 *sig_cut = NULL; /* significant part cutting position for long number */
     u8 *sig_end = NULL; /* significant part ending position */
     u8 *dot_pos = NULL; /* decimal point position */
@@ -1074,52 +1035,20 @@ force_inline bool read_number(DecodeObjStackInfo *decode_obj_stack_info, u8 **pt
         return false;                                                           \
     } while (0)
 
-// #define return_0() do { \
-//     pyyjson_number_op* op_int = (pyyjson_number_op*)*op; \
-//     PYYJSON_WRITE_OP(op_int, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_INT); \
-//     op_int->data.i = 0; \
-//     *op = (pyyjson_op*)(op_int + 1); \
-//     *end = cur; return true; \
-// } while (false)
-
 #define return_0() do { \
     *end = cur; \
     return pyyjson_decode_longlong(decode_obj_stack_info, 0); \
 } while (false)
-
-// #define return_i64(_v) do { \
-//     pyyjson_number_op* op_int = (pyyjson_number_op*)*op; \
-//     PYYJSON_WRITE_OP(op_int, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_INT); \
-//     op_int->data.u = (u64)(sign ? (u64)(~(_v) + 1) : (u64)(_v)); \
-//     *op = (pyyjson_op*)(op_int + 1); \
-//     *end = cur; return true; \
-// } while (false)
 
 #define return_i64(_v) do { \
     *end = cur; \
     return pyyjson_decode_longlong(decode_obj_stack_info, (i64)(sign ? (u64)(~(_v) + 1) : (u64)(_v))); \
 } while (false)
 
-// #define return_f64(_v) do { \
-//     pyyjson_number_op* op_float = (pyyjson_number_op*)*op; \
-//     PYYJSON_WRITE_OP(op_float, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_FLOAT); \
-//     op_float->data.f = sign ? -(f64)(_v) : (f64)(_v); \
-//     *op = (pyyjson_op*)(op_float + 1); \
-//     *end = cur; return true; \
-// } while (false)
-
 #define return_f64(_v) do { \
     *end = cur; \
     return pyyjson_decode_double(decode_obj_stack_info, sign ? -(f64)(_v) : (f64)(_v)); \
 } while (false)
-
-// #define return_f64_bin(_v) do { \
-//     pyyjson_number_op* op_float = (pyyjson_number_op*)*op; \
-//     PYYJSON_WRITE_OP(op_float, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_FLOAT); \
-//     op_float->data.u = ((u64)sign << 63) | (u64)(_v); \
-//     *op = (pyyjson_op*)(op_float + 1); \
-//     *end = cur; return true; \
-// } while (false)
 
 #define return_f64_bin(_v) do { \
     *end = cur; \
