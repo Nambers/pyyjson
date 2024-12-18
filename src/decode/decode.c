@@ -201,6 +201,7 @@ success:
 }
 
 force_inline bool init_decode_obj_stack_info(DecodeObjStackInfo *restrict decode_obj_stack_info) {
+    assert(!decode_obj_stack_info->result_stack);
     PyObject **new_buffer = get_decode_obj_stack_buffer();
     if (unlikely(!new_buffer)) {
         PyErr_NoMemory();
@@ -209,23 +210,11 @@ force_inline bool init_decode_obj_stack_info(DecodeObjStackInfo *restrict decode
     decode_obj_stack_info->result_stack = new_buffer;
     decode_obj_stack_info->cur_write_result_addr = new_buffer;
     decode_obj_stack_info->result_stack_end = new_buffer + PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE;
-    // decode_obj_stack_info->op = op_head;
-    // decode_obj_stack_info->result_stack = pyobject_stack_buffer;
-    //     if (unlikely(obj_stack_maxsize > PYYJSON_DECODE_OBJSTACK_BUFFER_SIZE)) {
-    //         decode_obj_stack_info->result_stack = (PyObject **) malloc(obj_stack_maxsize * sizeof(PyObject *));
-    //         if (unlikely(decode_obj_stack_info->result_stack == NULL)) {
-    //             PyErr_NoMemory();
-    //             return false;
-    //         }
-    //     }
-    //     decode_obj_stack_info->cur_write_result_addr = decode_obj_stack_info->result_stack;
-    // // #ifndef NDEBUG
-    //     decode_obj_stack_info->result_stack_end = decode_obj_stack_info->result_stack + obj_stack_maxsize;
-    // #endif
     return true;
 }
 
 force_inline bool init_decode_ctn_stack_info(DecodeCtnStackInfo *restrict decode_ctn_stack_info) {
+    assert(!decode_ctn_stack_info->ctn_start);
     DecodeCtnWithSize *new_buffer = get_decode_ctn_stack_buffer();
     if (unlikely(!new_buffer)) {
         PyErr_NoMemory();
@@ -252,85 +241,79 @@ force_inline bool init_decode_ctn_stack_info(DecodeCtnStackInfo *restrict decode
 #define PYYJSON_TRACE_OP(x)    (void)0
 #endif
 
-
-force_inline bool pyyjson_push_stack(DecodeObjStackInfo *restrict decode_obj_stack_info, PyObject *obj) {
-    static_assert((PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE << 1) > 0, "(PYYJSON_DECODE_OBJSTACK_BUFFER_SIZE << 1) > 0");
-    if (unlikely(decode_obj_stack_info->cur_write_result_addr >= decode_obj_stack_info->result_stack_end)) {
-        // resize
-        if (likely(PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE == decode_obj_stack_info->result_stack_end - decode_obj_stack_info->result_stack)) {
-            void *new_buffer = malloc(sizeof(PyObject *) * (PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE << 1));
-            if (unlikely(!new_buffer)) {
-                PyErr_NoMemory();
-                return false;
-            }
-            memcpy(new_buffer, decode_obj_stack_info->result_stack, sizeof(PyObject *) * PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE);
-            decode_obj_stack_info->result_stack = (PyObject **) new_buffer;
-            decode_obj_stack_info->cur_write_result_addr = decode_obj_stack_info->result_stack + PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE;
-            decode_obj_stack_info->result_stack_end = decode_obj_stack_info->result_stack + (PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE << 1);
-        } else {
-            Py_ssize_t old_capacity = decode_obj_stack_info->result_stack_end - decode_obj_stack_info->result_stack;
-            if (unlikely((PY_SSIZE_T_MAX >> 1) < old_capacity)) {
-                PyErr_NoMemory();
-                return false;
-            }
-            Py_ssize_t new_capacity = old_capacity << 1;
-            void *new_buffer = realloc(decode_obj_stack_info->result_stack, sizeof(PyObject *) * new_capacity);
-            if (unlikely(!new_buffer)) {
-                PyErr_NoMemory();
-                return false;
-            }
-            decode_obj_stack_info->result_stack = (PyObject **) new_buffer;
-            decode_obj_stack_info->cur_write_result_addr = decode_obj_stack_info->result_stack + old_capacity;
-            decode_obj_stack_info->result_stack_end = decode_obj_stack_info->result_stack + new_capacity;
+force_noinline bool _pyyjson_decode_obj_stack_resize(DecodeObjStackInfo *restrict decode_obj_stack_info) {
+    // resize
+    if (likely(PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE == decode_obj_stack_info->result_stack_end - decode_obj_stack_info->result_stack)) {
+        void *new_buffer = malloc(sizeof(PyObject *) * (PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE << 1));
+        if (unlikely(!new_buffer)) {
+            PyErr_NoMemory();
+            return false;
         }
+        memcpy(new_buffer, decode_obj_stack_info->result_stack, sizeof(PyObject *) * PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE);
+        decode_obj_stack_info->result_stack = (PyObject **) new_buffer;
+        decode_obj_stack_info->cur_write_result_addr = decode_obj_stack_info->result_stack + PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE;
+        decode_obj_stack_info->result_stack_end = decode_obj_stack_info->result_stack + (PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE << 1);
+    } else {
+        Py_ssize_t old_capacity = decode_obj_stack_info->result_stack_end - decode_obj_stack_info->result_stack;
+        if (unlikely((PY_SSIZE_T_MAX >> 1) < old_capacity)) {
+            PyErr_NoMemory();
+            return false;
+        }
+        Py_ssize_t new_capacity = old_capacity << 1;
+        void *new_buffer = realloc(decode_obj_stack_info->result_stack, sizeof(PyObject *) * new_capacity);
+        if (unlikely(!new_buffer)) {
+            PyErr_NoMemory();
+            return false;
+        }
+        decode_obj_stack_info->result_stack = (PyObject **) new_buffer;
+        decode_obj_stack_info->cur_write_result_addr = decode_obj_stack_info->result_stack + old_capacity;
+        decode_obj_stack_info->result_stack_end = decode_obj_stack_info->result_stack + new_capacity;
+    }
+    return true;
+}
+
+force_inline bool pyyjson_push_obj(DecodeObjStackInfo *restrict decode_obj_stack_info, PyObject *obj) {
+    static_assert(((Py_ssize_t) PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE << 1) > 0, "(PYYJSON_DECODE_OBJSTACK_BUFFER_SIZE << 1) > 0");
+    if (unlikely(decode_obj_stack_info->cur_write_result_addr >= decode_obj_stack_info->result_stack_end)) {
+        bool c = _pyyjson_decode_obj_stack_resize(decode_obj_stack_info);
+        RETURN_ON_UNLIKELY_ERR(!c);
     }
     *decode_obj_stack_info->cur_write_result_addr++ = obj;
     return true;
 }
 
-force_inline bool pyyjson_decode_string(DecodeObjStackInfo* restrict decode_obj_stack_info, const u8 *utf8_str, Py_ssize_t len, int type_flag, bool is_key) {
+force_inline bool pyyjson_decode_string(DecodeObjStackInfo *restrict decode_obj_stack_info, const u8 *utf8_str, Py_ssize_t len, int type_flag, bool is_key) {
     PYYJSON_TRACE_OP(PYYJSON_OP_STRING);
-    // pyyjson_string_op *op_str = (pyyjson_string_op *) decode_obj_stack_info->op;
     PyObject *new_val = make_string(utf8_str, len, type_flag, is_key);
     RETURN_ON_UNLIKELY_ERR(!new_val);
-    return pyyjson_push_stack(decode_obj_stack_info, new_val);
+    return pyyjson_push_obj(decode_obj_stack_info, new_val);
 }
 
 force_inline bool pyyjson_decode_double(DecodeObjStackInfo* restrict decode_obj_stack_info, double val) {
     PYYJSON_TRACE_OP(PYYJSON_OP_NUMBER);
     PyObject* obj = PyFloat_FromDouble(val);
     RETURN_ON_UNLIKELY_ERR(!obj);
-    return pyyjson_push_stack(decode_obj_stack_info, obj);
+    return pyyjson_push_obj(decode_obj_stack_info, obj);
 }
 
 force_inline bool pyyjson_decode_longlong(DecodeObjStackInfo* restrict decode_obj_stack_info, i64 val) {
     PYYJSON_TRACE_OP(PYYJSON_OP_NUMBER);
     PyObject* obj = PyLong_FromLongLong(val);
     RETURN_ON_UNLIKELY_ERR(!obj);
-    return pyyjson_push_stack(decode_obj_stack_info, obj);
+    return pyyjson_push_obj(decode_obj_stack_info, obj);
 }
 
 force_inline bool pyyjson_decode_unsignedlonglong(DecodeObjStackInfo* restrict decode_obj_stack_info, u64 val) {
     PYYJSON_TRACE_OP(PYYJSON_OP_NUMBER);
     PyObject* obj = PyLong_FromUnsignedLongLong(val);
     RETURN_ON_UNLIKELY_ERR(!obj);
-    return pyyjson_push_stack(decode_obj_stack_info, obj);
+    return pyyjson_push_obj(decode_obj_stack_info, obj);
 }
 
 force_inline bool pyyjson_decode_arr(DecodeObjStackInfo *restrict decode_obj_stack_info, Py_ssize_t arr_len) {
     assert(arr_len >= 0);
-    // pyyjson_container_op* op_container;
-    //decode_obj_stack_info->
-    // op_container = (pyyjson_container_op *) decode_obj_stack_info->op;
-    // Py_ssize_t len = //decode_obj_stack_info->
-    // op_container->len;
     PyObject *list = PyList_New(arr_len);
     RETURN_ON_UNLIKELY_ERR(!list);
-    // if (unlikely(list == NULL)) goto fail;
-    // if (unlikely(arr_len == 0)) {
-    //     // goto arr_end;
-    //     return pyyjson_push_stack(decode_obj_stack_info, list);
-    // }
     PyObject **list_val_start = decode_obj_stack_info->cur_write_result_addr - arr_len;
     assert(list_val_start >= decode_obj_stack_info->result_stack);
     for (Py_ssize_t j = 0; j < arr_len; j++) {
@@ -339,29 +322,12 @@ force_inline bool pyyjson_decode_arr(DecodeObjStackInfo *restrict decode_obj_sta
         PyList_SET_ITEM(list, j, val); // this never fails
     }
     decode_obj_stack_info->cur_write_result_addr -= arr_len;
-    return pyyjson_push_stack(decode_obj_stack_info, list);
-    // arr_end:
-    //decode_obj_stack_info->
-    // op_container++;
-    // decode_obj_stack_info->op = (pyyjson_op *) //decode_obj_stack_info->
-    // op_container;
-    // return true;
+    return pyyjson_push_obj(decode_obj_stack_info, list);
 }
 
 force_inline bool pyyjson_decode_obj(DecodeObjStackInfo *restrict decode_obj_stack_info, Py_ssize_t dict_len) {
-    // pyyjson_container_op* op_container;
-    // //decode_obj_stack_info->
-    // op_container = (pyyjson_container_op *) decode_obj_stack_info->op;
-    // Py_ssize_t len = //decode_obj_stack_info->
-    // op_container->len;
     PyObject *dict = _PyDict_NewPresized(dict_len);
     RETURN_ON_UNLIKELY_ERR(!dict);
-    // if (unlikely(dict == NULL)) goto fail;
-    // if (unlikely(len == 0)) {
-    //     PYYJSON_PUSH_STACK(dict);
-    //     goto dict_end;
-    // }
-    // PYYJSON_POP_STACK_PRE_CHECK(len * 2 - 1);
     PyObject **dict_val_start = decode_obj_stack_info->cur_write_result_addr - dict_len * 2;
     PyObject **dict_val_view = dict_val_start;
     for (size_t j = 0; j < dict_len; j++) {
@@ -386,32 +352,25 @@ force_inline bool pyyjson_decode_obj(DecodeObjStackInfo *restrict decode_obj_sta
         }
     }
     decode_obj_stack_info->cur_write_result_addr -= dict_len * 2;
-    return pyyjson_push_stack(decode_obj_stack_info, dict);
-    // dict_end:
-    //decode_obj_stack_info->
-    // op_container++;
-    // decode_obj_stack_info->op = (pyyjson_op *) //decode_obj_stack_info->
-    // op_container;
-    // break;
-    // return true;
+    return pyyjson_push_obj(decode_obj_stack_info, dict);
 }
 
 force_inline bool pyyjson_decode_null(DecodeObjStackInfo *restrict decode_obj_stack_info) {
     PYYJSON_TRACE_OP(PYYJSON_OP_CONSTANTS);
     Py_Immortal_IncRef(Py_None);
-    return pyyjson_push_stack(decode_obj_stack_info, Py_None);
+    return pyyjson_push_obj(decode_obj_stack_info, Py_None);
 }
 
 force_inline bool pyyjson_decode_false(DecodeObjStackInfo *restrict decode_obj_stack_info) {
     PYYJSON_TRACE_OP(PYYJSON_OP_CONSTANTS);
     Py_Immortal_IncRef(Py_False);
-    return pyyjson_push_stack(decode_obj_stack_info, Py_False);
+    return pyyjson_push_obj(decode_obj_stack_info, Py_False);
 }
 
 force_inline bool pyyjson_decode_true(DecodeObjStackInfo *restrict decode_obj_stack_info) {
     PYYJSON_TRACE_OP(PYYJSON_OP_CONSTANTS);
     Py_Immortal_IncRef(Py_True);
-    return pyyjson_push_stack(decode_obj_stack_info, Py_True);
+    return pyyjson_push_obj(decode_obj_stack_info, Py_True);
 }
 
 force_inline bool pyyjson_decode_nan(DecodeObjStackInfo *restrict decode_obj_stack_info, bool is_signed) {
@@ -419,9 +378,7 @@ force_inline bool pyyjson_decode_nan(DecodeObjStackInfo *restrict decode_obj_sta
     double val = is_signed ? -fabs(Py_NAN) : fabs(Py_NAN);
     PyObject *o = PyFloat_FromDouble(val);
     RETURN_ON_UNLIKELY_ERR(!o);
-    return pyyjson_push_stack(decode_obj_stack_info, o);
-    // decode_obj_stack_info->op++;
-    // break;
+    return pyyjson_push_obj(decode_obj_stack_info, o);
 }
 
 force_inline bool pyyjson_decode_inf(DecodeObjStackInfo *restrict decode_obj_stack_info, bool is_signed) {
@@ -429,7 +386,7 @@ force_inline bool pyyjson_decode_inf(DecodeObjStackInfo *restrict decode_obj_sta
     double val = is_signed ? -fabs(Py_HUGE_VAL) : fabs(Py_HUGE_VAL);
     PyObject *o = PyFloat_FromDouble(val);
     RETURN_ON_UNLIKELY_ERR(!o);
-    return pyyjson_push_stack(decode_obj_stack_info, o);
+    return pyyjson_push_obj(decode_obj_stack_info, o);
 }
 
 /** Character type table (generate with misc/make_tables.c) */
@@ -1522,13 +1479,6 @@ read_finalize:
             len_ucs1--;
         }
         return pyyjson_decode_string(decode_obj_stack_info, temp_string_buf, dst_ucs4 - (u32*)temp_string_buf, PYYJSON_STRING_TYPE_UCS4, is_key);
-        // pyyjson_string_op* string_op = (pyyjson_string_op*)*op;
-        // PYYJSON_WRITE_OP(string_op, PYYJSON_OP_STRING | PYYJSON_STRING_FLAG_UCS4);
-        // string_op->data = temp_string_buf;
-        // string_op->len = dst_ucs4 - (u32*)temp_string_buf;
-        // *op = (pyyjson_op*)(string_op + 1);
-        // *buffer = (char*)dst_ucs4;
-        // return true;//create_py_unicode(temp_string_buf, dst_ucs4 - (u32*)temp_string_buf, false, 4);
     } else if (unlikely(cur_max_ucs_size==2)) {
         u16* start = (u16*)temp_string_buf + len_ucs1 - 1;
         u8* ucs1_back = (u8*)temp_string_buf + len_ucs1 - 1;
@@ -1537,22 +1487,8 @@ read_finalize:
             len_ucs1--;
         }
         return pyyjson_decode_string(decode_obj_stack_info, temp_string_buf, dst_ucs2 - (u16*)temp_string_buf, PYYJSON_STRING_TYPE_UCS2, is_key);
-        // pyyjson_string_op* string_op = (pyyjson_string_op*) *op;
-        // PYYJSON_WRITE_OP(string_op, PYYJSON_OP_STRING | PYYJSON_STRING_FLAG_UCS2);
-        // string_op->data = temp_string_buf;
-        // string_op->len = dst_ucs2 - (u16*)temp_string_buf;
-        // *op = (pyyjson_op*)(string_op + 1);
-        // *buffer = (char*)dst_ucs2;
-        // return true;//create_py_unicode(temp_string_buf, dst_ucs2 - (u16*)temp_string_buf, false, 2);
     } else {
         return pyyjson_decode_string(decode_obj_stack_info, temp_string_buf, dst - (u8*)temp_string_buf, is_ascii?PYYJSON_STRING_TYPE_ASCII:PYYJSON_STRING_TYPE_LATIN1, is_key);
-        // pyyjson_string_op* string_op = (pyyjson_string_op*) *op;
-        // PYYJSON_WRITE_OP(string_op, PYYJSON_OP_STRING | (is_ascii ? PYYJSON_STRING_FLAG_ASCII : PYYJSON_STRING_FLAG_LATIN1));
-        // string_op->data = temp_string_buf;
-        // string_op->len = dst - (u8*)temp_string_buf;
-        // *op = (pyyjson_op*)(string_op + 1);
-        // *buffer = (char*)dst;
-        // return true;//create_py_unicode(temp_string_buf, dst - (u8*)temp_string_buf, false, 1);
     }
 
 #undef return_err
@@ -1566,15 +1502,6 @@ read_finalize:
 
 /** Read JSON document (accept all style, but optimized for pretty). */
 force_inline PyObject *read_root_pretty(const char *dat, usize len) {
-#define return_err(_pos, _type, _msg)                                                               \
-    do {                                                                                            \
-        if (_type == JSONDecodeError) {                                                             \
-            PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, ((u8 *) _pos) - (u8 *) dat); \
-        } else {                                                                                    \
-            PyErr_SetString(_type, _msg);                                                           \
-        }                                                                                           \
-        goto failed_cleanup;                                                                        \
-    } while (0)
 
     // container stack info
     DecodeCtnStackInfo _decode_ctn_info;
@@ -1602,16 +1529,10 @@ force_inline PyObject *read_root_pretty(const char *dat, usize len) {
 
     if (*cur++ == '{') {
         set_decode_ctn(decode_ctn_info->ctn, 0, false);
-        // ctn->tag = CONTAINER_OBJ_TYPE;
-        // ctn->size = 0;
-        // ctn++;
         if (*cur == '\n') cur++;
         goto obj_key_begin;
     } else {
         set_decode_ctn(decode_ctn_info->ctn, 0, true);
-        // ctn->tag = CONTAINER_ARR_TYPE;
-        // ctn->size = 0;
-        // ctn++;
         if (*cur == '\n') cur++;
         goto arr_val_begin;
     }
@@ -1620,10 +1541,7 @@ arr_begin:
     /* save current container */
     /* create a new array value, save parent container offset */
     if(unlikely(!ctn_grow_check(decode_ctn_info))) goto fail_ctn_grow;
-    // ctn->tag = CONTAINER_ARR_TYPE;
-    // ctn->size = 0;
     set_decode_ctn(decode_ctn_info->ctn, 0, true);
-
 
     /* push the new array value as current container */
     if (*cur == '\n') cur++;
@@ -1652,54 +1570,35 @@ arr_val_begin:
         goto arr_begin;
     }
     if (char_is_number(*cur)) {
-        // OP_BUFFER_GROW(sizeof(pyyjson_number_op));
-        // pyyjson_op *now_write_op = cur_write_op;
         if (likely(read_number(decode_obj_stack_info, &cur))) {
-            // OBJ_STACK_MAX_SIZE_UPDATE(1);
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
         }
         goto fail_number;
     }
     if (*cur == '"') {
-        // OP_BUFFER_GROW(sizeof(pyyjson_string_op));
-        // MOVE_STRING_BUFFER_ALIGNED_4();
         if (likely(read_string(decode_obj_stack_info, &cur, string_buffer_head, false))) {
-            // CHECK_STRING_BUFFER_OVERFLOW();
-            // OBJ_STACK_MAX_SIZE_UPDATE(1);
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
         }
         goto fail_string;
     }
     if (*cur == 't') {
-        // OP_BUFFER_GROW(sizeof(pyyjson_op));
         if (likely(_read_true(&cur) && pyyjson_decode_true(decode_obj_stack_info))) {
-            // PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_CONSTANTS | PYYJSON_CONSTANTS_FLAG_TRUE);
-            // OBJ_STACK_MAX_SIZE_UPDATE(1);
-            // cur_write_op++;
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
         }
         goto fail_literal_true;
     }
     if (*cur == 'f') {
-        // OP_BUFFER_GROW(sizeof(pyyjson_op));
         if (likely(_read_false(&cur) && pyyjson_decode_false(decode_obj_stack_info))) {
-            // PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_CONSTANTS | PYYJSON_CONSTANTS_FLAG_FALSE);
-            // OBJ_STACK_MAX_SIZE_UPDATE(1);
-            // cur_write_op++;
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
         }
         goto fail_literal_false;
     }
     if (*cur == 'n') {
-        // OP_BUFFER_GROW(sizeof(pyyjson_op));
         if (likely(_read_null(&cur) && pyyjson_decode_null(decode_obj_stack_info))) {
-            // PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_CONSTANTS | PYYJSON_CONSTANTS_FLAG_NULL);
-            // OBJ_STACK_MAX_SIZE_UPDATE(1);
-            // cur_write_op++;
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
         }
@@ -1711,9 +1610,7 @@ arr_val_begin:
     }
     if (*cur == ']') {
         cur++;
-        // if (likely(ctn_len == 0)) goto arr_end;
         if (likely(get_decode_ctn_len(decode_ctn_info->ctn) == 0)) goto arr_end;
-        //if (has_read_flag(ALLOW_TRAILING_COMMAS)) goto arr_end;
         while (*cur != ',') cur--;
         goto fail_trailing_comma;
     }
@@ -1723,9 +1620,7 @@ arr_val_begin:
         goto arr_val_begin;
     }
     if ((*cur == 'i' || *cur == 'I' || *cur == 'N')) {
-        // OP_BUFFER_GROW(sizeof(pyyjson_op));
         if (read_inf_or_nan(decode_obj_stack_info, false, &cur)) {
-            // OBJ_STACK_MAX_SIZE_UPDATE(1);
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
         }
@@ -1758,15 +1653,6 @@ arr_val_end:
 arr_end:
     assert(decode_ctn_is_arr(decode_ctn_info->ctn));
     if(!pyyjson_decode_arr(decode_obj_stack_info, get_decode_ctn_len(decode_ctn_info->ctn))) goto failed_cleanup;
-    // OP_BUFFER_GROW(sizeof(pyyjson_container_op));
-    // pyyjson_container_op *list_op = (pyyjson_container_op *) cur_write_op;
-    // PYYJSON_WRITE_OP(list_op, PYYJSON_OP_CONTAINER | PYYJSON_CONTAINER_FLAG_ARRAY);
-    {
-        // Py_ssize_t cur_ctn_size = get_decode_ctn_len(ctn);
-        // OBJ_STACK_MAX_SIZE_UPDATE(1 - cur_ctn_size);
-        // list_op->len = cur_ctn_size;
-    }
-    // cur_write_op = (pyyjson_op *) (list_op + 1);
     /* pop parent as current container */
     if (unlikely(decode_ctn_info->ctn-- == decode_ctn_info->ctn_start)) {
         goto doc_end;
@@ -1782,11 +1668,8 @@ arr_end:
 
 obj_begin:
     /* push container */
-    // CTN_BUFFER_GROW();
     ctn_grow_check(decode_ctn_info);
     set_decode_ctn(decode_ctn_info->ctn, 0, false);
-    // ctn->tag = CONTAINER_OBJ_TYPE;
-    // ctn->size = 0;
     if (*cur == '\n') cur++;
 
 obj_key_begin:
@@ -1804,13 +1687,7 @@ obj_key_begin:
     })
 #endif
         if (likely(*cur == '"')) {
-            // OP_BUFFER_GROW(sizeof(pyyjson_string_op));
-            // pyyjson_op *write_key_op = cur_write_op;
-            // MOVE_STRING_BUFFER_ALIGNED_4();
             if (likely(read_string(decode_obj_stack_info, &cur, string_buffer_head, true))) {
-                // CHECK_STRING_BUFFER_OVERFLOW();
-                // OBJ_STACK_MAX_SIZE_UPDATE(1);
-                // ((pyyjson_op_base *) write_key_op)->op |= PYYJSON_STRING_FLAG_OBJ_KEY;
                 goto obj_key_end;
             }
             goto fail_string;
@@ -1845,21 +1722,14 @@ obj_key_end:
 
 obj_val_begin:
     if (*cur == '"') {
-        // OP_BUFFER_GROW(sizeof(pyyjson_string_op));
-        // MOVE_STRING_BUFFER_ALIGNED_4();
         if (likely(read_string(decode_obj_stack_info, &cur, string_buffer_head, false))) {
-            // CHECK_STRING_BUFFER_OVERFLOW();
-            // OBJ_STACK_MAX_SIZE_UPDATE(1);
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
         }
         goto fail_string;
     }
     if (char_is_number(*cur)) {
-        // OP_BUFFER_GROW(PYYJSON_MAX(sizeof(pyyjson_op), sizeof(pyyjson_number_op)));
-        // pyyjson_op *now_write_op = cur_write_op;
         if (likely(read_number(decode_obj_stack_info, &cur))) {
-            // OBJ_STACK_MAX_SIZE_UPDATE(1);
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
         }
@@ -1874,33 +1744,21 @@ obj_val_begin:
         goto arr_begin;
     }
     if (*cur == 't') {
-        // OP_BUFFER_GROW(sizeof(pyyjson_op));
         if (likely(_read_true(&cur) && pyyjson_decode_true(decode_obj_stack_info))) {
-            // PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_CONSTANTS | PYYJSON_CONSTANTS_FLAG_TRUE);
-            // cur_write_op++;
-            // OBJ_STACK_MAX_SIZE_UPDATE(1);
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
         }
         goto fail_literal_true;
     }
     if (*cur == 'f') {
-        // OP_BUFFER_GROW(sizeof(pyyjson_op));
         if (likely(_read_false(&cur) && pyyjson_decode_false(decode_obj_stack_info))) {
-            // PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_CONSTANTS | PYYJSON_CONSTANTS_FLAG_FALSE);
-            // cur_write_op++;
-            // OBJ_STACK_MAX_SIZE_UPDATE(1);
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
         }
         goto fail_literal_false;
     }
     if (*cur == 'n') {
-        // OP_BUFFER_GROW(sizeof(pyyjson_op));
         if (likely(_read_null(&cur) && pyyjson_decode_null(decode_obj_stack_info))) {
-            // PYYJSON_WRITE_OP(cur_write_op, PYYJSON_OP_CONSTANTS | PYYJSON_CONSTANTS_FLAG_NULL);
-            // cur_write_op++;
-            // OBJ_STACK_MAX_SIZE_UPDATE(1);
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
         }
@@ -1916,10 +1774,8 @@ obj_val_begin:
         goto obj_val_begin;
     }
     if ((*cur == 'i' || *cur == 'I' || *cur == 'N')) {
-        // OP_BUFFER_GROW(sizeof(pyyjson_op));
         if (read_inf_or_nan(decode_obj_stack_info, false, &cur)) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
-            // OBJ_STACK_MAX_SIZE_UPDATE(1);
             goto obj_val_end;
         }
         goto fail_character_val;
@@ -1951,15 +1807,6 @@ obj_val_end:
 obj_end:
     assert(!decode_ctn_is_arr(decode_ctn_info->ctn));
     if(unlikely(!pyyjson_decode_obj(decode_obj_stack_info, get_decode_ctn_len(decode_ctn_info->ctn)))) goto failed_cleanup;
-    // OP_BUFFER_GROW(sizeof(pyyjson_container_op));
-    // pyyjson_container_op *dict_op = (pyyjson_container_op *) cur_write_op;
-    // PYYJSON_WRITE_OP(dict_op, PYYJSON_OP_CONTAINER | PYYJSON_CONTAINER_FLAG_DICT);
-    // {
-    //     Py_ssize_t cur_ctn_size = get_decode_ctn_len(ctn);
-    //     OBJ_STACK_MAX_SIZE_UPDATE(1 - cur_ctn_size);
-    //     dict_op->len = cur_ctn_size;
-    // }
-    // cur_write_op = (pyyjson_op *) (dict_op + 1);
     /* pop container */
     /* point to the next value */
     if (unlikely(decode_ctn_info->ctn-- == decode_ctn_info->ctn_start)) {
@@ -1975,44 +1822,37 @@ obj_end:
 
 doc_end:
     /* check invalid contents after json document */
-    if (unlikely(cur < end) // && !has_read_flag(STOP_WHEN_DONE)
-    ) {
+    if (unlikely(cur < end)) {
         while (char_is_space(*cur)) cur++;
         if (unlikely(cur < end)) goto fail_garbage;
     }
 
-    assert(decode_ctn_info->ctn == decode_ctn_info->ctn_start - 1);
-    // free ctn buffer before calling pyyjson_op_loads.
-    // if (unlikely(decode_ctn_info->ctn_start != __stack_ctn_buffer)) {
-    //     free(ctn_start);
-    // }
-    // add null terminate to op buffer
-    // OP_BUFFER_GROW(sizeof(pyyjson_op_base));
-    // PYYJSON_WRITE_OP(cur_write_op, PYYJSON_NO_OP);
-    // OBJ_STACK_MAX_SIZE_UPDATE(1);
-    assert(decode_obj_stack_info->cur_write_result_addr == decode_obj_stack_info->result_stack + 1);
+success:;
     PyObject *obj = *decode_obj_stack_info->result_stack;
-    assert(obj);
+    assert(decode_ctn_info->ctn == decode_ctn_info->ctn_start - 1);
+    assert(decode_obj_stack_info->cur_write_result_addr == decode_obj_stack_info->result_stack + 1);
+    assert(obj && !PyErr_Occurred());
     assert(obj->ob_refcnt == 1);
-    // TODO
-    // obj = pyyjson_op_loads(py_operations, object_stack_max_size);
-    // free py_operations
-    // if (py_operations != pyobject_stack_buffer) {
-    //     free(py_operations);
-    // }
     // free string buffer
     if (unlikely(string_buffer_head != pyyjson_string_buffer)) {
         free(string_buffer_head);
     }
-    if(unlikely(decode_obj_stack_info->result_stack_end - decode_obj_stack_info->result_stack > PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE)){
+    // free obj stack buffer if allocated dynamically
+    if (unlikely(decode_obj_stack_info->result_stack_end - decode_obj_stack_info->result_stack > PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE)) {
         free(decode_obj_stack_info->result_stack);
-    }
-    // check
-    if (!obj && !PyErr_Occurred()) {
-        PyErr_SetString(PyExc_RuntimeError, "Unknown error: pyyjson_op_loads() failed");
     }
 
     return obj;
+
+#define return_err(_pos, _type, _msg)                                                               \
+    do {                                                                                            \
+        if (_type == JSONDecodeError) {                                                             \
+            PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, ((u8 *) _pos) - (u8 *) dat); \
+        } else {                                                                                    \
+            PyErr_SetString(_type, _msg);                                                           \
+        }                                                                                           \
+        goto failed_cleanup;                                                                        \
+    } while (0)
 
 fail_string:
     return_err(cur, JSONDecodeError, "invalid string");
@@ -2059,41 +1899,24 @@ fail_ctn_grow:
                 "max recursion exceeded");
 
 failed_cleanup:
-    // free ctn_start
-    // if (ctn_start != __stack_ctn_buffer) {
-    //     free(ctn_start);
-    // }
-    // free py_operations
-    // if (py_operations != pyobject_stack_buffer) {
-    //     free(py_operations);
-    // }
-    // free string buffer. this need NULL check
+    for (PyObject **obj_ptr = decode_obj_stack_info->result_stack; obj_ptr < decode_obj_stack_info->cur_write_result_addr; obj_ptr++) {
+        Py_XDECREF(*obj_ptr);
+    }
+    // free string buffer
     if (unlikely(string_buffer_head != pyyjson_string_buffer)) {
         free(string_buffer_head);
     }
+    // free obj stack buffer if allocated dynamically
+    if (unlikely(decode_obj_stack_info->result_stack_end - decode_obj_stack_info->result_stack > PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE)) {
+        free(decode_obj_stack_info->result_stack);
+    }
     return NULL;
-// #undef val_incr
-#undef MOVE_STRING_BUFFER_ALIGNED_4
-#undef CHECK_STRING_BUFFER_OVERFLOW
-#undef CTN_BUFFER_GROW
-#undef CTN_REALLOC_CHECK
-#undef OP_BUFFER_GROW
-#undef OP_BUFFER_REALLOC_CHECK
-#undef OBJ_STACK_MAX_SIZE_UPDATE
-// #undef OP_BUFFER_INIT_SIZE
-// #undef COMMON_OPSIZE_RATIO
-// #undef STACK_BUFFER_SIZE
-// #undef CONTAINER_OBJ_TYPE
-// #undef CONTAINER_ARR_TYPE
 #undef return_err
 }
 
 
 PyObject *yyjson_read_opts(const char *dat,
                            usize len
-                           //  yyjson_read_flag flg,
-                           //  const yyjson_alc *alc_ptr,
-                           //yyjson_read_err *err
 ) {
 
 #define return_err(_pos, _type, _msg)                               \

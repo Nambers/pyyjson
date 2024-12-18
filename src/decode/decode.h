@@ -6,56 +6,7 @@
 #define PYYJSON_STRING_TYPE_ASCII 0
 #define PYYJSON_STRING_TYPE_LATIN1 1
 #define PYYJSON_STRING_TYPE_UCS2 2
-#define PYYJSON_STRING_TYPE_UCS4 3
-
-#define PYYJSON_NUM_TYPE_FLOAT 0
-#define PYYJSON_NUM_TYPE_INT 1
-#define PYYJSON_NUM_TYPE_UINT 2
-// hot spot:
-// string -> float,int->array,dict->null,false,true. least: uint, nan, inf
-#define PYYJSON_NO_OP (0)
-#define PYYJSON_OP_STRING (1)
-#define PYYJSON_OP_NUMBER (2)
-#define PYYJSON_OP_CONTAINER (3)
-#define PYYJSON_OP_CONSTANTS (4)
-#define PYYJSON_OP_NAN_INF (5)
-// mask: 7 = (1 << 3) - 1, to cover 0~5
-#define PYYJSON_OP_MASK (7)
-// PYYJSON_OP_BITCOUNT_MAX = 3, to cover 0~5
-#define PYYJSON_OP_BITCOUNT_MAX (3)
-// higher start: 8
-#define PYYJSON_OP_HIGHER_START (1 << PYYJSON_OP_BITCOUNT_MAX)
-//string flags ~~
-#define PYYJSON_STRING_FLAG_ASCII (PYYJSON_STRING_TYPE_ASCII << PYYJSON_OP_BITCOUNT_MAX)
-#define PYYJSON_STRING_FLAG_LATIN1 (PYYJSON_STRING_TYPE_LATIN1 << PYYJSON_OP_BITCOUNT_MAX)
-#define PYYJSON_STRING_FLAG_UCS2 (PYYJSON_STRING_TYPE_UCS2 << PYYJSON_OP_BITCOUNT_MAX)
-#define PYYJSON_STRING_FLAG_UCS4 (PYYJSON_STRING_TYPE_UCS4 << PYYJSON_OP_BITCOUNT_MAX)
-#define PYYJSON_STRING_FLAG_UCS_TYPE_MASK (3 << PYYJSON_OP_BITCOUNT_MAX)
-// is key ~~
-#define PYYJSON_STRING_FLAG_OBJ_KEY (4 << PYYJSON_OP_BITCOUNT_MAX)
-// num flags ~~
-#define PYYJSON_NUM_FLAG_FLOAT (0 << PYYJSON_OP_BITCOUNT_MAX)
-#define PYYJSON_NUM_FLAG_INT (1 << PYYJSON_OP_BITCOUNT_MAX)
-// #define PYYJSON_NUM_FLAG_UINT (2 << PYYJSON_OP_BITCOUNT_MAX)
-#define PYYJSON_NUM_FLAG_MASK (3 << PYYJSON_OP_BITCOUNT_MAX)
-// container flags ~~
-#define PYYJSON_CONTAINER_FLAG_ARRAY (0 << PYYJSON_OP_BITCOUNT_MAX)
-#define PYYJSON_CONTAINER_FLAG_DICT (1 << PYYJSON_OP_BITCOUNT_MAX)
-#define PYYJSON_CONTAINER_FLAG_MASK (1 << PYYJSON_OP_BITCOUNT_MAX)
-// constants flags
-#define PYYJSON_CONSTANTS_FLAG_NULL (0 << PYYJSON_OP_BITCOUNT_MAX)
-#define PYYJSON_CONSTANTS_FLAG_FALSE (1 << PYYJSON_OP_BITCOUNT_MAX)
-#define PYYJSON_CONSTANTS_FLAG_TRUE (2 << PYYJSON_OP_BITCOUNT_MAX)
-#define PYYJSON_CONSTANTS_FLAG_MASK (3 << PYYJSON_OP_BITCOUNT_MAX)
-// nan inf flags
-#define PYYJSON_NAN_INF_FLAG_NAN (0 << PYYJSON_OP_BITCOUNT_MAX)
-#define PYYJSON_NAN_INF_FLAG_INF (1 << PYYJSON_OP_BITCOUNT_MAX)
-#define PYYJSON_NAN_INF_FLAG_SIGNED (2 << PYYJSON_OP_BITCOUNT_MAX)
-#define PYYJSON_NAN_INF_FLAG_MASK_WITHOUT_SIGNED (1 << PYYJSON_OP_BITCOUNT_MAX)
-//interpret flags
-#define PYYJSON_MATCH_FLAG(x) case ((x) >> PYYJSON_OP_BITCOUNT_MAX)
-#define PYYJSON_GET_FLAG(x, mask) (((x) & (mask)) >> PYYJSON_OP_BITCOUNT_MAX)
-// end flags
+#define PYYJSON_STRING_TYPE_UCS4 4
 
 
 /** 16/32/64-bit vector */
@@ -297,7 +248,6 @@ force_inline bool _read_true(u8 **ptr) {
     u8 *cur = (u8 *)*ptr;
     u8 **end = (u8 **)ptr;
     if (likely(byte_match_4(cur, "true"))) {
-        // val->tag = YYJSON_TYPE_BOOL | YYJSON_SUBTYPE_TRUE;
         *end = cur + 4;
         return true;
     }
@@ -309,7 +259,6 @@ force_inline bool _read_false(u8 **ptr) {
     u8 *cur = (u8 *)*ptr;
     u8 **end = (u8 **)ptr;
     if (likely(byte_match_4(cur + 1, "alse"))) {
-        // val->tag = YYJSON_TYPE_BOOL | YYJSON_SUBTYPE_FALSE;
         *end = cur + 5;
         return true;
     }
@@ -321,7 +270,6 @@ force_inline bool _read_null(u8 **ptr) {
     u8 *cur = (u8 *)*ptr;
     u8 **end = (u8 **)ptr;
     if (likely(byte_match_4(cur, "null"))) {
-        // val->tag = YYJSON_TYPE_NULL;
         *end = cur + 4;
         return true;
     }
@@ -346,16 +294,6 @@ force_inline bool _read_inf(bool sign, u8 **ptr) {
             cur += 3;
         }
         *end = cur;
-        // if (pre) {
-        //     /* add null-terminator for previous raw string */
-        //     if (*pre) **pre = '\0';
-        //     *pre = cur;
-        //     val->tag = ((u64)(cur - hdr) << YYJSON_TAG_BIT) | YYJSON_TYPE_RAW;
-        //     val->uni.str = (const char *)hdr;
-        // } else {
-        //     val->tag = YYJSON_TYPE_NUM | YYJSON_SUBTYPE_REAL;
-        //     val->uni.u64 = f64_raw_get_inf(sign);
-        // }
         return true;
     }
     return false;
@@ -371,16 +309,6 @@ force_inline bool _read_nan(bool sign, u8 **ptr) {
         (cur[2] == 'N' || cur[2] == 'n')) {
         cur += 3;
         *end = cur;
-        // if (pre) {
-        //     /* add null-terminator for previous raw string */
-        //     if (*pre) **pre = '\0';
-        //     *pre = cur;
-        //     val->tag = ((u64)(cur - hdr) << YYJSON_TAG_BIT) | YYJSON_TYPE_RAW;
-        //     val->uni.str = (const char *)hdr;
-        // } else {
-        //     val->tag = YYJSON_TYPE_NUM | YYJSON_SUBTYPE_REAL;
-        //     val->uni.u64 = f64_raw_get_nan(sign);
-        // }
         return true;
     }
     return false;
