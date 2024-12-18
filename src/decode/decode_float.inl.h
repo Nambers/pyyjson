@@ -1186,10 +1186,7 @@ read_double:
     if (unlikely(f >= HUGE_VAL || f <= -HUGE_VAL)) {
         return_inf();
     }
-    
-    // PYYJSON_WRITE_OP(op_float_final, PYYJSON_OP_NUMBER | PYYJSON_NUM_FLAG_FLOAT);
-    // *op = (pyyjson_op*)(op_float_final + 1);
-    // val->tag = YYJSON_TYPE_NUM | YYJSON_SUBTYPE_REAL;
+
     *end = cur;
     return pyyjson_decode_double(decode_obj_stack_info, f);
     return true;

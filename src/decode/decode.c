@@ -681,14 +681,6 @@ skip_ascii_end:
         // this is a fast path for ascii strings. directly copy the buffer to pyobject
         *ptr = src + 1;
         return pyyjson_decode_string(decode_obj_stack_info, src_start, src - src_start, PYYJSON_STRING_TYPE_ASCII, is_key);
-        // pyyjson_string_op* string_op =(pyyjson_string_op*) *op;
-        // PYYJSON_WRITE_OP(string_op, PYYJSON_OP_STRING | PYYJSON_STRING_FLAG_ASCII);
-        // string_op->data = (char *)src_start;
-        // string_op->len = src - src_start;
-        // *op = (pyyjson_op*)(string_op + 1);
-        // // buffer unchanged
-        // return true;
-        
     } else if(src != src_start){
         memcpy(temp_string_buf, src_start, src - src_start);
         len_ucs1 = src - src_start;
