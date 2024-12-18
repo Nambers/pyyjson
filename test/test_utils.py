@@ -62,7 +62,7 @@ def get_benchfiles_fullpath():
     )
 
     return sorted(
-        [os.path.join(benchmark_folder, f) for f in os.listdir(benchmark_folder)]
+        [os.path.join(benchmark_folder, f) for f in os.listdir(benchmark_folder) if f.endswith(".json")]
     )
 
 
