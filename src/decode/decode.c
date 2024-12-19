@@ -501,7 +501,7 @@ force_inline u32 read_b4_unicode(u32 uni) {
  @param msg The error message pointer.
  @return Whether success.
  */
-force_inline bool read_string(DecodeObjStackInfo *restrict decode_obj_stack_info, u8 **ptr, u8 *write_buffer, bool is_key) {
+force_inline PyObject* read_string(u8 **ptr, u8 *write_buffer, bool is_key) {
     /*
      Each unicode code point is encoded as 1 to 4 bytes in UTF-8 encoding,
      we use 4-byte mask and pattern value to validate UTF-8 byte sequence,
@@ -601,14 +601,8 @@ force_inline bool read_string(DecodeObjStackInfo *restrict decode_obj_stack_info
 #define return_err(_end, _msg)                                                        \
     do {                                                                              \
         PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, _end - src_start); \
-        return false;                                                                 \
+        return NULL;                                                                 \
     } while (0)
-
-    // #define return_err(_end, _msg) do { \
-//     *msg = _msg; \
-//     *end = _end; \
-//     goto failed; \
-// } while (false)
 
     u8 *cur = (u8 *)*ptr;
     // u8 **end = (u8 **)ptr;
@@ -678,7 +672,7 @@ skip_ascii_end:
         /* modified BEGIN */
         // this is a fast path for ascii strings. directly copy the buffer to pyobject
         *ptr = src + 1;
-        return pyyjson_decode_string(decode_obj_stack_info, src_start, src - src_start, PYYJSON_STRING_TYPE_ASCII, is_key);
+        return make_string(src_start, src - src_start, PYYJSON_STRING_TYPE_ASCII, is_key);
     } else if(src != src_start){
         memcpy(temp_string_buf, src_start, src - src_start);
         len_ucs1 = src - src_start;
@@ -1468,7 +1462,7 @@ read_finalize:
             *start-- = *ucs1_back--;
             len_ucs1--;
         }
-        return pyyjson_decode_string(decode_obj_stack_info, temp_string_buf, dst_ucs4 - (u32*)temp_string_buf, PYYJSON_STRING_TYPE_UCS4, is_key);
+        return make_string(temp_string_buf, dst_ucs4 - (u32*)temp_string_buf, PYYJSON_STRING_TYPE_UCS4, is_key);
     } else if (unlikely(cur_max_ucs_size==2)) {
         u16* start = (u16*)temp_string_buf + len_ucs1 - 1;
         u8* ucs1_back = (u8*)temp_string_buf + len_ucs1 - 1;
@@ -1476,9 +1470,9 @@ read_finalize:
             *start-- = *ucs1_back--;
             len_ucs1--;
         }
-        return pyyjson_decode_string(decode_obj_stack_info, temp_string_buf, dst_ucs2 - (u16*)temp_string_buf, PYYJSON_STRING_TYPE_UCS2, is_key);
+        return make_string(temp_string_buf, dst_ucs2 - (u16*)temp_string_buf, PYYJSON_STRING_TYPE_UCS2, is_key);
     } else {
-        return pyyjson_decode_string(decode_obj_stack_info, temp_string_buf, dst - (u8*)temp_string_buf, is_ascii?PYYJSON_STRING_TYPE_ASCII:PYYJSON_STRING_TYPE_LATIN1, is_key);
+        return make_string(temp_string_buf, dst - (u8*)temp_string_buf, is_ascii?PYYJSON_STRING_TYPE_ASCII:PYYJSON_STRING_TYPE_LATIN1, is_key);
     }
 
 #undef return_err
@@ -1502,6 +1496,7 @@ read_finalize:
 //         goto failed_cleanup;                                                                        \
 //     } while (0)
 
+//     u8* cur = (u8*)dat;
 // // #define return_err(_pos, _code, _msg) do { \
 // //     err->pos = (usize)(_pos - hdr); \
 // //         err->code = YYJSON_READ_ERROR_##_code; \
@@ -1535,11 +1530,13 @@ read_finalize:
 //     // pre = raw ? &raw_end : NULL;
     
 //     if (char_is_number(*cur)) {
-//         if (likely(read_number(&cur, pre, flg, val, &msg))) goto doc_end;
+//         PyObject *number_obj = read_number(&cur);
+//         if (likely(number_obj)) return number_obj;
 //         goto fail_number;
 //     }
 //     if (*cur == '"') {
-//         if (likely(read_string(&cur, end, inv, val, &msg))) goto doc_end;
+//         PyObject* str_obj = read_string(&cur, end, inv, val, &msg);
+//         if (likely(str_obj)) return str_obj;
 //         goto fail_string;
 //     }
 //     if (*cur == 't') {
@@ -1693,7 +1690,8 @@ arr_val_begin:
         goto fail_number;
     }
     if (*cur == '"') {
-        if (likely(read_string(decode_obj_stack_info, &cur, string_buffer_head, false))) {
+        PyObject* str_obj = read_string(&cur, string_buffer_head, false);
+        if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
         }
@@ -1804,7 +1802,8 @@ obj_key_begin:
     })
 #endif
         if (likely(*cur == '"')) {
-            if (likely(read_string(decode_obj_stack_info, &cur, string_buffer_head, true))) {
+            PyObject* str_obj = read_string(&cur, string_buffer_head, true);
+            if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
                 goto obj_key_end;
             }
             goto fail_string;
@@ -1839,7 +1838,8 @@ obj_key_end:
 
 obj_val_begin:
     if (*cur == '"') {
-        if (likely(read_string(decode_obj_stack_info, &cur, string_buffer_head, false))) {
+        PyObject* str_obj = read_string(&cur, string_buffer_head, false);
+        if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
         }
