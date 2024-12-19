@@ -13,7 +13,13 @@ class TestDecode(unittest.TestCase):
         import pyyjson
 
         test_cases = {
-            ValueError: ["0xf", '{"a":}', "[1,2,3", '"111"]', '{"a": 1 2}'],
+            ValueError: [
+                "0xf",
+                '{"a":}',
+                "[1,2,3",
+                '"111"]',
+                '{"a": 1 2}'
+            ],
             # OverflowError: ["1e500"]
         }
         for err, cases in test_cases.items():
@@ -59,20 +65,20 @@ class TestDecode(unittest.TestCase):
         import pyyjson
 
         test_cases_origin = [
-            # True,
-            # False,
-            # None,
-            # 1,
-            # -1,
-            # 2.3,
-            # -2.3,
-            # 321321432.231543245,
-            # -321321432.231543245,
-            # "abc",
-            # math.inf,
-            # -math.inf,
-            # math.nan,
-            # math.pi,
+            True,
+            False,
+            None,
+            1,
+            -1,
+            2.3,
+            -2.3,
+            321321432.231543245,
+            -321321432.231543245,
+            "abc",
+            math.inf,
+            -math.inf,
+            math.nan,
+            math.pi,
             [],
             {},
             tuple(),
