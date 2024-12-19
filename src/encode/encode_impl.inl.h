@@ -673,7 +673,10 @@ PYYJSON_DUMPS_OBJ(
     switch (jump_flag) {
 #if COMPILE_UCS_LEVEL == 1
         case JumpFlag_Elevate1_ArrVal: {
-            goto arr_val_begin;
+            if (PyList_CheckExact(stack_vars->cur_obj))
+                goto arr_val_begin;
+            else
+                goto tuple_val_begin;
             break;
         }
         case JumpFlag_Elevate1_ObjVal: {
@@ -686,7 +689,10 @@ PYYJSON_DUMPS_OBJ(
         }
 #elif COMPILE_UCS_LEVEL == 2
         case JumpFlag_Elevate2_ArrVal: {
-            goto arr_val_begin;
+            if (PyList_CheckExact(stack_vars->cur_obj))
+                goto arr_val_begin;
+            else
+                goto tuple_val_begin;
             break;
         }
         case JumpFlag_Elevate2_ObjVal: {
@@ -699,7 +705,10 @@ PYYJSON_DUMPS_OBJ(
         }
 #elif COMPILE_UCS_LEVEL == 4
         case JumpFlag_Elevate4_ArrVal: {
-            goto arr_val_begin;
+            if (PyList_CheckExact(stack_vars->cur_obj))
+                goto arr_val_begin;
+            else
+                goto tuple_val_begin;
             break;
         }
         case JumpFlag_Elevate4_ObjVal: {

@@ -1553,27 +1553,6 @@ single_end:
         if (unlikely(cur < end)) goto fail_garbage;
     }
     return ret;
-    //     /* check invalid contents after json document */
-    //     if (unlikely(cur < end) && !has_read_flag(STOP_WHEN_DONE)) {
-    //         if (has_read_flag(ALLOW_COMMENTS)) {
-    //             if (!skip_spaces_and_comments(&cur)) {
-    //                 if (byte_match_2(cur, "/*")) goto fail_comment;
-    //             }
-    //         } else {
-    //             while (char_is_space(*cur)) cur++;
-    //         }
-    //         if (unlikely(cur < end)) goto fail_garbage;
-    //     }
-
-    //     if (pre && *pre) **pre = '\0';
-    //     doc = (yyjson_doc *)val_hdr;
-    //     doc->root = val_hdr + hdr_len;
-    //     doc->alc = alc;
-    //     doc->dat_read = (usize)(cur - hdr);
-    //     doc->val_read = 1;
-    //     doc->str_pool = has_read_flag(INSITU) ? NULL : (char *)hdr;
-    //     return doc;
-    Py_UNREACHABLE();
 
 fail_string:
     return_err(cur, JSONDecodeError, "invalid string");
