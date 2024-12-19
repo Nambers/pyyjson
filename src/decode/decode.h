@@ -314,15 +314,25 @@ force_inline bool _read_nan(bool sign, u8 **ptr) {
     return false;
 }
 
+// force_inline bool read_inf_or_nan(DecodeObjStackInfo *decode_obj_stack_info, bool sign, u8 **ptr) {
+//     if (_read_inf(sign, ptr)) {
+//         return pyyjson_decode_inf(decode_obj_stack_info, sign);
+//     }
+//     if (_read_nan(sign, ptr)) {
+//         return pyyjson_decode_nan(decode_obj_stack_info, sign);
+//     }
+//     return false;
+// }
+
 /** Read 'Inf', 'Infinity' or 'NaN' literal (ignoring case). */
-force_inline bool read_inf_or_nan(DecodeObjStackInfo *decode_obj_stack_info, bool sign, u8 **ptr) {
+force_inline PyObject* read_inf_or_nan(bool sign, u8 **ptr) {
     if (_read_inf(sign, ptr)) {
-        return pyyjson_decode_inf(decode_obj_stack_info, sign);
+        return PyFloat_FromDouble(sign ? -fabs(Py_HUGE_VAL) : fabs(Py_HUGE_VAL));//pyyjson_decode_inf(decode_obj_stack_info, sign);
     }
     if (_read_nan(sign, ptr)) {
-        return pyyjson_decode_nan(decode_obj_stack_info, sign);
+        return PyFloat_FromDouble(sign ? -fabs(Py_NAN) : fabs(Py_NAN));//pyyjson_decode_nan(decode_obj_stack_info, sign);
     }
-    return false;
+    return NULL;
 }
 
 

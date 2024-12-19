@@ -18,7 +18,7 @@ typedef PyObject *pyyjson_cache_type;
 
 extern pyyjson_cache_type AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
 
-PyObject *yyjson_read_opts(const char *dat, size_t len);
+PyObject *yyjson_read_opts(const char *dat, Py_ssize_t len);
 // bool is_lzcnt_supported(void);
 
 PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject *kwargs);
@@ -154,7 +154,7 @@ PyMODINIT_FUNC PyInit_pyyjson(void) {
 
 PyObject *pyyjson_Decode(PyObject *self, PyObject *args, PyObject *kwargs) {
     const char *string = NULL;
-    size_t len = 0;
+    Py_ssize_t len = 0;
     static const char *kwlist[] = {"s", NULL};
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#", (char **) kwlist, &string, &len)) {
         PyErr_SetString(PyExc_TypeError, "Invalid argument");

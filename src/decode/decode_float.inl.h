@@ -428,33 +428,33 @@ static const f64 f64_pow10_table[] = {
     number is infinite, the return value is based on flag.
  3. This function (with inline attribute) may generate a lot of instructions.
  */
-force_inline bool read_number(DecodeObjStackInfo *decode_obj_stack_info, u8 **ptr) {
+force_inline PyObject* read_number(u8 **ptr) {
 
 #define return_err(_end, _msg)                                                  \
     do {                                                                        \
         PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, _end - hdr); \
-        return false;                                                           \
+        return NULL;                                                           \
     } while (0)
 
 #define return_0() do { \
     *end = cur; \
-    return pyyjson_decode_longlong(decode_obj_stack_info, 0); \
+    return PyLong_FromLongLong(0); \
 } while (false)
 
 #define return_i64(_v) do { \
     *end = cur; \
-    return pyyjson_decode_longlong(decode_obj_stack_info, (i64)(sign ? (u64)(~(_v) + 1) : (u64)(_v))); \
+    return PyLong_FromLongLong((i64)(sign ? (u64)(~(_v) + 1) : (u64)(_v))); \
 } while (false)
 
 #define return_f64(_v) do { \
     *end = cur; \
-    return pyyjson_decode_double(decode_obj_stack_info, sign ? -(f64)(_v) : (f64)(_v)); \
+    return PyFloat_FromDouble(sign ? -(f64)(_v) : (f64)(_v)); \
 } while (false)
 
 #define return_f64_bin(_v) do { \
     *end = cur; \
     u64 temp = ((u64)sign << 63) | (u64)(_v); \
-    return pyyjson_decode_double(decode_obj_stack_info, *(double *)&temp); \
+    return PyFloat_FromDouble(*(double *)&temp); \
 } while (false)
 
 #define return_inf() do { \
@@ -491,15 +491,16 @@ force_inline bool read_number(DecodeObjStackInfo *decode_obj_stack_info, u8 **pt
     if (unlikely(!digi_is_nonzero(*cur))) { /* 0 or non-digit char */
         if (unlikely(*cur != '0')) { /* non-digit char */
             //if (has_read_flag(ALLOW_INF_AND_NAN)) {
-            if (read_inf_or_nan(decode_obj_stack_info, sign, &cur)) {
+            PyObject* number_obj = read_inf_or_nan(sign, &cur);
+            if (likely(number_obj)) {
                 *end = cur;
-                return true;
+                return number_obj;
             }
             //}
             if(unlikely(!PyErr_Occurred())){
                 return_err(cur, "no digit after minus sign");
             }
-            return false;
+            return NULL;
         }
         /* begin with 0 */
         if (likely(!digi_is_digit_or_fp(*++cur))) return_0();
@@ -1027,33 +1028,33 @@ digi_finish:
  This is a fallback function if the custom number reader is disabled.
  This function use libc's strtod() to read floating-point number.
  */
-force_inline bool read_number(DecodeObjStackInfo *decode_obj_stack_info, u8 **ptr) {
+force_inline PyObject* read_number(u8 **ptr) {
 
 #define return_err(_end, _msg)                                                  \
     do {                                                                        \
         PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, _end - hdr); \
-        return false;                                                           \
+        return NULL;                                                           \
     } while (0)
 
 #define return_0() do { \
     *end = cur; \
-    return pyyjson_decode_longlong(decode_obj_stack_info, 0); \
+    return PyLong_FromLongLong(0); \
 } while (false)
 
 #define return_i64(_v) do { \
     *end = cur; \
-    return pyyjson_decode_longlong(decode_obj_stack_info, (i64)(sign ? (u64)(~(_v) + 1) : (u64)(_v))); \
+    return PyLong_FromLongLong((i64)(sign ? (u64)(~(_v) + 1) : (u64)(_v))); \
 } while (false)
 
 #define return_f64(_v) do { \
     *end = cur; \
-    return pyyjson_decode_double(decode_obj_stack_info, sign ? -(f64)(_v) : (f64)(_v)); \
+    return PyFloat_FromDouble(sign ? -(f64)(_v) : (f64)(_v)); \
 } while (false)
 
 #define return_f64_bin(_v) do { \
     *end = cur; \
     u64 temp = ((u64)sign << 63) | (u64)(_v); \
-    return pyyjson_decode_double(decode_obj_stack_info, *(double *)&temp); \
+    return PyFloat_FromDouble(*(double *)&temp); \
 } while (false)
 
 #define return_inf() do { \
@@ -1075,15 +1076,16 @@ force_inline bool read_number(DecodeObjStackInfo *decode_obj_stack_info, u8 **pt
     /* read first digit, check leading zero */
     if (unlikely(!digi_is_digit(*cur))) {
         // if (has_read_flag(ALLOW_INF_AND_NAN)) {
-        if (read_inf_or_nan(decode_obj_stack_info, sign, &cur)) {
+        PyObject* number_obj = read_inf_or_nan(sign, &cur);
+        if (likely(number_obj)) {
             *end = cur;
-            return true;
+            return number_obj;
         }
         // }
         if(unlikely(!PyErr_Occurred())){
             return_err(cur, "no digit after minus sign");
         }
-        return false;
+        return NULL;
     }
     if (*cur == '0') {
         cur++;
@@ -1188,8 +1190,7 @@ read_double:
     }
 
     *end = cur;
-    return pyyjson_decode_double(decode_obj_stack_info, f);
-    return true;
+    return PyFloat_FromDouble(f);
     
 #undef return_err
 #undef return_0

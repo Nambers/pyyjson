@@ -375,16 +375,14 @@ force_inline bool pyyjson_decode_true(DecodeObjStackInfo *restrict decode_obj_st
 
 force_inline bool pyyjson_decode_nan(DecodeObjStackInfo *restrict decode_obj_stack_info, bool is_signed) {
     PYYJSON_TRACE_OP(PYYJSON_OP_NAN_INF);
-    double val = is_signed ? -fabs(Py_NAN) : fabs(Py_NAN);
-    PyObject *o = PyFloat_FromDouble(val);
+    PyObject *o = PyFloat_FromDouble(is_signed ? -fabs(Py_NAN) : fabs(Py_NAN));
     RETURN_ON_UNLIKELY_ERR(!o);
     return pyyjson_push_obj(decode_obj_stack_info, o);
 }
 
 force_inline bool pyyjson_decode_inf(DecodeObjStackInfo *restrict decode_obj_stack_info, bool is_signed) {
     PYYJSON_TRACE_OP(PYYJSON_OP_NAN_INF);
-    double val = is_signed ? -fabs(Py_HUGE_VAL) : fabs(Py_HUGE_VAL);
-    PyObject *o = PyFloat_FromDouble(val);
+    PyObject *o = PyFloat_FromDouble(is_signed ? -fabs(Py_HUGE_VAL) : fabs(Py_HUGE_VAL));
     RETURN_ON_UNLIKELY_ERR(!o);
     return pyyjson_push_obj(decode_obj_stack_info, o);
 }
@@ -1492,6 +1490,131 @@ read_finalize:
 
 
 
+// /** Read single value JSON document. */
+// force_noinline PyObject *read_root_single(const char *dat, usize len) {
+// #define return_err(_pos, _type, _msg)                                                               \
+//     do {                                                                                            \
+//         if (_type == JSONDecodeError) {                                                             \
+//             PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, ((u8 *) _pos) - (u8 *) dat); \
+//         } else {                                                                                    \
+//             PyErr_SetString(_type, _msg);                                                           \
+//         }                                                                                           \
+//         goto failed_cleanup;                                                                        \
+//     } while (0)
+
+// // #define return_err(_pos, _code, _msg) do { \
+// //     err->pos = (usize)(_pos - hdr); \
+// //         err->code = YYJSON_READ_ERROR_##_code; \
+// //         err->msg = _msg; \
+// //     if (val_hdr) alc.free(alc.ctx, (void *)val_hdr); \
+// //     return NULL; \
+// // } while (false)
+    
+//     // usize hdr_len; /* value count used by doc */
+//     // usize alc_num; /* value count capacity */
+//     // yyjson_val *val_hdr; /* the head of allocated values */
+//     // yyjson_val *val; /* current value */
+//     // yyjson_doc *doc; /* the JSON document, equals to val_hdr */
+//     // const char *msg; /* error message */
+    
+//     // bool raw; /* read number as raw */
+//     // bool inv; /* allow invalid unicode */
+//     // u8 *raw_end; /* raw end for null-terminator */
+//     // u8 **pre; /* previous raw end pointer */
+    
+//     // hdr_len = sizeof(yyjson_doc) / sizeof(yyjson_val);
+//     // hdr_len += (sizeof(yyjson_doc) % sizeof(yyjson_val)) > 0;
+//     // alc_num = hdr_len + 1; /* single value */
+    
+//     // val_hdr = (yyjson_val *)alc.malloc(alc.ctx, alc_num * sizeof(yyjson_val));
+//     // if (unlikely(!val_hdr)) goto fail_alloc;
+//     // val = val_hdr + hdr_len;
+//     // raw = has_read_flag(NUMBER_AS_RAW) || has_read_flag(BIGNUM_AS_RAW);
+//     // inv = has_read_flag(ALLOW_INVALID_UNICODE) != 0;
+//     // raw_end = NULL;
+//     // pre = raw ? &raw_end : NULL;
+    
+//     if (char_is_number(*cur)) {
+//         if (likely(read_number(&cur, pre, flg, val, &msg))) goto doc_end;
+//         goto fail_number;
+//     }
+//     if (*cur == '"') {
+//         if (likely(read_string(&cur, end, inv, val, &msg))) goto doc_end;
+//         goto fail_string;
+//     }
+//     if (*cur == 't') {
+//         if (likely(read_true(&cur, val))) goto doc_end;
+//         goto fail_literal_true;
+//     }
+//     if (*cur == 'f') {
+//         if (likely(read_false(&cur, val))) goto doc_end;
+//         goto fail_literal_false;
+//     }
+//     if (*cur == 'n') {
+//         if (likely(read_null(&cur, val))) goto doc_end;
+//         if (has_read_flag(ALLOW_INF_AND_NAN)) {
+//             if (read_nan(false, &cur, pre, val)) goto doc_end;
+//         }
+//         goto fail_literal_null;
+//     }
+//     if (has_read_flag(ALLOW_INF_AND_NAN)) {
+//         if (read_inf_or_nan(false, &cur, pre, val)) goto doc_end;
+//     }
+//     goto fail_character;
+    
+// doc_end:
+//     /* check invalid contents after json document */
+//     if (unlikely(cur < end) && !has_read_flag(STOP_WHEN_DONE)) {
+//         if (has_read_flag(ALLOW_COMMENTS)) {
+//             if (!skip_spaces_and_comments(&cur)) {
+//                 if (byte_match_2(cur, "/*")) goto fail_comment;
+//             }
+//         } else {
+//             while (char_is_space(*cur)) cur++;
+//         }
+//         if (unlikely(cur < end)) goto fail_garbage;
+//     }
+    
+//     if (pre && *pre) **pre = '\0';
+//     doc = (yyjson_doc *)val_hdr;
+//     doc->root = val_hdr + hdr_len;
+//     doc->alc = alc;
+//     doc->dat_read = (usize)(cur - hdr);
+//     doc->val_read = 1;
+//     doc->str_pool = has_read_flag(INSITU) ? NULL : (char *)hdr;
+//     return doc;
+    
+// fail_string:
+//     return_err(cur, INVALID_STRING, msg);
+// fail_number:
+//     return_err(cur, INVALID_NUMBER, msg);
+// fail_alloc:
+//     return_err(cur, MEMORY_ALLOCATION, 
+//                "memory allocation failed");
+// fail_literal_true:
+//     return_err(cur, LITERAL, 
+//                "invalid literal, expected a valid literal such as 'true'");
+// fail_literal_false:
+//     return_err(cur, LITERAL, 
+//                "invalid literal, expected a valid literal such as 'false'");
+// fail_literal_null:
+//     return_err(cur, LITERAL, 
+//                "invalid literal, expected a valid literal such as 'null'");
+// fail_character:
+//     return_err(cur, UNEXPECTED_CHARACTER, 
+//                "unexpected character, expected a valid root value");
+// fail_comment:
+//     return_err(cur, INVALID_COMMENT,
+//                "unclosed multiline comment");
+// fail_garbage:
+//     return_err(cur, UNEXPECTED_CONTENT, 
+//                "unexpected content after document");
+    
+// #undef return_err
+// }
+
+
+
 /** Read JSON document (accept all style, but optimized for pretty). */
 force_inline PyObject *read_root_pretty(const char *dat, usize len) {
 
@@ -1562,7 +1685,8 @@ arr_val_begin:
         goto arr_begin;
     }
     if (char_is_number(*cur)) {
-        if (likely(read_number(decode_obj_stack_info, &cur))) {
+        PyObject* number_obj = read_number(&cur);
+        if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
         }
@@ -1612,7 +1736,8 @@ arr_val_begin:
         goto arr_val_begin;
     }
     if ((*cur == 'i' || *cur == 'I' || *cur == 'N')) {
-        if (read_inf_or_nan(decode_obj_stack_info, false, &cur)) {
+        PyObject* number_obj = read_inf_or_nan(false, &cur);
+        if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
         }
@@ -1721,7 +1846,8 @@ obj_val_begin:
         goto fail_string;
     }
     if (char_is_number(*cur)) {
-        if (likely(read_number(decode_obj_stack_info, &cur))) {
+        PyObject* number_obj = read_number(&cur);
+        if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
         }
@@ -1766,7 +1892,8 @@ obj_val_begin:
         goto obj_val_begin;
     }
     if ((*cur == 'i' || *cur == 'I' || *cur == 'N')) {
-        if (read_inf_or_nan(decode_obj_stack_info, false, &cur)) {
+        PyObject* number_obj = read_inf_or_nan(false, &cur);
+        if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
         }
@@ -1908,7 +2035,7 @@ failed_cleanup:
 
 
 PyObject *yyjson_read_opts(const char *dat,
-                           usize len
+                           Py_ssize_t len
 ) {
 
 #define return_err(_pos, _type, _msg)                               \
@@ -1947,17 +2074,18 @@ PyObject *yyjson_read_opts(const char *dat,
     }
 
     /* read json document */
-    obj = read_root_pretty(dat, len);
+    // obj = read_root_pretty(dat, len);
     // TODO
-    // if (likely(char_is_container(*dat))) {
-    //     if (char_is_space(dat[1]) && char_is_space(dat[2])) {
-    //         obj = read_root_pretty(dat, len);
-    //     } else {
-    //         obj = read_root_minify(dat, len);
-    //     }
-    // } else {
-    //     obj = read_root_single(dat, len);
-    // }
+    if (likely(char_is_container(*dat))) {
+        if (char_is_space(dat[1]) && char_is_space(dat[2])) {
+            obj = read_root_pretty(dat, len);
+        } else {
+            obj = read_root_pretty(dat, len);
+            // obj = read_root_minify(dat, len);
+        }
+    } else {
+        obj = NULL;//read_root_single(dat, len);
+    }
 
     /* check result */
     // if (likely(obj)) {
