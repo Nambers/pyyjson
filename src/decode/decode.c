@@ -1757,7 +1757,7 @@ arr_end:
 
 obj_begin:
     /* push container */
-    ctn_grow_check(decode_ctn_info);
+    if(unlikely(!ctn_grow_check(decode_ctn_info))) goto fail_ctn_grow;
     set_decode_ctn(decode_ctn_info->ctn, 0, false);
     if (*cur == '\n') cur++;
 
