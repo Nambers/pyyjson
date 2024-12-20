@@ -1508,19 +1508,14 @@ force_noinline PyObject *read_root_single(const char *dat, usize len) {
     if (*cur == '"') {
         u8 *write_buffer;
         bool dynamic = false;
-        Py_ssize_t dym_size;
-        if (unlikely(5 * len > PYYJSON_STRING_BUFFER_SIZE)) {
-            dym_size = 5 * len;
-            write_buffer = malloc(5 * len);
+        if (unlikely(4 * len > PYYJSON_STRING_BUFFER_SIZE)) {
+            write_buffer = malloc(4 * len);
             if (unlikely(!write_buffer)) goto fail_alloc;
             dynamic = true;
         } else {
-            dym_size = PYYJSON_STRING_BUFFER_SIZE;
             write_buffer = pyyjson_string_buffer;
         }
-        u8* old_cur = cur;
         ret = read_string(&cur, write_buffer, false);
-        assert(PyUnicode_GET_LENGTH(ret) * PyUnicode_KIND(ret) <= dym_size);
         if (dynamic) free(write_buffer);
         if (likely(ret)) goto single_end;
         goto fail_string;
