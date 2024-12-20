@@ -2,8 +2,8 @@
 #include "simd/cvt.h"
 #include "simd/simd_detect.h"
 #include "simd/simd_impl.h"
-#include "unicode/uvector.h"
 #include "tls.h"
+#include "unicode/uvector.h"
 
 
 typedef enum EncodeValJumpFlag {
@@ -45,8 +45,6 @@ typedef struct UnicodeInfo {
     Py_ssize_t u32_size;
     int cur_ucs_type;
 } UnicodeInfo;
-
-
 
 
 typedef struct EncodeStackVars {
@@ -229,7 +227,6 @@ force_inline PyFastTypes fast_type_check(PyObject *val) {
 }
 
 
-
 #define TAIL_PADDING (512 / 8)
 
 
@@ -274,12 +271,13 @@ force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {
     Py_ssize_t len = PyUnicode_GET_LENGTH(unicode);
     int unicode_kind = PyUnicode_KIND(unicode);
     bool is_ascii = PyUnicode_IS_ASCII(unicode);
+    Py_ssize_t offset;
     if (is_ascii) {
-        U8_WRITER(vec) = (u8 *) (((PyASCIIObject *) vec) + 1);
+        offset = sizeof(PyASCIIObject);
     } else {
-        U8_WRITER(vec) = (u8 *) (((PyCompactUnicodeObject *) vec) + 1);
+        offset = sizeof(PyCompactUnicodeObject);
     }
-    void *write_start = (void *) U8_WRITER(vec);
+    U8_WRITER(vec) = ((u8 *) vec) + offset;
     vec->head.write_end = (void *) (((u8 *) vec) + PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
     bool success;
     switch (unicode_kind) {
@@ -308,7 +306,7 @@ force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {
         PyObject_Free(vec);
         return NULL;
     }
-    Py_ssize_t written_len = (Py_ssize_t) U8_WRITER(vec) - (Py_ssize_t) write_start;
+    Py_ssize_t written_len = (Py_ssize_t) U8_WRITER(vec) - (Py_ssize_t) vec - offset;
     written_len /= unicode_kind;
     assert(written_len >= 2);
     success = vector_resize_to_fit(&vec, written_len, is_ascii ? 0 : unicode_kind);
