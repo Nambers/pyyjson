@@ -1035,7 +1035,8 @@ copy_utf8_inner_ucs1:
                     *dst++ = (u8)to_write;
                     // move src and load
                     src += 2;
-                    break;
+                    // still ascii, no need goto
+                    uni = byte_load_4(src);
                 }
                 // code point: [U+0080, U+07FF], latin1 or ucs2
                 // byte_copy_2(dst, &uni);
