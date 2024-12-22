@@ -291,7 +291,7 @@ force_inline void bigint_set_u64(bigint *big, u64 val) {
 
 /** Set a bigint with floating point number string. */
 static force_noinline void bigint_set_buf(bigint *big, u64 sig, i32 *exp,
-                                    u8 *sig_cut, u8 *sig_end, u8 *dot_pos) {
+                                    const u8 *sig_cut, const u8 *sig_end, const u8 *dot_pos) {
     
     if (unlikely(!sig_cut)) {
         /* no digit cut, set significant part only */
@@ -300,8 +300,8 @@ static force_noinline void bigint_set_buf(bigint *big, u64 sig, i32 *exp,
         
     } else {
         /* some digits were cut, read them from 'sig_cut' to 'sig_end' */
-        u8 *hdr = sig_cut;
-        u8 *cur = hdr;
+        const u8 *hdr = sig_cut;
+        const u8 *cur = hdr;
         u32 len = 0;
         u64 val = 0;
         bool dig_big_cut = false;
@@ -428,7 +428,7 @@ static const f64 f64_pow10_table[] = {
     number is infinite, the return value is based on flag.
  3. This function (with inline attribute) may generate a lot of instructions.
  */
-force_inline PyObject* read_number(u8 **ptr) {
+force_inline PyObject* read_number(const u8 **ptr) {
 
 #define return_err(_end, _msg)                                                  \
     do {                                                                        \
@@ -461,9 +461,9 @@ force_inline PyObject* read_number(u8 **ptr) {
     return_f64_bin(F64_RAW_INF); \
 } while (false)
 
-    u8 *sig_cut = NULL; /* significant part cutting position for long number */
-    u8 *sig_end = NULL; /* significant part ending position */
-    u8 *dot_pos = NULL; /* decimal point position */
+    const u8 *sig_cut = NULL; /* significant part cutting position for long number */
+    const u8 *sig_end = NULL; /* significant part ending position */
+    const u8 *dot_pos = NULL; /* decimal point position */
     
     u64 sig = 0; /* significant part of the number */
     i32 exp = 0; /* exponent part of the number */
@@ -472,11 +472,11 @@ force_inline PyObject* read_number(u8 **ptr) {
     i64 exp_sig = 0; /* temporary exponent number from significant part */
     i64 exp_lit = 0; /* temporary exponent number from exponent literal part */
     u64 num; /* temporary number for reading */
-    u8 *tmp; /* temporary cursor for reading */
+    const u8 *tmp; /* temporary cursor for reading */
     
-    u8 *hdr = (u8 *)*ptr;
-    u8 *cur = (u8 *)*ptr;
-    u8 **end = (u8 **)ptr;
+    const u8 *hdr = *ptr;
+    const u8 *cur = *ptr;
+    const u8 **end = ptr;
     bool sign;
     
     /* read number as raw string if has `YYJSON_READ_NUMBER_AS_RAW` flag */
@@ -1028,7 +1028,7 @@ digi_finish:
  This is a fallback function if the custom number reader is disabled.
  This function use libc's strtod() to read floating-point number.
  */
-force_inline PyObject* read_number(u8 **ptr) {
+force_inline PyObject* read_number(const u8 **ptr) {
 
 #define return_err(_end, _msg)                                                  \
     do {                                                                        \
@@ -1062,11 +1062,11 @@ force_inline PyObject* read_number(u8 **ptr) {
 } while (false)
 
     u64 sig, num;
-    u8 *hdr = *ptr;
-    u8 *cur = *ptr;
-    u8 **end = ptr;
-    u8 *dot = NULL;
-    u8 *f64_end = NULL;
+    const u8 *hdr = *ptr;
+    const u8 *cur = *ptr;
+    const u8 **end = ptr;
+    const u8 *dot = NULL;
+    const u8 *f64_end = NULL;
     bool sign;
     
     sign = (*hdr == '-');
@@ -1174,13 +1174,13 @@ read_double:
     if (unlikely(f64_end != cur)) {
         /* replace '.' with ',' for locale */
         bool cut = (*cur == ',');
-        if (cut) *cur = ' ';
-        if (dot) *dot = ',';
+        if (cut) *(u8*)cur = ' ';
+        if (dot) *(u8*)dot = ',';
         // op_float_final->data.
         f = strtod((const char *)hdr, (char **)&f64_end);
         /* restore ',' to '.' */
-        if (cut) *cur = ',';
-        if (dot) *dot = '.';
+        if (cut) *(u8*)cur = ',';
+        if (dot) *(u8*)dot = '.';
         if (unlikely(f64_end != cur)) {
             return_err(hdr, "strtod() failed to parse the number");
         }

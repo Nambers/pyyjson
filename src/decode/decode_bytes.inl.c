@@ -8,7 +8,7 @@
  @param msg The error message pointer.
  @return Whether success.
  */
-force_inline PyObject* read_bytes(u8 **ptr, u8 *write_buffer, bool is_key) {
+force_inline PyObject* read_bytes(const u8 **ptr, u8 *write_buffer, bool is_key) {
     /*
      Each unicode code point is encoded as 1 to 4 bytes in UTF-8 encoding,
      we use 4-byte mask and pattern value to validate UTF-8 byte sequence,
@@ -1014,8 +1014,8 @@ force_inline PyObject *read_bytes_root_pretty(const char *dat, usize len) {
         if (!string_buffer_head) goto fail_alloc;
     }
     //
-    u8 *cur = (u8 *) dat;
-    u8 *end = (u8 *) dat + len;
+    const u8 *cur = (const u8 *) dat;
+    const u8 *const end = (const u8 *) dat + len;
 
     if (*cur++ == '{') {
         set_decode_ctn(decode_ctn_info->ctn, 0, false);

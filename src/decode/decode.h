@@ -184,14 +184,14 @@ force_inline bool read_hex_u16(const u8 *cur, u16 *val) {
     return ((t0 | t1) & (u16)0xF0F0) == 0;
 }
 
-force_inline bool byte_match_2(void *buf, const char *pat) {
+force_inline bool byte_match_2(const void *buf, const char *pat) {
     v16_uni u1, u2;
     memcpy(&u1, buf, 2);
     memcpy(&u2, pat, 2);
     return u1.u == u2.u;
 }
 
-force_inline bool byte_match_4(void *buf, const char *pat) {
+force_inline bool byte_match_4(const void *buf, const char *pat) {
     v32_uni u1, u2;
     memcpy(&u1, buf, 4);
     memcpy(&u2, pat, 4);
@@ -244,7 +244,7 @@ force_inline bool pyyjson_decode_inf(DecodeObjStackInfo *restrict decode_obj_sta
 force_inline bool pyyjson_decode_nan(DecodeObjStackInfo *restrict decode_obj_stack_info, bool is_signed);
 
 /** Read 'true' literal, '*cur' should be 't'. */
-force_inline bool _read_true(u8 **ptr) {
+force_inline bool _read_true(const u8 **ptr) {
     u8 *cur = (u8 *)*ptr;
     u8 **end = (u8 **)ptr;
     if (likely(byte_match_4(cur, "true"))) {
@@ -255,7 +255,7 @@ force_inline bool _read_true(u8 **ptr) {
 }
 
 /** Read 'false' literal, '*cur' should be 'f'. */
-force_inline bool _read_false(u8 **ptr) {
+force_inline bool _read_false(const u8 **ptr) {
     u8 *cur = (u8 *)*ptr;
     u8 **end = (u8 **)ptr;
     if (likely(byte_match_4(cur + 1, "alse"))) {
@@ -266,7 +266,7 @@ force_inline bool _read_false(u8 **ptr) {
 }
 
 /** Read 'null' literal, '*cur' should be 'n'. */
-force_inline bool _read_null(u8 **ptr) {
+force_inline bool _read_null(const u8 **ptr) {
     u8 *cur = (u8 *)*ptr;
     u8 **end = (u8 **)ptr;
     if (likely(byte_match_4(cur, "null"))) {
@@ -277,7 +277,7 @@ force_inline bool _read_null(u8 **ptr) {
 }
 
 /** Read 'Inf' or 'Infinity' literal (ignoring case). */
-force_inline bool _read_inf(bool sign, u8 **ptr) {
+force_inline bool _read_inf(bool sign, const u8 **ptr) {
     u8 *hdr = (u8 *)(*ptr - sign);
     u8 *cur = (u8 *)*ptr;
     u8 **end = (u8 **)ptr;
@@ -300,7 +300,7 @@ force_inline bool _read_inf(bool sign, u8 **ptr) {
 }
 
 /** Read 'NaN' literal (ignoring case). */
-force_inline bool _read_nan(bool sign, u8 **ptr) {
+force_inline bool _read_nan(bool sign, const u8 **ptr) {
     u8 *hdr = (u8 *)(*ptr - sign);
     u8 *cur = (u8 *)*ptr;
     u8 **end = (u8 **)ptr;
@@ -325,7 +325,7 @@ force_inline bool _read_nan(bool sign, u8 **ptr) {
 // }
 
 /** Read 'Inf', 'Infinity' or 'NaN' literal (ignoring case). */
-force_inline PyObject* read_inf_or_nan(bool sign, u8 **ptr) {
+force_inline PyObject* read_inf_or_nan(bool sign, const u8 **ptr) {
     if (_read_inf(sign, ptr)) {
         return PyFloat_FromDouble(sign ? -fabs(Py_HUGE_VAL) : fabs(Py_HUGE_VAL));//pyyjson_decode_inf(decode_obj_stack_info, sign);
     }

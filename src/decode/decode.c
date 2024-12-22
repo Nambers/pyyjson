@@ -12,7 +12,7 @@
 
 thread_local u8 pyyjson_string_buffer[PYYJSON_STRING_BUFFER_SIZE];
 
-force_inline PyObject* read_bytes(u8 **ptr, u8 *write_buffer, bool is_key);
+force_inline PyObject* read_bytes(const u8 **ptr, u8 *write_buffer, bool is_key);
 force_inline PyObject *read_bytes_root_pretty(const char *dat, usize len);
 
 force_inline bool decode_ctn_is_arr(DecodeCtnWithSize*ctn){
@@ -506,8 +506,8 @@ force_noinline PyObject *read_root_single(const char *dat, usize len) {
         goto fail_cleanup;                                                                                \
     } while (0)
 
-    u8 *cur = (u8 *) dat;
-    u8 *const end = cur + len;
+    const u8 *cur = (const u8 *) dat;
+    const u8 *const end = cur + len;
 
     PyObject *ret = NULL;
 
