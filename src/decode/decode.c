@@ -129,18 +129,18 @@ force_inline void add_key_cache(pyyjson_hash_t hash, PyObject *obj) {
     AssociativeKeyCache[index] = obj;
 }
 
-force_inline PyObject *get_key_cache(const u8 *utf8_str, pyyjson_hash_t hash, size_t real_len) {
+force_inline PyObject *get_key_cache(const u8 *unicode_str, pyyjson_hash_t hash, size_t real_len) {
     assert(real_len <= 64);
     pyyjson_cache_type cache = AssociativeKeyCache[REHASHER(hash)];
     if (!cache) return NULL;
-    if (likely(((real_len == PyUnicode_GET_LENGTH(cache) * PyUnicode_KIND(cache))) && (memcmp(PyUnicode_DATA(cache), utf8_str, real_len) == 0))) {
+    if (likely(((real_len == PyUnicode_GET_LENGTH(cache) * PyUnicode_KIND(cache))) && (memcmp(PyUnicode_DATA(cache), unicode_str, real_len) == 0))) {
         PYYJSON_TRACE_CACHE_HIT();
         return cache;
     }
     return NULL;
 }
 
-force_inline PyObject *make_string(const u8 *utf8_str, Py_ssize_t len, int type_flag, bool is_key) {
+force_inline PyObject *make_string(const u8 *unicode_str, Py_ssize_t len, int type_flag, bool is_key) {
     PYYJSON_TRACE_STR_LEN(len);
     PyObject *obj;
     Py_UCS4 max_char;
@@ -176,8 +176,8 @@ force_inline PyObject *make_string(const u8 *utf8_str, Py_ssize_t len, int type_
     bool should_cache = (is_key && likely(real_len <= 64));
 
     if (should_cache) {
-        hash = XXH3_64bits(utf8_str, real_len);
-        obj = get_key_cache(utf8_str, hash, real_len);
+        hash = XXH3_64bits(unicode_str, real_len);
+        obj = get_key_cache(unicode_str, hash, real_len);
         if (obj) {
             Py_INCREF(obj);
             return obj;
@@ -186,7 +186,7 @@ force_inline PyObject *make_string(const u8 *utf8_str, Py_ssize_t len, int type_
 
     obj = PyUnicode_New(len, max_char);
     if (obj == NULL) return NULL;
-    memcpy(PyUnicode_DATA(obj), utf8_str, real_len);
+    memcpy(PyUnicode_DATA(obj), unicode_str, real_len);
     if (should_cache) {
         add_key_cache(hash, obj);
     }
@@ -196,7 +196,7 @@ success:
 #if PY_MINOR_VERSION >= 14
         ((PyASCIIObject *) obj)->hash = PyUnicode_Type.tp_hash(obj);
 #else
-        ((PyASCIIObject *) obj)->hash = _Py_HashBytes(utf8_str, real_len);
+        ((PyASCIIObject *) obj)->hash = _Py_HashBytes(unicode_str, real_len);
 #endif
     }
     return obj;
@@ -284,12 +284,12 @@ force_inline bool pyyjson_push_obj(DecodeObjStackInfo *restrict decode_obj_stack
     return true;
 }
 
-force_inline bool pyyjson_decode_string(DecodeObjStackInfo *restrict decode_obj_stack_info, const u8 *utf8_str, Py_ssize_t len, int type_flag, bool is_key) {
-    PYYJSON_TRACE_OP(PYYJSON_OP_STRING);
-    PyObject *new_val = make_string(utf8_str, len, type_flag, is_key);
-    RETURN_ON_UNLIKELY_ERR(!new_val);
-    return pyyjson_push_obj(decode_obj_stack_info, new_val);
-}
+// force_inline bool pyyjson_decode_string(DecodeObjStackInfo *restrict decode_obj_stack_info, const u8 *unicode_str, Py_ssize_t len, int type_flag, bool is_key) {
+//     PYYJSON_TRACE_OP(PYYJSON_OP_STRING);
+//     PyObject *new_val = make_string(unicode_str, len, type_flag, is_key);
+//     RETURN_ON_UNLIKELY_ERR(!new_val);
+//     return pyyjson_push_obj(decode_obj_stack_info, new_val);
+// }
 
 force_inline bool pyyjson_decode_double(DecodeObjStackInfo* restrict decode_obj_stack_info, double val) {
     PYYJSON_TRACE_OP(PYYJSON_OP_NUMBER);
