@@ -235,6 +235,13 @@
 
 #define PYYJSON_MAX(x, y) ((x) > (y) ? (x) : (y))
 
+/* String type macros */
+#define PYYJSON_STRING_TYPE_ASCII 0
+#define PYYJSON_STRING_TYPE_LATIN1 1
+#define PYYJSON_STRING_TYPE_UCS2 2
+#define PYYJSON_STRING_TYPE_UCS4 4
+
+
 /* IEEE 754 floating-point binary representation */
 #if defined(DOUBLE_IS_LITTLE_ENDIAN_IEEE754) || defined(DOUBLE_IS_BIG_ENDIAN_IEEE754) || defined(DOUBLE_IS_ARM_MIXED_ENDIAN_IEEE754)
 #   define PYYJSON_HAS_IEEE_754 1

@@ -3,11 +3,6 @@
 #include "pyyjson.h"
 #include <assert.h>
 
-#define PYYJSON_STRING_TYPE_ASCII 0
-#define PYYJSON_STRING_TYPE_LATIN1 1
-#define PYYJSON_STRING_TYPE_UCS2 2
-#define PYYJSON_STRING_TYPE_UCS4 4
-
 
 /** 16/32/64-bit vector */
 typedef struct v16 { char c[2]; } v16;
