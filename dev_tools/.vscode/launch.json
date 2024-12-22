@@ -8,7 +8,10 @@
             "program": "${file}",
             "python": "${workspaceFolder}/.nix-pyenv/bin/python",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/build"
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/build"
+            }
         },
         {
             "name": "(gdb) Launch",
@@ -22,8 +25,13 @@
                 "/build": "${workspaceFolder}/debug_source"
             },
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/build",
-            "environment": [],
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "PYTHONPATH",
+                    "value": "${workspaceFolder}/build"
+                }
+            ],
             "externalConsole": false,
             "MIMode": "gdb",
             "setupCommands": [
@@ -79,11 +87,15 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/a.out",
-            "args": [
-            ],
+            "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/build",
-            "environment": [],
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "PYTHONPATH",
+                    "value": "${workspaceFolder}/build"
+                }
+            ],
             "externalConsole": false,
             "MIMode": "gdb",
             "setupCommands": [
@@ -105,11 +117,15 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/.nix-pyenv/bin/python",
-            "args": [
-            ],
+            "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/build",
-            "environment": [],
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "PYTHONPATH",
+                    "value": "${workspaceFolder}/build"
+                }
+            ],
             "sourceFileMap": {
                 "/build": "${workspaceFolder}/debug_source"
             },
@@ -135,13 +151,20 @@
             "request": "launch",
             "program": "${workspaceFolder}/.nix-pyenv/bin/python",
             "args": [
-                "${workspaceFolder}/.nix-pyenv/lib/pytest",
+                "-m",
+                "pytest",
                 "-s",
                 "-rxX",
-                "../python-test/test_canonical.py"
+                "./python-test/test_type.py"
+            ],
+            "environment": [
+                {
+                    "name": "PYTHONPATH",
+                    "value": "${workspaceFolder}/build"
+                }
             ],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/build",
+            "cwd": "${workspaceFolder}",
             "sourceFileMap": {
                 "/build": "${workspaceFolder}/debug_source"
             },
@@ -158,8 +181,7 @@
                     "text": "-gdb-set disassembly-flavor intel",
                     "ignoreFailures": true
                 }
-            ],
-            "preLaunchTask": "pre-pytest"
+            ]
         }
     ]
 }
