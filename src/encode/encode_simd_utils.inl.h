@@ -108,7 +108,7 @@ force_inline bool CHECK_MASK_ZERO(SIMD_MASK_TYPE mask) {
 
 #if COMPILE_WRITE_UCS_LEVEL == 4
 #if SIMD_BIT_SIZE == 512
-SIMD_MASK_TYPE CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(SIMD_512 z, SIMD_MASK_TYPE rw_mask) {
+force_inline SIMD_MASK_TYPE CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(SIMD_512 z, SIMD_MASK_TYPE rw_mask) {
 #define CUR_QUOTE PYYJSON_SIMPLE_CONCAT2(_Quote_i, READ_BIT_SIZE)
 #define CUR_SLASH PYYJSON_SIMPLE_CONCAT2(_Slash_i, READ_BIT_SIZE)
 #define CUR_CONTROL_MAX PYYJSON_SIMPLE_CONCAT2(_ControlMax_i, READ_BIT_SIZE)
@@ -312,8 +312,9 @@ force_inline void MASK_ELEVATE_WRITE_512(_TARGET_TYPE *dst, SIMD_512 z, Py_ssize
 }
 #endif // SIMD_BIT_SIZE == 512 && COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
 
-// #include "commondef/r_out.inl.h"
-// #include "commondef/w_out.inl.h"
+#include "commondef/r_out.inl.h"
+#include "commondef/w_out.inl.h"
+
 #undef MASK_ELEVATE_WRITE_512
 #undef BACK_WRITE_SIMD256_WITH_TAIL_LEN
 #undef WRITE_SIMD_256_WITH_WRITEMASK
