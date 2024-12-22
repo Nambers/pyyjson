@@ -68,9 +68,9 @@ def run_test(args):
     if args.ignore and args.build_only:
         print("Ignore test names only works when not building only.")
         return 1
-    if args.asan and args.build_only:
-        print("ASAN check only works when not building only.")
-        return 1
+    # if args.asan and args.build_only:
+    #     print("ASAN check only works when not building only.")
+    #     return 1
     if args.asan:
         print("NOTE: use asan check will suppress `ignore` and `build-type` options.")
 
@@ -90,8 +90,8 @@ def run_test(args):
             envs["TARGET_BUILD_TYPE"] = build_type
             if args.ignore:
                 envs["IGNORES"] = " ".join(args.ignore)
-            if args.build_only:
-                envs["SKIP_TEST"] = "1"
+        if args.build_only:
+            envs["SKIP_TEST"] = "1"
         if "IN_NIX_SHELL" in os.environ:
             print("Already in nix shell")
             os.execvpe("bash", ["bash", test_entrance], envs)

@@ -14,5 +14,8 @@ if [ $return_value -ne 0 ]; then
     echo "This version of CPython has memory leaks, skip ASAN test"
     exit 0
 fi
+if [ ! -z ${SKIP_TEST+x} ]; then
+    exit 0
+fi
 export PYTHONPATH=$(pwd)/$BUILD_DIR
 exec $Python3_EXECUTABLE test/all_test.py --ignore bench file

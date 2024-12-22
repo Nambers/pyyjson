@@ -482,7 +482,7 @@ force_inline EncodeValJumpFlag ENCODE_PROCESS_VAL(
 #define CTN_SIZE_GROW()                                                               \
     do {                                                                              \
         if (unlikely(stack_vars->cur_nested_depth == PYYJSON_ENCODE_MAX_RECURSION)) { \
-            PyErr_SetString(PyExc_ValueError, "Too many nested structures");          \
+            PyErr_SetString(JSONEncodeError, "Too many nested structures");           \
             return JumpFlag_Fail;                                                     \
         }                                                                             \
     } while (0)
