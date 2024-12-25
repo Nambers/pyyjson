@@ -291,6 +291,21 @@ force_inline void extract_128_four_parts(SIMD_128 x, SIMD_128 *restrict x1, SIMD
 #undef MOVEHDUP
 }
 
+/*Mask utilities.*/
+force_inline bool check_mask_zero(SIMD_MASK_TYPE mask) {
+#if SIMD_BIT_SIZE == 512
+    return mask == 0;
+#elif SIMD_BIT_SIZE == 256
+    return (bool) _mm256_testz_si256(mask, mask);
+#else
+#if defined(__SSE4_1__)
+    return (bool) _mm_testz_si128(mask, mask);
+#else
+    return _mm_movemask_epi8(_mm_cmpeq_epi8(mask, _mm_setzero_si128())) == 0xFFFF;
+#endif
+#endif
+}
+
 /*==============================================================================
  * SSE4.1 only SIMD code
  *============================================================================*/

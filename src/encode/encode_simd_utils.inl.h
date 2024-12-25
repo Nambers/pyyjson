@@ -7,30 +7,12 @@
 
 
 // read only
-#define CHECK_MASK_ZERO PYYJSON_CONCAT2(check_mask_zero, COMPILE_READ_UCS_LEVEL)
 #define CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512 PYYJSON_CONCAT2(check_escape_tail_impl_get_mask_512, COMPILE_READ_UCS_LEVEL)
 // write only or read-write
 #define WRITE_SIMD_IMPL PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define WRITE_SIMD_256_WITH_WRITEMASK PYYJSON_CONCAT2(write_simd_256_with_writemask, COMPILE_WRITE_UCS_LEVEL)
 #define BACK_WRITE_SIMD256_WITH_TAIL_LEN PYYJSON_CONCAT3(back_write_simd256_with_tail_len, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define MASK_ELEVATE_WRITE_512 PYYJSON_CONCAT3(mask_elevate_write_512, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
-
-
-#if COMPILE_WRITE_UCS_LEVEL == 4
-force_inline bool CHECK_MASK_ZERO(SIMD_MASK_TYPE mask) {
-#if SIMD_BIT_SIZE == 512
-    return mask == 0;
-#elif SIMD_BIT_SIZE == 256
-    return (bool) _mm256_testz_si256(mask, mask);
-#else
-#if defined(__SSE4_1__)
-    return (bool) _mm_testz_si128(mask, mask); // ptest, sse4.1
-#else
-    return _mm_movemask_epi8(_mm_cmpeq_epi8(mask, _mm_setzero_si128())) == 0xFFFF;
-#endif
-#endif
-}
-#endif // COMPILE_WRITE_UCS_LEVEL == 4
 
 
 #if COMPILE_WRITE_UCS_LEVEL == 4
@@ -247,5 +229,4 @@ force_inline void MASK_ELEVATE_WRITE_512(_TARGET_TYPE *dst, SIMD_512 z, Py_ssize
 #undef WRITE_SIMD_256_WITH_WRITEMASK
 #undef WRITE_SIMD_IMPL
 #undef CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512
-#undef CHECK_MASK_ZERO
 #undef CHECK_COUNT_MAX

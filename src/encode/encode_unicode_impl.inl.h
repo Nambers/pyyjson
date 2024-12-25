@@ -9,7 +9,6 @@
 
 // encode_simd_utils.inl
 #define CHECK_ESCAPE_IMPL_GET_MASK PYYJSON_CONCAT2(check_escape_impl_get_mask, COMPILE_READ_UCS_LEVEL)
-#define CHECK_MASK_ZERO PYYJSON_CONCAT2(check_mask_zero, COMPILE_READ_UCS_LEVEL)
 #define WRITE_SIMD_256_WITH_WRITEMASK PYYJSON_CONCAT2(write_simd_256_with_writemask, COMPILE_WRITE_UCS_LEVEL)
 #define BACK_WRITE_SIMD256_WITH_TAIL_LEN PYYJSON_CONCAT3(back_write_simd256_with_tail_len, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 // define here
@@ -130,7 +129,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
     rw_mask = ((u64) 1 << (usize) len) - 1;
     z = _MASKZ_LOADU(rw_mask, (const void *) src);
     tail_mask = CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(z, rw_mask);
-    if (likely(CHECK_MASK_ZERO(tail_mask))) {
+    if (likely(check_mask_zero(tail_mask))) {
 #if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
         _MASK_STOREU((void *) _WRITER(vec), rw_mask, z);
 #else
@@ -165,7 +164,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
 #undef MASK_READER
     check_mask = CHECK_ESCAPE_IMPL_GET_MASK(load_start, &y);
     check_mask = simd_and_256(check_mask, mask);
-    if (likely(CHECK_MASK_ZERO(check_mask))) {
+    if (likely(check_mask_zero(check_mask))) {
 #if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
         WRITE_SIMD_256_WITH_WRITEMASK(store_start, y, mask);
 #else
@@ -187,7 +186,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
 #undef MASK_TABLE_READ
     check_mask = CHECK_ESCAPE_IMPL_GET_MASK(load_start, &x);
     check_mask = simd_and_128(check_mask, mask);
-    if (likely(CHECK_MASK_ZERO(check_mask))) {
+    if (likely(check_mask_zero(check_mask))) {
 #if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
 #if __SSE4_1__
         x = blendv_128(load_128((const void *) store_start), x, mask);
@@ -231,7 +230,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_IMPL(UnicodeVector **restrict v
     while (len >= CHECK_COUNT_MAX) {
         mask = CHECK_ESCAPE_IMPL_GET_MASK(src, &SIMD_VAR);
         WRITE_SIMD_IMPL(_WRITER(vec), SIMD_VAR);
-        if (likely(CHECK_MASK_ZERO(mask))) {
+        if (likely(check_mask_zero(mask))) {
             src += CHECK_COUNT_MAX;
             _WRITER(vec) += CHECK_COUNT_MAX;
             len -= CHECK_COUNT_MAX;
@@ -347,7 +346,6 @@ force_inline bool PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, COMPILE_R
 #undef WRITE_SIMD_IMPL
 #undef BACK_WRITE_SIMD256_WITH_TAIL_LEN
 #undef WRITE_SIMD_256_WITH_WRITEMASK
-#undef CHECK_MASK_ZERO
 #undef CHECK_ESCAPE_IMPL_GET_MASK
 #undef _CONTROL_SEQ_TABLE
 #undef CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512
