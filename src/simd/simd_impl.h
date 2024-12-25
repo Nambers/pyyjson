@@ -291,7 +291,9 @@ force_inline void extract_128_four_parts(SIMD_128 x, SIMD_128 *restrict x1, SIMD
 #undef MOVEHDUP
 }
 
-/*Mask utilities.*/
+/*
+ * Mask utilities.
+ */
 force_inline bool check_mask_zero(SIMD_MASK_TYPE mask) {
 #if SIMD_BIT_SIZE == 512
     return mask == 0;

@@ -1,7 +1,6 @@
 #ifndef SIMD_CVT_H
 #define SIMD_CVT_H
 
-
 #include "simd/mask_table.h"
 #include "unicode/uvector.h"
 
