@@ -752,34 +752,6 @@ force_inline void byte_copy_8(void *dst, const void *src) {
     memcpy(dst, src, 8);
 }
 
-/** Returns the number of trailing 0-bits in value (input should not be 0). */
-force_inline u32 u64_tz_bits(u64 v) {
-#if GCC_HAS_CTZLL
-    return (u32)__builtin_ctzll(v);
-#elif MSC_HAS_BIT_SCAN_64
-    unsigned long r;
-    _BitScanForward64(&r, v);
-    return (u32)r;
-#elif MSC_HAS_BIT_SCAN
-    unsigned long lo, hi;
-    bool lo_set = _BitScanForward(&lo, (u32)(v)) != 0;
-    _BitScanForward(&hi, (u32)(v >> 32));
-    hi += 32;
-    return lo_set ? lo : hi;
-#else
-    /*
-     branchless, use de Bruijn sequences
-     see: https://www.chessprogramming.org/BitScan
-     */
-    const u8 table[64] = {
-         0,  1,  2, 53,  3,  7, 54, 27,  4, 38, 41,  8, 34, 55, 48, 28,
-        62,  5, 39, 46, 44, 42, 22,  9, 24, 35, 59, 56, 49, 18, 29, 11,
-        63, 52,  6, 26, 37, 40, 33, 47, 61, 45, 43, 21, 23, 58, 17, 10,
-        51, 25, 36, 32, 60, 20, 57, 16, 50, 31, 19, 15, 30, 14, 13, 12
-    };
-    return table[((v & (~v + 1)) * U64(0x022FDD63, 0xCC95386D)) >> 58];
-#endif
-}
 
 /*==============================================================================
  * Number Utils

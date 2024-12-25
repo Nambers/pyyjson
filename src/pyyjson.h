@@ -369,4 +369,68 @@ force_inline bool digi_is_digit_or_fp(u8 d) {
                                        DIGI_TYPE_DOT | DIGI_TYPE_EXP));
 }
 
+/** Returns the number of leading 0-bits in value (input should not be 0). */
+force_inline u32 u64_lz_bits(u64 v) {
+#if GCC_HAS_CLZLL
+    return (u32)__builtin_clzll(v);
+#elif MSC_HAS_BIT_SCAN_64
+    unsigned long r;
+    _BitScanReverse64(&r, v);
+    return (u32)63 - (u32)r;
+#elif MSC_HAS_BIT_SCAN
+    unsigned long hi, lo;
+    bool hi_set = _BitScanReverse(&hi, (u32)(v >> 32)) != 0;
+    _BitScanReverse(&lo, (u32)v);
+    hi |= 32;
+    return (u32)63 - (u32)(hi_set ? hi : lo);
+#else
+    /*
+     branchless, use de Bruijn sequences
+     see: https://www.chessprogramming.org/BitScan
+     */
+    const u8 table[64] = {
+        63, 16, 62,  7, 15, 36, 61,  3,  6, 14, 22, 26, 35, 47, 60,  2,
+         9,  5, 28, 11, 13, 21, 42, 19, 25, 31, 34, 40, 46, 52, 59,  1,
+        17,  8, 37,  4, 23, 27, 48, 10, 29, 12, 43, 20, 32, 41, 53, 18,
+        38, 24, 49, 30, 44, 33, 54, 39, 50, 45, 55, 51, 56, 57, 58,  0
+    };
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v |= v >> 32;
+    return table[(v * U64(0x03F79D71, 0xB4CB0A89)) >> 58];
+#endif
+}
+
+/** Returns the number of trailing 0-bits in value (input should not be 0). */
+force_inline u32 u64_tz_bits(u64 v) {
+#if GCC_HAS_CTZLL
+    return (u32)__builtin_ctzll(v);
+#elif MSC_HAS_BIT_SCAN_64
+    unsigned long r;
+    _BitScanForward64(&r, v);
+    return (u32)r;
+#elif MSC_HAS_BIT_SCAN
+    unsigned long lo, hi;
+    bool lo_set = _BitScanForward(&lo, (u32)(v)) != 0;
+    _BitScanForward(&hi, (u32)(v >> 32));
+    hi += 32;
+    return lo_set ? lo : hi;
+#else
+    /*
+     branchless, use de Bruijn sequences
+     see: https://www.chessprogramming.org/BitScan
+     */
+    const u8 table[64] = {
+         0,  1,  2, 53,  3,  7, 54, 27,  4, 38, 41,  8, 34, 55, 48, 28,
+        62,  5, 39, 46, 44, 42, 22,  9, 24, 35, 59, 56, 49, 18, 29, 11,
+        63, 52,  6, 26, 37, 40, 33, 47, 61, 45, 43, 21, 23, 58, 17, 10,
+        51, 25, 36, 32, 60, 20, 57, 16, 50, 31, 19, 15, 30, 14, 13, 12
+    };
+    return table[((v & (~v + 1)) * U64(0x022FDD63, 0xCC95386D)) >> 58];
+#endif
+}
+
 #endif // PYYJSON_H
