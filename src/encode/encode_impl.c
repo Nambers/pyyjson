@@ -4,6 +4,7 @@
 #include "simd/simd_impl.h"
 #include "tls.h"
 #include "unicode/uvector.h"
+#include "encode_float.inl.h"
 
 
 typedef enum EncodeValJumpFlag {
