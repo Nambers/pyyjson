@@ -34,29 +34,21 @@ force_inline void _ELEVATE_FROM_U8_NUM_BUFFER(UnicodeVector *vec, u8 *buffer, Py
     z = elevate_1_2_to_512(y);
     write_512((void *) _WRITER(vec), z); // processed 32, done
     _WRITER(vec) += len;
-#else // SIMD_BIT_SIZE == 512 && COMPILE_WRITE_UCS_LEVEL == 2
+#else // SIMD_BIT_SIZE != 512 || COMPILE_WRITE_UCS_LEVEL == 4
     const Py_ssize_t per_write_count = SIMD_BIT_SIZE / 8 / COMPILE_WRITE_UCS_LEVEL;
     _TARGET_TYPE *writer = _WRITER(vec);
     u8 *buffer_end = buffer + len;
-    SIMD_128 _x;
-    SIMD_TYPE SIMD_VAR;
+#define ELEVATOR PYYJSON_CONCAT4(elevate_1, COMPILE_WRITE_UCS_LEVEL, to, SIMD_BIT_SIZE)
+#define WRITER PYYJSON_CONCAT2(write, SIMD_BIT_SIZE)
     while (buffer < buffer_end) {
-        _x = load_128((const void *) buffer);
-#if SIMD_BIT_SIZE == 512
-        z = elevate_1_4_to_512(_x);
-        write_512((void *) writer, z);
-#elif SIMD_BIT_SIZE == 256
-        y = PYYJSON_CONCAT3(elevate_1, COMPILE_WRITE_UCS_LEVEL, to_256)(_x);
-        write_256((void *) writer, y);
-#else  // SIMD_BIT_SIZE == 128
-        x = PYYJSON_CONCAT3(elevate_1, COMPILE_WRITE_UCS_LEVEL, to_128)(_x);
-        write_128((void *) writer, x);
-#endif // SIMD_BIT_SIZE
+        WRITER((void *) writer, ELEVATOR(load_128((const void *) buffer)));
         writer += per_write_count;
         buffer += per_write_count;
     }
+#undef ELEVATOR
+#undef WRITER
     _WRITER(vec) += len;
-#endif // SIMD_BIT_SIZE == 512 && COMPILE_WRITE_UCS_LEVEL == 2
+#endif // SIMD_BIT_SIZE != 512 || COMPILE_WRITE_UCS_LEVEL == 4
     assert(vec_in_boundary(vec));
 #endif // COMPILE_WRITE_UCS_LEVEL != 1
 }
