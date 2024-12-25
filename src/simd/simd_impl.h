@@ -473,25 +473,4 @@ force_inline u32 tzcnt_u32(u32 x) {
 #endif
 }
 
-force_inline u64 tzcnt_u64(u64 x) {
-    // never pass a zero here.
-    assert(x);
-#if __BMI__
-// same as above
-#if !defined(__clang__) && !defined(__INTEL_COMPILER) && !defined(__ICC) && defined(__GNUC__)
-    return __tzcnt_u64(x);
-#else
-    return _mm_tzcnt_64(x);
-#endif
-#else
-    #if defined(_MSC_VER)
-        unsigned long index = 0;
-        _BitScanForward64(&index, x);
-        return index;
-    #else
-        return __builtin_ctzll(x);
-    #endif
-#endif
-}
-
 #endif // ENCODE_SIMD_IMPL_H

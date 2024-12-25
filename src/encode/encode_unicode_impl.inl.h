@@ -139,9 +139,9 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
         _WRITER(vec) += len;
     } else {
 #if COMPILE_READ_UCS_LEVEL == 1
-        usize tzcnt = (usize) tzcnt_u64(tail_mask);
+        usize tzcnt = (usize) u64_tz_bits(tail_mask);
 #else
-        usize tzcnt = (usize) tzcnt_u32((u32) tail_mask);
+        usize tzcnt = (usize) u32_tz_bits((u32) tail_mask);
 #endif
         assert(tzcnt < (usize) len);
 #if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
@@ -239,7 +239,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_IMPL(UnicodeVector **restrict v
 #if SIMD_BIT_SIZE == 512
             bit_mask = mask;
             assert(bit_mask);
-            u64 done_count = tzcnt_u64(bit_mask) / sizeof(_FROM_TYPE);
+            u32 done_count = u64_tz_bits(bit_mask) / sizeof(_FROM_TYPE);
 #elif SIMD_BIT_SIZE == 256
             // for bit size < 512, we don't have cmp_epu8, the mask is calculated by subs_epu8
             // so we have to cmpeq with zero to get the real bit mask.
@@ -247,7 +247,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_IMPL(UnicodeVector **restrict v
             bit_mask = to_bitmask_256(mask);
             bit_mask = ~bit_mask;
             assert(bit_mask);
-            u32 done_count = tzcnt_u32(bit_mask) / sizeof(_FROM_TYPE);
+            u32 done_count = u32_tz_bits(bit_mask) / sizeof(_FROM_TYPE);
 #else // SIMD_BIT_SIZE
 #if COMPILE_READ_UCS_LEVEL != 4
             // for bit size < 512, we don't have cmp_epu8,
