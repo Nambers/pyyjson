@@ -124,7 +124,7 @@ void long_back_elevate_1_2(u16 *restrict write_start, u8 *restrict read_start, P
         u16 *const write_tail_start = write_end - read_once_count;
         x = load_128((const void *) (read_end - read_once_count));
         y = elevate_1_2_to_256(x);
-        mask = load_256_aligned(mask_table_read_16(read_once_count - tail_len));
+        mask = load_256_aligned(read_tail_mask_table_16(read_once_count - tail_len));
         blend = load_256((const void *) write_tail_start);
         y = blendv_256(blend, y, mask);
         write_256((void *) write_tail_start, y);
@@ -328,7 +328,7 @@ void long_back_elevate_2_4(u32 *restrict write_start, u16 *restrict read_start, 
         u32 *const write_tail_start = write_end - read_once_count;
         x = load_128((const void *) (read_end - read_once_count));
         y = elevate_2_4_to_256(x);
-        mask = load_256_aligned(mask_table_read_32(read_once_count - tail_len));
+        mask = load_256_aligned(read_tail_mask_table_32(read_once_count - tail_len));
         blend = load_256((const void *) write_tail_start);
         y = blendv_256(blend, y, mask);
         write_256((void *) write_tail_start, y);

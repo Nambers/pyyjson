@@ -160,7 +160,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
     const _FROM_TYPE *load_start = src + len - CHECK_COUNT_MAX;
     _TARGET_TYPE *store_start = _WRITER(vec) + len - CHECK_COUNT_MAX;
     __m256i mask, check_mask;
-#define MASK_READER PYYJSON_CONCAT2(mask_table_read, READ_BIT_SIZE)
+#define MASK_READER PYYJSON_CONCAT2(read_tail_mask_table, READ_BIT_SIZE)
     mask = load_256_aligned(MASK_READER(CHECK_COUNT_MAX - len));
 #undef MASK_READER
     check_mask = CHECK_ESCAPE_IMPL_GET_MASK(load_start, &y);
@@ -182,9 +182,9 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
     SIMD_128 x, mask, check_mask;
     const _FROM_TYPE *load_start = src + len - CHECK_COUNT_MAX;
     _TARGET_TYPE *store_start = _WRITER(vec) + len - CHECK_COUNT_MAX;
-#define MASK_TABLE_READ PYYJSON_CONCAT2(mask_table_read, READ_BIT_SIZE)
-    mask = load_128_aligned(MASK_TABLE_READ(CHECK_COUNT_MAX - len));
-#undef MASK_TABLE_READ
+#define MASK_TABLE_READER PYYJSON_CONCAT2(read_tail_mask_table, READ_BIT_SIZE)
+    mask = load_128_aligned(MASK_TABLE_READER(CHECK_COUNT_MAX - len));
+#undef MASK_TABLE_READER
     check_mask = CHECK_ESCAPE_IMPL_GET_MASK(load_start, &x);
     check_mask = simd_and_128(check_mask, mask);
     if (likely(check_mask_zero(check_mask))) {

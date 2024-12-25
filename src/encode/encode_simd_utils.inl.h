@@ -100,7 +100,7 @@ force_inline void WRITE_SIMD_256_WITH_WRITEMASK(_TARGET_TYPE *dst, SIMD_256 y, S
 
 #if SIMD_BIT_SIZE == 256 && COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
 force_inline void BACK_WRITE_SIMD256_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_256 y, Py_ssize_t len) {
-#define MASK_TABLE_READ PYYJSON_CONCAT2(mask_table_read, WRITE_BIT_SIZE)
+#define MASK_TABLE_READER PYYJSON_CONCAT2(read_tail_mask_table, WRITE_BIT_SIZE)
 #define MASK_WRITER PYYJSON_CONCAT2(write_simd_256_with_writemask, COMPILE_WRITE_UCS_LEVEL)
 #define ELEVATOR PYYJSON_CONCAT5(elevate, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL, to, SIMD_BIT_SIZE)
 #if COMPILE_READ_UCS_LEVEL == 1 && COMPILE_WRITE_UCS_LEVEL == 4
@@ -113,19 +113,19 @@ force_inline void BACK_WRITE_SIMD256_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_256 y
     extract_256_four_parts(SIMD_VAR, &x1, &x2, &x3, &x4);
     // 0
     ;
-    writemask = load_256_aligned(MASK_TABLE_READ(CHECK_COUNT_MAX / 4 - part1));
+    writemask = load_256_aligned(MASK_TABLE_READER(CHECK_COUNT_MAX / 4 - part1));
     MASK_WRITER(dst, ELEVATOR(x1), writemask);
     dst += CHECK_COUNT_MAX / 4;
     // 1
-    writemask = load_256_aligned(MASK_TABLE_READ(CHECK_COUNT_MAX / 4 - part2));
+    writemask = load_256_aligned(MASK_TABLE_READER(CHECK_COUNT_MAX / 4 - part2));
     MASK_WRITER(dst, ELEVATOR(x2), writemask);
     dst += CHECK_COUNT_MAX / 4;
     // 2
-    writemask = load_256_aligned(MASK_TABLE_READ(CHECK_COUNT_MAX / 4 - part3));
+    writemask = load_256_aligned(MASK_TABLE_READER(CHECK_COUNT_MAX / 4 - part3));
     MASK_WRITER(dst, ELEVATOR(x3), writemask);
     dst += CHECK_COUNT_MAX / 4;
     // 3
-    writemask = load_256_aligned(MASK_TABLE_READ(CHECK_COUNT_MAX / 4 - part4));
+    writemask = load_256_aligned(MASK_TABLE_READER(CHECK_COUNT_MAX / 4 - part4));
     MASK_WRITER(dst, ELEVATOR(x4), writemask);
     dst += CHECK_COUNT_MAX / 4;
 #else  // COMPILE_READ_UCS_LEVEL != 1 || COMPILE_WRITE_UCS_LEVEL != 4
@@ -137,16 +137,16 @@ force_inline void BACK_WRITE_SIMD256_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_256 y
     extract_256_two_parts(y, &x1, &x2);
     // 0
 
-    writemask = load_256_aligned(MASK_TABLE_READ(CHECK_COUNT_MAX / 2 - part1));
+    writemask = load_256_aligned(MASK_TABLE_READER(CHECK_COUNT_MAX / 2 - part1));
     MASK_WRITER(dst, ELEVATOR(x1), writemask);
     dst += CHECK_COUNT_MAX / 2;
     // 1
-    writemask = load_256_aligned(MASK_TABLE_READ(CHECK_COUNT_MAX / 2 - part2));
+    writemask = load_256_aligned(MASK_TABLE_READER(CHECK_COUNT_MAX / 2 - part2));
     MASK_WRITER(dst, ELEVATOR(x2), writemask);
     dst += CHECK_COUNT_MAX / 2;
 #endif // COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL
 #undef ELEVATOR
-#undef MASK_TABLE_READ
+#undef MASK_TABLE_READER
 #undef MASK_WRITER
 }
 #endif // SIMD_BIT_SIZE == 256 && COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
