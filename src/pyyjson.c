@@ -3,16 +3,17 @@
 #include "tls.h"
 
 #if defined(_MSC_VER)
-#include <intrin.h>
-#define cpuid(info, x) __cpuidex(info, x, 0)
+#    include <intrin.h>
+#    define cpuid(info, x) __cpuidex(info, x, 0)
 #else
-#include <cpuid.h>
+#    include <cpuid.h>
+
 void cpuid(int info[4], int x) {
     __cpuid_count(x, 0, info[0], info[1], info[2], info[3]);
 }
 #endif
 
-#define MODULE_STATE(o) ((modulestate *) PyModule_GetState(o))
+#define MODULE_STATE(o) ((modulestate *)PyModule_GetState(o))
 
 typedef PyObject *pyyjson_cache_type;
 
@@ -32,10 +33,10 @@ PyObject *JSONEncodeError = NULL;
 // bool lzcnt_supported = 0;
 
 static PyMethodDef pyyjson_Methods[] = {
-        {"encode", (PyCFunction) pyyjson_Encode, METH_VARARGS | METH_KEYWORDS, "Converts arbitrary object recursively into JSON."},
-        {"decode", (PyCFunction) pyyjson_Decode, METH_VARARGS | METH_KEYWORDS, "Converts JSON as string to dict object structure."},
-        {"dumps", (PyCFunction) pyyjson_Encode, METH_VARARGS | METH_KEYWORDS, "Converts arbitrary object recursively into JSON."},
-        {"loads", (PyCFunction) pyyjson_Decode, METH_VARARGS | METH_KEYWORDS, "Converts JSON as string to dict object structure."},
+        {"encode", (PyCFunction)pyyjson_Encode, METH_VARARGS | METH_KEYWORDS, "Converts arbitrary object recursively into JSON."},
+        {"decode", (PyCFunction)pyyjson_Decode, METH_VARARGS | METH_KEYWORDS, "Converts JSON as string to dict object structure."},
+        {"dumps", (PyCFunction)pyyjson_Encode, METH_VARARGS | METH_KEYWORDS, "Converts arbitrary object recursively into JSON."},
+        {"loads", (PyCFunction)pyyjson_Decode, METH_VARARGS | METH_KEYWORDS, "Converts JSON as string to dict object structure."},
         // {"dump", (PyCFunction)pyyjson_FileEncode, METH_VARARGS | METH_KEYWORDS, "Converts arbitrary object recursively into JSON file. "},
         // {"load", (PyCFunction)pyyjson_DecodeFile, METH_VARARGS | METH_KEYWORDS, "Converts JSON as file to dict object structure."},
         {NULL, NULL, 0, NULL} /* Sentinel */
@@ -44,6 +45,7 @@ static PyMethodDef pyyjson_Methods[] = {
 static int module_traverse(PyObject *m, visitproc visit, void *arg);
 static int module_clear(PyObject *m);
 static void module_free(void *m);
+
 typedef struct
 {
     PyObject *type_decimal;
@@ -72,13 +74,13 @@ static int module_clear(PyObject *m) {
 }
 
 static void module_free(void *m) {
-    module_clear((PyObject *) m);
+    module_clear((PyObject *)m);
 
     for (size_t i = 0; i < PYYJSON_KEY_CACHE_SIZE; i++) {
         Py_XDECREF(AssociativeKeyCache[i]);
     }
 
-    if(unlikely(!pyyjson_tls_free())){
+    if (unlikely(!pyyjson_tls_free())) {
         // critical
         printf("pyyjson: failed to free TLS\n");
     }
@@ -131,7 +133,7 @@ PyMODINIT_FUNC PyInit_pyyjson(void) {
     }
 
     // TLS init.
-    if(unlikely(!pyyjson_tls_init())){
+    if (unlikely(!pyyjson_tls_init())) {
         PyErr_SetString(PyExc_RuntimeError, "Failed to initialize TLS");
         Py_XDECREF(JSONEncodeError);
         Py_CLEAR(JSONEncodeError);
@@ -156,7 +158,7 @@ PyObject *pyyjson_Decode(PyObject *self, PyObject *args, PyObject *kwargs) {
     const char *string = NULL;
     Py_ssize_t len = 0;
     static const char *kwlist[] = {"s", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#", (char **) kwlist, &string, &len)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#", (char **)kwlist, &string, &len)) {
         PyErr_SetString(PyExc_TypeError, "Invalid argument");
         return NULL;
     }

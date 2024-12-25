@@ -8,7 +8,7 @@
  @param msg The error message pointer.
  @return Whether success.
  */
-force_inline PyObject* read_bytes(const u8 **ptr, u8 *write_buffer, bool is_key) {
+force_inline PyObject *read_bytes(const u8 **ptr, u8 *write_buffer, bool is_key) {
     /*
      Each unicode code point is encoded as 1 to 4 bytes in UTF-8 encoding,
      we use 4-byte mask and pattern value to validate UTF-8 byte sequence,
@@ -83,32 +83,28 @@ force_inline PyObject* read_bytes(const u8 **ptr, u8 *write_buffer, bool is_key)
     const u32 b4_err0 = 0x00000004UL;
     const u32 b4_err1 = 0x00003003UL;
 #endif
-    
-#define is_valid_seq_1(uni) ( \
-    ((uni & b1_mask) == b1_patt) \
-)
 
-#define is_valid_seq_2(uni) ( \
-    ((uni & b2_mask) == b2_patt) && \
-    ((uni & b2_requ)) \
-)
-    
-#define is_valid_seq_3(uni) ( \
-    ((uni & b3_mask) == b3_patt) && \
-    ((tmp = (uni & b3_requ))) && \
-    ((tmp != b3_erro)) \
-)
-    
-#define is_valid_seq_4(uni) ( \
-    ((uni & b4_mask) == b4_patt) && \
-    ((tmp = (uni & b4_requ))) && \
-    ((tmp & b4_err0) == 0 || (tmp & b4_err1) == 0) \
-)
+#define is_valid_seq_1(uni) ( \
+        ((uni & b1_mask) == b1_patt))
+
+#define is_valid_seq_2(uni) (           \
+        ((uni & b2_mask) == b2_patt) && \
+        ((uni & b2_requ)))
+
+#define is_valid_seq_3(uni) (           \
+        ((uni & b3_mask) == b3_patt) && \
+        ((tmp = (uni & b3_requ))) &&    \
+        ((tmp != b3_erro)))
+
+#define is_valid_seq_4(uni) (           \
+        ((uni & b4_mask) == b4_patt) && \
+        ((tmp = (uni & b4_requ))) &&    \
+        ((tmp & b4_err0) == 0 || (tmp & b4_err1) == 0))
 
 #define return_err(_end, _msg)                                                        \
     do {                                                                              \
         PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, _end - src_start); \
-        return NULL;                                                                 \
+        return NULL;                                                                  \
     } while (0)
 
     u8 *cur = (u8 *)*ptr;
@@ -120,19 +116,19 @@ force_inline PyObject* read_bytes(const u8 **ptr, u8 *write_buffer, bool is_key)
     u16 hi, lo;
     u32 uni, tmp;
     /* modified BEGIN */
-    u8* const src_start = src;
+    u8 *const src_start = src;
     size_t len_ucs1 = 0, len_ucs2 = 0, len_ucs4 = 0;
-    u8* temp_string_buf = write_buffer;//(u8*)*buffer;
-    u8* dst = temp_string_buf;
+    u8 *temp_string_buf = write_buffer; //(u8*)*buffer;
+    u8 *dst = temp_string_buf;
     u8 cur_max_ucs_size = 1;
-    u16* dst_ucs2;
-    u32* dst_ucs4;
+    u16 *dst_ucs2;
+    u32 *dst_ucs4;
     bool is_ascii = true;
     /* modified END */
 
 skip_ascii:
     /* Most strings have no escaped characters, so we can jump them quickly. */
-    
+
 skip_ascii_begin:
     /*
      We want to make loop unrolling, as shown in the following code. Some
@@ -145,25 +141,25 @@ skip_ascii_begin:
             else break;
          })
      */
-#define expr_jump(i) \
-    if (likely(!char_is_ascii_stop(src[i]))) {} \
-    else goto skip_ascii_stop##i;
-    
-#define expr_stop(i) \
-    skip_ascii_stop##i: \
-    src += i; \
+#define expr_jump(i)                           \
+    if (likely(!char_is_ascii_stop(src[i]))) { \
+    } else                                     \
+        goto skip_ascii_stop##i;
+
+#define expr_stop(i)               \
+    skip_ascii_stop##i : src += i; \
     goto skip_ascii_end;
-    
+
     REPEAT_INCR_16(expr_jump)
     src += 16;
     goto skip_ascii_begin;
     REPEAT_INCR_16(expr_stop)
-    
+
 #undef expr_jump
 #undef expr_stop
-    
+
 skip_ascii_end:
-    
+
     /*
      GCC may store src[i] in a register at each line of expr_jump(i) above.
      These instructions are useless and will degrade performance.
@@ -173,14 +169,14 @@ skip_ascii_end:
      MSVC, Clang, ICC can generate expected instructions without this hint.
      */
 #if PYYJSON_IS_REAL_GCC
-    __asm__ volatile("":"=m"(*src));
+    __asm__ volatile("" : "=m"(*src));
 #endif
     if (likely(*src == '"')) {
         /* modified BEGIN */
         // this is a fast path for ascii strings. directly copy the buffer to pyobject
         *ptr = src + 1;
         return make_string(src_start, src - src_start, PYYJSON_STRING_TYPE_ASCII, is_key);
-    } else if(src != src_start){
+    } else if (src != src_start) {
         memcpy(temp_string_buf, src_start, src - src_start);
         len_ucs1 = src - src_start;
         dst += len_ucs1;
@@ -188,39 +184,39 @@ skip_ascii_end:
     goto copy_utf8_ucs1;
     /* modified END */
 
-    /* modified BEGIN */    
-// skip_utf8:
-//     if (*src & 0x80) { /* non-ASCII character */
-//         /*
-//          Non-ASCII character appears here, which means that the text is likely
-//          to be written in non-English or emoticons. According to some common
-//          data set statistics, byte sequences of the same length may appear
-//          consecutively. We process the byte sequences of the same length in each
-//          loop, which is more friendly to branch prediction.
-//          */
-//         pos = src;
+    /* modified BEGIN */
+    // skip_utf8:
+    //     if (*src & 0x80) { /* non-ASCII character */
+    //         /*
+    //          Non-ASCII character appears here, which means that the text is likely
+    //          to be written in non-English or emoticons. According to some common
+    //          data set statistics, byte sequences of the same length may appear
+    //          consecutively. We process the byte sequences of the same length in each
+    //          loop, which is more friendly to branch prediction.
+    //          */
+    //         pos = src;
 
-//         while (true) repeat8({
-//             if (likely((*src & 0xF0) == 0xE0)) src += 3;
-//             else break;
-//         })
-//         if (*src < 0x80) goto skip_ascii;
-//         while (true) repeat8({
-//             if (likely((*src & 0xE0) == 0xC0)) src += 2;
-//             else break;
-//         })
-//         while (true) repeat8({
-//             if (likely((*src & 0xF8) == 0xF0)) src += 4;
-//             else break;
-//         })
+    //         while (true) repeat8({
+    //             if (likely((*src & 0xF0) == 0xE0)) src += 3;
+    //             else break;
+    //         })
+    //         if (*src < 0x80) goto skip_ascii;
+    //         while (true) repeat8({
+    //             if (likely((*src & 0xE0) == 0xC0)) src += 2;
+    //             else break;
+    //         })
+    //         while (true) repeat8({
+    //             if (likely((*src & 0xF8) == 0xF0)) src += 4;
+    //             else break;
+    //         })
 
-//         if (unlikely(pos == src)) {
-//             if (!inv) return_err(src, "invalid UTF-8 encoding in string");
-//             ++src;
-//         }
-//         goto skip_ascii;
-//     }
-    
+    //         if (unlikely(pos == src)) {
+    //             if (!inv) return_err(src, "invalid UTF-8 encoding in string");
+    //             ++src;
+    //         }
+    //         goto skip_ascii;
+    //     }
+
     /* The escape character appears, we need to copy it. */
     // dst = src;
     /* modified END */
@@ -228,16 +224,40 @@ skip_ascii_end:
     /* modified BEGIN */
 copy_escape_ucs1:
     if (likely(*src == '\\')) {
-    /* modified END */
+        /* modified END */
         switch (*++src) {
-            case '"':  *dst++ = '"';  src++; break;
-            case '\\': *dst++ = '\\'; src++; break;
-            case '/':  *dst++ = '/';  src++; break;
-            case 'b':  *dst++ = '\b'; src++; break;
-            case 'f':  *dst++ = '\f'; src++; break;
-            case 'n':  *dst++ = '\n'; src++; break;
-            case 'r':  *dst++ = '\r'; src++; break;
-            case 't':  *dst++ = '\t'; src++; break;
+            case '"':
+                *dst++ = '"';
+                src++;
+                break;
+            case '\\':
+                *dst++ = '\\';
+                src++;
+                break;
+            case '/':
+                *dst++ = '/';
+                src++;
+                break;
+            case 'b':
+                *dst++ = '\b';
+                src++;
+                break;
+            case 'f':
+                *dst++ = '\f';
+                src++;
+                break;
+            case 'n':
+                *dst++ = '\n';
+                src++;
+                break;
+            case 'r':
+                *dst++ = '\r';
+                src++;
+                break;
+            case 't':
+                *dst++ = '\t';
+                src++;
+                break;
             case 'u':
                 if (unlikely(!read_hex_u16(++src, &hi))) {
                     return_err(src - 2, "invalid escaped sequence in string");
@@ -249,14 +269,14 @@ copy_escape_ucs1:
                     if (hi >= 0x100) {
                         // BEGIN ucs1 -> ucs2
                         assert(cur_max_ucs_size == 1);
-                        len_ucs1 = dst - (u8*)temp_string_buf;
-                        dst_ucs2 = ((u16*)temp_string_buf) + len_ucs1;
+                        len_ucs1 = dst - (u8 *)temp_string_buf;
+                        dst_ucs2 = ((u16 *)temp_string_buf) + len_ucs1;
                         cur_max_ucs_size = 2;
                         // END ucs1 -> ucs2
                         *dst_ucs2++ = hi;
                         goto copy_ascii_ucs2;
                     } else {
-                        if (hi >= 0x80) is_ascii = false;  // latin1
+                        if (hi >= 0x80) is_ascii = false; // latin1
                         *dst++ = (u8)hi;
                         goto copy_ascii_ucs1;
                     }
@@ -286,12 +306,13 @@ copy_escape_ucs1:
                         return_err(src, "invalid low surrogate in string");
                     }
                     uni = ((((u32)hi - 0xD800) << 10) |
-                            ((u32)lo - 0xDC00)) + 0x10000;
+                           ((u32)lo - 0xDC00)) +
+                          0x10000;
                     /* modified BEGIN */
                     // BEGIN ucs1 -> ucs4
                     assert(cur_max_ucs_size == 1);
-                    len_ucs1 = dst - (u8*)temp_string_buf;
-                    dst_ucs4 = ((u32*)temp_string_buf) + len_ucs1;
+                    len_ucs1 = dst - (u8 *)temp_string_buf;
+                    dst_ucs4 = ((u32 *)temp_string_buf) + len_ucs1;
                     cur_max_ucs_size = 4;
                     // END ucs1 -> ucs4
                     *dst_ucs4++ = uni;
@@ -304,7 +325,8 @@ copy_escape_ucs1:
                     /* modified END */
                 }
                 break;
-            default: return_err(src, "invalid escaped character in string");
+            default:
+                return_err(src, "invalid escaped character in string");
         }
         /* modified BEGIN */
         goto copy_ascii_ucs1;
@@ -312,7 +334,7 @@ copy_escape_ucs1:
         /* modified BEGIN */
     } else if (likely(*src == '"')) {
         goto read_finalize;
-        
+
         /* modified END */
     } else {
         /* modified BEGIN */
@@ -338,27 +360,32 @@ copy_ascii_ucs1:
      */
 #if PYYJSON_IS_REAL_GCC
     /* modified BEGIN */
-#   define expr_jump(i) \
-    if (likely(!(char_is_ascii_stop(src[i])))) {} \
-    else { __asm__ volatile("":"=m"(src[i])); goto copy_ascii_ucs1_stop_##i; }
+#    define expr_jump(i)                             \
+        if (likely(!(char_is_ascii_stop(src[i])))) { \
+        } else {                                     \
+            __asm__ volatile("" : "=m"(src[i]));     \
+            goto copy_ascii_ucs1_stop_##i;           \
+        }
     /* modified END */
 #else
     /* modified BEGIN */
-#   define expr_jump(i) \
-    if (likely(!(char_is_ascii_stop(src[i])))) {} \
-    else { goto copy_ascii_ucs1_stop_##i; }
+#    define expr_jump(i)                             \
+        if (likely(!(char_is_ascii_stop(src[i])))) { \
+        } else {                                     \
+            goto copy_ascii_ucs1_stop_##i;           \
+        }
     /* modified END */
 #endif
     REPEAT_INCR_16(expr_jump)
 #undef expr_jump
-    
+
     byte_move_16(dst, src);
     src += 16;
     dst += 16;
     /* modified BEGIN */
     goto copy_ascii_ucs1;
     /* modified END */
-    
+
     /*
      The memory will be moved forward by at least 1 byte. So the `byte_move`
      can be one byte more than needed to reduce the number of instructions.
@@ -482,16 +509,14 @@ copy_ascii_ucs1_stop_15:
     /* modified BEGIN */
     goto copy_utf8_ucs1;
     /* modified END */
-    
-
 
 
     /* modified BEGIN */
 copy_utf8_ucs1:
-    assert(cur_max_ucs_size==1);
+    assert(cur_max_ucs_size == 1);
     /* modified END */
     if (*src & 0x80) { /* non-ASCII character */
-copy_utf8_inner_ucs1:
+    copy_utf8_inner_ucs1:
         pos = src;
         uni = byte_load_4(src);
         // TODO remove the repeat4 later
@@ -501,8 +526,8 @@ copy_utf8_inner_ucs1:
                 // code point: [U+0800, U+FFFF]
                 // BEGIN ucs1 -> ucs2
                 assert(cur_max_ucs_size == 1);
-                len_ucs1 = dst - (u8*)temp_string_buf;
-                dst_ucs2 = ((u16*)temp_string_buf) + len_ucs1;
+                len_ucs1 = dst - (u8 *)temp_string_buf;
+                dst_ucs2 = ((u16 *)temp_string_buf) + len_ucs1;
                 cur_max_ucs_size = 2;
                 // END ucs1 -> ucs2
                 // write
@@ -514,7 +539,8 @@ copy_utf8_inner_ucs1:
                 goto copy_utf8_inner_ucs2;
                 // uni = byte_load_4(src);
                 /* modified END */
-            } else break;
+            } else
+                break;
         })
         if ((uni & b1_mask) == b1_patt) goto copy_ascii_ucs1;
         while (true) REPEAT_CALL_4({
@@ -526,8 +552,8 @@ copy_utf8_inner_ucs1:
                     // UCS2
                     // BEGIN ucs1 -> ucs2
                     assert(cur_max_ucs_size == 1);
-                    len_ucs1 = dst - (u8*)temp_string_buf;
-                    dst_ucs2 = ((u16*)temp_string_buf) + len_ucs1;
+                    len_ucs1 = dst - (u8 *)temp_string_buf;
+                    dst_ucs2 = ((u16 *)temp_string_buf) + len_ucs1;
                     cur_max_ucs_size = 2;
                     // END ucs1 -> ucs2
                     // write
@@ -549,7 +575,8 @@ copy_utf8_inner_ucs1:
                 // byte_copy_2(dst, &uni);
                 // dst += 2;
                 /* modified END */
-            } else break;
+            } else
+                break;
         })
         while (true) REPEAT_CALL_4({
             if ((uni & b4_mask) == b4_patt) {
@@ -558,8 +585,8 @@ copy_utf8_inner_ucs1:
                 // must be ucs4
                 // BEGIN ucs1 -> ucs4
                 assert(cur_max_ucs_size == 1);
-                len_ucs1 = dst - (u8*)temp_string_buf;
-                dst_ucs4 = ((u32*)temp_string_buf) + len_ucs1;
+                len_ucs1 = dst - (u8 *)temp_string_buf;
+                dst_ucs4 = ((u32 *)temp_string_buf) + len_ucs1;
                 cur_max_ucs_size = 4;
                 // END ucs1 -> ucs4
                 *dst_ucs4++ = read_b4_unicode(uni);
@@ -569,7 +596,8 @@ copy_utf8_inner_ucs1:
                 goto copy_utf8_inner_ucs4;
                 // uni = byte_load_4(src);
                 /* modified END */
-            } else break;
+            } else
+                break;
         })
 
         /* modified BEGIN */
@@ -583,22 +611,46 @@ copy_utf8_inner_ucs1:
     /* modified BEGIN */
     goto copy_escape_ucs1;
     /* modified END */
-    
+
 
     /* modified BEGIN */
 copy_escape_ucs2:
-    assert(cur_max_ucs_size==2);
+    assert(cur_max_ucs_size == 2);
     if (likely(*src == '\\')) {
-    /* modified END */
+        /* modified END */
         switch (*++src) {
-            case '"':  *dst_ucs2++ = '"';  src++; break;
-            case '\\': *dst_ucs2++ = '\\'; src++; break;
-            case '/':  *dst_ucs2++ = '/';  src++; break;
-            case 'b':  *dst_ucs2++ = '\b'; src++; break;
-            case 'f':  *dst_ucs2++ = '\f'; src++; break;
-            case 'n':  *dst_ucs2++ = '\n'; src++; break;
-            case 'r':  *dst_ucs2++ = '\r'; src++; break;
-            case 't':  *dst_ucs2++ = '\t'; src++; break;
+            case '"':
+                *dst_ucs2++ = '"';
+                src++;
+                break;
+            case '\\':
+                *dst_ucs2++ = '\\';
+                src++;
+                break;
+            case '/':
+                *dst_ucs2++ = '/';
+                src++;
+                break;
+            case 'b':
+                *dst_ucs2++ = '\b';
+                src++;
+                break;
+            case 'f':
+                *dst_ucs2++ = '\f';
+                src++;
+                break;
+            case 'n':
+                *dst_ucs2++ = '\n';
+                src++;
+                break;
+            case 'r':
+                *dst_ucs2++ = '\r';
+                src++;
+                break;
+            case 't':
+                *dst_ucs2++ = '\t';
+                src++;
+                break;
             case 'u':
                 if (unlikely(!read_hex_u16(++src, &hi))) {
                     return_err(src - 2, "invalid escaped sequence in string");
@@ -635,12 +687,13 @@ copy_escape_ucs2:
                         return_err(src, "invalid low surrogate in string");
                     }
                     uni = ((((u32)hi - 0xD800) << 10) |
-                            ((u32)lo - 0xDC00)) + 0x10000;
+                           ((u32)lo - 0xDC00)) +
+                          0x10000;
                     /* modified BEGIN */
                     // BEGIN ucs2 -> ucs4
                     assert(cur_max_ucs_size == 2);
-                    len_ucs2 = dst_ucs2 - (u16*)temp_string_buf - len_ucs1;
-                    dst_ucs4 = ((u32*)temp_string_buf) + len_ucs1 + len_ucs2;
+                    len_ucs2 = dst_ucs2 - (u16 *)temp_string_buf - len_ucs1;
+                    dst_ucs4 = ((u32 *)temp_string_buf) + len_ucs1 + len_ucs2;
                     cur_max_ucs_size = 4;
                     // END ucs2 -> ucs4
                     *dst_ucs4++ = uni;
@@ -653,7 +706,8 @@ copy_escape_ucs2:
                     /* modified END */
                 }
                 break;
-            default: return_err(src, "invalid escaped character in string");
+            default:
+                return_err(src, "invalid escaped character in string");
         }
         /* modified BEGIN */
         goto copy_ascii_ucs2;
@@ -661,7 +715,7 @@ copy_escape_ucs2:
         /* modified BEGIN */
     } else if (likely(*src == '"')) {
         goto read_finalize;
-        
+
         /* modified END */
     } else {
         /* modified BEGIN */
@@ -676,7 +730,7 @@ copy_escape_ucs2:
 
     /* modified BEGIN */
 copy_ascii_ucs2:
-    assert(cur_max_ucs_size==2);
+    assert(cur_max_ucs_size == 2);
     while (true) REPEAT_CALL_16({
         if (unlikely(char_is_ascii_stop(*src))) break;
         *dst_ucs2++ = *src++;
@@ -684,14 +738,12 @@ copy_ascii_ucs2:
     /* modified END */
 
 
-
-
     /* modified BEGIN */
 copy_utf8_ucs2:
-    assert(cur_max_ucs_size==2);
+    assert(cur_max_ucs_size == 2);
     /* modified END */
     if (*src & 0x80) { /* non-ASCII character */
-copy_utf8_inner_ucs2:
+    copy_utf8_inner_ucs2:
         pos = src;
         uni = byte_load_4(src);
         // TODO remove the repeat4 later
@@ -709,7 +761,8 @@ copy_utf8_inner_ucs2:
                 // goto copy_utf8_ucs2;
                 uni = byte_load_4(src);
                 /* modified END */
-            } else break;
+            } else
+                break;
         })
         if ((uni & b1_mask) == b1_patt) goto copy_ascii_ucs2;
         while (true) REPEAT_CALL_4({
@@ -740,7 +793,8 @@ copy_utf8_inner_ucs2:
                 // byte_copy_2(dst, &uni);
                 // dst += 2;
                 /* modified END */
-            } else break;
+            } else
+                break;
         })
         while (true) REPEAT_CALL_4({
             if ((uni & b4_mask) == b4_patt) {
@@ -749,8 +803,8 @@ copy_utf8_inner_ucs2:
                 // must be ucs4
                 // BEGIN ucs2 -> ucs4
                 assert(cur_max_ucs_size == 2);
-                len_ucs2 = dst_ucs2 - (u16*)temp_string_buf - len_ucs1;
-                dst_ucs4 = ((u32*)temp_string_buf) + len_ucs1 + len_ucs2;
+                len_ucs2 = dst_ucs2 - (u16 *)temp_string_buf - len_ucs1;
+                dst_ucs4 = ((u32 *)temp_string_buf) + len_ucs1 + len_ucs2;
                 cur_max_ucs_size = 4;
                 // END ucs2 -> ucs4
                 *dst_ucs4++ = read_b4_unicode(uni);
@@ -760,7 +814,8 @@ copy_utf8_inner_ucs2:
                 goto copy_utf8_inner_ucs4;
                 // uni = byte_load_4(src);
                 /* modified END */
-            } else break;
+            } else
+                break;
         })
 
         /* modified BEGIN */
@@ -774,22 +829,46 @@ copy_utf8_inner_ucs2:
     /* modified BEGIN */
     goto copy_escape_ucs2;
     /* modified END */
-    
+
 
     /* modified BEGIN */
 copy_escape_ucs4:
-    assert(cur_max_ucs_size==4);
+    assert(cur_max_ucs_size == 4);
     if (likely(*src == '\\')) {
-    /* modified END */
+        /* modified END */
         switch (*++src) {
-            case '"':  *dst_ucs4++ = '"';  src++; break;
-            case '\\': *dst_ucs4++ = '\\'; src++; break;
-            case '/':  *dst_ucs4++ = '/';  src++; break;
-            case 'b':  *dst_ucs4++ = '\b'; src++; break;
-            case 'f':  *dst_ucs4++ = '\f'; src++; break;
-            case 'n':  *dst_ucs4++ = '\n'; src++; break;
-            case 'r':  *dst_ucs4++ = '\r'; src++; break;
-            case 't':  *dst_ucs4++ = '\t'; src++; break;
+            case '"':
+                *dst_ucs4++ = '"';
+                src++;
+                break;
+            case '\\':
+                *dst_ucs4++ = '\\';
+                src++;
+                break;
+            case '/':
+                *dst_ucs4++ = '/';
+                src++;
+                break;
+            case 'b':
+                *dst_ucs4++ = '\b';
+                src++;
+                break;
+            case 'f':
+                *dst_ucs4++ = '\f';
+                src++;
+                break;
+            case 'n':
+                *dst_ucs4++ = '\n';
+                src++;
+                break;
+            case 'r':
+                *dst_ucs4++ = '\r';
+                src++;
+                break;
+            case 't':
+                *dst_ucs4++ = '\t';
+                src++;
+                break;
             case 'u':
                 if (unlikely(!read_hex_u16(++src, &hi))) {
                     return_err(src - 2, "invalid escaped sequence in string");
@@ -826,9 +905,10 @@ copy_escape_ucs4:
                         return_err(src, "invalid low surrogate in string");
                     }
                     uni = ((((u32)hi - 0xD800) << 10) |
-                            ((u32)lo - 0xDC00)) + 0x10000;
+                           ((u32)lo - 0xDC00)) +
+                          0x10000;
                     /* modified BEGIN */
-                    
+
                     // END ucs2 -> ucs4
                     *dst_ucs4++ = uni;
                     // *dst++ = (u8)(0xF0 | (uni >> 18));
@@ -840,7 +920,8 @@ copy_escape_ucs4:
                     /* modified END */
                 }
                 break;
-            default: return_err(src, "invalid escaped character in string");
+            default:
+                return_err(src, "invalid escaped character in string");
         }
         /* modified BEGIN */
         goto copy_ascii_ucs4;
@@ -848,7 +929,7 @@ copy_escape_ucs4:
         /* modified BEGIN */
     } else if (likely(*src == '"')) {
         goto read_finalize;
-        
+
         /* modified END */
     } else {
         /* modified BEGIN */
@@ -863,7 +944,7 @@ copy_escape_ucs4:
 
     /* modified BEGIN */
 copy_ascii_ucs4:
-    assert(cur_max_ucs_size==4);
+    assert(cur_max_ucs_size == 4);
     while (true) REPEAT_CALL_16({
         if (unlikely(char_is_ascii_stop(*src))) break;
         *dst_ucs4++ = *src++;
@@ -871,14 +952,12 @@ copy_ascii_ucs4:
     /* modified END */
 
 
-
-
     /* modified BEGIN */
 copy_utf8_ucs4:
-    assert(cur_max_ucs_size==4);
+    assert(cur_max_ucs_size == 4);
     /* modified END */
     if (*src & 0x80) { /* non-ASCII character */
-copy_utf8_inner_ucs4:
+    copy_utf8_inner_ucs4:
         pos = src;
         uni = byte_load_4(src);
         // TODO remove the repeat4 later
@@ -896,7 +975,8 @@ copy_utf8_inner_ucs4:
                 // goto copy_utf8_ucs2;
                 uni = byte_load_4(src);
                 /* modified END */
-            } else break;
+            } else
+                break;
         })
         if ((uni & b1_mask) == b1_patt) goto copy_ascii_ucs4;
         while (true) REPEAT_CALL_4({
@@ -926,7 +1006,8 @@ copy_utf8_inner_ucs4:
                 // byte_copy_2(dst, &uni);
                 // dst += 2;
                 /* modified END */
-            } else break;
+            } else
+                break;
         })
         while (true) REPEAT_CALL_4({
             if ((uni & b4_mask) == b4_patt) {
@@ -940,7 +1021,8 @@ copy_utf8_inner_ucs4:
                 // goto copy_utf8_ucs4;
                 uni = byte_load_4(src);
                 /* modified END */
-            } else break;
+            } else
+                break;
         })
 
         /* modified BEGIN */
@@ -954,13 +1036,13 @@ copy_utf8_inner_ucs4:
     /* modified BEGIN */
     goto copy_escape_ucs4;
     /* modified END */
-    
+
 read_finalize:
     *ptr = src + 1;
-    if(unlikely(cur_max_ucs_size==4)) {
-        u32* start = (u32*)temp_string_buf + len_ucs1 + len_ucs2 - 1;
-        u16* ucs2_back = (u16*)temp_string_buf + len_ucs1 + len_ucs2 - 1;
-        u8* ucs1_back = (u8*)temp_string_buf + len_ucs1 - 1;
+    if (unlikely(cur_max_ucs_size == 4)) {
+        u32 *start = (u32 *)temp_string_buf + len_ucs1 + len_ucs2 - 1;
+        u16 *ucs2_back = (u16 *)temp_string_buf + len_ucs1 + len_ucs2 - 1;
+        u8 *ucs1_back = (u8 *)temp_string_buf + len_ucs1 - 1;
         while (len_ucs2) {
             *start-- = *ucs2_back--;
             len_ucs2--;
@@ -969,17 +1051,17 @@ read_finalize:
             *start-- = *ucs1_back--;
             len_ucs1--;
         }
-        return make_string(temp_string_buf, dst_ucs4 - (u32*)temp_string_buf, PYYJSON_STRING_TYPE_UCS4, is_key);
-    } else if (unlikely(cur_max_ucs_size==2)) {
-        u16* start = (u16*)temp_string_buf + len_ucs1 - 1;
-        u8* ucs1_back = (u8*)temp_string_buf + len_ucs1 - 1;
+        return make_string(temp_string_buf, dst_ucs4 - (u32 *)temp_string_buf, PYYJSON_STRING_TYPE_UCS4, is_key);
+    } else if (unlikely(cur_max_ucs_size == 2)) {
+        u16 *start = (u16 *)temp_string_buf + len_ucs1 - 1;
+        u8 *ucs1_back = (u8 *)temp_string_buf + len_ucs1 - 1;
         while (len_ucs1) {
             *start-- = *ucs1_back--;
             len_ucs1--;
         }
-        return make_string(temp_string_buf, dst_ucs2 - (u16*)temp_string_buf, PYYJSON_STRING_TYPE_UCS2, is_key);
+        return make_string(temp_string_buf, dst_ucs2 - (u16 *)temp_string_buf, PYYJSON_STRING_TYPE_UCS2, is_key);
     } else {
-        return make_string(temp_string_buf, dst - (u8*)temp_string_buf, is_ascii?PYYJSON_STRING_TYPE_ASCII:PYYJSON_STRING_TYPE_LATIN1, is_key);
+        return make_string(temp_string_buf, dst - (u8 *)temp_string_buf, is_ascii ? PYYJSON_STRING_TYPE_ASCII : PYYJSON_STRING_TYPE_LATIN1, is_key);
     }
 
 #undef return_err
@@ -989,24 +1071,23 @@ read_finalize:
 #undef is_valid_seq_4
 }
 
-
 /** Read JSON document (accept all style, but optimized for pretty). */
 force_inline PyObject *read_bytes_root_pretty(const char *dat, usize len) {
 
     // container stack info
     DecodeCtnStackInfo _decode_ctn_info;
-    DecodeCtnStackInfo* decode_ctn_info = &_decode_ctn_info;
+    DecodeCtnStackInfo *decode_ctn_info = &_decode_ctn_info;
     // object stack info
     DecodeObjStackInfo _decode_obj_stack_info;
-    DecodeObjStackInfo * const decode_obj_stack_info = &_decode_obj_stack_info;
+    DecodeObjStackInfo *const decode_obj_stack_info = &_decode_obj_stack_info;
     memset(decode_ctn_info, 0, sizeof(DecodeCtnStackInfo));
     memset(decode_obj_stack_info, 0, sizeof(DecodeObjStackInfo));
     // init
-    if(!init_decode_ctn_stack_info(decode_ctn_info) || !init_decode_obj_stack_info(decode_obj_stack_info)) goto failed_cleanup;
-    u8 * string_buffer_head =(u8 *)pyyjson_string_buffer;
-    
+    if (!init_decode_ctn_stack_info(decode_ctn_info) || !init_decode_obj_stack_info(decode_obj_stack_info)) goto failed_cleanup;
+    u8 *string_buffer_head = (u8 *)pyyjson_string_buffer;
+
     //
-    if (unlikely(len > ((size_t) (-1)) / 4)) {
+    if (unlikely(len > ((size_t)(-1)) / 4)) {
         goto fail_alloc;
     }
     if (unlikely(4 * len > PYYJSON_STRING_BUFFER_SIZE)) {
@@ -1014,8 +1095,8 @@ force_inline PyObject *read_bytes_root_pretty(const char *dat, usize len) {
         if (!string_buffer_head) goto fail_alloc;
     }
     //
-    const u8 *cur = (const u8 *) dat;
-    const u8 *const end = (const u8 *) dat + len;
+    const u8 *cur = (const u8 *)dat;
+    const u8 *const end = (const u8 *)dat + len;
 
     if (*cur++ == '{') {
         set_decode_ctn(decode_ctn_info->ctn, 0, false);
@@ -1030,7 +1111,7 @@ force_inline PyObject *read_bytes_root_pretty(const char *dat, usize len) {
 arr_begin:
     /* save current container */
     /* create a new array value, save parent container offset */
-    if(unlikely(!ctn_grow_check(decode_ctn_info))) goto fail_ctn_grow;
+    if (unlikely(!ctn_grow_check(decode_ctn_info))) goto fail_ctn_grow;
     set_decode_ctn(decode_ctn_info->ctn, 0, true);
 
     /* push the new array value as current container */
@@ -1039,7 +1120,7 @@ arr_begin:
 arr_val_begin:
 #if PYYJSON_IS_REAL_GCC
     while (true) REPEAT_CALL_16({
-        if (byte_match_2((void *) cur, "  ")) cur += 2;
+        if (byte_match_2((void *)cur, "  ")) cur += 2;
         else
             break;
     })
@@ -1051,16 +1132,16 @@ arr_val_begin:
     })
 #endif
 
-            if (*cur == '{') {
-            cur++;
-            goto obj_begin;
-        }
+    if (*cur == '{') {
+        cur++;
+        goto obj_begin;
+    }
     if (*cur == '[') {
         cur++;
         goto arr_begin;
     }
     if (char_is_number(*cur)) {
-        PyObject* number_obj = read_number(&cur);
+        PyObject *number_obj = read_number(&cur);
         if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
@@ -1068,7 +1149,7 @@ arr_val_begin:
         goto fail_number;
     }
     if (*cur == '"') {
-        PyObject* str_obj = read_bytes(&cur, string_buffer_head, false);
+        PyObject *str_obj = read_bytes(&cur, string_buffer_head, false);
         if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
@@ -1107,12 +1188,11 @@ arr_val_begin:
         goto fail_trailing_comma;
     }
     if (char_is_space(*cur)) {
-        while (char_is_space(*++cur))
-            ;
+        while (char_is_space(*++cur));
         goto arr_val_begin;
     }
     if ((*cur == 'i' || *cur == 'I' || *cur == 'N')) {
-        PyObject* number_obj = read_inf_or_nan(false, &cur);
+        PyObject *number_obj = read_inf_or_nan(false, &cur);
         if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
@@ -1123,7 +1203,7 @@ arr_val_begin:
     goto fail_character_val;
 
 arr_val_end:
-    if (byte_match_2((void *) cur, ",\n")) {
+    if (byte_match_2((void *)cur, ",\n")) {
         cur += 2;
         goto arr_val_begin;
     }
@@ -1136,8 +1216,7 @@ arr_val_end:
         goto arr_end;
     }
     if (char_is_space(*cur)) {
-        while (char_is_space(*++cur))
-            ;
+        while (char_is_space(*++cur));
         goto arr_val_end;
     }
 
@@ -1145,7 +1224,7 @@ arr_val_end:
 
 arr_end:
     assert(decode_ctn_is_arr(decode_ctn_info->ctn));
-    if(!pyyjson_decode_arr(decode_obj_stack_info, get_decode_ctn_len(decode_ctn_info->ctn))) goto failed_cleanup;
+    if (!pyyjson_decode_arr(decode_obj_stack_info, get_decode_ctn_len(decode_ctn_info->ctn))) goto failed_cleanup;
     /* pop parent as current container */
     if (unlikely(decode_ctn_info->ctn-- == decode_ctn_info->ctn_start)) {
         goto doc_end;
@@ -1161,14 +1240,14 @@ arr_end:
 
 obj_begin:
     /* push container */
-    if(unlikely(!ctn_grow_check(decode_ctn_info))) goto fail_ctn_grow;
+    if (unlikely(!ctn_grow_check(decode_ctn_info))) goto fail_ctn_grow;
     set_decode_ctn(decode_ctn_info->ctn, 0, false);
     if (*cur == '\n') cur++;
 
 obj_key_begin:
 #if PYYJSON_IS_REAL_GCC
     while (true) REPEAT_CALL_16({
-        if (byte_match_2((void *) cur, "  ")) cur += 2;
+        if (byte_match_2((void *)cur, "  ")) cur += 2;
         else
             break;
     })
@@ -1179,27 +1258,26 @@ obj_key_begin:
             break;
     })
 #endif
-        if (likely(*cur == '"')) {
-            PyObject* str_obj = read_bytes(&cur, string_buffer_head, true);
-            if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
-                goto obj_key_end;
-            }
-            goto fail_string;
+    if (likely(*cur == '"')) {
+        PyObject *str_obj = read_bytes(&cur, string_buffer_head, true);
+        if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
+            goto obj_key_end;
         }
+        goto fail_string;
+    }
     if (likely(*cur == '}')) {
         cur++;
         if (likely(get_decode_ctn_len(decode_ctn_info->ctn) == 0)) goto obj_end;
         goto fail_trailing_comma;
     }
     if (char_is_space(*cur)) {
-        while (char_is_space(*++cur))
-            ;
+        while (char_is_space(*++cur));
         goto obj_key_begin;
     }
     goto fail_character_obj_key;
 
 obj_key_end:
-    if (byte_match_2((void *) cur, ": ")) {
+    if (byte_match_2((void *)cur, ": ")) {
         cur += 2;
         goto obj_val_begin;
     }
@@ -1208,15 +1286,14 @@ obj_key_end:
         goto obj_val_begin;
     }
     if (char_is_space(*cur)) {
-        while (char_is_space(*++cur))
-            ;
+        while (char_is_space(*++cur));
         goto obj_key_end;
     }
     goto fail_character_obj_sep;
 
 obj_val_begin:
     if (*cur == '"') {
-        PyObject* str_obj = read_bytes(&cur, string_buffer_head, false);
+        PyObject *str_obj = read_bytes(&cur, string_buffer_head, false);
         if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
@@ -1224,7 +1301,7 @@ obj_val_begin:
         goto fail_string;
     }
     if (char_is_number(*cur)) {
-        PyObject* number_obj = read_number(&cur);
+        PyObject *number_obj = read_number(&cur);
         if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
@@ -1265,12 +1342,11 @@ obj_val_begin:
         goto fail_literal_null;
     }
     if (char_is_space(*cur)) {
-        while (char_is_space(*++cur))
-            ;
+        while (char_is_space(*++cur));
         goto obj_val_begin;
     }
     if ((*cur == 'i' || *cur == 'I' || *cur == 'N')) {
-        PyObject* number_obj = read_inf_or_nan(false, &cur);
+        PyObject *number_obj = read_inf_or_nan(false, &cur);
         if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
@@ -1281,7 +1357,7 @@ obj_val_begin:
     goto fail_character_val;
 
 obj_val_end:
-    if (byte_match_2((void *) cur, ",\n")) {
+    if (byte_match_2((void *)cur, ",\n")) {
         cur += 2;
         goto obj_key_begin;
     }
@@ -1294,8 +1370,7 @@ obj_val_end:
         goto obj_end;
     }
     if (char_is_space(*cur)) {
-        while (char_is_space(*++cur))
-            ;
+        while (char_is_space(*++cur));
         goto obj_val_end;
     }
 
@@ -1303,7 +1378,7 @@ obj_val_end:
 
 obj_end:
     assert(!decode_ctn_is_arr(decode_ctn_info->ctn));
-    if(unlikely(!pyyjson_decode_obj(decode_obj_stack_info, get_decode_ctn_len(decode_ctn_info->ctn)))) goto failed_cleanup;
+    if (unlikely(!pyyjson_decode_obj(decode_obj_stack_info, get_decode_ctn_len(decode_ctn_info->ctn)))) goto failed_cleanup;
     /* pop container */
     /* point to the next value */
     if (unlikely(decode_ctn_info->ctn-- == decode_ctn_info->ctn_start)) {
@@ -1341,14 +1416,14 @@ success:;
 
     return obj;
 
-#define return_err(_pos, _type, _msg)                                                               \
-    do {                                                                                            \
-        if (_type == JSONDecodeError) {                                                             \
-            PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, ((u8 *) _pos) - (u8 *) dat); \
-        } else {                                                                                    \
-            PyErr_SetString(_type, _msg);                                                           \
-        }                                                                                           \
-        goto failed_cleanup;                                                                        \
+#define return_err(_pos, _type, _msg)                                                             \
+    do {                                                                                          \
+        if (_type == JSONDecodeError) {                                                           \
+            PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, ((u8 *)_pos) - (u8 *)dat); \
+        } else {                                                                                  \
+            PyErr_SetString(_type, _msg);                                                         \
+        }                                                                                         \
+        goto failed_cleanup;                                                                      \
     } while (0)
 
 fail_string:
@@ -1393,7 +1468,7 @@ fail_garbage:
                "unexpected content after document");
 fail_ctn_grow:
     return_err(cur, JSONDecodeError,
-                "max recursion exceeded");
+               "max recursion exceeded");
 
 failed_cleanup:
     for (PyObject **obj_ptr = decode_obj_stack_info->result_stack; obj_ptr < decode_obj_stack_info->cur_write_result_addr; obj_ptr++) {

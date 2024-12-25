@@ -1,17 +1,17 @@
 #ifndef COMPILE_UCS_LEVEL
-#error "COMPILE_UCS_LEVEL is not defined"
+#    error "COMPILE_UCS_LEVEL is not defined"
 #endif
 
 #ifndef COMPILE_INDENT_LEVEL
-#error "COMPILE_INDENT_LEVEL is not defined"
+#    error "COMPILE_INDENT_LEVEL is not defined"
 #endif
 
 #if COMPILE_UCS_LEVEL <= 1
-#define COMPILE_READ_UCS_LEVEL 1
-#define COMPILE_WRITE_UCS_LEVEL 1
+#    define COMPILE_READ_UCS_LEVEL 1
+#    define COMPILE_WRITE_UCS_LEVEL 1
 #else
-#define COMPILE_READ_UCS_LEVEL COMPILE_UCS_LEVEL
-#define COMPILE_WRITE_UCS_LEVEL COMPILE_UCS_LEVEL
+#    define COMPILE_READ_UCS_LEVEL COMPILE_UCS_LEVEL
+#    define COMPILE_WRITE_UCS_LEVEL COMPILE_UCS_LEVEL
 #endif
 
 #include "commondef/w_in.inl.h"
@@ -27,7 +27,7 @@
         if (unlikely(!vec)) return false;                                                              \
     } while (0)
 
-#define _CTN_STACK(stack_vars) ((void) 0, stack_vars->ctn_stack)
+#define _CTN_STACK(stack_vars) ((void)0, stack_vars->ctn_stack)
 
 #define VEC_BACK1 PYYJSON_CONCAT2(vec_back1, COMPILE_UCS_LEVEL)
 #if COMPILE_INDENT_LEVEL == 0
@@ -146,7 +146,6 @@ force_inline bool VECTOR_APPEND_KEY(PyObject *key, UnicodeVector **restrict vec_
     }
     return true;
 }
-
 
 #define VECTOR_APPEND_STR PYYJSON_CONCAT3(vector_append_str, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
@@ -271,16 +270,16 @@ force_inline bool VECTOR_APPEND_FALSE(UnicodeVector **restrict vec_addr, Py_ssiz
     *writer++ = 0;
     *writer++ = 0;
 #elif COMPILE_UCS_LEVEL == 2
-#if SIZEOF_VOID_P == 8
+#    if SIZEOF_VOID_P == 8
     *writer++ = 0;
     *writer++ = 0;
-#endif // SIZEOF_VOID_P
-#else  // COMPILE_UCS_LEVEL == 4
-#if __AVX__
+#    endif // SIZEOF_VOID_P
+#else      // COMPILE_UCS_LEVEL == 4
+#    if __AVX__
     *writer++ = 0;
     *writer++ = 0;
-#endif // __AVX__
-#endif // COMPILE_UCS_LEVEL
+#    endif // __AVX__
+#endif     // COMPILE_UCS_LEVEL
     _WRITER(vec) += 6;
     return true;
 }
@@ -305,18 +304,18 @@ force_inline bool VECTOR_APPEND_TRUE(UnicodeVector **restrict vec_addr, Py_ssize
     *writer++ = 0;
 #elif COMPILE_UCS_LEVEL == 2
     *writer++ = 0;
-#if SIZEOF_VOID_P == 8
+#    if SIZEOF_VOID_P == 8
     *writer++ = 0;
     *writer++ = 0;
-#endif // SIZEOF_VOID_P == 8
-#else  // COMPILE_UCS_LEVEL == 4
-#if SIZEOF_VOID_P == 8
+#    endif // SIZEOF_VOID_P == 8
+#else      // COMPILE_UCS_LEVEL == 4
+#    if SIZEOF_VOID_P == 8
     *writer++ = 0;
-#if __AVX__
+#        if __AVX__
     *writer++ = 0;
     *writer++ = 0;
-#endif // __AVX__
-#endif
+#        endif // __AVX__
+#    endif
 #endif // COMPILE_UCS_LEVEL
     _WRITER(vec) += 5;
     return true;
@@ -342,18 +341,18 @@ force_inline bool VECTOR_APPEND_NULL(UnicodeVector **restrict vec_addr, Py_ssize
     *writer++ = 0;
 #elif COMPILE_UCS_LEVEL == 2
     *writer++ = 0;
-#if SIZEOF_VOID_P == 8
+#    if SIZEOF_VOID_P == 8
     *writer++ = 0;
     *writer++ = 0;
-#endif // SIZEOF_VOID_P == 8
-#else  // COMPILE_UCS_LEVEL == 4
-#if SIZEOF_VOID_P == 8
+#    endif // SIZEOF_VOID_P == 8
+#else      // COMPILE_UCS_LEVEL == 4
+#    if SIZEOF_VOID_P == 8
     *writer++ = 0;
-#if __AVX__
+#        if __AVX__
     *writer++ = 0;
     *writer++ = 0;
-#endif // __AVX__
-#endif
+#        endif // __AVX__
+#    endif
 #endif // COMPILE_UCS_LEVEL
     _WRITER(vec) += 5;
     return true;
@@ -366,7 +365,7 @@ force_inline bool VECTOR_APPEND_FLOAT(UnicodeVector **restrict vec_addr, Py_ssiz
     WRITE_INDENT_RETURN_IF_FAIL(vec_addr, cur_nested_depth, is_in_obj, TAIL_PADDING);
     double v = PyFloat_AS_DOUBLE(val);
     // u8 *const buffer = (u8 *) reserve_view_data_buffer<u8[32]>(viewer);
-    u64 *raw = (u64 *) &v;
+    u64 *raw = (u64 *)&v;
     VEC_WRITE_F64(vec, *raw);
     *_WRITER(vec)++ = ',';
     return true;
@@ -462,15 +461,15 @@ force_inline bool VECTOR_APPEND_ARR_END(UnicodeVector **restrict vec_addr, Py_ss
 #if COMPILE_INDENT_LEVEL == 0
 // avoid compile again
 force_inline Py_ssize_t GET_VECTOR_FINAL_LEN(UnicodeVector *vec) {
-#if COMPILE_UCS_LEVEL == 0
-    return vec->head.write_u8 - (u8 *) GET_VEC_ASCII_START(vec);
-#elif COMPILE_UCS_LEVEL == 1
-    return vec->head.write_u8 - (u8 *) GET_VEC_COMPACT_START(vec);
-#elif COMPILE_UCS_LEVEL == 2
-    return vec->head.write_u16 - (u16 *) GET_VEC_COMPACT_START(vec);
-#elif COMPILE_UCS_LEVEL == 4
-    return vec->head.write_u32 - (u32 *) GET_VEC_COMPACT_START(vec);
-#endif
+#    if COMPILE_UCS_LEVEL == 0
+    return vec->head.write_u8 - (u8 *)GET_VEC_ASCII_START(vec);
+#    elif COMPILE_UCS_LEVEL == 1
+    return vec->head.write_u8 - (u8 *)GET_VEC_COMPACT_START(vec);
+#    elif COMPILE_UCS_LEVEL == 2
+    return vec->head.write_u16 - (u16 *)GET_VEC_COMPACT_START(vec);
+#    elif COMPILE_UCS_LEVEL == 4
+    return vec->head.write_u32 - (u32 *)GET_VEC_COMPACT_START(vec);
+#    endif
 }
 #endif
 
@@ -671,7 +670,7 @@ PYYJSON_DUMPS_OBJ(
     Py_UNREACHABLE();
 #else
     switch (jump_flag) {
-#if COMPILE_UCS_LEVEL == 1
+#    if COMPILE_UCS_LEVEL == 1
         case JumpFlag_Elevate1_ArrVal: {
             if (PyList_CheckExact(stack_vars->cur_obj))
                 goto arr_val_begin;
@@ -687,7 +686,7 @@ PYYJSON_DUMPS_OBJ(
             goto dict_key_done;
             break;
         }
-#elif COMPILE_UCS_LEVEL == 2
+#    elif COMPILE_UCS_LEVEL == 2
         case JumpFlag_Elevate2_ArrVal: {
             if (PyList_CheckExact(stack_vars->cur_obj))
                 goto arr_val_begin;
@@ -703,7 +702,7 @@ PYYJSON_DUMPS_OBJ(
             goto dict_key_done;
             break;
         }
-#elif COMPILE_UCS_LEVEL == 4
+#    elif COMPILE_UCS_LEVEL == 4
         case JumpFlag_Elevate4_ArrVal: {
             if (PyList_CheckExact(stack_vars->cur_obj))
                 goto arr_val_begin;
@@ -719,7 +718,7 @@ PYYJSON_DUMPS_OBJ(
             goto dict_key_done;
             break;
         }
-#endif
+#    endif
         default: {
             Py_UNREACHABLE();
             break;
@@ -990,7 +989,7 @@ success:;
     bool _c = vector_resize_to_fit(&GET_VEC(stack_vars), final_len, COMPILE_UCS_LEVEL);
     GOTO_FAIL_ON_UNLIKELY_ERR(!_c);
     init_py_unicode(GET_VEC(stack_vars), final_len, COMPILE_UCS_LEVEL);
-    return (PyObject *) GET_VEC(stack_vars);
+    return (PyObject *)GET_VEC(stack_vars);
 fail:;
     if (GET_VEC(stack_vars)) {
         PyObject_Free(GET_VEC(stack_vars));
@@ -1003,7 +1002,6 @@ fail_keytype:;
     PyErr_SetString(JSONEncodeError, "Expected `str` as key");
     goto fail;
 }
-
 
 #include "commondef/w_out.inl.h"
 

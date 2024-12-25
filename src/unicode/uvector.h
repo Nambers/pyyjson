@@ -5,33 +5,32 @@
 
 #include "pyyjson.h"
 
-
 typedef struct UnicodeVecHead {
     union {
         u8 *write_u8;
         u16 *write_u16;
         u32 *write_u32;
     };
+
     void *write_end;
 } UnicodeVecHead;
 
-
 static_assert(sizeof(UnicodeVecHead) <= sizeof(PyASCIIObject), "sizeof(UnicodeVecHead) <= sizeof(PyASCIIObject)");
-
 
 typedef struct VecASCIIRep {
     union {
         PyASCIIObject ascii_obj;
     };
+
     u8 ascii_data[1];
 } VecASCIIRep;
-
 
 typedef struct CompactUnicodeRep {
     union {
         VecASCIIRep ascii_rep;
         PyCompactUnicodeObject compact_obj;
     };
+
     union {
         u8 latin1_data[1];
         u16 u16_data[1];
@@ -46,13 +45,12 @@ typedef struct UnicodeVector {
     };
 } UnicodeVector;
 
-
 #define U8_WRITER(vec) (vec->head.write_u8)
 #define U16_WRITER(vec) (vec->head.write_u16)
 #define U32_WRITER(vec) (vec->head.write_u32)
 
-#define GET_VEC_ASCII_START(vec) ((void *) &(vec)->unicode_rep.ascii_rep.ascii_data[0])
-#define GET_VEC_COMPACT_START(vec) ((void *) &(vec)->unicode_rep.latin1_data[0])
+#define GET_VEC_ASCII_START(vec) ((void *)&(vec)->unicode_rep.ascii_rep.ascii_data[0])
+#define GET_VEC_COMPACT_START(vec) ((void *)&(vec)->unicode_rep.latin1_data[0])
 
 #define VEC_END(vec) (vec->head.write_end)
 
@@ -62,9 +60,8 @@ force_noinline UnicodeVector *unicode_vec_reserve(UnicodeVector *vec, void *targ
 
 force_noinline void init_py_unicode(UnicodeVector *restrict vec_addr, Py_ssize_t size, int kind);
 
-
 force_inline bool vec_in_boundary(UnicodeVector *vec) {
-    return vec->head.write_u8 <= (u8 *) vec->head.write_end && vec->head.write_u8 >= (u8 *) GET_VEC_ASCII_START(vec);
+    return vec->head.write_u8 <= (u8 *)vec->head.write_end && vec->head.write_u8 >= (u8 *)GET_VEC_ASCII_START(vec);
 }
 
 /* Resize the vector pointed by `vec_addr`.

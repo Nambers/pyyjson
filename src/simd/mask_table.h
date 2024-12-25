@@ -13,17 +13,17 @@ extern pyyjson_align(64) const u8 _TailmaskTable_8[64][64];
 
 /* Read tail mask of u8. */
 force_inline const void *read_tail_mask_table_8(Py_ssize_t row) {
-    return (void *) &_TailmaskTable_8[row][0];
+    return (void *)&_TailmaskTable_8[row][0];
 }
 
 /* Read tail mask of u16. */
 force_inline const void *read_tail_mask_table_16(Py_ssize_t row) {
-    return (void *) &_TailmaskTable_8[2 * row][0];
+    return (void *)&_TailmaskTable_8[2 * row][0];
 }
 
 /* Read tail mask of u32. */
 force_inline const void *read_tail_mask_table_32(Py_ssize_t row) {
-    return (void *) &_TailmaskTable_8[4 * row][0];
+    return (void *)&_TailmaskTable_8[4 * row][0];
 }
 
 

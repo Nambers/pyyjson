@@ -5,34 +5,34 @@
 #include "simd/simd_detect.h"
 #include <immintrin.h>
 #if defined(_MSC_VER)
-#include <intrin.h>
+#    include <intrin.h>
 #endif
 
 
 #if SIMD_BIT_SIZE == 512
-#define SIMD_VAR z
-#define SIMD_TYPE __m512i
-#define SIMD_MASK_TYPE u64
-#define SIMD_SMALL_MASK_TYPE u16
-#define SIMD_BIT_MASK_TYPE u64
-#define SIMD_HALF_TYPE __m256i
-#define SIMD_EXTRACT_QUARTER _mm512_extracti32x4_epi32
-#define SIMD_EXTRACT_HALF _mm512_extracti64x4_epi64
+#    define SIMD_VAR z
+#    define SIMD_TYPE __m512i
+#    define SIMD_MASK_TYPE u64
+#    define SIMD_SMALL_MASK_TYPE u16
+#    define SIMD_BIT_MASK_TYPE u64
+#    define SIMD_HALF_TYPE __m256i
+#    define SIMD_EXTRACT_QUARTER _mm512_extracti32x4_epi32
+#    define SIMD_EXTRACT_HALF _mm512_extracti64x4_epi64
 #elif SIMD_BIT_SIZE == 256
-#define SIMD_VAR y
-#define SIMD_TYPE __m256i
-#define SIMD_MASK_TYPE SIMD_TYPE
-#define SIMD_SMALL_MASK_TYPE __m128i
-#define SIMD_BIT_MASK_TYPE u32
-#define SIMD_HALF_TYPE __m128i
-#define SIMD_EXTRACT_HALF _mm256_extracti128_si256
+#    define SIMD_VAR y
+#    define SIMD_TYPE __m256i
+#    define SIMD_MASK_TYPE SIMD_TYPE
+#    define SIMD_SMALL_MASK_TYPE __m128i
+#    define SIMD_BIT_MASK_TYPE u32
+#    define SIMD_HALF_TYPE __m128i
+#    define SIMD_EXTRACT_HALF _mm256_extracti128_si256
 #else
-#define SIMD_VAR x
-#define SIMD_TYPE __m128i
-#define SIMD_MASK_TYPE SIMD_TYPE
-#define SIMD_SMALL_MASK_TYPE SIMD_TYPE
-#define SIMD_BIT_MASK_TYPE u16
-#define SIMD_HALF_TYPE SIMD_TYPE
+#    define SIMD_VAR x
+#    define SIMD_TYPE __m128i
+#    define SIMD_MASK_TYPE SIMD_TYPE
+#    define SIMD_SMALL_MASK_TYPE SIMD_TYPE
+#    define SIMD_BIT_MASK_TYPE u16
+#    define SIMD_HALF_TYPE SIMD_TYPE
 #endif
 
 /*==============================================================================
@@ -56,9 +56,9 @@ force_inline void write_simd(void *dst, SIMD_TYPE SIMD_VAR) {
 #if SIMD_BIT_SIZE == 512
     _mm512_storeu_si512(dst, SIMD_VAR);
 #elif SIMD_BIT_SIZE == 256
-    _mm256_storeu_si256((SIMD_256_IU *) dst, SIMD_VAR);
+    _mm256_storeu_si256((SIMD_256_IU *)dst, SIMD_VAR);
 #else
-    _mm_storeu_si128((SIMD_128_IU *) dst, SIMD_VAR);
+    _mm_storeu_si128((SIMD_128_IU *)dst, SIMD_VAR);
 #endif
 }
 
@@ -143,9 +143,9 @@ force_inline SIMD_128 runtime_right_shift_128bits(SIMD_128 x, int imm8) {
  */
 force_inline void write_aligned(void *dst, SIMD_TYPE SIMD_VAR) {
 #if SIMD_BIT_SIZE == 128
-    _mm_store_si128((__m128i *) dst, SIMD_VAR);
+    _mm_store_si128((__m128i *)dst, SIMD_VAR);
 #elif SIMD_BIT_SIZE == 256
-    _mm256_store_si256((__m256i *) dst, SIMD_VAR);
+    _mm256_store_si256((__m256i *)dst, SIMD_VAR);
 #else
     _mm512_store_si512(dst, SIMD_VAR);
 #endif
@@ -155,19 +155,19 @@ force_inline void write_aligned(void *dst, SIMD_TYPE SIMD_VAR) {
  * write memory with length sizeof(SIMD_TYPE) to dst.
  */
 force_inline void write_128(void *dst, SIMD_128 x) {
-    _mm_storeu_si128((SIMD_128_IU *) dst, x);
+    _mm_storeu_si128((SIMD_128_IU *)dst, x);
 }
 
 force_inline SIMD_128 load_128(const void *src) {
 #if __SSE3__
-    return _mm_lddqu_si128((const SIMD_128_IU *) src);
+    return _mm_lddqu_si128((const SIMD_128_IU *)src);
 #else
-    return _mm_loadu_si128((const SIMD_128_IU *) src);
+    return _mm_loadu_si128((const SIMD_128_IU *)src);
 #endif
 }
 
 force_inline SIMD_128 load_128_aligned(const void *src) {
-    return _mm_load_si128((const __m128i *) src);
+    return _mm_load_si128((const __m128i *)src);
 }
 
 force_inline SIMD_128 simd_and_128(SIMD_128 a, SIMD_128 b) {
@@ -190,7 +190,7 @@ force_inline SIMD_128 broadcast_64_128(i64 v) {
 #if defined(_MSC_VER) && !defined(_M_IX86)
     return _mm_set1_epi64x(v);
 #else
-    return _mm_set1_epi64((__m64) v);
+    return _mm_set1_epi64((__m64)v);
 #endif
 }
 
@@ -207,7 +207,7 @@ force_inline SIMD_128 cmpeq0_8_128(SIMD_128 a) {
 }
 
 force_inline u16 to_bitmask_128(SIMD_128 a) {
-    return (u16) _mm_movemask_epi8(a);
+    return (u16)_mm_movemask_epi8(a);
 }
 
 force_inline SIMD_128 cmpeq_8_128(SIMD_128 a, SIMD_128 b) {
@@ -280,9 +280,9 @@ force_inline void extract_128_two_parts(SIMD_128 x, SIMD_128 *restrict x1, SIMD_
 
 force_inline void extract_128_four_parts(SIMD_128 x, SIMD_128 *restrict x1, SIMD_128 *restrict x2, SIMD_128 *restrict x3, SIMD_128 *restrict x4) {
 #if __SSE3__
-#define MOVEHDUP(_x) (SIMD_128) _mm_movehdup_ps((__m128) (_x))
+#    define MOVEHDUP(_x) (SIMD_128) _mm_movehdup_ps((__m128)(_x))
 #else
-#define MOVEHDUP(_x) _mm_bsrli_si128((_x), 4)
+#    define MOVEHDUP(_x) _mm_bsrli_si128((_x), 4)
 #endif
     *x1 = x;
     *x2 = MOVEHDUP(x);
@@ -298,13 +298,13 @@ force_inline bool check_mask_zero(SIMD_MASK_TYPE mask) {
 #if SIMD_BIT_SIZE == 512
     return mask == 0;
 #elif SIMD_BIT_SIZE == 256
-    return (bool) _mm256_testz_si256(mask, mask);
+    return (bool)_mm256_testz_si256(mask, mask);
 #else
-#if defined(__SSE4_1__)
-    return (bool) _mm_testz_si128(mask, mask);
-#else
+#    if defined(__SSE4_1__)
+    return (bool)_mm_testz_si128(mask, mask);
+#    else
     return _mm_movemask_epi8(_mm_cmpeq_epi8(mask, _mm_setzero_si128())) == 0xFFFF;
-#endif
+#    endif
 #endif
 }
 
@@ -328,19 +328,19 @@ force_inline SIMD_128 blendv_128(SIMD_128 blend, SIMD_128 x, SIMD_128 mask) {
  *============================================================================*/
 #if __AVX__
 force_inline SIMD_256 load_256(const void *src) {
-    return _mm256_lddqu_si256((const SIMD_256_IU *) src);
+    return _mm256_lddqu_si256((const SIMD_256_IU *)src);
 }
 
 force_inline SIMD_256 load_256_aligned(const void *src) {
-    return _mm256_load_si256((const __m256i *) src);
+    return _mm256_load_si256((const __m256i *)src);
 }
 
 force_inline void write_256(void *dst, SIMD_256 y) {
-    _mm256_storeu_si256((SIMD_256_IU *) dst, y);
+    _mm256_storeu_si256((SIMD_256_IU *)dst, y);
 }
 
 force_inline void write_256_aligned(void *dst, SIMD_256 y) {
-    _mm256_store_si256((__m256i *) dst, y);
+    _mm256_store_si256((__m256i *)dst, y);
 }
 #endif
 
@@ -370,7 +370,7 @@ force_inline SIMD_256 simd_or_256(SIMD_256 a, SIMD_256 b) {
 
 force_inline u32 to_bitmask_256(SIMD_256 a) {
     int t = _mm256_movemask_epi8(a);
-    return (u32) t;
+    return (u32)t;
 }
 
 force_inline SIMD_256 cmpeq0_8_256(SIMD_256 a) {
@@ -449,19 +449,19 @@ force_inline SIMD_512 elevate_1_2_to_512(SIMD_256 y) {
  *============================================================================*/
 #if SIMD_BIT_SIZE > 128
 force_inline SIMD_HALF_TYPE load_aligned_half(const void *src) {
-#if SIMD_BIT_SIZE == 256
+#    if SIMD_BIT_SIZE == 256
     return load_128_aligned(src);
-#else // SIMD_BIT_SIZE == 512
+#    else // SIMD_BIT_SIZE == 512
     return load_256_aligned(src);
-#endif
+#    endif
 }
 
 force_inline SIMD_HALF_TYPE load_half(const void *src) {
-#if SIMD_BIT_SIZE == 256
+#    if SIMD_BIT_SIZE == 256
     return load_128(src);
-#else
+#    else
     return load_256(src);
-#endif
+#    endif
 }
 
 #endif // SIMD_BIT_SIZE > 128

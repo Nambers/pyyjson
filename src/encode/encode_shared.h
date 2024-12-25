@@ -38,7 +38,6 @@ static Py_ssize_t _ControlJump[_Slash + 1] = {
 
 static_assert((PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE % 64) == 0, "(PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE % 64) == 0");
 
-
 /*==============================================================================
  * Utils
  *============================================================================*/
@@ -105,50 +104,50 @@ force_inline Py_ssize_t get_indent_char_count(Py_ssize_t cur_nested_depth, Py_ss
  *============================================================================*/
 
 force_inline void *get_unicode_data(PyObject *unicode) {
-    if (((PyASCIIObject *) unicode)->state.ascii) {
-        return (void *) (((PyASCIIObject *) unicode) + 1);
+    if (((PyASCIIObject *)unicode)->state.ascii) {
+        return (void *)(((PyASCIIObject *)unicode) + 1);
     }
-    return (void *) (((PyCompactUnicodeObject *) unicode) + 1);
+    return (void *)(((PyCompactUnicodeObject *)unicode) + 1);
 }
 
 force_inline bool pylong_is_unsigned(PyObject *obj) {
 #if PY_MINOR_VERSION >= 12
-    return !(bool) (((PyLongObject *) obj)->long_value.lv_tag & 2);
+    return !(bool)(((PyLongObject *)obj)->long_value.lv_tag & 2);
 #else
-    return ((PyVarObject *) obj)->ob_size > 0;
+    return ((PyVarObject *)obj)->ob_size > 0;
 #endif
 }
 
 force_inline bool pylong_is_zero(PyObject *obj) {
 #if PY_MINOR_VERSION >= 12
-    return (bool) (((PyLongObject *) obj)->long_value.lv_tag & 1);
+    return (bool)(((PyLongObject *)obj)->long_value.lv_tag & 1);
 #else
-    return ((PyVarObject *) obj)->ob_size == 0;
+    return ((PyVarObject *)obj)->ob_size == 0;
 #endif
 }
 
 // PyErr may occur.
 force_inline bool pylong_value_unsigned(PyObject *obj, u64 *value) {
 #if PY_MINOR_VERSION >= 12
-    if (likely(((PyLongObject *) obj)->long_value.lv_tag < (2 << _PyLong_NON_SIZE_BITS))) {
-        *value = (u64) * ((PyLongObject *) obj)->long_value.ob_digit;
+    if (likely(((PyLongObject *)obj)->long_value.lv_tag < (2 << _PyLong_NON_SIZE_BITS))) {
+        *value = (u64) * ((PyLongObject *)obj)->long_value.ob_digit;
         return true;
     }
 #endif
     unsigned long long v = PyLong_AsUnsignedLongLong(obj);
-    if (unlikely(v == (unsigned long long) -1 && PyErr_Occurred())) {
+    if (unlikely(v == (unsigned long long)-1 && PyErr_Occurred())) {
         return false;
     }
-    *value = (u64) v;
+    *value = (u64)v;
     static_assert(sizeof(unsigned long long) <= sizeof(u64), "sizeof(unsigned long long) <= sizeof(u64)");
     return true;
 }
 
 force_inline i64 pylong_value_signed(PyObject *obj, i64 *value) {
 #if PY_MINOR_VERSION >= 12
-    if (likely(((PyLongObject *) obj)->long_value.lv_tag < (2 << _PyLong_NON_SIZE_BITS))) {
-        i64 sign = 1 - (i64) ((((PyLongObject *) obj)->long_value.lv_tag & 3));
-        *value = sign * (i64) * ((PyLongObject *) obj)->long_value.ob_digit;
+    if (likely(((PyLongObject *)obj)->long_value.lv_tag < (2 << _PyLong_NON_SIZE_BITS))) {
+        i64 sign = 1 - (i64)((((PyLongObject *)obj)->long_value.lv_tag & 3));
+        *value = sign * (i64) * ((PyLongObject *)obj)->long_value.ob_digit;
         return true;
     }
 #endif
@@ -156,7 +155,7 @@ force_inline i64 pylong_value_signed(PyObject *obj, i64 *value) {
     if (unlikely(v == -1 && PyErr_Occurred())) {
         return false;
     }
-    *value = (i64) v;
+    *value = (i64)v;
     static_assert(sizeof(long long) <= sizeof(i64), "sizeof(long long) <= sizeof(i64)");
     return true;
 }

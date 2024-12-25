@@ -10,7 +10,7 @@ DRAFT utf-8 encoding.
 
 /* read: 32 bytes, write: 48 bytes, reserve: 56 bytes */
 force_inline void ucs2_encode_3bytes_utf8(const uint16_t *reader, uint8_t *writer) {
-    __m256i tmp = _mm256_loadu_si256((const void *) reader);
+    __m256i tmp = _mm256_loadu_si256((const void *)reader);
     __m256i y[2];
     __m128i x_low = _mm256_extracti128_si256(tmp, 0);
     __m128i x_high = _mm256_extracti128_si256(tmp, 1);
@@ -136,7 +136,7 @@ force_inline void ucs2_encode_3bytes_utf8(const uint16_t *reader, uint8_t *write
         z = _mm256_and_si256(z, _mm256_loadu_si256(m1));
         // 5678[mmmm]|gh1234[mm]|abcdef[mm]
         z = _mm256_or_si256(z, _mm256_loadu_si256(m2));
-        _mm256_storeu_si256((void *) writer, z);
+        _mm256_storeu_si256((void *)writer, z);
         writer += 24;
     }
 }
@@ -146,7 +146,7 @@ force_inline void ucs2_encode_3bytes_utf8(const uint16_t *reader, uint8_t *write
 /* read: 16 bytes, write: 24 bytes, reserve: 28 bytes */
 void ucs2_encode_3bytes_utf8(const uint16_t *reader, uint8_t *writer) {
     __m128i x[2];
-    x[0] = _mm_loadu_si128((const __m128i_u *) reader);
+    x[0] = _mm_loadu_si128((const __m128i_u *)reader);
     x[1] = _mm_unpackhi_epi64(x[0], x[0]);
     uint8_t t1[16] = {
             0x80,
@@ -245,7 +245,7 @@ void ucs2_encode_3bytes_utf8(const uint16_t *reader, uint8_t *writer) {
         x0 = _mm_and_si128(x0, _mm_loadu_si128(m1));
         // 5678[mmmm]|gh1234[mm]|abcdef[mm]
         x0 = _mm_or_si128(x0, _mm_loadu_si128(m2));
-        _mm_storeu_si128((__m128i_u *) writer, x0);
+        _mm_storeu_si128((__m128i_u *)writer, x0);
         writer += 12;
     }
 }
@@ -259,9 +259,9 @@ void ucs2_encode_3bytes_utf8(const uint16_t *reader, uint8_t *writer) {
         if (unlikely(c <= 0x7ff)) {
             break;
         }
-        writer[0] = (uint8_t) (0xE0 | (c >> 12));
-        writer[1] = (uint8_t) (0x80 | ((c >> 6) & 0x3F));
-        writer[2] = (uint8_t) (0x80 | (c & 0x3F));
+        writer[0] = (uint8_t)(0xE0 | (c >> 12));
+        writer[1] = (uint8_t)(0x80 | ((c >> 6) & 0x3F));
+        writer[2] = (uint8_t)(0x80 | (c & 0x3F));
         reader++;
         writer += 3;
     }
@@ -275,7 +275,7 @@ void ucs2_encode_3bytes_utf8(const uint16_t *reader, uint8_t *writer) {
 /* read: 32 bytes, write: 32 bytes, reserve: 32 bytes */
 force_inline void ucs2_encode_2bytes_utf8(const uint16_t *reader, uint8_t *writer) {
     /* y1 = abcdefgh|12300000 */
-    __m256i y = _mm256_loadu_si256((const void *) reader);
+    __m256i y = _mm256_loadu_si256((const void *)reader);
     /* y2 = gh123000|00000000 */
     __m256i y2 = _mm256_srli_epi16(y, 6);
     /* y3 = 00000000|abcdefgh */
@@ -322,7 +322,7 @@ force_inline void ucs2_encode_2bytes_utf8(const uint16_t *reader, uint8_t *write
     y = _mm256_and_si256(y, _mm256_load_si256(m1));
     /* y = gh123[mmm]|abcdef[mm] */
     y = _mm256_or_si256(y, _mm256_load_si256(m2));
-    _mm256_storeu_si256((void *) writer, y);
+    _mm256_storeu_si256((void *)writer, y);
 }
 
 #else
@@ -330,7 +330,7 @@ force_inline void ucs2_encode_2bytes_utf8(const uint16_t *reader, uint8_t *write
 /* read: 16 bytes, write: 16 bytes, reserve: 16 bytes */
 void ucs2_encode_2bytes_utf8(const uint16_t *reader, uint8_t *writer) {
     /* x = abcdefgh|12300000 */
-    __m128i x = _mm_loadu_si128((const void *) reader);
+    __m128i x = _mm_loadu_si128((const void *)reader);
     /* x2 = gh123000|00000000 */
     __m128i x2 = _mm_srli_epi16(x, 6);
     /* x3 = 00000000|abcdefgh */
@@ -361,7 +361,7 @@ void ucs2_encode_2bytes_utf8(const uint16_t *reader, uint8_t *writer) {
     x = _mm_and_si128(x, _mm_load_si128(m1));
     /* x = gh123[mmm]|abcdef[mm] */
     x = _mm_or_si128(x, _mm_load_si128(m2));
-    _mm_storeu_si128((void *) writer, x);
+    _mm_storeu_si128((void *)writer, x);
 }
 
 #endif
@@ -370,19 +370,19 @@ void ucs2_encode_2bytes_utf8(const uint16_t *reader, uint8_t *writer) {
 
 /* read: 32 bytes, write: 16 bytes, reserve: 32 bytes */
 void ucs2_encode_1bytes_utf8(const uint16_t *reader, uint8_t *writer) {
-    __m256i y = _mm256_loadu_si256((const void *) reader);
+    __m256i y = _mm256_loadu_si256((const void *)reader);
     __m256i y2 = _mm256_set_m128i(_mm_undefined_si128(), _mm256_extracti128_si256(y, 1));
     y = _mm256_packs_epi16(y, y2);
-    _mm256_storeu_si256((void *) writer, y);
+    _mm256_storeu_si256((void *)writer, y);
 }
 
 #else
 
 /* read: 16 bytes, write: 8 bytes, reserve: 16 bytes */
 void ucs2_encode_1bytes_utf8(const uint16_t *reader, uint8_t *writer) {
-    __m128i x = _mm_loadu_si128((const void *) reader);
+    __m128i x = _mm_loadu_si128((const void *)reader);
     x = _mm_packs_epi16(x, x);
-    _mm_storeu_si128((void *) writer, x);
+    _mm_storeu_si128((void *)writer, x);
 }
 
 #endif

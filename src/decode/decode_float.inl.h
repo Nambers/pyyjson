@@ -6,19 +6,19 @@
  error C2520: conversion from unsigned __int64 to double not implemented.
  */
 #ifndef PYYJSON_U64_TO_F64_NO_IMPL
-#   if (0 < PYYJSON_MSC_VER) && (PYYJSON_MSC_VER <= 1200)
-#       define PYYJSON_U64_TO_F64_NO_IMPL 1
-#   else
-#       define PYYJSON_U64_TO_F64_NO_IMPL 0
-#   endif
+#    if (0 < PYYJSON_MSC_VER) && (PYYJSON_MSC_VER <= 1200)
+#        define PYYJSON_U64_TO_F64_NO_IMPL 1
+#    else
+#        define PYYJSON_U64_TO_F64_NO_IMPL 0
+#    endif
 #endif
 
 /* int128 type */
 #if defined(__SIZEOF_INT128__) && (__SIZEOF_INT128__ == 16) && \
-    (defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER))
+        (defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER))
 #    define PYYJSON_HAS_INT128 1
 /** 128-bit integer, used by floating-point number reader and writer. */
-__extension__ typedef __int128          i128;
+__extension__ typedef __int128 i128;
 __extension__ typedef unsigned __int128 u128;
 #else
 #    define PYYJSON_HAS_INT128 0
@@ -63,19 +63,19 @@ __extension__ typedef unsigned __int128 u128;
 
 #if defined(FLT_EVAL_METHOD) && FLT_EVAL_METHOD != 0 && FLT_EVAL_METHOD != 1
 #    define PYYJSON_DOUBLE_MATH_CORRECT 0
-#elif defined(i386) || defined(__i386) || defined(__i386__) || \
-    defined(_X86_) || defined(__X86__) || defined(_M_IX86) || \
-    defined(__I86__) || defined(__IA32__) || defined(__THW_INTEL)
-#   if (defined(_MSC_VER) && defined(_M_IX86_FP) && _M_IX86_FP == 2) || \
-        (defined(__SSE2_MATH__) && __SSE2_MATH__)
-#       define PYYJSON_DOUBLE_MATH_CORRECT 1
-#   else
-#       define PYYJSON_DOUBLE_MATH_CORRECT 0
-#   endif
+#elif defined(i386) || defined(__i386) || defined(__i386__) ||    \
+        defined(_X86_) || defined(__X86__) || defined(_M_IX86) || \
+        defined(__I86__) || defined(__IA32__) || defined(__THW_INTEL)
+#    if (defined(_MSC_VER) && defined(_M_IX86_FP) && _M_IX86_FP == 2) || \
+            (defined(__SSE2_MATH__) && __SSE2_MATH__)
+#        define PYYJSON_DOUBLE_MATH_CORRECT 1
+#    else
+#        define PYYJSON_DOUBLE_MATH_CORRECT 0
+#    endif
 #elif defined(__mc68000__) || defined(__pnacl__) || defined(__native_client__)
-#   define PYYJSON_DOUBLE_MATH_CORRECT 0
+#    define PYYJSON_DOUBLE_MATH_CORRECT 0
 #else
-#   define PYYJSON_DOUBLE_MATH_CORRECT 1
+#    define PYYJSON_DOUBLE_MATH_CORRECT 1
 #endif
 
 /**
@@ -94,9 +94,9 @@ force_inline f64 normalized_u64_to_f64(u64 val) {
 #endif
 }
 
-force_inline bool pyyjson_decode_double(DecodeObjStackInfo* restrict decode_obj_stack_info, double val);
+force_inline bool pyyjson_decode_double(DecodeObjStackInfo *restrict decode_obj_stack_info, double val);
 
-force_inline bool pyyjson_decode_longlong(DecodeObjStackInfo* restrict decode_obj_stack_info, i64 val);
+force_inline bool pyyjson_decode_longlong(DecodeObjStackInfo *restrict decode_obj_stack_info, i64 val);
 
 /*==============================================================================
  * 128-bit Integer Utils
@@ -155,28 +155,27 @@ force_inline void u128_mul_add(u64 a, u64 b, u64 c, u64 *hi, u64 *lo) {
  *============================================================================*/
 
 /** Maximum exponent of exact pow10 */
-#define U64_POW10_MAX_EXP 19
+#    define U64_POW10_MAX_EXP 19
 
 /** Table: [ 10^0, ..., 10^19 ] (generate with misc/make_tables.c) */
 static const u64 u64_pow10_table[U64_POW10_MAX_EXP + 1] = {
-    U64(0x00000000, 0x00000001), U64(0x00000000, 0x0000000A),
-    U64(0x00000000, 0x00000064), U64(0x00000000, 0x000003E8),
-    U64(0x00000000, 0x00002710), U64(0x00000000, 0x000186A0),
-    U64(0x00000000, 0x000F4240), U64(0x00000000, 0x00989680),
-    U64(0x00000000, 0x05F5E100), U64(0x00000000, 0x3B9ACA00),
-    U64(0x00000002, 0x540BE400), U64(0x00000017, 0x4876E800),
-    U64(0x000000E8, 0xD4A51000), U64(0x00000918, 0x4E72A000),
-    U64(0x00005AF3, 0x107A4000), U64(0x00038D7E, 0xA4C68000),
-    U64(0x002386F2, 0x6FC10000), U64(0x01634578, 0x5D8A0000),
-    U64(0x0DE0B6B3, 0xA7640000), U64(0x8AC72304, 0x89E80000)
-};
+        U64(0x00000000, 0x00000001), U64(0x00000000, 0x0000000A),
+        U64(0x00000000, 0x00000064), U64(0x00000000, 0x000003E8),
+        U64(0x00000000, 0x00002710), U64(0x00000000, 0x000186A0),
+        U64(0x00000000, 0x000F4240), U64(0x00000000, 0x00989680),
+        U64(0x00000000, 0x05F5E100), U64(0x00000000, 0x3B9ACA00),
+        U64(0x00000002, 0x540BE400), U64(0x00000017, 0x4876E800),
+        U64(0x000000E8, 0xD4A51000), U64(0x00000918, 0x4E72A000),
+        U64(0x00005AF3, 0x107A4000), U64(0x00038D7E, 0xA4C68000),
+        U64(0x002386F2, 0x6FC10000), U64(0x01634578, 0x5D8A0000),
+        U64(0x0DE0B6B3, 0xA7640000), U64(0x8AC72304, 0x89E80000)};
 
 /** Maximum numbers of chunks used by a bigint (58 is enough here). */
-#define BIGINT_MAX_CHUNKS 64
+#    define BIGINT_MAX_CHUNKS 64
 
 /** Unsigned arbitrarily large integer */
 typedef struct bigint {
-    u32 used; /* used chunks count, should not be 0 */
+    u32 used;                    /* used chunks count, should not be 0 */
     u64 bits[BIGINT_MAX_CHUNKS]; /* chunks */
 } bigint;
 
@@ -291,13 +290,13 @@ force_inline void bigint_set_u64(bigint *big, u64 val) {
 
 /** Set a bigint with floating point number string. */
 static force_noinline void bigint_set_buf(bigint *big, u64 sig, i32 *exp,
-                                    const u8 *sig_cut, const u8 *sig_end, const u8 *dot_pos) {
-    
+                                          const u8 *sig_cut, const u8 *sig_end, const u8 *dot_pos) {
+
     if (unlikely(!sig_cut)) {
         /* no digit cut, set significant part only */
         bigint_set_u64(big, sig);
         return;
-        
+
     } else {
         /* some digits were cut, read them from 'sig_cut' to 'sig_end' */
         const u8 *hdr = sig_cut;
@@ -307,7 +306,7 @@ static force_noinline void bigint_set_buf(bigint *big, u64 sig, i32 *exp,
         bool dig_big_cut = false;
         bool has_dot = (hdr < dot_pos) & (dot_pos < sig_end);
         u32 dig_len_total = U64_SAFE_DIG + (u32)(sig_end - hdr) - has_dot;
-        
+
         sig -= (*sig_cut >= '5'); /* sig was rounded before */
         if (dig_len_total > F64_MAX_DEC_DIG) {
             dig_big_cut = true;
@@ -316,7 +315,7 @@ static force_noinline void bigint_set_buf(bigint *big, u64 sig, i32 *exp,
             dig_len_total = (F64_MAX_DEC_DIG + 1);
         }
         *exp -= (i32)dig_len_total - U64_SAFE_DIG;
-        
+
         big->used = 1;
         big->bits[0] = sig;
         while (cur < sig_end) {
@@ -340,8 +339,6 @@ static force_noinline void bigint_set_buf(bigint *big, u64 sig, i32 *exp,
         }
     }
 }
-
-
 
 /*==============================================================================
  * Diy Floating Point
@@ -380,14 +377,14 @@ force_inline u64 diy_fp_to_ieee_raw(diy_fp fp) {
     i32 exp = fp.exp;
     u32 lz_bits;
     if (unlikely(fp.sig == 0)) return 0;
-    
+
     lz_bits = u64_lz_bits(sig);
     sig <<= lz_bits;
     sig >>= F64_BITS - F64_SIG_FULL_BITS;
     exp -= (i32)lz_bits;
     exp += F64_BITS - F64_SIG_FULL_BITS;
     exp += F64_SIG_BITS;
-    
+
     if (unlikely(exp >= F64_MAX_BIN_EXP)) {
         /* overflow */
         return F64_RAW_INF;
@@ -404,20 +401,17 @@ force_inline u64 diy_fp_to_ieee_raw(diy_fp fp) {
     }
 }
 
-
-
 /*==============================================================================
  * JSON Number Reader (IEEE-754)
  *============================================================================*/
 
 /** Maximum exact pow10 exponent for double value. */
-#define F64_POW10_EXP_MAX_EXACT 22
+#    define F64_POW10_EXP_MAX_EXACT 22
 
 /** Cached pow10 table. */
 static const f64 f64_pow10_table[] = {
-    1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12,
-    1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22
-};
+        1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12,
+        1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22};
 
 /**
  Read a JSON number.
@@ -428,76 +422,81 @@ static const f64 f64_pow10_table[] = {
     number is infinite, the return value is based on flag.
  3. This function (with inline attribute) may generate a lot of instructions.
  */
-force_inline PyObject* read_number(const u8 **ptr) {
+force_inline PyObject *read_number(const u8 **ptr) {
 
-#define return_err(_end, _msg)                                                  \
-    do {                                                                        \
-        PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, _end - hdr); \
-        return NULL;                                                           \
-    } while (0)
+#    define return_err(_end, _msg)                                                  \
+        do {                                                                        \
+            PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, _end - hdr); \
+            return NULL;                                                            \
+        } while (0)
 
-#define return_0() do { \
-    *end = cur; \
-    return PyLong_FromLongLong(0); \
-} while (false)
+#    define return_0()                     \
+        do {                               \
+            *end = cur;                    \
+            return PyLong_FromLongLong(0); \
+        } while (false)
 
-#define return_i64(_v) do { \
-    *end = cur; \
-    return PyLong_FromLongLong((i64)(sign ? (u64)(~(_v) + 1) : (u64)(_v))); \
-} while (false)
+#    define return_i64(_v)                                                          \
+        do {                                                                        \
+            *end = cur;                                                             \
+            return PyLong_FromLongLong((i64)(sign ? (u64)(~(_v) + 1) : (u64)(_v))); \
+        } while (false)
 
-#define return_f64(_v) do { \
-    *end = cur; \
-    return PyFloat_FromDouble(sign ? -(f64)(_v) : (f64)(_v)); \
-} while (false)
+#    define return_f64(_v)                                            \
+        do {                                                          \
+            *end = cur;                                               \
+            return PyFloat_FromDouble(sign ? -(f64)(_v) : (f64)(_v)); \
+        } while (false)
 
-#define return_f64_bin(_v) do { \
-    *end = cur; \
-    u64 temp = ((u64)sign << 63) | (u64)(_v); \
-    return PyFloat_FromDouble(*(double *)&temp); \
-} while (false)
+#    define return_f64_bin(_v)                           \
+        do {                                             \
+            *end = cur;                                  \
+            u64 temp = ((u64)sign << 63) | (u64)(_v);    \
+            return PyFloat_FromDouble(*(double *)&temp); \
+        } while (false)
 
-#define return_inf() do { \
-    return_f64_bin(F64_RAW_INF); \
-} while (false)
+#    define return_inf()                 \
+        do {                             \
+            return_f64_bin(F64_RAW_INF); \
+        } while (false)
 
     const u8 *sig_cut = NULL; /* significant part cutting position for long number */
     const u8 *sig_end = NULL; /* significant part ending position */
     const u8 *dot_pos = NULL; /* decimal point position */
-    
+
     u64 sig = 0; /* significant part of the number */
     i32 exp = 0; /* exponent part of the number */
-    
-    bool exp_sign; /* temporary exponent sign from literal part */
+
+    bool exp_sign;   /* temporary exponent sign from literal part */
     i64 exp_sig = 0; /* temporary exponent number from significant part */
     i64 exp_lit = 0; /* temporary exponent number from exponent literal part */
-    u64 num; /* temporary number for reading */
-    const u8 *tmp; /* temporary cursor for reading */
-    
+    u64 num;         /* temporary number for reading */
+    const u8 *tmp;   /* temporary cursor for reading */
+
     const u8 *hdr = *ptr;
     const u8 *cur = *ptr;
     const u8 **end = ptr;
     bool sign;
-    
+
     /* read number as raw string if has `YYJSON_READ_NUMBER_AS_RAW` flag */
     // if (has_read_flag(NUMBER_AS_RAW)) {
     //     return read_number_raw(ptr, pre, flg, val, msg);
     // }
-    
+
     sign = (*hdr == '-');
     cur += sign;
-    
+
     /* begin with a leading zero or non-digit */
     if (unlikely(!digi_is_nonzero(*cur))) { /* 0 or non-digit char */
-        if (unlikely(*cur != '0')) { /* non-digit char */
+        if (unlikely(*cur != '0')) {        /* non-digit char */
             //if (has_read_flag(ALLOW_INF_AND_NAN)) {
-            PyObject* number_obj = read_inf_or_nan(sign, &cur);
+            PyObject *number_obj = read_inf_or_nan(sign, &cur);
             if (likely(number_obj)) {
                 *end = cur;
                 return number_obj;
             }
             //}
-            if(unlikely(!PyErr_Occurred())){
+            if (unlikely(!PyErr_Occurred())) {
                 return_err(cur, "no digit after minus sign");
             }
             return NULL;
@@ -529,10 +528,10 @@ force_inline PyObject* read_number(const u8 **ptr) {
         }
         return_f64_bin(0);
     }
-    
+
     /* begin with non-zero digit */
     sig = (u64)(*cur - '0');
-    
+
     /*
      Read integral part, same as the following code.
      
@@ -542,13 +541,13 @@ force_inline PyObject* read_number(const u8 **ptr) {
             else goto digi_sepr_i;
          }
      */
-#define expr_intg(i) \
-    if (likely((num = (u64)(cur[i] - (u8)'0')) <= 9)) sig = num + sig * 10; \
-    else { goto digi_sepr_##i; }
+#    define expr_intg(i)                                                        \
+        if (likely((num = (u64)(cur[i] - (u8)'0')) <= 9)) sig = num + sig * 10; \
+        else { goto digi_sepr_##i; }
     REPEAT_INCR_IN_1_18(expr_intg)
-#undef expr_intg
-    
-    
+#    undef expr_intg
+
+
     cur += 19; /* skip continuous 19 digits */
     if (!digi_is_digit_or_fp(*cur)) {
         /* this number is an integer consisting of 19 digits */
@@ -559,42 +558,44 @@ force_inline PyObject* read_number(const u8 **ptr) {
         return_i64(sig);
     }
     goto digi_intg_more; /* read more digits in integral part */
-    
-    
+
+
     /* process first non-digit character */
-#define expr_sepr(i) \
-    digi_sepr_##i: \
-    if (likely(!digi_is_fp(cur[i]))) { cur += i; return_i64(sig); } \
-    dot_pos = cur + i; \
-    if (likely(cur[i] == '.')) goto digi_frac_##i; \
-    cur += i; sig_end = cur; goto digi_exp_more;
+#    define expr_sepr(i)                                   \
+        digi_sepr_##i : if (likely(!digi_is_fp(cur[i]))) { \
+            cur += i;                                      \
+            return_i64(sig);                               \
+        }                                                  \
+        dot_pos = cur + i;                                 \
+        if (likely(cur[i] == '.')) goto digi_frac_##i;     \
+        cur += i;                                          \
+        sig_end = cur;                                     \
+        goto digi_exp_more;
     REPEAT_INCR_IN_1_18(expr_sepr)
-#undef expr_sepr
-    
-    
+#    undef expr_sepr
+
+
     /* read fraction part */
-#define expr_frac(i) \
-    digi_frac_##i: \
-    if (likely((num = (u64)(cur[i + 1] - (u8)'0')) <= 9)) \
-        sig = num + sig * 10; \
-    else { goto digi_stop_##i; }
+#    define expr_frac(i)                                                      \
+        digi_frac_##i : if (likely((num = (u64)(cur[i + 1] - (u8)'0')) <= 9)) \
+                                sig = num + sig * 10;                         \
+        else { goto digi_stop_##i; }
     REPEAT_INCR_IN_1_18(expr_frac)
-#undef expr_frac
-    
-    cur += 20; /* skip 19 digits and 1 decimal point */
+#    undef expr_frac
+
+    cur += 20;                                    /* skip 19 digits and 1 decimal point */
     if (!digi_is_digit(*cur)) goto digi_frac_end; /* fraction part end */
-    goto digi_frac_more; /* read more digits in fraction part */
-    
-    
+    goto digi_frac_more;                          /* read more digits in fraction part */
+
+
     /* significant part end */
-#define expr_stop(i) \
-    digi_stop_##i: \
-    cur += i + 1; \
-    goto digi_frac_end;
+#    define expr_stop(i)              \
+        digi_stop_##i : cur += i + 1; \
+        goto digi_frac_end;
     REPEAT_INCR_IN_1_18(expr_stop)
-#undef expr_stop
-    
-    
+#    undef expr_stop
+
+
     /* read more digits in integral part */
 digi_intg_more:
     if (digi_is_digit(*cur)) {
@@ -614,23 +615,23 @@ digi_intg_more:
             }
         }
     }
-    
+
     if (digi_is_exp(*cur)) {
         dot_pos = cur;
         goto digi_exp_more;
     }
-    
+
     if (*cur == '.') {
         dot_pos = cur++;
         if (!digi_is_digit(*cur)) {
             return_err(cur, "no digit after decimal point");
         }
     }
-    
-    
+
+
     /* read more digits in fraction part */
 digi_frac_more:
-    sig_cut = cur; /* too large to fit in u64, excess digits need to be cut */
+    sig_cut = cur;        /* too large to fit in u64, excess digits need to be cut */
     sig += (*cur >= '5'); /* round */
     while (digi_is_digit(*++cur));
     if (!dot_pos) {
@@ -647,7 +648,7 @@ digi_frac_more:
     }
     exp_sig = (i64)(dot_pos - sig_cut);
     exp_sig += (dot_pos < sig_cut);
-    
+
     /* ignore trailing zeros */
     tmp = cur - 1;
     while (*tmp == '0' || *tmp == '.') tmp--;
@@ -656,11 +657,11 @@ digi_frac_more:
     } else {
         sig_end = cur;
     }
-    
+
     if (digi_is_exp(*cur)) goto digi_exp_more;
     goto digi_exp_finish;
-    
-    
+
+
     /* fraction part end */
 digi_frac_end:
     if (unlikely(dot_pos + 1 == cur)) {
@@ -677,8 +678,8 @@ digi_frac_end:
     } else {
         goto digi_exp_more;
     }
-    
-    
+
+
     /* read exponent part */
 digi_exp_more:
     exp_sign = (*++cur == '-');
@@ -687,7 +688,7 @@ digi_exp_more:
         return_err(cur, "no digit after exponent sign");
     }
     while (*cur == '0') cur++;
-    
+
     /* read exponent literal */
     tmp = cur;
     while (digi_is_digit(*cur)) {
@@ -701,8 +702,8 @@ digi_exp_more:
         }
     }
     exp_sig += exp_sign ? -exp_lit : exp_lit;
-    
-    
+
+
     /* validate exponent value */
 digi_exp_finish:
     if (unlikely(exp_sig < F64_MIN_DEC_EXP - 19)) {
@@ -712,11 +713,11 @@ digi_exp_finish:
         return_inf(); /* overflow */
     }
     exp = (i32)exp_sig;
-    
-    
+
+
     /* all digit read finished */
 digi_finish:
-    
+
     /*
      Fast path 1:
      
@@ -729,7 +730,7 @@ digi_finish:
      We don't check all available inputs here, because that would make the code
      more complicated, and not friendly to branch predictor.
      */
-#if PYYJSON_DOUBLE_MATH_CORRECT
+#    if PYYJSON_DOUBLE_MATH_CORRECT
     if (sig < ((u64)1 << 53) &&
         exp >= -F64_POW10_EXP_MAX_EXACT &&
         exp <= +F64_POW10_EXP_MAX_EXACT) {
@@ -741,8 +742,8 @@ digi_finish:
         }
         return_f64(dbl);
     }
-#endif
-    
+#    endif
+
     /*
      Fast path 2:
      
@@ -796,23 +797,23 @@ digi_finish:
          3. if bit 54 is 1 and all bits beyond bit 54 are 0, round to even,
             as the extra bits is unknown, this case will not be handled here.
          */
-        
+
         u64 raw;
         u64 sig1, sig2, sig2_ext, hi, lo, hi2, lo2, add, bits;
         i32 exp2;
         u32 lz;
         bool exact = false, carry, round_up;
-        
+
         /* convert (10^exp) to (sig2 * 2^exp2) */
         pow10_table_get_sig(exp, &sig2, &sig2_ext);
         pow10_table_get_exp(exp, &exp2);
-        
+
         /* normalize and multiply */
         lz = u64_lz_bits(sig);
         sig1 = sig << lz;
         exp2 -= (i32)lz;
         u128_mul(sig1, sig2, &hi, &lo);
-        
+
         /*
          The `hi` is in range [0x4000000000000000, 0xFFFFFFFFFFFFFFFE],
          To get normalized value, `hi` should be shifted to the left by 0 or 1.
@@ -831,7 +832,7 @@ digi_finish:
              after `0`.
              */
             exact = true;
-            
+
         } else {
             /*
              (bits == 0 || bits == 0x1FF)
@@ -839,7 +840,7 @@ digi_finish:
              lower bits with another 64-bit multiplication.
              */
             u128_mul(sig1, sig2_ext, &hi2, &lo2);
-            
+
             add = lo + hi2;
             if (add + 1 > (u64)1) {
                 /*
@@ -854,24 +855,24 @@ digi_finish:
                 exact = true;
             }
         }
-        
+
         if (exact) {
             /* normalize */
             lz = hi < ((u64)1 << 63);
             hi <<= lz;
             exp2 -= (i32)lz;
             exp2 += 64;
-            
+
             /* test the bit 54 and get rounding direction */
             round_up = (hi & ((u64)1 << (64 - 54))) > (u64)0;
             hi += (round_up ? ((u64)1 << (64 - 54)) : (u64)0);
-            
+
             /* test overflow */
             if (hi < ((u64)1 << (64 - 54))) {
                 hi = ((u64)1 << 63);
                 exp2 += 1;
             }
-            
+
             /* This is a normal number, convert it to IEEE-754 format. */
             hi >>= F64_BITS - F64_SIG_FULL_BITS;
             exp2 += F64_BITS - F64_SIG_FULL_BITS + F64_SIG_BITS;
@@ -880,7 +881,7 @@ digi_finish:
             return_f64_bin(raw);
         }
     }
-    
+
     /*
      Slow path: read double number exactly with diyfp.
      1. Use cached diyfp to get an approximation value.
@@ -897,7 +898,7 @@ digi_finish:
         const i32 DIY_SIG_BITS = 64;
         const i32 EXP_BIAS = F64_EXP_BIAS + F64_SIG_BITS;
         const i32 EXP_SUBNORMAL = -EXP_BIAS + 1;
-        
+
         u64 fp_err;
         u32 bits;
         i32 order_of_magnitude;
@@ -905,32 +906,32 @@ digi_finish:
         i32 precision_digits_count;
         u64 precision_bits;
         u64 half_way;
-        
+
         u64 raw;
         diy_fp fp, fp_upper;
         bigint big_full, big_comp;
         i32 cmp;
-        
+
         fp.sig = sig;
         fp.exp = 0;
         fp_err = sig_cut ? (u64)(ERR_ULP / 2) : (u64)0;
-        
+
         /* normalize */
         bits = u64_lz_bits(fp.sig);
         fp.sig <<= bits;
         fp.exp -= (i32)bits;
         fp_err <<= bits;
-        
+
         /* multiply and add error */
         fp = diy_fp_mul(fp, diy_fp_get_cached_pow10(exp));
         fp_err += (u64)ERR_CACHED_POW + (fp_err != 0) + (u64)ERR_MUL_FIXED;
-        
+
         /* normalize */
         bits = u64_lz_bits(fp.sig);
         fp.sig <<= bits;
         fp.exp -= (i32)bits;
         fp_err <<= bits;
-        
+
         /* effective significand */
         order_of_magnitude = DIY_SIG_BITS + fp.exp;
         if (likely(order_of_magnitude >= EXP_SUBNORMAL + F64_SIG_FULL_BITS)) {
@@ -940,7 +941,7 @@ digi_finish:
         } else {
             effective_significand_size = order_of_magnitude - EXP_SUBNORMAL;
         }
-        
+
         /* precision digits count */
         precision_digits_count = DIY_SIG_BITS - effective_significand_size;
         if (unlikely(precision_digits_count + ERR_ULP_LOG >= DIY_SIG_BITS)) {
@@ -950,18 +951,18 @@ digi_finish:
             fp_err = (fp_err >> shr) + 1 + (u32)ERR_ULP;
             precision_digits_count -= shr;
         }
-        
+
         /* half way */
         precision_bits = fp.sig & (((u64)1 << precision_digits_count) - 1);
         precision_bits *= (u32)ERR_ULP;
         half_way = (u64)1 << (precision_digits_count - 1);
         half_way *= (u32)ERR_ULP;
-        
+
         /* rounding */
         fp.sig >>= precision_digits_count;
         fp.sig += (precision_bits >= half_way + fp_err);
         fp.exp += precision_digits_count;
-        
+
         /* get IEEE double raw value */
         raw = diy_fp_to_ieee_raw(fp);
         if (unlikely(raw == F64_RAW_INF)) return_inf();
@@ -970,7 +971,7 @@ digi_finish:
             return_f64_bin(raw); /* number is accurate */
         }
         /* now the number is the correct value, or the next lower value */
-        
+
         /* upper boundary */
         if (raw & F64_EXP_MASK) {
             fp_upper.sig = (raw & F64_SIG_MASK) + ((u64)1 << F64_SIG_BITS);
@@ -983,7 +984,7 @@ digi_finish:
         fp_upper.sig <<= 1;
         fp_upper.exp -= 1;
         fp_upper.sig += 1; /* add half ulp */
-        
+
         /* compare with bigint */
         bigint_set_buf(&big_full, sig, &exp, sig_cut, sig_end, dot_pos);
         bigint_set_u64(&big_comp, fp_upper.sig);
@@ -993,7 +994,7 @@ digi_finish:
             bigint_mul_pow10(&big_comp, -exp);
         }
         if (fp_upper.exp > 0) {
-            bigint_mul_pow2(&big_comp, (u32)+fp_upper.exp);
+            bigint_mul_pow2(&big_comp, (u32) + fp_upper.exp);
         } else {
             bigint_mul_pow2(&big_full, (u32)-fp_upper.exp);
         }
@@ -1005,20 +1006,19 @@ digi_finish:
             /* falls midway, round to even */
             raw += (raw & 1);
         }
-        
+
         if (unlikely(raw == F64_RAW_INF)) return_inf();
         return_f64_bin(raw);
     }
-    
-#undef return_err
-#undef return_inf
-#undef return_0
-#undef return_i64
-#undef return_f64
-#undef return_f64_bin
-#undef return_raw
-}
 
+#    undef return_err
+#    undef return_inf
+#    undef return_0
+#    undef return_i64
+#    undef return_f64
+#    undef return_f64_bin
+#    undef return_raw
+}
 
 
 #else /* FP_READER */
@@ -1028,38 +1028,43 @@ digi_finish:
  This is a fallback function if the custom number reader is disabled.
  This function use libc's strtod() to read floating-point number.
  */
-force_inline PyObject* read_number(const u8 **ptr) {
+force_inline PyObject *read_number(const u8 **ptr) {
 
-#define return_err(_end, _msg)                                                  \
-    do {                                                                        \
-        PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, _end - hdr); \
-        return NULL;                                                           \
-    } while (0)
+#    define return_err(_end, _msg)                                                  \
+        do {                                                                        \
+            PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, _end - hdr); \
+            return NULL;                                                            \
+        } while (0)
 
-#define return_0() do { \
-    *end = cur; \
-    return PyLong_FromLongLong(0); \
-} while (false)
+#    define return_0()                     \
+        do {                               \
+            *end = cur;                    \
+            return PyLong_FromLongLong(0); \
+        } while (false)
 
-#define return_i64(_v) do { \
-    *end = cur; \
-    return PyLong_FromLongLong((i64)(sign ? (u64)(~(_v) + 1) : (u64)(_v))); \
-} while (false)
+#    define return_i64(_v)                                                          \
+        do {                                                                        \
+            *end = cur;                                                             \
+            return PyLong_FromLongLong((i64)(sign ? (u64)(~(_v) + 1) : (u64)(_v))); \
+        } while (false)
 
-#define return_f64(_v) do { \
-    *end = cur; \
-    return PyFloat_FromDouble(sign ? -(f64)(_v) : (f64)(_v)); \
-} while (false)
+#    define return_f64(_v)                                            \
+        do {                                                          \
+            *end = cur;                                               \
+            return PyFloat_FromDouble(sign ? -(f64)(_v) : (f64)(_v)); \
+        } while (false)
 
-#define return_f64_bin(_v) do { \
-    *end = cur; \
-    u64 temp = ((u64)sign << 63) | (u64)(_v); \
-    return PyFloat_FromDouble(*(double *)&temp); \
-} while (false)
+#    define return_f64_bin(_v)                           \
+        do {                                             \
+            *end = cur;                                  \
+            u64 temp = ((u64)sign << 63) | (u64)(_v);    \
+            return PyFloat_FromDouble(*(double *)&temp); \
+        } while (false)
 
-#define return_inf() do { \
-    return_f64_bin(F64_RAW_INF); \
-} while (false)
+#    define return_inf()                 \
+        do {                             \
+            return_f64_bin(F64_RAW_INF); \
+        } while (false)
 
     u64 sig, num;
     const u8 *hdr = *ptr;
@@ -1068,21 +1073,21 @@ force_inline PyObject* read_number(const u8 **ptr) {
     const u8 *dot = NULL;
     const u8 *f64_end = NULL;
     bool sign;
-    
+
     sign = (*hdr == '-');
     cur += sign;
     sig = (u8)(*cur - '0');
-    
+
     /* read first digit, check leading zero */
     if (unlikely(!digi_is_digit(*cur))) {
         // if (has_read_flag(ALLOW_INF_AND_NAN)) {
-        PyObject* number_obj = read_inf_or_nan(sign, &cur);
+        PyObject *number_obj = read_inf_or_nan(sign, &cur);
         if (likely(number_obj)) {
             *end = cur;
             return number_obj;
         }
         // }
-        if(unlikely(!PyErr_Occurred())){
+        if (unlikely(!PyErr_Occurred())) {
             return_err(cur, "no digit after minus sign");
         }
         return NULL;
@@ -1095,14 +1100,17 @@ force_inline PyObject* read_number(const u8 **ptr) {
         if (!digi_is_fp(*cur)) return_0();
         goto read_double;
     }
-    
+
     /* read continuous digits, up to 19 characters */
-#define expr_intg(i) \
-    if (likely((num = (u64)(cur[i] - (u8)'0')) <= 9)) sig = num + sig * 10; \
-    else { cur += i; goto intg_end; }
+#    define expr_intg(i)                                                        \
+        if (likely((num = (u64)(cur[i] - (u8)'0')) <= 9)) sig = num + sig * 10; \
+        else {                                                                  \
+            cur += i;                                                           \
+            goto intg_end;                                                      \
+        }
     REPEAT_INCR_IN_1_18(expr_intg)
-#undef expr_intg
-    
+#    undef expr_intg
+
     /* here are 19 continuous digits, skip them */
     cur += 19;
     if (digi_is_digit(cur[0]) && !digi_is_digit_or_fp(cur[1])) {
@@ -1119,7 +1127,7 @@ force_inline PyObject* read_number(const u8 **ptr) {
             return_i64(sig);
         }
     }
-    
+
 intg_end:
     /* continuous digits ended */
     if (!digi_is_digit_or_fp(*cur)) {
@@ -1130,7 +1138,7 @@ intg_end:
         }
         return_i64(sig);
     }
-    
+
 read_double:
     /* this number should be read as double */
     while (digi_is_digit(*cur)) cur++;
@@ -1156,7 +1164,7 @@ read_double:
         cur++;
         while (digi_is_digit(*cur)) cur++;
     }
-    
+
     /*
      libc's strtod() is used to parse the floating-point number.
      
@@ -1174,13 +1182,13 @@ read_double:
     if (unlikely(f64_end != cur)) {
         /* replace '.' with ',' for locale */
         bool cut = (*cur == ',');
-        if (cut) *(u8*)cur = ' ';
-        if (dot) *(u8*)dot = ',';
+        if (cut) *(u8 *)cur = ' ';
+        if (dot) *(u8 *)dot = ',';
         // op_float_final->data.
         f = strtod((const char *)hdr, (char **)&f64_end);
         /* restore ',' to '.' */
-        if (cut) *(u8*)cur = ',';
-        if (dot) *(u8*)dot = '.';
+        if (cut) *(u8 *)cur = ',';
+        if (dot) *(u8 *)dot = '.';
         if (unlikely(f64_end != cur)) {
             return_err(hdr, "strtod() failed to parse the number");
         }
@@ -1191,14 +1199,14 @@ read_double:
 
     *end = cur;
     return PyFloat_FromDouble(f);
-    
-#undef return_err
-#undef return_0
-#undef return_i64
-#undef return_f64
-#undef return_f64_bin
-#undef return_inf
-#undef return_raw
+
+#    undef return_err
+#    undef return_0
+#    undef return_i64
+#    undef return_f64
+#    undef return_f64_bin
+#    undef return_inf
+#    undef return_raw
 }
 
 #endif /* FP_READER */

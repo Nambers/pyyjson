@@ -1,34 +1,34 @@
 #define XXH_INLINE_ALL
 #include "decode.h"
-#include "pyyjson.h"
-#include "xxhash.h"
 #include "decode_float.inl.h"
+#include "pyyjson.h"
+#include "tls.h"
+#include "xxhash.h"
 #include <assert.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <threads.h>
-#include "tls.h"
 
 thread_local u8 pyyjson_string_buffer[PYYJSON_STRING_BUFFER_SIZE];
 
-force_inline PyObject* read_bytes(const u8 **ptr, u8 *write_buffer, bool is_key);
+force_inline PyObject *read_bytes(const u8 **ptr, u8 *write_buffer, bool is_key);
 force_inline PyObject *read_bytes_root_pretty(const char *dat, usize len);
 
-force_inline bool decode_ctn_is_arr(DecodeCtnWithSize*ctn){
+force_inline bool decode_ctn_is_arr(DecodeCtnWithSize *ctn) {
     return ctn->raw < 0;
 }
 
-force_inline Py_ssize_t get_decode_ctn_len(DecodeCtnWithSize*ctn){
+force_inline Py_ssize_t get_decode_ctn_len(DecodeCtnWithSize *ctn) {
     return ctn->raw & PY_SSIZE_T_MAX;
 }
 
-force_inline void set_decode_ctn(DecodeCtnWithSize*ctn, Py_ssize_t len, bool is_arr){
+force_inline void set_decode_ctn(DecodeCtnWithSize *ctn, Py_ssize_t len, bool is_arr) {
     assert(len >= 0);
     ctn->raw = len | (is_arr ? PY_SSIZE_T_MIN : 0);
 }
 
-force_inline void incr_decode_ctn_size(DecodeCtnWithSize*ctn){
+force_inline void incr_decode_ctn_size(DecodeCtnWithSize *ctn) {
     assert(ctn->raw != PY_SSIZE_T_MAX);
     ctn->raw++;
 }
@@ -39,25 +39,25 @@ force_inline bool ctn_grow_check(DecodeCtnStackInfo *decode_ctn_info) {
 
 #if PY_MINOR_VERSION >= 13
 // these are hidden in Python 3.13
-#if PY_MINOR_VERSION == 13
+#    if PY_MINOR_VERSION == 13
 PyAPI_FUNC(Py_hash_t) _Py_HashBytes(const void *, Py_ssize_t);
-#endif // PY_MINOR_VERSION == 13
+#    endif // PY_MINOR_VERSION == 13
 PyAPI_FUNC(int) _PyDict_SetItem_KnownHash(PyObject *mp, PyObject *key, PyObject *item, Py_hash_t hash);
 #endif // PY_MINOR_VERSION >= 13
 
 #if PY_MINOR_VERSION >= 12
-#define PYYJSON_PY_DECREF_DEBUG() (_Py_DECREF_STAT_INC())
-#define PYYJSON_PY_INCREF_DEBUG() (_Py_INCREF_STAT_INC())
+#    define PYYJSON_PY_DECREF_DEBUG() (_Py_DECREF_STAT_INC())
+#    define PYYJSON_PY_INCREF_DEBUG() (_Py_INCREF_STAT_INC())
 #else
-#ifdef Py_REF_DEBUG
-#define PYYJSON_PY_DECREF_DEBUG() (_Py_RefTotal--)
-#define PYYJSON_PY_INCREF_DEBUG() (_Py_RefTotal++)
-#else
-#define PYYJSON_PY_DECREF_DEBUG()
-#define PYYJSON_PY_INCREF_DEBUG()
+#    ifdef Py_REF_DEBUG
+#        define PYYJSON_PY_DECREF_DEBUG() (_Py_RefTotal--)
+#        define PYYJSON_PY_INCREF_DEBUG() (_Py_RefTotal++)
+#    else
+#        define PYYJSON_PY_DECREF_DEBUG()
+#        define PYYJSON_PY_INCREF_DEBUG()
+#    endif
 #endif
-#endif
-#define REHASHER(_x) (((size_t) (_x)) % (PYYJSON_KEY_CACHE_SIZE))
+#define REHASHER(_x) (((size_t)(_x)) % (PYYJSON_KEY_CACHE_SIZE))
 
 typedef XXH64_hash_t pyyjson_hash_t;
 
@@ -69,17 +69,17 @@ int __hash_trace[PYYJSON_KEY_CACHE_SIZE] = {0};
 size_t __hash_hit_counter = 0;
 size_t __hash_add_key_call_count = 0;
 
-#define PYYJSON_TRACE_STR_LEN(_len) max_str_len = max_str_len > _len ? max_str_len : _len
-#define PYYJSON_TRACE_HASH(_hash) \
-    __hash_add_key_call_count++;  \
-    __hash_trace[_hash & (PYYJSON_KEY_CACHE_SIZE - 1)]++
-#define PYYJSON_TRACE_CACHE_HIT() __hash_hit_counter++
-#define PYYJSON_TRACE_HASH_CONFLICT(_hash) printf("hash conflict: %lld, index=%lld\n", (long long int) _hash, (long long int) (_hash & (PYYJSON_KEY_CACHE_SIZE - 1)))
+#    define PYYJSON_TRACE_STR_LEN(_len) max_str_len = max_str_len > _len ? max_str_len : _len
+#    define PYYJSON_TRACE_HASH(_hash) \
+        __hash_add_key_call_count++;  \
+        __hash_trace[_hash & (PYYJSON_KEY_CACHE_SIZE - 1)]++
+#    define PYYJSON_TRACE_CACHE_HIT() __hash_hit_counter++
+#    define PYYJSON_TRACE_HASH_CONFLICT(_hash) printf("hash conflict: %lld, index=%lld\n", (long long int)_hash, (long long int)(_hash & (PYYJSON_KEY_CACHE_SIZE - 1)))
 #else // PYYJSON_ENABLE_TRACE
-#define PYYJSON_TRACE_STR_LEN(_len) (void) (0)
-#define PYYJSON_TRACE_HASH(_hash) (void) (0)
-#define PYYJSON_TRACE_CACHE_HIT() (void) (0)
-#define PYYJSON_TRACE_HASH_CONFLICT(_hash) (void) (0)
+#    define PYYJSON_TRACE_STR_LEN(_len) (void)(0)
+#    define PYYJSON_TRACE_HASH(_hash) (void)(0)
+#    define PYYJSON_TRACE_CACHE_HIT() (void)(0)
+#    define PYYJSON_TRACE_HASH_CONFLICT(_hash) (void)(0)
 #endif // PYYJSON_ENABLE_TRACE
 
 force_inline void Py_DecRef_NoCheck(PyObject *op) {
@@ -99,18 +99,18 @@ force_inline void Py_Immortal_IncRef(PyObject *op) {
     // Non-limited C API and limited C API for Python 3.9 and older access
     // directly PyObject.ob_refcnt.
 #if PY_MINOR_VERSION >= 12
-#if SIZEOF_VOID_P > 4
+#    if SIZEOF_VOID_P > 4
     // Portable saturated add, branching on the carry flag and set low bits
-#ifndef NDEBUG
-    assert(0 > (int32_t) op->ob_refcnt_split[PY_BIG_ENDIAN]);
-#endif // NDEBUG
-#else  // SIZEOF_VOID_P > 4
+#        ifndef NDEBUG
+    assert(0 > (int32_t)op->ob_refcnt_split[PY_BIG_ENDIAN]);
+#        endif // NDEBUG
+#    else      // SIZEOF_VOID_P > 4
     // Explicitly check immortality against the immortal value
     assert(_Py_IsImmortal(op));
-#endif // SIZEOF_VOID_P > 4
-#else  // PY_MINOR_VERSION >= 12
+#    endif     // SIZEOF_VOID_P > 4
+#else          // PY_MINOR_VERSION >= 12
     op->ob_refcnt++;
-#endif // PY_MINOR_VERSION >= 12
+#endif         // PY_MINOR_VERSION >= 12
     PYYJSON_PY_INCREF_DEBUG();
 }
 
@@ -192,11 +192,11 @@ force_inline PyObject *make_string(const u8 *unicode_str, Py_ssize_t len, int ty
     }
 success:
     if (is_key) {
-        assert(((PyASCIIObject *) obj)->hash == -1);
+        assert(((PyASCIIObject *)obj)->hash == -1);
 #if PY_MINOR_VERSION >= 14
-        ((PyASCIIObject *) obj)->hash = PyUnicode_Type.tp_hash(obj);
+        ((PyASCIIObject *)obj)->hash = PyUnicode_Type.tp_hash(obj);
 #else
-        ((PyASCIIObject *) obj)->hash = _Py_HashBytes(unicode_str, real_len);
+        ((PyASCIIObject *)obj)->hash = _Py_HashBytes(unicode_str, real_len);
 #endif
     }
     return obj;
@@ -229,18 +229,18 @@ force_inline bool init_decode_ctn_stack_info(DecodeCtnStackInfo *restrict decode
 }
 
 #if PYYJSON_ENABLE_TRACE
-#define PYYJSON_TRACE_OP(x)                                 \
-    do {                                                    \
-        for (int i = 0; i < PYYJSON_OP_BITCOUNT_MAX; i++) { \
-            if (x & (1 << i)) {                             \
-                __count_trace[i]++;                         \
-                break;                                      \
-            }                                               \
-        }                                                   \
-        __op_counter++;                                     \
-    } while (0)
+#    define PYYJSON_TRACE_OP(x)                                 \
+        do {                                                    \
+            for (int i = 0; i < PYYJSON_OP_BITCOUNT_MAX; i++) { \
+                if (x & (1 << i)) {                             \
+                    __count_trace[i]++;                         \
+                    break;                                      \
+                }                                               \
+            }                                                   \
+            __op_counter++;                                     \
+        } while (0)
 #else
-#define PYYJSON_TRACE_OP(x)    (void)0
+#    define PYYJSON_TRACE_OP(x) (void)0
 #endif
 
 force_noinline bool _pyyjson_decode_obj_stack_resize(DecodeObjStackInfo *restrict decode_obj_stack_info) {
@@ -252,7 +252,7 @@ force_noinline bool _pyyjson_decode_obj_stack_resize(DecodeObjStackInfo *restric
             return false;
         }
         memcpy(new_buffer, decode_obj_stack_info->result_stack, sizeof(PyObject *) * PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE);
-        decode_obj_stack_info->result_stack = (PyObject **) new_buffer;
+        decode_obj_stack_info->result_stack = (PyObject **)new_buffer;
         decode_obj_stack_info->cur_write_result_addr = decode_obj_stack_info->result_stack + PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE;
         decode_obj_stack_info->result_stack_end = decode_obj_stack_info->result_stack + (PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE << 1);
     } else {
@@ -267,7 +267,7 @@ force_noinline bool _pyyjson_decode_obj_stack_resize(DecodeObjStackInfo *restric
             PyErr_NoMemory();
             return false;
         }
-        decode_obj_stack_info->result_stack = (PyObject **) new_buffer;
+        decode_obj_stack_info->result_stack = (PyObject **)new_buffer;
         decode_obj_stack_info->cur_write_result_addr = decode_obj_stack_info->result_stack + old_capacity;
         decode_obj_stack_info->result_stack_end = decode_obj_stack_info->result_stack + new_capacity;
     }
@@ -275,7 +275,7 @@ force_noinline bool _pyyjson_decode_obj_stack_resize(DecodeObjStackInfo *restric
 }
 
 force_inline bool pyyjson_push_obj(DecodeObjStackInfo *restrict decode_obj_stack_info, PyObject *obj) {
-    static_assert(((Py_ssize_t) PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE << 1) > 0, "(PYYJSON_DECODE_OBJSTACK_BUFFER_SIZE << 1) > 0");
+    static_assert(((Py_ssize_t)PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE << 1) > 0, "(PYYJSON_DECODE_OBJSTACK_BUFFER_SIZE << 1) > 0");
     if (unlikely(decode_obj_stack_info->cur_write_result_addr >= decode_obj_stack_info->result_stack_end)) {
         bool c = _pyyjson_decode_obj_stack_resize(decode_obj_stack_info);
         RETURN_ON_UNLIKELY_ERR(!c);
@@ -291,23 +291,23 @@ force_inline bool pyyjson_push_obj(DecodeObjStackInfo *restrict decode_obj_stack
 //     return pyyjson_push_obj(decode_obj_stack_info, new_val);
 // }
 
-force_inline bool pyyjson_decode_double(DecodeObjStackInfo* restrict decode_obj_stack_info, double val) {
+force_inline bool pyyjson_decode_double(DecodeObjStackInfo *restrict decode_obj_stack_info, double val) {
     PYYJSON_TRACE_OP(PYYJSON_OP_NUMBER);
-    PyObject* obj = PyFloat_FromDouble(val);
+    PyObject *obj = PyFloat_FromDouble(val);
     RETURN_ON_UNLIKELY_ERR(!obj);
     return pyyjson_push_obj(decode_obj_stack_info, obj);
 }
 
-force_inline bool pyyjson_decode_longlong(DecodeObjStackInfo* restrict decode_obj_stack_info, i64 val) {
+force_inline bool pyyjson_decode_longlong(DecodeObjStackInfo *restrict decode_obj_stack_info, i64 val) {
     PYYJSON_TRACE_OP(PYYJSON_OP_NUMBER);
-    PyObject* obj = PyLong_FromLongLong(val);
+    PyObject *obj = PyLong_FromLongLong(val);
     RETURN_ON_UNLIKELY_ERR(!obj);
     return pyyjson_push_obj(decode_obj_stack_info, obj);
 }
 
-force_inline bool pyyjson_decode_unsignedlonglong(DecodeObjStackInfo* restrict decode_obj_stack_info, u64 val) {
+force_inline bool pyyjson_decode_unsignedlonglong(DecodeObjStackInfo *restrict decode_obj_stack_info, u64 val) {
     PYYJSON_TRACE_OP(PYYJSON_OP_NUMBER);
-    PyObject* obj = PyLong_FromUnsignedLongLong(val);
+    PyObject *obj = PyLong_FromUnsignedLongLong(val);
     RETURN_ON_UNLIKELY_ERR(!obj);
     return pyyjson_push_obj(decode_obj_stack_info, obj);
 }
@@ -336,8 +336,8 @@ force_inline bool pyyjson_decode_obj(DecodeObjStackInfo *restrict decode_obj_sta
         PyObject *key = *dict_val_view++;
         assert(PyUnicode_Check(key));
         PyObject *val = *dict_val_view++;
-        assert(((PyASCIIObject *) key)->hash != -1);
-        int retcode = _PyDict_SetItem_KnownHash(dict, key, val, ((PyASCIIObject *) key)->hash); // this may fail
+        assert(((PyASCIIObject *)key)->hash != -1);
+        int retcode = _PyDict_SetItem_KnownHash(dict, key, val, ((PyASCIIObject *)key)->hash); // this may fail
         if (likely(0 == retcode)) {
             Py_DecRef_NoCheck(key);
             Py_DecRef_NoCheck(val);
@@ -391,40 +391,38 @@ force_inline bool pyyjson_decode_inf(DecodeObjStackInfo *restrict decode_obj_sta
 
 /** Character type table (generate with misc/make_tables.c) */
 static const u8 char_table[256] = {
-    0x44, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04,
-    0x04, 0x05, 0x45, 0x04, 0x04, 0x45, 0x04, 0x04,
-    0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04,
-    0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04,
-    0x01, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x20,
-    0x82, 0x82, 0x82, 0x82, 0x82, 0x82, 0x82, 0x82,
-    0x82, 0x82, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x10, 0x04, 0x00, 0x00, 0x00,
-    0x00, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00,
-    0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-    0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-    0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-    0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-    0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-    0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-    0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-    0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-    0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-    0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-    0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-    0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-    0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-    0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-    0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
-    0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08
-};
-
+        0x44, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04,
+        0x04, 0x05, 0x45, 0x04, 0x04, 0x45, 0x04, 0x04,
+        0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04,
+        0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04,
+        0x01, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x20,
+        0x82, 0x82, 0x82, 0x82, 0x82, 0x82, 0x82, 0x82,
+        0x82, 0x82, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x10, 0x04, 0x00, 0x00, 0x00,
+        0x00, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00,
+        0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+        0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+        0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+        0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+        0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+        0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+        0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+        0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+        0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+        0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+        0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+        0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+        0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+        0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+        0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+        0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08};
 
 /** Match a character with specified type. */
 force_inline bool char_is_type(u8 c, u8 type) {
@@ -454,7 +452,7 @@ force_inline bool char_is_container(u8 c) {
 /** Match a stop character in ASCII string: '"', '\', [0x00-0x1F,0x80-0xFF]. */
 force_inline bool char_is_ascii_stop(u8 c) {
     return char_is_type(c, (u8)(CHAR_TYPE_ESC_ASCII |
-                                       CHAR_TYPE_NON_ASCII));
+                                CHAR_TYPE_NON_ASCII));
 }
 
 /** Match a line end character: '\\n', '\\r', '\0'. */
@@ -466,7 +464,6 @@ force_inline bool char_is_ascii_stop(u8 c) {
 // force_inline bool char_is_hex(u8 c) {
 //     return char_is_type(c, (u8)CHAR_TYPE_HEX);
 // }
-
 
 
 force_inline u16 read_b2_unicode(u32 uni) {
@@ -487,26 +484,25 @@ force_inline u16 read_b3_unicode(u32 uni) {
 
 force_inline u32 read_b4_unicode(u32 uni) {
 #if PY_BIG_ENDIAN
-    return ((uni & 0x07000000) >> 6) | ((uni & 0x3f0000) >> 4) | ((uni & 0x3f00) >> 2)  | ((uni & 0x3f));
+    return ((uni & 0x07000000) >> 6) | ((uni & 0x3f0000) >> 4) | ((uni & 0x3f00) >> 2) | ((uni & 0x3f));
 #else
     return ((uni & 0x07) << 18) | ((uni & 0x3f00) << 4) | ((uni & 0x3f0000) >> 10) | ((uni & 0x3f000000) >> 24);
 #endif
 }
 
-
 /** Read single value JSON document. */
 force_noinline PyObject *read_root_single(const char *dat, usize len) {
-#define return_err(_pos, _type, _msg)                                                               \
-    do {                                                                                            \
-        if (_type == JSONDecodeError) {                                                             \
-            PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, ((u8 *) _pos) - (u8 *) dat); \
-        } else {                                                                                    \
-            PyErr_SetString(_type, _msg);                                                           \
-        }                                                                                           \
-        goto fail_cleanup;                                                                                \
+#define return_err(_pos, _type, _msg)                                                             \
+    do {                                                                                          \
+        if (_type == JSONDecodeError) {                                                           \
+            PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, ((u8 *)_pos) - (u8 *)dat); \
+        } else {                                                                                  \
+            PyErr_SetString(_type, _msg);                                                         \
+        }                                                                                         \
+        goto fail_cleanup;                                                                        \
     } while (0)
 
-    const u8 *cur = (const u8 *) dat;
+    const u8 *cur = (const u8 *)dat;
     const u8 *const end = cur + len;
 
     PyObject *ret = NULL;
@@ -555,7 +551,7 @@ force_noinline PyObject *read_root_single(const char *dat, usize len) {
         }
         if (_read_nan(false, &cur)) {
             ret = PyFloat_FromDouble(fabs(Py_NAN));
-            if(likely(ret)) goto single_end;
+            if (likely(ret)) goto single_end;
         }
         goto fail_literal_null;
     }
@@ -604,11 +600,8 @@ fail_cleanup:
 #undef return_err
 }
 
-
-
 PyObject *yyjson_read_opts(const char *dat,
-                           Py_ssize_t len
-) {
+                           Py_ssize_t len) {
 
 #define return_err(_pos, _type, _msg)                               \
     do {                                                            \
@@ -637,8 +630,7 @@ PyObject *yyjson_read_opts(const char *dat,
     /* skip empty contents before json document */
     if (unlikely(char_is_space_or_comment(*dat))) {
         if (likely(char_is_space(*dat))) {
-            while (char_is_space(*++dat))
-                ;
+            while (char_is_space(*++dat));
         }
         if (unlikely(dat >= end)) {
             return_err(0, JSONDecodeError, "input data is empty");
@@ -685,6 +677,5 @@ PyObject *yyjson_read_opts(const char *dat,
 
 #undef return_err
 }
-
 
 #include "decode_bytes.inl.c"

@@ -10,7 +10,6 @@ void _tls_buffer_destructor(void *ptr) {
     if (ptr) free(ptr);
 }
 
-
 bool pyyjson_tls_init(void) {
     bool success = true;
 #if defined(_POSIX_THREADS)

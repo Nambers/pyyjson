@@ -8,23 +8,23 @@
  * TLS related macros
  *============================================================================*/
 #if defined(_POSIX_THREADS)
-#define PYYJSON_DECLARE_TLS_GETTER(_key, _getter_name) \
-    force_inline void *_getter_name(void) {            \
-        return pthread_getspecific((_key));            \
-    }
-#define PYYJSON_DECLARE_TLS_SETTER(_key, _setter_name) \
-    force_inline bool _setter_name(void *ptr) {        \
-        return 0 == pthread_setspecific(_key, ptr);    \
-    }
+#    define PYYJSON_DECLARE_TLS_GETTER(_key, _getter_name) \
+        force_inline void *_getter_name(void) {            \
+            return pthread_getspecific((_key));            \
+        }
+#    define PYYJSON_DECLARE_TLS_SETTER(_key, _setter_name) \
+        force_inline bool _setter_name(void *ptr) {        \
+            return 0 == pthread_setspecific(_key, ptr);    \
+        }
 #else
-#define PYYJSON_DECLARE_TLS_GETTER(_key, _getter_name) \
-    force_inline void *_getter_name(void) {            \
-        return FlsGetValue((_key));                    \
-    }
-#define PYYJSON_DECLARE_TLS_SETTER(_key, _setter_name) \
-    force_inline bool _setter_name(void *ptr) {        \
-        return FlsSetValue(_key, ptr);                 \
-    }
+#    define PYYJSON_DECLARE_TLS_GETTER(_key, _getter_name) \
+        force_inline void *_getter_name(void) {            \
+            return FlsGetValue((_key));                    \
+        }
+#    define PYYJSON_DECLARE_TLS_SETTER(_key, _setter_name) \
+        force_inline bool _setter_name(void *ptr) {        \
+            return FlsSetValue(_key, ptr);                 \
+        }
 #endif
 
 /*==============================================================================
@@ -49,7 +49,6 @@ typedef struct EncodeCtnWithIndex {
 PYYJSON_DECLARE_TLS_GETTER(_EncodeObjStackBuffer_Key, _get_encode_obj_stack_buffer_pointer)
 PYYJSON_DECLARE_TLS_SETTER(_EncodeObjStackBuffer_Key, _set_encode_obj_stack_buffer_pointer)
 
-
 force_inline EncodeCtnWithIndex *get_encode_obj_stack_buffer(void) {
     void *value = _get_encode_obj_stack_buffer_pointer();
     if (unlikely(value == NULL)) {
@@ -61,7 +60,7 @@ force_inline EncodeCtnWithIndex *get_encode_obj_stack_buffer(void) {
             return NULL;
         }
     }
-    return (EncodeCtnWithIndex *) value;
+    return (EncodeCtnWithIndex *)value;
 }
 
 /*==============================================================================
@@ -88,9 +87,8 @@ force_inline DecodeCtnWithSize *get_decode_ctn_stack_buffer(void) {
             return NULL;
         }
     }
-    return (DecodeCtnWithSize *) value;
+    return (DecodeCtnWithSize *)value;
 }
-
 
 /*==============================================================================
  * Thread Local Decode buffer
@@ -116,7 +114,7 @@ force_inline PyObject **get_decode_obj_stack_buffer(void) {
             return NULL;
         }
     }
-    return (PyObject **) value;
+    return (PyObject **)value;
 }
 
 

@@ -76,8 +76,8 @@ force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(UnicodeVector **restrict 
     _TARGET_TYPE *writer = _WRITER(vec);
     const _FROM_TYPE *src_end = src + len;
     while (src < src_end) {
-        _TARGET_TYPE srcval = (_TARGET_TYPE) *src;
-        usize unicode_point = (usize) srcval;
+        _TARGET_TYPE srcval = (_TARGET_TYPE)*src;
+        usize unicode_point = (usize)srcval;
         Py_ssize_t copy_count = (unicode_point <= _Slash) ? _ControlJump[unicode_point] : 0;
         if (likely(!copy_count)) {
             *writer++ = srcval;
@@ -88,7 +88,7 @@ force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(UnicodeVector **restrict 
                 vec = VEC_RESERVE(vec_addr, 2 + len + TAIL_PADDING / sizeof(_TARGET_TYPE) + additional_len);
                 RETURN_ON_UNLIKELY_ERR(!vec);
                 writer = _WRITER(vec);
-                memcpy((void *) writer, (const void *) copy_ptr, 2 * sizeof(_TARGET_TYPE));
+                memcpy((void *)writer, (const void *)copy_ptr, 2 * sizeof(_TARGET_TYPE));
                 writer += 2;
             } else {
                 assert(6 == copy_count);
@@ -101,7 +101,7 @@ force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(UnicodeVector **restrict 
                 vec = VEC_RESERVE(vec_addr, _CopyLen + len + TAIL_PADDING / sizeof(_TARGET_TYPE) + additional_len);
                 RETURN_ON_UNLIKELY_ERR(!vec);
                 writer = _WRITER(vec);
-                memcpy((void *) writer, (const void *) copy_ptr, _CopyLen * sizeof(_TARGET_TYPE));
+                memcpy((void *)writer, (const void *)copy_ptr, _CopyLen * sizeof(_TARGET_TYPE));
                 writer += 6;
             }
         }
@@ -116,61 +116,61 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
     UnicodeVector *vec = *vec_addr;
 #if SIMD_BIT_SIZE == 512
     SIMD_512 z;
-#if COMPILE_READ_UCS_LEVEL == 1
-#define _MASKZ_LOADU _mm512_maskz_loadu_epi8
-#define _MASK_STOREU _mm512_mask_storeu_epi8
-#elif COMPILE_READ_UCS_LEVEL == 2
-#define _MASKZ_LOADU _mm512_maskz_loadu_epi16
-#define _MASK_STOREU _mm512_mask_storeu_epi16
-#else // COMPILE_READ_UCS_LEVEL == 4
-#define _MASKZ_LOADU _mm512_maskz_loadu_epi32
-#define _MASK_STOREU _mm512_mask_storeu_epi32
-#endif
+#    if COMPILE_READ_UCS_LEVEL == 1
+#        define _MASKZ_LOADU _mm512_maskz_loadu_epi8
+#        define _MASK_STOREU _mm512_mask_storeu_epi8
+#    elif COMPILE_READ_UCS_LEVEL == 2
+#        define _MASKZ_LOADU _mm512_maskz_loadu_epi16
+#        define _MASK_STOREU _mm512_mask_storeu_epi16
+#    else // COMPILE_READ_UCS_LEVEL == 4
+#        define _MASKZ_LOADU _mm512_maskz_loadu_epi32
+#        define _MASK_STOREU _mm512_mask_storeu_epi32
+#    endif
     u64 rw_mask, tail_mask;
-    rw_mask = ((u64) 1 << (usize) len) - 1;
-    z = _MASKZ_LOADU(rw_mask, (const void *) src);
+    rw_mask = ((u64)1 << (usize)len) - 1;
+    z = _MASKZ_LOADU(rw_mask, (const void *)src);
     tail_mask = CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(z, rw_mask);
     if (likely(check_mask_zero(tail_mask))) {
-#if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
-        _MASK_STOREU((void *) _WRITER(vec), rw_mask, z);
-#else
+#    if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
+        _MASK_STOREU((void *)_WRITER(vec), rw_mask, z);
+#    else
         MASK_ELEVATE_WRITE_512(_WRITER(vec), z, len);
-#endif
+#    endif
         _WRITER(vec) += len;
     } else {
-#if COMPILE_READ_UCS_LEVEL == 1
-        usize tzcnt = (usize) u64_tz_bits(tail_mask);
-#else
-        usize tzcnt = (usize) u32_tz_bits((u32) tail_mask);
-#endif
-        assert(tzcnt < (usize) len);
-#if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
-        _MASK_STOREU((void *) _WRITER(vec), ((u64) 1 << tzcnt) - 1, z);
-#else
+#    if COMPILE_READ_UCS_LEVEL == 1
+        usize tzcnt = (usize)u64_tz_bits(tail_mask);
+#    else
+        usize tzcnt = (usize)u32_tz_bits((u32)tail_mask);
+#    endif
+        assert(tzcnt < (usize)len);
+#    if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
+        _MASK_STOREU((void *)_WRITER(vec), ((u64)1 << tzcnt) - 1, z);
+#    else
         if (tzcnt) MASK_ELEVATE_WRITE_512(_WRITER(vec), z, tzcnt);
-#endif
+#    endif
         _WRITER(vec) += tzcnt;
         vec = VECTOR_WRITE_ESCAPE_IMPL(vec_addr, src + tzcnt, len - tzcnt, 0);
         RETURN_ON_UNLIKELY_ERR(!vec);
     }
-#undef _MASKZ_LOADU
-#undef _MASK_STOREU
+#    undef _MASKZ_LOADU
+#    undef _MASK_STOREU
 #elif SIMD_BIT_SIZE == 256
     __m256i y;
     const _FROM_TYPE *load_start = src + len - CHECK_COUNT_MAX;
     _TARGET_TYPE *store_start = _WRITER(vec) + len - CHECK_COUNT_MAX;
     __m256i mask, check_mask;
-#define MASK_READER PYYJSON_CONCAT2(read_tail_mask_table, READ_BIT_SIZE)
+#    define MASK_READER PYYJSON_CONCAT2(read_tail_mask_table, READ_BIT_SIZE)
     mask = load_256_aligned(MASK_READER(CHECK_COUNT_MAX - len));
-#undef MASK_READER
+#    undef MASK_READER
     check_mask = CHECK_ESCAPE_IMPL_GET_MASK(load_start, &y);
     check_mask = simd_and_256(check_mask, mask);
     if (likely(check_mask_zero(check_mask))) {
-#if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
+#    if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
         WRITE_SIMD_256_WITH_WRITEMASK(store_start, y, mask);
-#else
+#    else
         BACK_WRITE_SIMD256_WITH_TAIL_LEN(store_start, y, len);
-#endif
+#    endif
         _WRITER(vec) += len;
     } else {
         vec = VECTOR_WRITE_ESCAPE_IMPL(vec_addr, src, len, 0);
@@ -182,24 +182,24 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
     SIMD_128 x, mask, check_mask;
     const _FROM_TYPE *load_start = src + len - CHECK_COUNT_MAX;
     _TARGET_TYPE *store_start = _WRITER(vec) + len - CHECK_COUNT_MAX;
-#define MASK_TABLE_READER PYYJSON_CONCAT2(read_tail_mask_table, READ_BIT_SIZE)
+#    define MASK_TABLE_READER PYYJSON_CONCAT2(read_tail_mask_table, READ_BIT_SIZE)
     mask = load_128_aligned(MASK_TABLE_READER(CHECK_COUNT_MAX - len));
-#undef MASK_TABLE_READER
+#    undef MASK_TABLE_READER
     check_mask = CHECK_ESCAPE_IMPL_GET_MASK(load_start, &x);
     check_mask = simd_and_128(check_mask, mask);
     if (likely(check_mask_zero(check_mask))) {
-#if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
-#if __SSE4_1__
-        x = blendv_128(load_128((const void *) store_start), x, mask);
-        write_128((void *) store_start, x);
-#else  // < __SSE4_1__
-        x = runtime_right_shift_128bits(x, COMPILE_READ_UCS_LEVEL * (int) (CHECK_COUNT_MAX - len));
+#    if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
+#        if __SSE4_1__
+        x = blendv_128(load_128((const void *)store_start), x, mask);
+        write_128((void *)store_start, x);
+#        else  // < __SSE4_1__
+        x = runtime_right_shift_128bits(x, COMPILE_READ_UCS_LEVEL * (int)(CHECK_COUNT_MAX - len));
         write_128(_WRITER(vec), x);
-#endif // __SSE4_1__
-#else  // COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
-        x = runtime_right_shift_128bits(x, COMPILE_READ_UCS_LEVEL * (int) (CHECK_COUNT_MAX - len));
+#        endif // __SSE4_1__
+#    else      // COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
+        x = runtime_right_shift_128bits(x, COMPILE_READ_UCS_LEVEL * (int)(CHECK_COUNT_MAX - len));
         WRITE_SIMD_IMPL(_WRITER(vec), x);
-#endif // COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
+#    endif     // COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
         _WRITER(vec) += len;
     } else {
         vec = VECTOR_WRITE_ESCAPE_IMPL(vec_addr, src, len, 0);
@@ -217,7 +217,7 @@ static_assert(sizeof(PyASCIIObject) >= 32, "sizeof(PyASCIIObject) == ?");
 
 force_inline UnicodeVector *VECTOR_WRITE_UNICODE_IMPL(UnicodeVector **restrict vec_addr, _FROM_TYPE *src, Py_ssize_t len) {
     UnicodeVector *vec = *vec_addr;
-    usize total_size = (usize) len;
+    usize total_size = (usize)len;
     __m128i x;
 #if SIMD_BIT_SIZE >= 256
     __m256i y;
@@ -266,7 +266,7 @@ force_inline bool PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, COMPILE_R
     RETURN_ON_UNLIKELY_ERR(!vec);
     VECTOR_WRITE_INDENT(vec, cur_nested_depth);
     *_WRITER(vec)++ = '"';
-    vec = VECTOR_WRITE_UNICODE_IMPL(vec_addr, (_FROM_TYPE *) get_unicode_data(key), len);
+    vec = VECTOR_WRITE_UNICODE_IMPL(vec_addr, (_FROM_TYPE *)get_unicode_data(key), len);
     RETURN_ON_UNLIKELY_ERR(!vec);
     vec = VEC_RESERVE(vec_addr, 3 + TAIL_PADDING);
     RETURN_ON_UNLIKELY_ERR(!vec);
@@ -275,10 +275,10 @@ force_inline bool PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, COMPILE_R
     *writer++ = ':';
 #if COMPILE_INDENT_LEVEL > 0
     *writer++ = ' ';
-#if SIZEOF_VOID_P == 8 || COMPILE_WRITE_UCS_LEVEL != 4
+#    if SIZEOF_VOID_P == 8 || COMPILE_WRITE_UCS_LEVEL != 4
     *writer = 0;
-#endif // SIZEOF_VOID_P == 8 || COMPILE_WRITE_UCS_LEVEL != 4
-#endif // COMPILE_INDENT_LEVEL > 0
+#    endif // SIZEOF_VOID_P == 8 || COMPILE_WRITE_UCS_LEVEL != 4
+#endif     // COMPILE_INDENT_LEVEL > 0
     _WRITER(vec) += (COMPILE_INDENT_LEVEL > 0) ? 3 : 2;
     assert(vec_in_boundary(vec));
     return true;
@@ -298,7 +298,7 @@ force_inline bool PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, COMPILE_R
         VECTOR_WRITE_INDENT(vec, cur_nested_depth);
     }
     *_WRITER(vec)++ = '"';
-    vec = VECTOR_WRITE_UNICODE_IMPL(vec_addr, (_FROM_TYPE *) get_unicode_data(str), len);
+    vec = VECTOR_WRITE_UNICODE_IMPL(vec_addr, (_FROM_TYPE *)get_unicode_data(str), len);
     RETURN_ON_UNLIKELY_ERR(!vec);
     vec = VEC_RESERVE(vec_addr, 2 + TAIL_PADDING);
     RETURN_ON_UNLIKELY_ERR(!vec);

@@ -2,24 +2,22 @@
 #include "include/indent.h"
 #include "include/reserve.h"
 
-
 force_inline void VECTOR_WRITE_INDENT(UnicodeVector *restrict vec, Py_ssize_t _cur_nested_depth) {
 #if COMPILE_INDENT_LEVEL > 0
     _TARGET_TYPE *writer = _WRITER(vec);
     *writer++ = '\n';
-    usize cur_nested_depth = (usize) _cur_nested_depth;
+    usize cur_nested_depth = (usize)_cur_nested_depth;
     for (usize i = 0; i < cur_nested_depth; i++) {
         *writer++ = ' ';
         *writer++ = ' ';
-#if COMPILE_INDENT_LEVEL == 4
+#    if COMPILE_INDENT_LEVEL == 4
         *writer++ = ' ';
         *writer++ = ' ';
-#endif // COMPILE_INDENT_LEVEL == 4
+#    endif // COMPILE_INDENT_LEVEL == 4
     }
     _WRITER(vec) += COMPILE_INDENT_LEVEL * cur_nested_depth + 1;
 #endif // COMPILE_INDENT_LEVEL > 0
 }
-
 
 force_inline UnicodeVector *INDENT_WRITER(UnicodeVector **vec_addr, Py_ssize_t cur_nested_depth, bool is_in_obj, Py_ssize_t additional_reserve_count) {
     UnicodeVector *vec;
@@ -33,6 +31,5 @@ force_inline UnicodeVector *INDENT_WRITER(UnicodeVector **vec_addr, Py_ssize_t c
     }
     return vec;
 }
-
 
 #include "commondef/w_out.inl.h"

@@ -2,45 +2,45 @@
 #define PYYJSON_CONFIG_H
 
 #ifdef _DEBUG
-#undef _DEBUG
-#include <Python.h>
-#define _DEBUG
+#    undef _DEBUG
+#    include <Python.h>
+#    define _DEBUG
 #else
-#include <Python.h>
+#    include <Python.h>
 #endif
 #include <stdalign.h>
 #include <stdbool.h>
 #include <stdint.h>
 #if defined(_POSIX_THREADS)
-#include <pthread.h>
-#define TLS_KEY_TYPE pthread_key_t
+#    include <pthread.h>
+#    define TLS_KEY_TYPE pthread_key_t
 #elif defined(NT_THREADS)
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#define TLS_KEY_TYPE DWORD
+#    define WIN32_LEAN_AND_MEAN
+#    include <windows.h>
+#    define TLS_KEY_TYPE DWORD
 #else
-#error "Unknown thread model"
+#    error "Unknown thread model"
 #endif
 
 #define PYYJSON_VERSION_STRING "0.0.1"
 
 // feature checks
 #if INTPTR_MAX == INT64_MAX
-#define PYYJSON_64BIT
+#    define PYYJSON_64BIT
 #elif INTPTR_MAX == INT32_MAX
-#define PYYJSON_32BIT
+#    define PYYJSON_32BIT
 #else
-#error "Unsupported platform"
+#    error "Unsupported platform"
 #endif
 
 /* String buffer size for decoding. Default cost: 512 * 1024 = 512kb (per thread). */
 #ifndef PYYJSON_STRING_BUFFER_SIZE
-#define PYYJSON_STRING_BUFFER_SIZE (512 * 1024)
+#    define PYYJSON_STRING_BUFFER_SIZE (512 * 1024)
 #endif
 
 /* Buffer for key associative cache. Default cost: 2048 * sizeof(pyyjson_cache_type) = 16kb (per thread). */
 #ifndef PYYJSON_KEY_CACHE_SIZE
-#define PYYJSON_KEY_CACHE_SIZE (1 << 11)
+#    define PYYJSON_KEY_CACHE_SIZE (1 << 11)
 #endif
 
 // /* Stack buffer for PyObject*. Default cost: 8 * 1024 = 8kb (per thread). */
@@ -49,7 +49,7 @@
 // #endif
 
 #ifndef PYYJSON_READER_ESTIMATED_PRETTY_RATIO
-#define PYYJSON_READER_ESTIMATED_PRETTY_RATIO 16
+#    define PYYJSON_READER_ESTIMATED_PRETTY_RATIO 16
 #endif
 
 /*
@@ -57,7 +57,7 @@
  Cost: PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE * sizeof(void*) bytes per thread.
  */
 #ifndef PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE
-#define PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE (1024)
+#    define PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE (1024)
 #endif
 
 /*
@@ -65,7 +65,7 @@
  Cost: PYYJSON_DECODE_CONTAINER_BUFFER_INIT_SIZE * sizeof(Py_ssize_t) bytes per thread.
  */
 #ifndef PYYJSON_DECODE_MAX_RECURSION
-#define PYYJSON_DECODE_MAX_RECURSION (1024)
+#    define PYYJSON_DECODE_MAX_RECURSION (1024)
 #endif
 
 /*
@@ -73,7 +73,7 @@
  Cost: PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE bytes per thread.
  */
 #ifndef PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE
-#define PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE (1024)
+#    define PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE (1024)
 #endif
 
 /*
@@ -81,7 +81,7 @@
  Cost: PYYJSON_ENCODE_MAX_RECURSION * sizeof(void*) * 2 bytes per thread.
  */
 #ifndef PYYJSON_ENCODE_MAX_RECURSION
-#define PYYJSON_ENCODE_MAX_RECURSION (1024)
+#    define PYYJSON_ENCODE_MAX_RECURSION (1024)
 #endif
 
 /*
@@ -92,7 +92,7 @@
  are centralized in a certain range.
  */
 #ifndef PYYJSON_ENCODE_ESCAPE_ONCE_BYTES
-#define PYYJSON_ENCODE_ESCAPE_ONCE_BYTES (16)
+#    define PYYJSON_ENCODE_ESCAPE_ONCE_BYTES (16)
 #endif
 
 /** Type define for primitive types. */
