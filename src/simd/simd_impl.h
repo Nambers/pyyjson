@@ -449,28 +449,4 @@ force_inline SIMD_HALF_TYPE load_half(const void *src) {
 
 #endif // SIMD_BIT_SIZE > 128
 
-/*==============================================================================
- * TZCNT.
- *============================================================================*/
-force_inline u32 tzcnt_u32(u32 x) {
-    // never pass a zero here.
-    assert(x);
-#if __BMI__
-// real gcc check from yyjson
-#if !defined(__clang__) && !defined(__INTEL_COMPILER) && !defined(__ICC) && defined(__GNUC__)
-    return __tzcnt_u32(x);
-#else
-    return _mm_tzcnt_32(x);
-#endif
-#else
-    #if defined(_MSC_VER)
-        unsigned long index = 0;
-        _BitScanForward(&index, x);
-        return index;
-    #else
-        return __builtin_ctz(x);
-    #endif
-#endif
-}
-
 #endif // ENCODE_SIMD_IMPL_H

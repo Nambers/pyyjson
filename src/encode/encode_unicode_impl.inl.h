@@ -262,7 +262,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_IMPL(UnicodeVector **restrict v
             bit_mask = to_bitmask_128(mask);
 #endif // COMPILE_READ_UCS_LEVEL
             assert(bit_mask);
-            u32 done_count = tzcnt_u32((u32) bit_mask) / sizeof(_FROM_TYPE);
+            u32 done_count = u32_tz_bits((u32) bit_mask) / sizeof(_FROM_TYPE);
             // vec = VECTOR_WRITE_ESCAPE_IMPL(vec_addr, src, CHECK_COUNT_MAX, len - CHECK_COUNT_MAX);
             // src += CHECK_COUNT_MAX;
 #endif
