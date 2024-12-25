@@ -501,3 +501,5 @@ fail:;
 /* Implmentations of some inline functions used in current scope */
 #include "unicode/_include_helper/indent_wrap.h"
 #include "unicode/_include_helper/reserve_wrap.h"
+
+#include "simd/check_mask_wrap.inl.c"
