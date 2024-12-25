@@ -9,6 +9,7 @@
 
 // encode_simd_utils.inl
 #define CHECK_ESCAPE_IMPL_GET_MASK PYYJSON_CONCAT2(check_escape_impl_get_mask, COMPILE_READ_UCS_LEVEL)
+#define GET_DONE_COUNT_FROM_MASK PYYJSON_CONCAT2(get_done_count_from_mask, COMPILE_READ_UCS_LEVEL)
 #define WRITE_SIMD_256_WITH_WRITEMASK PYYJSON_CONCAT2(write_simd_256_with_writemask, COMPILE_WRITE_UCS_LEVEL)
 #define BACK_WRITE_SIMD256_WITH_TAIL_LEN PYYJSON_CONCAT3(back_write_simd256_with_tail_len, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 // define here
@@ -23,7 +24,7 @@
 
 // forward declaration
 force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *src, SIMD_TYPE *restrict SIMD_VAR);
-
+force_inline u32 GET_DONE_COUNT_FROM_MASK(SIMD_MASK_TYPE mask);
 
 #if COMPILE_READ_UCS_LEVEL == 1 && COMPILE_INDENT_LEVEL == 0
 static _TARGET_TYPE _CONTROL_SEQ_TABLE[(_Slash + 1) * 8] = {
@@ -225,7 +226,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_IMPL(UnicodeVector **restrict v
     __m512i z;
 #endif
     SIMD_MASK_TYPE mask;
-    SIMD_BIT_MASK_TYPE bit_mask;
+    // SIMD_BIT_MASK_TYPE bit_mask;
     bool _c;
     while (len >= CHECK_COUNT_MAX) {
         mask = CHECK_ESCAPE_IMPL_GET_MASK(src, &SIMD_VAR);
@@ -235,36 +236,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_IMPL(UnicodeVector **restrict v
             _WRITER(vec) += CHECK_COUNT_MAX;
             len -= CHECK_COUNT_MAX;
         } else {
-#if SIMD_BIT_SIZE == 512
-            bit_mask = mask;
-            assert(bit_mask);
-            u32 done_count = u64_tz_bits(bit_mask) / sizeof(_FROM_TYPE);
-#elif SIMD_BIT_SIZE == 256
-            // for bit size < 512, we don't have cmp_epu8, the mask is calculated by subs_epu8
-            // so we have to cmpeq with zero to get the real bit mask.
-            mask = cmpeq0_8_256(mask);
-            bit_mask = to_bitmask_256(mask);
-            bit_mask = ~bit_mask;
-            assert(bit_mask);
-            u32 done_count = u32_tz_bits(bit_mask) / sizeof(_FROM_TYPE);
-#else // SIMD_BIT_SIZE
-#if COMPILE_READ_UCS_LEVEL != 4
-            // for bit size < 512, we don't have cmp_epu8,
-            // the mask is calculated by subs_epu for ucs < 4
-            // so we have to cmpeq with zero to get the real bit mask.
-            mask = cmpeq0_8_128(mask);
-            bit_mask = to_bitmask_128(mask);
-            bit_mask = ~bit_mask;
-#else
-            // ucs4 does not have subs_epu, so we don't need cmpeq0.
-            // The mask itself is ready for use
-            bit_mask = to_bitmask_128(mask);
-#endif // COMPILE_READ_UCS_LEVEL
-            assert(bit_mask);
-            u32 done_count = u32_tz_bits((u32) bit_mask) / sizeof(_FROM_TYPE);
-            // vec = VECTOR_WRITE_ESCAPE_IMPL(vec_addr, src, CHECK_COUNT_MAX, len - CHECK_COUNT_MAX);
-            // src += CHECK_COUNT_MAX;
-#endif
+            u32 done_count = GET_DONE_COUNT_FROM_MASK(mask);
             assert(len >= done_count);
             len -= done_count;
             src += done_count;
@@ -346,6 +318,7 @@ force_inline bool PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, COMPILE_R
 #undef WRITE_SIMD_IMPL
 #undef BACK_WRITE_SIMD256_WITH_TAIL_LEN
 #undef WRITE_SIMD_256_WITH_WRITEMASK
+#undef GET_DONE_COUNT_FROM_MASK
 #undef CHECK_ESCAPE_IMPL_GET_MASK
 #undef _CONTROL_SEQ_TABLE
 #undef CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512
