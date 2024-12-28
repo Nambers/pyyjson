@@ -12,14 +12,11 @@ let
           self = x;
           packageOverrides = (
             self: super:
-            if !py.isPy39 then
-              { }
-            else
-              {
-                # for py39 there is an upstream bug
-                # https://github.com/NixOS/nixpkgs/issues/353830
-                setuptools = pkgs.callPackage ./py39setuptools.nix { inherit super; };
-              }
+            lib.optionalAttrs py.isPy39 {
+              # for py39 there is an upstream bug
+              # https://github.com/NixOS/nixpkgs/issues/353830
+              setuptools = pkgs.callPackage ./py39setuptools.nix { inherit super; };
+            }
           );
         }
       );
