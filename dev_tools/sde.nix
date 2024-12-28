@@ -5,11 +5,7 @@ stdenv.mkDerivation {
     runHook preInstall
     mkdir -p $out/bin
     mkdir -p $out/share
-    cp -r $src/* $out/share
-    mv $out/share/sde64 $out/bin
-    mv $out/share/sde $out/bin
-    mv $out/share/xed $out/bin
-    mv $out/share/xed64 $out/bin
+    cp -r $src/* $out/bin
     runHook postInstall
   '';
   postFixup = ''

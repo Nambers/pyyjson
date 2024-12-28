@@ -10,11 +10,12 @@ in
 # make sure pyenv selected by use_minor_ver is the first one
 [ pyenv ]
 ++ (with drvs; [
-  cmake
-  gdb
-  valgrind
   clang
+  cmake
   gcc
-  python-launcher # use python-launcher to use other versions
+  gdb
+  python-launcher
+  sde
+  valgrind
 ])
 ++ drvs.pyenvs

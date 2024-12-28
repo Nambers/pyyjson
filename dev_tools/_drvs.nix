@@ -33,16 +33,18 @@ let
   required_python_packages = import ./py_requirements.nix;
   pyenvs_map = py: (py.withPackages required_python_packages);
   pyenvs = builtins.map pyenvs_map using_pythons;
+  sde = pkgs.callPackage ./sde.nix { };
 in
 {
   inherit pyenvs; # list
   inherit using_pythons; # list
   inherit (pkgs)
-    cmake
-    gdb
-    valgrind
     clang
+    cmake
     gcc
+    gdb
     python-launcher
+    valgrind
     ; # packages
+  inherit sde;
 }
