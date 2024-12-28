@@ -5,6 +5,7 @@
   using_python,
   pkgs,
   inputDerivation,
+  lib,
 }:
 let
   debugSourceDir = "debug_source";
@@ -45,12 +46,10 @@ let
     fi
   '';
   orjsonSource =
-    if using_python.sourceVersion.minor != "14" then
+    lib.optionalString (using_python.sourceVersion.minor != "14")
       (builtins.elemAt (builtins.filter (x: x.pname == "orjson") (
         import ./py_requirements.nix using_python.pkgs
-      )) 0).src
-    else
-      "";
+      )) 0).src;
 in
 ''
   _SOURCE_ROOT=$(readlink -f ${builtins.toString ./.}/..)
@@ -60,10 +59,11 @@ in
   fi
   cd $_SOURCE_ROOT
 
-  # ensure the nix-pyenv directory exists
-  mkdir -p ${nix_pyenv_directory}
-  mkdir -p ${nix_pyenv_directory}/lib
-  mkdir -p ${nix_pyenv_directory}/bin
+  if [ "$IN_FLAKE" = "true" ] && [ ! -f "flake.nix" ]; then
+    _SHOULD_CREATE_PYENV=false
+  else
+    _SHOULD_CREATE_PYENV=true
+  fi
 
   ensure_symlink() {
       local link_path="$1"
@@ -74,6 +74,16 @@ in
       rm -f "$link_path" > /dev/null 2>&1
       ln -s "$target_path" "$link_path"
   }
+
+  if [ "$_SHOULD_CREATE_PYENV" = "false" ]; then
+    echo "Not creating pyenv because not in the root directory"
+    return
+  fi
+
+  # ensure the nix-pyenv directory exists
+  mkdir -p ${nix_pyenv_directory}
+  mkdir -p ${nix_pyenv_directory}/lib
+  mkdir -p ${nix_pyenv_directory}/bin
 ''
 + (pkgs.lib.strings.concatStrings (builtins.map link_python_cmd pyenvs))
 + ''

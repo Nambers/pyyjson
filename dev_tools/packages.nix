@@ -3,7 +3,7 @@
 }:
 let
   use_minor_ver = import ./pyver.nix;
-  drvs = (import ./_drvs.nix { inherit pkgs; });
+  drvs = (pkgs.callPackage ./_drvs.nix { });
   pyenv = builtins.elemAt drvs.pyenvs (use_minor_ver - 9);
 in
 # this defines the order in PATH.

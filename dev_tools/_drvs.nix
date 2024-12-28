@@ -18,7 +18,7 @@ let
               {
                 # for py39 there is an upstream bug
                 # https://github.com/NixOS/nixpkgs/issues/353830
-                setuptools = import ./py39setuptools.nix { inherit super pkgs; };
+                setuptools = pkgs.callPackage ./py39setuptools.nix { inherit super; };
               }
           );
         }
@@ -31,8 +31,7 @@ let
         supportedVer: builtins.getAttr ("python3" + (builtins.toString supportedVer)) pkgs
       ) supportedVers
     )
-  )
-  ;
+  );
   # import required python packages
   required_python_packages = import ./py_requirements.nix;
   pyenvs_map = py: (py.withPackages required_python_packages);
