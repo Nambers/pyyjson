@@ -70,7 +70,7 @@ with pypkgs;
         pytestCheckHook
         python-dateutil
         pytz
-        xxhash
+        # xxhash
       ];
 
       preBuild = ''
