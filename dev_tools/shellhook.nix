@@ -40,8 +40,8 @@ let
 
     mkdir -p ${debugSourceDir}
     if [[ ! -d ${debugSourceDir}/Python-${python_env.python.version} ]]; then
-      tar xvf ${python_env.python.src} -C ${debugSourceDir} > /dev/null 2>&1
-      chmod -R 700 ${debugSourceDir}/Python-${python_env.python.version}
+      tar xvf ${python_env.python.src} -C ${debugSourceDir} --exclude='Doc' --exclude='Grammar' --exclude='Lib' > /dev/null 2>&1
+      chmod -R 755 ${debugSourceDir}/Python-${python_env.python.version}
     fi
   '';
   orjsonSource =
