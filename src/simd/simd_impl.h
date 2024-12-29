@@ -35,6 +35,9 @@
 #    define SIMD_HALF_TYPE SIMD_TYPE
 #endif
 
+#define SIMD_STORER PYYJSON_CONCAT2(write, SIMD_BIT_SIZE)
+#define SIMD_AND PYYJSON_CONCAT2(simd_and, SIMD_BIT_SIZE)
+
 /*==============================================================================
  * common SIMD code
  *============================================================================*/
