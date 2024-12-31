@@ -98,51 +98,6 @@ force_inline bool pyyjson_decode_double(DecodeObjStackInfo *restrict decode_obj_
 
 force_inline bool pyyjson_decode_longlong(DecodeObjStackInfo *restrict decode_obj_stack_info, i64 val);
 
-/*==============================================================================
- * 128-bit Integer Utils
- * These functions are used by the floating-point number reader and writer.
- *============================================================================*/
-
-/** Multiplies two 64-bit unsigned integers (a * b),
-    returns the 128-bit result as 'hi' and 'lo'. */
-force_inline void u128_mul(u64 a, u64 b, u64 *hi, u64 *lo) {
-#if PYYJSON_HAS_INT128
-    u128 m = (u128)a * b;
-    *hi = (u64)(m >> 64);
-    *lo = (u64)(m);
-#elif MSC_HAS_UMUL128
-    *lo = _umul128(a, b, hi);
-#else
-    u32 a0 = (u32)(a), a1 = (u32)(a >> 32);
-    u32 b0 = (u32)(b), b1 = (u32)(b >> 32);
-    u64 p00 = (u64)a0 * b0, p01 = (u64)a0 * b1;
-    u64 p10 = (u64)a1 * b0, p11 = (u64)a1 * b1;
-    u64 m0 = p01 + (p00 >> 32);
-    u32 m00 = (u32)(m0), m01 = (u32)(m0 >> 32);
-    u64 m1 = p10 + m00;
-    u32 m10 = (u32)(m1), m11 = (u32)(m1 >> 32);
-    *hi = p11 + m01 + m11;
-    *lo = ((u64)m10 << 32) | (u32)p00;
-#endif
-}
-
-/** Multiplies two 64-bit unsigned integers and add a value (a * b + c),
-    returns the 128-bit result as 'hi' and 'lo'. */
-force_inline void u128_mul_add(u64 a, u64 b, u64 c, u64 *hi, u64 *lo) {
-#if PYYJSON_HAS_INT128
-    u128 m = (u128)a * b + c;
-    *hi = (u64)(m >> 64);
-    *lo = (u64)(m);
-#else
-    u64 h, l, t;
-    u128_mul(a, b, &h, &l);
-    t = l + c;
-    h += (u64)(((t < l) | (t < c)));
-    *hi = h;
-    *lo = t;
-#endif
-}
-
 
 #if PYYJSON_HAS_IEEE_754
 
