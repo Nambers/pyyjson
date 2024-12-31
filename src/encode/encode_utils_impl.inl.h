@@ -1,3 +1,4 @@
+#include "ryu/ryu.h"
 #include "simd/simd_impl.h"
 
 #ifndef COMPILE_WRITE_UCS_LEVEL
@@ -86,7 +87,7 @@ force_inline void PYYJSON_CONCAT2(vec_write_f64, COMPILE_WRITE_UCS_LEVEL)(Unicod
     u8 _buffer[64];
     u8 *buffer = _buffer;
 #endif
-    u8 *buffer_end = write_f64_raw(buffer, val_u64_repr);
+    u8 *buffer_end = buffer + d2s_buffered_n(f64_from_raw(val_u64_repr), (char *)buffer);
 #if COMPILE_WRITE_UCS_LEVEL == 1
     vec->head.write_u8 = buffer_end;
 #else

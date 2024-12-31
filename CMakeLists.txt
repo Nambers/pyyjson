@@ -89,6 +89,7 @@ add_library(pyyjson SHARED
     src/simd/cvt.c
     src/simd/mask_table.c
     src/tls.c
+    src/ryu/d2s.c
 )
 target_include_directories(pyyjson PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src> ${Python3_INCLUDE_DIRS})
 
