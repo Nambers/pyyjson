@@ -678,4 +678,6 @@ PyObject *yyjson_read_opts(const char *dat,
 #undef return_err
 }
 
+#include "decode_utils_wrap.inl.c"
+
 #include "decode_bytes.inl.c"

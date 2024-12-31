@@ -259,7 +259,7 @@ copy_escape_ucs1:
                 src++;
                 break;
             case 'u':
-                if (unlikely(!read_hex_u16(++src, &hi))) {
+                if (unlikely(!read_8_to_hex_u16(++src, &hi))) {
                     return_err(src - 2, "invalid escaped sequence in string");
                 }
                 src += 4;
@@ -299,7 +299,7 @@ copy_escape_ucs1:
                     if (unlikely(!byte_match_2(src, "\\u"))) {
                         return_err(src, "no low surrogate in string");
                     }
-                    if (unlikely(!read_hex_u16(src + 2, &lo))) {
+                    if (unlikely(!read_8_to_hex_u16(src + 2, &lo))) {
                         return_err(src, "invalid escaped sequence in string");
                     }
                     if (unlikely((lo & 0xFC00) != 0xDC00)) {
@@ -652,7 +652,7 @@ copy_escape_ucs2:
                 src++;
                 break;
             case 'u':
-                if (unlikely(!read_hex_u16(++src, &hi))) {
+                if (unlikely(!read_8_to_hex_u16(++src, &hi))) {
                     return_err(src - 2, "invalid escaped sequence in string");
                 }
                 src += 4;
@@ -680,7 +680,7 @@ copy_escape_ucs2:
                     if (unlikely(!byte_match_2(src, "\\u"))) {
                         return_err(src, "no low surrogate in string");
                     }
-                    if (unlikely(!read_hex_u16(src + 2, &lo))) {
+                    if (unlikely(!read_8_to_hex_u16(src + 2, &lo))) {
                         return_err(src, "invalid escaped sequence in string");
                     }
                     if (unlikely((lo & 0xFC00) != 0xDC00)) {
@@ -870,7 +870,7 @@ copy_escape_ucs4:
                 src++;
                 break;
             case 'u':
-                if (unlikely(!read_hex_u16(++src, &hi))) {
+                if (unlikely(!read_8_to_hex_u16(++src, &hi))) {
                     return_err(src - 2, "invalid escaped sequence in string");
                 }
                 src += 4;
@@ -898,7 +898,7 @@ copy_escape_ucs4:
                     if (unlikely(!byte_match_2(src, "\\u"))) {
                         return_err(src, "no low surrogate in string");
                     }
-                    if (unlikely(!read_hex_u16(src + 2, &lo))) {
+                    if (unlikely(!read_8_to_hex_u16(src + 2, &lo))) {
                         return_err(src, "invalid escaped sequence in string");
                     }
                     if (unlikely((lo & 0xFC00) != 0xDC00)) {

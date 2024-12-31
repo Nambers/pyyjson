@@ -294,6 +294,15 @@ force_inline void extract_128_four_parts(SIMD_128 x, SIMD_128 *restrict x1, SIMD
 #undef MOVEHDUP
 }
 
+/* (a & b) == 0 */
+force_inline bool testz_128(SIMD_128 a, SIMD_128 b) {
+#if defined(__SSE4_1__)
+    return (bool)_mm_testz_si128(a, b);
+#else
+    return _mm_movemask_epi8(_mm_cmpeq_epi8(simd_and_128(a, b), _mm_setzero_si128())) == 0xFFFF;
+#endif
+}
+
 /*
  * Mask utilities.
  */

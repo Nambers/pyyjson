@@ -181,17 +181,18 @@ static const u8 hex_conv_table[256] = {
  
  This requires the string has 4-byte zero padding.
  */
-force_inline bool read_hex_u16(const u8 *cur, u16 *val) {
-    u16 c0, c1, c2, c3, t0, t1;
-    c0 = hex_conv_table[cur[0]];
-    c1 = hex_conv_table[cur[1]];
-    c2 = hex_conv_table[cur[2]];
-    c3 = hex_conv_table[cur[3]];
-    t0 = (u16)((c0 << 8) | c2);
-    t1 = (u16)((c1 << 8) | c3);
-    *val = (u16)((t0 << 4) | t1);
-    return ((t0 | t1) & (u16)0xF0F0) == 0;
-}
+force_inline bool read_8_to_hex_u16(const u8 *cur, u16 *val);
+//  {
+//     u16 c0, c1, c2, c3, t0, t1;
+//     c0 = hex_conv_table[cur[0]];
+//     c1 = hex_conv_table[cur[1]];
+//     c2 = hex_conv_table[cur[2]];
+//     c3 = hex_conv_table[cur[3]];
+//     t0 = (u16)((c0 << 8) | c2);
+//     t1 = (u16)((c1 << 8) | c3);
+//     *val = (u16)((t0 << 4) | t1);
+//     return ((t0 | t1) & (u16)0xF0F0) == 0;
+// }
 
 force_inline bool byte_match_2(const void *buf, const char *pat) {
     v16_uni u1, u2;
