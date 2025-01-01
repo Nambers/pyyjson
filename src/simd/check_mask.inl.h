@@ -4,6 +4,7 @@
 
 #define CHECK_ESCAPE_IMPL_GET_MASK PYYJSON_CONCAT2(check_escape_impl_get_mask, COMPILE_READ_UCS_LEVEL)
 #define GET_DONE_COUNT_FROM_MASK PYYJSON_CONCAT2(get_done_count_from_mask, COMPILE_READ_UCS_LEVEL)
+#define CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512 PYYJSON_CONCAT2(check_escape_tail_impl_get_mask_512, COMPILE_READ_UCS_LEVEL)
 
 force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *src, SIMD_TYPE *restrict SIMD_VAR) {
 #if SIMD_BIT_SIZE == 512
@@ -109,5 +110,28 @@ force_inline u32 GET_DONE_COUNT_FROM_MASK(SIMD_MASK_TYPE mask) {
     return done_count;
 }
 
+#if SIMD_BIT_SIZE == 512
+force_inline SIMD_MASK_TYPE CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(SIMD_512 z, SIMD_MASK_TYPE rw_mask) {
+#    define CUR_QUOTE PYYJSON_SIMPLE_CONCAT2(_Quote_i, READ_BIT_SIZE)
+#    define CUR_SLASH PYYJSON_SIMPLE_CONCAT2(_Slash_i, READ_BIT_SIZE)
+#    define CUR_CONTROL_MAX PYYJSON_SIMPLE_CONCAT2(_ControlMax_i, READ_BIT_SIZE)
+#    define CMPEQ PYYJSON_SIMPLE_CONCAT3(_mm512_mask_cmpeq_epi, READ_BIT_SIZE, _mask)
+#    define CMPLT PYYJSON_SIMPLE_CONCAT3(_mm512_mask_cmplt_epu, READ_BIT_SIZE, _mask)
+    SIMD_512 t1 = load_512_aligned((const void *)CUR_QUOTE);
+    SIMD_512 t2 = load_512_aligned((const void *)CUR_SLASH);
+    SIMD_512 t3 = load_512_aligned((const void *)CUR_CONTROL_MAX);
+    SIMD_MASK_TYPE m1 = CMPEQ(rw_mask, z, t1); // AVX512BW / AVX512F
+    SIMD_MASK_TYPE m2 = CMPEQ(rw_mask, z, t2); // AVX512BW / AVX512F
+    SIMD_MASK_TYPE m3 = CMPLT(rw_mask, z, t3); // AVX512BW / AVX512F
+    return m1 | m2 | m3;
+#    undef CMPLT
+#    undef CMPEQ
+#    undef CUR_CONTROL_MAX
+#    undef CUR_SLASH
+#    undef CUR_QUOTE
+}
+#endif // SIMD_BIT_SIZE == 512
+
+#undef CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512
 #undef GET_DONE_COUNT_FROM_MASK
 #undef CHECK_ESCAPE_IMPL_GET_MASK

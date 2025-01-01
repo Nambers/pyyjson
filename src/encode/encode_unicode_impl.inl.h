@@ -25,6 +25,10 @@
 // forward declaration
 force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *src, SIMD_TYPE *restrict SIMD_VAR);
 force_inline u32 GET_DONE_COUNT_FROM_MASK(SIMD_MASK_TYPE mask);
+#if SIMD_BIT_SIZE == 512
+force_inline SIMD_MASK_TYPE CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(SIMD_512 z, SIMD_MASK_TYPE rw_mask);
+#endif
+
 
 #if COMPILE_READ_UCS_LEVEL == 1 && COMPILE_INDENT_LEVEL == 0
 static _TARGET_TYPE _CONTROL_SEQ_TABLE[(_Slash + 1) * 8] = {
