@@ -6,12 +6,6 @@
 #include <stddef.h>
 
 
-#define _Quote (34)
-#define _Slash (92)
-#define _MinusOne (-1)
-#define ControlMax (32)
-
-
 #define CONTROL_SEQ_ESCAPE_PREFIX _Slash, 'u', '0', '0'
 #define CONTROL_SEQ_ESCAPE_SUFFIX '\0', '\0'
 #define CONTROL_SEQ_ESCAPE_MIDDLE CONTROL_SEQ_ESCAPE_SUFFIX, CONTROL_SEQ_ESCAPE_SUFFIX

@@ -1,11 +1,10 @@
 #include "pyyjson.h"
-#define COMPILE_UCS_LEVEL PYYJSON_STRING_TYPE_UCS4
 #if COMPILE_UCS_LEVEL == 0
 #    define COMPILE_READ_UCS_LEVEL 1
 #else
 #    define COMPILE_READ_UCS_LEVEL COMPILE_UCS_LEVEL
 #endif
-#include "encode/encode_simd_utils.inl.h"
+// #include "encode/encode_simd_utils.inl.h"
 #include "simd/simd_impl.h"
 //
 #include "commondef/r_in.inl.h"
@@ -141,8 +140,7 @@ force_inline void check_max_char_in_loop(
     }
     if (need_mask) {
         // need a mask
-        mask = load_head_mask(index);
-        SIMD_VAR = SIMD_AND(mask, SIMD_VAR);
+        SIMD_VAR = SIMD_AND(load_head_mask(index), SIMD_VAR);
     }
     switch (cur_max_char_type) {
         case PYYJSON_STRING_TYPE_ASCII: { // TODO
@@ -237,7 +235,7 @@ force_inline bool verify_escape_hex(DECODE_SRC_INFO *decode_src_info) {
     return true;
 }
 
-struct SpecialCharReadResult {
+typedef struct SpecialCharReadResult {
     u32 value;
     ReadStrScanFlag flag;
 } SpecialCharReadResult;
@@ -260,7 +258,7 @@ force_noinline u32 DECODE_ESCAPE_UNICODE(DECODE_SRC_INFO *restrict decode_src_in
 
             decode_src_info->src++;
             if (unlikely(!verify_escape_hex(decode_src_info) || !READ_TO_HEX_U16(decode_src_info->src, &hi))) {
-                if (unlikely(!PyErr_Occured())) {
+                if (unlikely(!PyErr_Occurred())) {
                     PyErr_SetString(JSONDecodeError, "Invalid escape sequence in string");
                 }
                 return (u32)0xffffffff;
@@ -320,10 +318,11 @@ force_inline SpecialCharReadResult DO_SPECIAL(DECODE_SRC_INFO *restrict decode_s
         return result;
     } else if (u < ControlMax) {
         // invalid
-        return StrInvalid;
+        result.flag = StrInvalid;
+        return result;
     } else {
         assert(false);
-        Py_UNREAHCABLE();
+        Py_UNREACHABLE();
     }
 }
 
@@ -447,7 +446,7 @@ force_inline void READ_STR_IN_LOOP(
         if (write_as > COMPILE_READ_UCS_LEVEL) { // compile time determined
             if (write_as == 2) {                 // compile time determined
                 assert(decode_unicode_info->unicode_ucs2);
-                PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, 2)(get_ucs2_writer(decode_unicode_info), SIMD_VAR)
+                PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, 2)(get_ucs2_writer(decode_unicode_info), SIMD_VAR);
             } else {
                 assert(write_as == 4);
                 assert(decode_unicode_info->unicode_ucs4);
@@ -481,7 +480,7 @@ force_inline void READ_STR_IN_LOOP(
             return;
         }
         if (unlikely(escape_result.flag == StrInvalid)) {
-            assert(PyErr_Occured());
+            assert(PyErr_Occurred());
             read_state->scan_flag = StrInvalid;
             return;
         }

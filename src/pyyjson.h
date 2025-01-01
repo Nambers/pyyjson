@@ -274,6 +274,12 @@ static_assert(false, "false");
         }                         \
     } while (0)
 
+/* Some constants. */
+#define _Quote (34)
+#define _Slash (92)
+#define _MinusOne (-1)
+#define ControlMax (32)
+
 
 /*==============================================================================
  * 128-bit Integer Utils
