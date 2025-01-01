@@ -128,21 +128,20 @@ force_inline void move_writer(DECODE_UNICODE_INFO *decode_unicode_info, int writ
 
 force_inline void check_max_char_in_loop(
         SIMD_TYPE SIMD_VAR,
-        int cur_max_char_type, /* known at compile time */
-        /*out*/ int *write_cur_max_char_type_addr,
+        ReadStrState* restrict read_state,
         bool need_mask, /* known at compile time */
         Py_ssize_t index /* only used when need_mask */) {
 #if COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_ASCII
     return;
 #endif
-    if (cur_max_char_type == PYYJSON_STRING_TYPE_UCS4) {
+    if (read_state->max_char_type == PYYJSON_STRING_TYPE_UCS4) {
         assert(false); // logic error
     }
     if (need_mask) {
         // need a mask
         SIMD_VAR = SIMD_AND(load_head_mask(index), SIMD_VAR);
     }
-    switch (cur_max_char_type) {
+    switch (read_state->max_char_type) {
         case PYYJSON_STRING_TYPE_ASCII: { // TODO
 #if COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_UCS4
             _checkmax_ucs4();
@@ -463,7 +462,7 @@ force_inline void READ_STR_IN_LOOP(
         // should be extremely fast if the string is long enough
         decode_src_info->src += CHECK_COUNT_MAX;
         move_writer(decode_unicode_info, write_as, CHECK_COUNT_MAX);
-        if (need_check_max_char) check_max_char_in_loop(SIMD_VAR, cur_max_char_type, write_cur_max_char_type_addr, CHECK_COUNT_MAX); // compile time determined
+        if (need_check_max_char) check_max_char_in_loop(SIMD_VAR, read_state, false, CHECK_COUNT_MAX); // compile time determined
         // read_state->scan_flag = StrContinue;
     } else {
         // this is not an *unlikely* case
@@ -475,7 +474,7 @@ force_inline void READ_STR_IN_LOOP(
         SpecialCharReadResult escape_result = DO_SPECIAL(decode_src_info);
         // *write_scan_flag = escape_result.flag;
         if (likely(escape_result.flag == StrEnd)) {
-            if (need_check_max_char) check_max_char_in_loop(SIMD_VAR, cur_max_char_type, write_cur_max_char_type_addr, (Py_ssize_t)done_count);
+            if (need_check_max_char) check_max_char_in_loop(SIMD_VAR, read_state, true, (Py_ssize_t)done_count);
             read_state->scan_flag = StrEnd;
             return;
         }
@@ -485,10 +484,10 @@ force_inline void READ_STR_IN_LOOP(
             return;
         }
         // slow path (escape character)
-        PROCESS_ESCAPE(decode_unicode_info, read_state, decode_src_info, write_as, do_copy);
+        PROCESS_ESCAPE(decode_unicode_info, read_state, decode_src_info, escape_result.value, write_as, do_copy);
         // read_state->scan_flag = StrContinue;
         if (need_check_max_char && read_state->max_char_type < COMPILE_UCS_LEVEL) {
-            check_max_char_in_loop(SIMD_VAR, cur_max_char_type, write_cur_max_char_type_addr, (Py_ssize_t)done_count);
+            check_max_char_in_loop(SIMD_VAR, read_state, true, (Py_ssize_t)done_count);
         }
     }
 }

@@ -117,7 +117,7 @@ def run_test(args):
             cmd += ["--ignore"] + args.ignore
         target_file = f"build/{args.build_type}/pyyjson.dll"
         os.rename(target_file, "build/pyyjson.pyd")
-        os.environ["PYTHONPATH"] = os.path.join(CUR_DIR, "build")
+        os.environ["PYTHONPATH"] = os.path.join(CUR_DIR, "..", "build")
         subprocess.run(cmd, check=True)
     return 0
 
