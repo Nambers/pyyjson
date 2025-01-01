@@ -101,14 +101,15 @@ def run_test(args):
         import shutil
         from os.path import dirname
         from sysconfig import get_config_h_filename, get_config_var
-        os.environ["Python3_EXECUTABLE"] = sys.executable
-        os.environ["Python3_INCLUDE_DIR"] = dirname(get_config_h_filename())
-        os.environ["Python3_LIBRARY"] = get_config_var("prefix") + os.path.sep + get_config_var("LDLIBRARY")
+        new_env = os.environ.copy()
+        new_env["Python3_EXECUTABLE"] = sys.executable
+        new_env["Python3_INCLUDE_DIR"] = dirname(get_config_h_filename())
+        new_env["Python3_LIBRARY"] = get_config_var("prefix") + os.path.sep + get_config_var("LDLIBRARY")
         if os.path.exists("build"):
             shutil.rmtree("build")
         os.makedirs("build")
-        subprocess.run(["cmake", "-S", ".", "-B", "build", "-DCMAKE_BUILD_TYPE=" + args.build_type], check=True)
-        subprocess.run(["cmake", "--build", "build", "--config", args.build_type], check=True)
+        subprocess.run(["cmake", "-S", ".", "-B", "build", "-DCMAKE_BUILD_TYPE=" + args.build_type], check=True, env=new_env)
+        subprocess.run(["cmake", "--build", "build", "--config", args.build_type], check=True, env=new_env)
         if args.build_only:
             return 0
         exe_base_name = os.path.basename(sys.executable)
@@ -117,8 +118,8 @@ def run_test(args):
             cmd += ["--ignore"] + args.ignore
         target_file = f"build/{args.build_type}/pyyjson.dll"
         os.rename(target_file, "build/pyyjson.pyd")
-        os.environ["PYTHONPATH"] = os.path.join(CUR_DIR, "..", "build")
-        subprocess.run(cmd, check=True)
+        new_env["PYTHONPATH"] = os.path.join(os.curdir, "build")
+        subprocess.run(cmd, check=True, env=new_env)
     return 0
 
 
