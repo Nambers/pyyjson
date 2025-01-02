@@ -104,7 +104,9 @@ def run_test(args):
         new_env = os.environ.copy()
         new_env["Python3_EXECUTABLE"] = sys.executable
         new_env["Python3_INCLUDE_DIR"] = dirname(get_config_h_filename())
-        new_env["Python3_LIBRARY"] = get_config_var("prefix") + os.path.sep + get_config_var("LDLIBRARY")
+        ldlib = get_config_var("LDLIBRARY")
+        if ldlib is not None:
+            new_env["Python3_LIBRARY"] = get_config_var("prefix") + os.path.sep + ldlib
         if os.path.exists("build"):
             shutil.rmtree("build")
         os.makedirs("build")
