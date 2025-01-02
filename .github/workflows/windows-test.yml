@@ -32,16 +32,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install pyyjson
-        run: |
-          mkdir build
-          cd build
-          cmake ..
-          cmake --build . --config Debug
-          copy Debug\pyyjson.dll .\pyyjson.pyd
-
       - name: run tests
         id: tests
         run: |
-          set PYTHONPATH=.\build
-          python test\all_test.py --ignore bench
+          python dev_tools\automated_test.py --ignore bench
