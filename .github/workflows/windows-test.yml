@@ -43,5 +43,5 @@ jobs:
       - name: run tests
         id: tests
         run: |
-          set PYTHONPATH=".\build"
+          set PYTHONPATH=.\build
           python test\all_test.py --ignore bench
