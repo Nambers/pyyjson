@@ -6,7 +6,7 @@
 #define GET_DONE_COUNT_FROM_MASK PYYJSON_CONCAT2(get_done_count_from_mask, COMPILE_READ_UCS_LEVEL)
 #define CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512 PYYJSON_CONCAT2(check_escape_tail_impl_get_mask_512, COMPILE_READ_UCS_LEVEL)
 
-force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *src, SIMD_TYPE *restrict SIMD_VAR) {
+force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restrict src, SIMD_TYPE *restrict SIMD_VAR) {
 #if SIMD_BIT_SIZE == 512
 #    define CUR_QUOTE PYYJSON_SIMPLE_CONCAT2(_Quote_i, READ_BIT_SIZE)
 #    define CUR_SLASH PYYJSON_SIMPLE_CONCAT2(_Slash_i, READ_BIT_SIZE)
@@ -41,8 +41,8 @@ force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *src, SI
 #    else  // COMPILE_READ_UCS_LEVEL == 4
     // there is no `_mm256_subs_epu32`
     __m256i t3 = SET1(_MinusOne);
-    __m256i _1 = _mm256_cmpgt_epi32(*y, t3);
-    __m256i _2 = _mm256_cmpgt_epi32(t4, *y);
+    __m256i _1 = cmpgt_i32_256(*y, t3);
+    __m256i _2 = cmpgt_i32_256(t4, *y);
     __m256i m3 = simd_and_256(_1, _2);
 #    endif // COMPILE_READ_UCS_LEVEL
     __m256i r = simd_or_256(simd_or_256(m1, m2), m3);
