@@ -61,6 +61,7 @@ force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restric
 #    undef SUBS
 #    undef CMPEQ
 #    undef SET1
+#    undef MM_PREFIX
 #endif // SIMD_BIT_SIZE
 }
 
