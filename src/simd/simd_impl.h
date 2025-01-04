@@ -52,6 +52,22 @@
     } while (0)
 
 /*
+ * Load memory to a simd variable.
+ * This is unaligned.
+ */
+force_inline SIMD_TYPE load_simd(const void *src) {
+#if SIMD_BIT_SIZE == 512
+    return _mm512_loadu_si512(src);
+#elif SIMD_BIT_SIZE == 256
+    return _mm256_lddqu_si256((const SIMD_256_IU *)src);
+#elif __SSE3__
+    return _mm_lddqu_si128((const SIMD_128_IU *)src);
+#else
+    return _mm_loadu_si128((const SIMD_128_IU *)src);
+#endif
+}
+
+/*
  * Write memory with length sizeof(SIMD_TYPE) to `dst`.
  * This is unaligned.
  */
@@ -402,6 +418,10 @@ force_inline void extract_256_four_parts(SIMD_256 y, SIMD_128 *restrict x1, SIMD
     extract_256_two_parts(y, x1, x3);
     *x2 = unpack_hi_64_128(*x1, *x1);
     *x4 = unpack_hi_64_128(*x3, *x3);
+}
+
+force_inline SIMD_256 cmpgt_i32_256(SIMD_256 a, SIMD_256 b) {
+    return _mm256_cmpgt_epi32(a, b);
 }
 #endif
 
