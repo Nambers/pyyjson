@@ -50,6 +50,19 @@ extern PyObject *JSONDecodeError;
 
 typedef PyObject *pyyjson_cache_type;
 
+typedef enum ReadStrScanFlag {
+    StrContinue,
+    StrInvalid,
+    StrEnd,
+} ReadStrScanFlag;
+
+typedef struct ReadStrState {
+    ReadStrScanFlag scan_flag;
+    int max_char_type;
+    bool need_copy;
+    bool dont_check_max_char;
+    bool state_dirty;
+} ReadStrState;
 
 /*==============================================================================
  * Integer Constants
@@ -182,6 +195,7 @@ static const u8 hex_conv_table[256] = {
  This requires the string has 4-byte zero padding.
  */
 force_inline bool read_8_to_hex_u16(const u8 *cur, u16 *val);
+
 //  {
 //     u16 c0, c1, c2, c3, t0, t1;
 //     c0 = hex_conv_table[cur[0]];
@@ -1056,5 +1070,14 @@ force_inline void pow10_table_get_exp(i32 exp10, i32 *exp2) {
     *exp2 = (exp10 * 217706 - 4128768) >> 16;
 }
 
+/*==============================================================================
+ * Read state utilities
+ *============================================================================*/
+
+force_inline void update_max_char_type(ReadStrState *read_state, int max_char_type) {
+    assert(read_state->max_char_type < max_char_type);
+    read_state->max_char_type = max_char_type;
+    read_state->state_dirty = true;
+}
 
 #endif // PYYJSON_DECODE_H

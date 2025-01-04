@@ -201,6 +201,14 @@ force_inline SIMD_128 cmpgt_i32_128(SIMD_128 a, SIMD_128 b) {
     return _mm_cmpgt_epi32(a, b);
 }
 
+force_inline SIMD_128 broadcast_8_128(i8 v) {
+    return _mm_set1_epi8(v);
+}
+
+force_inline SIMD_128 broadcast_16_128(i16 v) {
+    return _mm_set1_epi16(v);
+}
+
 force_inline SIMD_128 broadcast_32_128(i32 v) {
     return _mm_set1_epi32(v);
 }
@@ -369,6 +377,10 @@ force_inline void write_256(void *dst, SIMD_256 y) {
 
 force_inline void write_256_aligned(void *dst, SIMD_256 y) {
     _mm256_store_si256((__m256i *)dst, y);
+}
+
+force_inline SIMD_256 broadcast_32_256(i32 v) {
+    return _mm256_set1_epi32(v);
 }
 #endif
 

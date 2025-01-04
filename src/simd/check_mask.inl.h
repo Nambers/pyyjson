@@ -35,7 +35,6 @@ force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restric
 #    define SET1 PYYJSON_SIMPLE_CONCAT3(MM_PREFIX, _set1_epi, READ_BIT_SIZE)
 #    define CMPEQ PYYJSON_SIMPLE_CONCAT3(MM_PREFIX, _cmpeq_epi, READ_BIT_SIZE)
 #    define SUBS PYYJSON_SIMPLE_CONCAT3(MM_PREFIX, _subs_epu, READ_BIT_SIZE)
-#    define CMPGT PYYJSON_CONCAT2(cmpgt_i32, SIMD_BIT_SIZE)
 #    define AND PYYJSON_CONCAT2(simd_and, SIMD_BIT_SIZE)
 #    define OR PYYJSON_CONCAT2(simd_or, SIMD_BIT_SIZE)
     *SIMD_VAR = load_simd((const void *)src);
@@ -46,18 +45,19 @@ force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restric
     SIMD_TYPE m2 = CMPEQ(*SIMD_VAR, t2);
 #    if COMPILE_READ_UCS_LEVEL != 4
     SIMD_TYPE m3 = SUBS(t4, *SIMD_VAR);
-#    else  // COMPILE_READ_UCS_LEVEL == 4
+#    else // COMPILE_READ_UCS_LEVEL == 4
     // there is no `MM_PREFIX_subs_epu32`
+#        define CMPGT PYYJSON_CONCAT2(cmpgt_i32, SIMD_BIT_SIZE)
     SIMD_TYPE t3 = SET1(_MinusOne);
     SIMD_TYPE _1 = CMPGT(*SIMD_VAR, t3);
     SIMD_TYPE _2 = CMPGT(t4, *SIMD_VAR);
     SIMD_TYPE m3 = AND(_1, _2);
+#        undef CMPGT
 #    endif // COMPILE_READ_UCS_LEVEL
     SIMD_TYPE r = OR(OR(m1, m2), m3);
     return r;
 #    undef OR
 #    undef AND
-#    undef CMPGT
 #    undef SUBS
 #    undef CMPEQ
 #    undef SET1
