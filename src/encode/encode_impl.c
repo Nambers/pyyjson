@@ -494,3 +494,5 @@ fail:;
 #include "unicode/_include_helper/reserve_wrap.h"
 
 #include "simd/check_mask_wrap.inl.c"
+
+#include "simd/readwrite_utils_wrap.inl.c"
