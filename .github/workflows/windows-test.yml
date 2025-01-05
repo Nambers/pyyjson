@@ -32,7 +32,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: run tests
+      - name: Run Tests
         id: tests
         run: |
           python dev_tools\automated_test.py --ignore bench
