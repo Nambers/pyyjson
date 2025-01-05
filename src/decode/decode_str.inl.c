@@ -556,8 +556,8 @@ force_inline void READ_STR_IN_LOOP(
         if (write_as > COMPILE_READ_UCS_LEVEL) { // compile time determined
 
             if (write_as == 2) { // compile time determined
-                assert(decode_unicode_info->unicode_ucs2);
 #if COMPILE_READ_UCS_LEVEL <= 2
+                assert(decode_unicode_info->unicode_ucs2);
                 WRITE_SIMD_IMPL_TARGET2(GET_UCS2_WRITER(decode_unicode_info), SIMD_VAR);
 #else
                 assert(false);
