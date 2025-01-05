@@ -18,6 +18,8 @@
 #    define SIMD_HALF_TYPE __m256i
 #    define SIMD_EXTRACT_QUARTER _mm512_extracti32x4_epi32
 #    define SIMD_EXTRACT_HALF _mm512_extracti64x4_epi64
+#    define SIMD_REAL_HALF_TYPE __m256i
+#    define SIMD_REAL_QUARTER_TYPE __m128i
 #elif SIMD_BIT_SIZE == 256
 #    define SIMD_VAR y
 #    define SIMD_TYPE __m256i
@@ -26,6 +28,8 @@
 #    define SIMD_BIT_MASK_TYPE u32
 #    define SIMD_HALF_TYPE __m128i
 #    define SIMD_EXTRACT_HALF _mm256_extracti128_si256
+#    define SIMD_REAL_HALF_TYPE __m128i
+#    define SIMD_REAL_QUARTER_TYPE u64
 #else
 #    define SIMD_VAR x
 #    define SIMD_TYPE __m128i
@@ -33,6 +37,8 @@
 #    define SIMD_SMALL_MASK_TYPE SIMD_TYPE
 #    define SIMD_BIT_MASK_TYPE u16
 #    define SIMD_HALF_TYPE SIMD_TYPE
+#    define SIMD_REAL_HALF_TYPE u64
+#    define SIMD_REAL_QUARTER_TYPE u32
 #endif
 
 #define SIMD_STORER PYYJSON_CONCAT2(write, SIMD_BIT_SIZE)
@@ -318,6 +324,18 @@ force_inline void extract_128_four_parts(SIMD_128 x, SIMD_128 *restrict x1, SIMD
 #undef MOVEHDUP
 }
 
+force_inline u64 real_extract_first_64_from_128(SIMD_128 x) {
+#if defined(_MSC_VER) && !defined(_M_IX86)
+    return (u64)_mm_cvtsi128_si64x(x);
+#else
+    return (u64)_mm_cvtsi128_si64(x);
+#endif
+}
+
+force_inline u32 real_extract_first_32_from_128(SIMD_128 x) {
+    return (u32)_mm_cvtsi128_si32(x);
+}
+
 /* (a & b) == 0 */
 force_inline bool testz_128(SIMD_128 a, SIMD_128 b) {
 #if defined(__SSE4_1__)
@@ -509,5 +527,140 @@ force_inline SIMD_HALF_TYPE load_half(const void *src) {
 }
 
 #endif // SIMD_BIT_SIZE > 128
+
+/*==============================================================================
+ * Zip unsigned integer related.
+ * Zip array of u32/u16 to u16/u8.
+ *============================================================================*/
+
+force_inline SIMD_REAL_HALF_TYPE zip_simd_32_to_16(SIMD_TYPE SIMD_VAR) {
+#if SIMD_BIT_SIZE == 512
+    /* z = A|B|C|D */
+    SIMD_128 x1, x2, x3, x4;
+    extract_512_four_parts(z, &x1, &x2, &x3, &x4);
+    /* y1 = A|C */
+    SIMD_256 y1 = _mm256_set_m128i(x3, x1);
+    /* y2 = B|D */
+    SIMD_256 y2 = _mm256_set_m128i(x4, x2);
+    return _mm256_packus_epi32(y1, y2);
+#elif SIMD_BIT_SIZE == 256
+    __m128i x_low = _mm256_extracti128_si256(y, 0);
+    __m128i x_high = _mm256_extracti128_si256(y, 1);
+    return _mm_packus_epi32(x_low, x_high);
+#elif __SSE4_1__
+    return (SIMD_REAL_HALF_TYPE)real_extract_first_64_from_128(_mm_packus_epi32(x, x));
+#else
+    // in this case we don't have the convenient `_mm_packus_epi32`
+    // TODO: is this really faster than *dst++ = *src++ ???
+    /* x =  aa00bb00|cc00dd00 */
+    /* x1 = 00cc00dd|00000000 */
+    SIMD_128 x1 = _mm_srli_si128(x, 6);
+    /* x2 = bb00cc00|dd000000 */
+    SIMD_128 x2 = _mm_srli_si128(x, 4);
+    /* x3 = 00dd0000|00000000 */
+    SIMD_128 x3 = _mm_srli_si128(x, 10);
+    /* x4 = aaccbbdd|cc00dd00 */
+    SIMD_128 x4 = simd_or_128(x, x1);
+    /* x5 = bbddcc00|dd000000 */
+    SIMD_128 x5 = simd_or_128(x2, x3);
+    return (SIMD_REAL_HALF_TYPE)real_extract_first_64_from_128(_mm_unpacklo_epi16(x4, x5));
+#endif
+}
+
+force_inline SIMD_REAL_HALF_TYPE zip_simd_16_to_8(SIMD_TYPE SIMD_VAR) {
+#if SIMD_BIT_SIZE == 512
+    /* z = A|B|C|D */
+    SIMD_128 x1, x2, x3, x4;
+    extract_512_four_parts(z, &x1, &x2, &x3, &x4);
+    /* y1 = A|C */
+    SIMD_256 y1 = _mm256_set_m128i(x3, x1);
+    /* y2 = B|D */
+    SIMD_256 y2 = _mm256_set_m128i(x4, x2);
+    return _mm256_packus_epi16(y1, y2);
+#elif SIMD_BIT_SIZE == 256
+    __m128i x_low = _mm256_extracti128_si256(y, 0);
+    __m128i x_high = _mm256_extracti128_si256(y, 1);
+    return _mm_packus_epi16(x_low, x_high);
+#else
+    /* x = aaxxbbxxccxxddxx */
+    return (SIMD_REAL_HALF_TYPE)real_extract_first_64_from_128(_mm_packus_epi16(x, x));
+#endif
+}
+
+force_inline SIMD_REAL_QUARTER_TYPE zip_simd_32_to_8(SIMD_TYPE SIMD_VAR) {
+#if SIMD_BIT_SIZE == 512
+    static const u8 t1[64] = {
+            0, 4, 8, 12,
+            16, 20, 24, 28,
+            32, 36, 40, 44,
+            48, 52, 56, 60,
+            // seperate
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80,
+            // seperate
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80,
+            // seperate
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80};
+    SIMD_512 z1 = _mm512_shuffle_epi8(z, load_512_aligned(t1));
+    return SIMD_EXTRACT_QUARTER(z1, 0);
+#elif SIMD_BIT_SIZE == 256
+    /*y = axxxbxxxcxxxdxxx|exxxfxxxgxxxhxxx */
+    static const u8 t1[32] = {0, 4, 8, 12,
+                              0x80, 0x80,
+                              0x80, 0x80,
+                              0x80, 0x80,
+                              0x80, 0x80,
+                              0x80, 0x80,
+                              0x80, 0x80,
+                              // seperate
+                              0x80, 0x80,
+                              0x80, 0x80,
+                              0, 4, 8, 12,
+                              0x80, 0x80,
+                              0x80, 0x80,
+                              0x80, 0x80,
+                              0x80, 0x80};
+    /* y2 = abcd000000000000|0000efgh00000000 */
+    __m256i y2 = _mm256_shuffle_epi8(y, load_256_aligned(t1));
+    /* x_high = 0000efgh00000000 */
+    i64 i1 = _mm256_extract_epi64(y2, 0);
+    i64 i2 = _mm256_extract_epi64(y2, 2);
+    return (SIMD_REAL_QUARTER_TYPE)(i1 | i2);
+#elif __SSSE3__
+    static const u8 t1[16] = {0, 4, 8, 12,
+                              0x80, 0x80,
+                              0x80, 0x80,
+                              0x80, 0x80,
+                              0x80, 0x80,
+                              0x80, 0x80,
+                              0x80, 0x80};
+    return (SIMD_REAL_QUARTER_TYPE)real_extract_first_32_from_128(_mm_shuffle_epi8(x, load_128_aligned(t1)));
+#else
+    // first using signed pack to u16. The values in `x` are below 256, so signed pack is equivalent to unsigned pack.
+    SIMD_128 x1 = _mm_packs_epi32(x, x);
+    // then use unsigned pack to u8
+    return real_extract_first_32_from_128(_mm_packus_epi16(x1, x1));
+#endif
+}
 
 #endif // ENCODE_SIMD_IMPL_H
