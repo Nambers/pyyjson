@@ -681,3 +681,23 @@ PyObject *yyjson_read_opts(const char *dat,
 #include "decode_utils_wrap.inl.c"
 
 #include "decode_bytes.inl.c"
+
+#include "simd/check_mask_wrap.inl.c"
+
+#define COMPILE_UCS_LEVEL 0
+#include "decode_str.inl.c"
+#undef COMPILE_UCS_LEVEL
+
+#define COMPILE_UCS_LEVEL 1
+#include "decode_str.inl.c"
+#undef COMPILE_UCS_LEVEL
+
+#define COMPILE_UCS_LEVEL 2
+#include "decode_str.inl.c"
+#undef COMPILE_UCS_LEVEL
+
+#define COMPILE_UCS_LEVEL 4
+#include "decode_str.inl.c"
+#undef COMPILE_UCS_LEVEL
+
+#include "simd/readwrite_utils_wrap.inl.c"
