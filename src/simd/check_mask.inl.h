@@ -1,5 +1,6 @@
 // requires: READ
 
+#include "pyyjson.h"
 #include "simd_impl.h"
 
 #define CHECK_ESCAPE_IMPL_GET_MASK PYYJSON_CONCAT2(check_escape_impl_get_mask, COMPILE_READ_UCS_LEVEL)
@@ -13,14 +14,16 @@ force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restric
 #    define CUR_CONTROL_MAX PYYJSON_SIMPLE_CONCAT2(_ControlMax_i, READ_BIT_SIZE)
 #    define CMPEQ PYYJSON_SIMPLE_CONCAT3(_mm512_cmpeq_epi, READ_BIT_SIZE, _mask)
 #    define CMPLT PYYJSON_SIMPLE_CONCAT3(_mm512_cmplt_epu, READ_BIT_SIZE, _mask)
+#    define SET1 PYYJSON_SIMPLE_CONCAT2(_mm512_set1_epi, READ_BIT_SIZE)
     *z = load_512((const void *)src);
-    SIMD_512 t1 = load_512_aligned((const void *)CUR_QUOTE);
-    SIMD_512 t2 = load_512_aligned((const void *)CUR_SLASH);
-    SIMD_512 t3 = load_512_aligned((const void *)CUR_CONTROL_MAX);
-    SIMD_MASK_TYPE m1 = CMPEQ(*z, t1); // AVX512BW, AVX512F
-    SIMD_MASK_TYPE m2 = CMPEQ(*z, t2); // AVX512BW, AVX512F
-    SIMD_MASK_TYPE m3 = CMPLT(*z, t3); // AVX512BW, AVX512F
+    const SIMD_512 t1 = SET1(_Quote);     //load_512_aligned((const void *)CUR_QUOTE);
+    const SIMD_512 t2 = SET1(_Slash);     //load_512_aligned((const void *)CUR_SLASH);
+    const SIMD_512 t3 = SET1(ControlMax); //load_512_aligned((const void *)CUR_CONTROL_MAX);
+    SIMD_MASK_TYPE m1 = CMPEQ(*z, t1);    // AVX512BW, AVX512F
+    SIMD_MASK_TYPE m2 = CMPEQ(*z, t2);    // AVX512BW, AVX512F
+    SIMD_MASK_TYPE m3 = CMPLT(*z, t3);    // AVX512BW, AVX512F
     return m1 | m2 | m3;
+#    undef SET1
 #    undef CMPLT
 #    undef CMPEQ
 #    undef CUR_CONTROL_MAX
@@ -105,13 +108,15 @@ force_inline SIMD_MASK_TYPE CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(SIMD_512 z, SIMD
 #    define CUR_CONTROL_MAX PYYJSON_SIMPLE_CONCAT2(_ControlMax_i, READ_BIT_SIZE)
 #    define CMPEQ PYYJSON_SIMPLE_CONCAT3(_mm512_mask_cmpeq_epi, READ_BIT_SIZE, _mask)
 #    define CMPLT PYYJSON_SIMPLE_CONCAT3(_mm512_mask_cmplt_epu, READ_BIT_SIZE, _mask)
-    SIMD_512 t1 = load_512_aligned((const void *)CUR_QUOTE);
-    SIMD_512 t2 = load_512_aligned((const void *)CUR_SLASH);
-    SIMD_512 t3 = load_512_aligned((const void *)CUR_CONTROL_MAX);
+#    define SET1 PYYJSON_SIMPLE_CONCAT2(_mm512_set1_epi, READ_BIT_SIZE)
+    const SIMD_512 t1 = SET1(_Quote);          //load_512_aligned((const void *)CUR_QUOTE);
+    const SIMD_512 t2 = SET1(_Slash);                //load_512_aligned((const void *)CUR_SLASH);
+    const SIMD_512 t3 = SET1(ControlMax);            //load_512_aligned((const void *)CUR_CONTROL_MAX);
     SIMD_MASK_TYPE m1 = CMPEQ(rw_mask, z, t1); // AVX512BW / AVX512F
     SIMD_MASK_TYPE m2 = CMPEQ(rw_mask, z, t2); // AVX512BW / AVX512F
     SIMD_MASK_TYPE m3 = CMPLT(rw_mask, z, t3); // AVX512BW / AVX512F
     return m1 | m2 | m3;
+#    undef SET1
 #    undef CMPLT
 #    undef CMPEQ
 #    undef CUR_CONTROL_MAX

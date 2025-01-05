@@ -475,6 +475,10 @@ force_inline void write_512_aligned(void *dst, SIMD_512 z) {
     _mm512_store_si512(dst, z);
 }
 
+force_inline SIMD_512 simd_and_512(SIMD_512 a, SIMD_512 b) {
+    return _mm512_and_si512(a, b);
+}
+
 force_inline SIMD_512 elevate_2_4_to_512(SIMD_256 y) {
     return _mm512_cvtepu16_epi32(y);
 }
