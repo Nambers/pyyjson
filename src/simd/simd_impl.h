@@ -397,6 +397,14 @@ force_inline void write_256_aligned(void *dst, SIMD_256 y) {
     _mm256_store_si256((__m256i *)dst, y);
 }
 
+force_inline SIMD_256 broadcast_8_256(i8 v) {
+    return _mm256_set1_epi8(v);
+}
+
+force_inline SIMD_256 broadcast_16_256(i16 v) {
+    return _mm256_set1_epi16(v);
+}
+
 force_inline SIMD_256 broadcast_32_256(i32 v) {
     return _mm256_set1_epi32(v);
 }
