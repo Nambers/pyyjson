@@ -64,6 +64,11 @@ typedef struct ReadStrState {
     bool state_dirty;
 } ReadStrState;
 
+typedef struct SpecialCharReadResult {
+    u32 value;
+    ReadStrScanFlag flag;
+} SpecialCharReadResult;
+
 /*==============================================================================
  * Integer Constants
  *============================================================================*/
@@ -1078,6 +1083,11 @@ force_inline void update_max_char_type(ReadStrState *read_state, int max_char_ty
     assert(read_state->max_char_type < max_char_type);
     read_state->max_char_type = max_char_type;
     read_state->state_dirty = true;
+}
+
+force_inline void init_read_state(ReadStrState *state) {
+    // all initialized as 0 or false
+    memset(state, 0, sizeof(ReadStrState));
 }
 
 #endif // PYYJSON_DECODE_H
