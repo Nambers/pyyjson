@@ -270,38 +270,6 @@ force_inline bool pyyjson_decode_inf(DecodeObjStackInfo *restrict decode_obj_sta
 
 force_inline bool pyyjson_decode_nan(DecodeObjStackInfo *restrict decode_obj_stack_info, bool is_signed);
 
-/** Read 'true' literal, '*cur' should be 't'. */
-force_inline bool _read_true(const u8 **ptr) {
-    u8 *cur = (u8 *)*ptr;
-    u8 **end = (u8 **)ptr;
-    if (likely(byte_match_4(cur, "true"))) {
-        *end = cur + 4;
-        return true;
-    }
-    return false;
-}
-
-/** Read 'false' literal, '*cur' should be 'f'. */
-force_inline bool _read_false(const u8 **ptr) {
-    u8 *cur = (u8 *)*ptr;
-    u8 **end = (u8 **)ptr;
-    if (likely(byte_match_4(cur + 1, "alse"))) {
-        *end = cur + 5;
-        return true;
-    }
-    return false;
-}
-
-/** Read 'null' literal, '*cur' should be 'n'. */
-force_inline bool _read_null(const u8 **ptr) {
-    u8 *cur = (u8 *)*ptr;
-    u8 **end = (u8 **)ptr;
-    if (likely(byte_match_4(cur, "null"))) {
-        *end = cur + 4;
-        return true;
-    }
-    return false;
-}
 
 /** Read 'Inf' or 'Infinity' literal (ignoring case). */
 force_inline bool _read_inf(bool sign, const u8 **ptr) {
@@ -326,26 +294,13 @@ force_inline bool _read_inf(bool sign, const u8 **ptr) {
     return false;
 }
 
-/** Read 'NaN' literal (ignoring case). */
-force_inline bool _read_nan(bool sign, const u8 **ptr) {
-    u8 *hdr = (u8 *)(*ptr - sign);
-    u8 *cur = (u8 *)*ptr;
-    u8 **end = (u8 **)ptr;
-    if ((cur[0] == 'N' || cur[0] == 'n') &&
-        (cur[1] == 'A' || cur[1] == 'a') &&
-        (cur[2] == 'N' || cur[2] == 'n')) {
-        cur += 3;
-        *end = cur;
-        return true;
-    }
-    return false;
-}
+
 
 // force_inline bool read_inf_or_nan(DecodeObjStackInfo *decode_obj_stack_info, bool sign, u8 **ptr) {
 //     if (_read_inf(sign, ptr)) {
 //         return pyyjson_decode_inf(decode_obj_stack_info, sign);
 //     }
-//     if (_read_nan(sign, ptr)) {
+//     if (_read_nan_1(sign, ptr)) {
 //         return pyyjson_decode_nan(decode_obj_stack_info, sign);
 //     }
 //     return false;
@@ -356,7 +311,7 @@ force_inline PyObject *read_inf_or_nan(bool sign, const u8 **ptr) {
     if (_read_inf(sign, ptr)) {
         return PyFloat_FromDouble(sign ? -fabs(Py_HUGE_VAL) : fabs(Py_HUGE_VAL)); //pyyjson_decode_inf(decode_obj_stack_info, sign);
     }
-    if (_read_nan(sign, ptr)) {
+    if (_read_nan_1(sign, ptr)) {
         return PyFloat_FromDouble(sign ? -fabs(Py_NAN) : fabs(Py_NAN)); //pyyjson_decode_nan(decode_obj_stack_info, sign);
     }
     return NULL;
@@ -1073,6 +1028,22 @@ force_inline void pow10_table_get_exp(i32 exp10, i32 *exp2) {
     /* e2 = floor(log2(pow(10, e))) - 64 + 1 */
     /*    = floor(e * log2(10) - 63)         */
     *exp2 = (exp10 * 217706 - 4128768) >> 16;
+}
+
+/**
+ Convert normalized u64 (highest bit is 1) to f64.
+ 
+ Some compiler (such as Microsoft Visual C++ 6.0) do not support converting
+ number from u64 to f64. This function will first convert u64 to i64 and then
+ to f64, with `to nearest` rounding mode.
+ */
+force_inline f64 normalized_u64_to_f64(u64 val) {
+#if PYYJSON_U64_TO_F64_NO_IMPL
+    i64 sig = (i64)((val >> 1) | (val & 1));
+    return ((f64)sig) * (f64)2.0;
+#else
+    return (f64)val;
+#endif
 }
 
 /*==============================================================================

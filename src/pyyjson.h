@@ -266,6 +266,87 @@
 static_assert(false, "false");
 #endif
 
+
+/**
+ Microsoft Visual C++ 6.0 doesn't support converting number from u64 to f64:
+ error C2520: conversion from unsigned __int64 to double not implemented.
+ */
+#ifndef PYYJSON_U64_TO_F64_NO_IMPL
+#    if (0 < PYYJSON_MSC_VER) && (PYYJSON_MSC_VER <= 1200)
+#        define PYYJSON_U64_TO_F64_NO_IMPL 1
+#    else
+#        define PYYJSON_U64_TO_F64_NO_IMPL 0
+#    endif
+#endif
+
+
+/* int128 type */
+#if defined(__SIZEOF_INT128__) && (__SIZEOF_INT128__ == 16) && \
+        (defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER))
+#    define PYYJSON_HAS_INT128 1
+/** 128-bit integer, used by floating-point number reader and writer. */
+__extension__ typedef __int128 i128;
+__extension__ typedef unsigned __int128 u128;
+#else
+#    define PYYJSON_HAS_INT128 0
+#endif
+
+
+/*
+ Correct rounding in double number computations.
+ 
+ On the x86 architecture, some compilers may use x87 FPU instructions for
+ floating-point arithmetic. The x87 FPU loads all floating point number as
+ 80-bit double-extended precision internally, then rounds the result to original
+ precision, which may produce inaccurate results. For a more detailed
+ explanation, see the paper: https://arxiv.org/abs/cs/0701192
+ 
+ Here are some examples of double precision calculation error:
+ 
+     2877.0 / 1e6   == 0.002877,  but x87 returns 0.0028770000000000002
+     43683.0 * 1e21 == 4.3683e25, but x87 returns 4.3683000000000004e25
+ 
+ Here are some examples of compiler flags to generate x87 instructions on x86:
+ 
+     clang -m32 -mno-sse
+     gcc/icc -m32 -mfpmath=387
+     msvc /arch:SSE or /arch:IA32
+ 
+ If we are sure that there's no similar error described above, we can define the
+ PYYJSON_DOUBLE_MATH_CORRECT as 1 to enable the fast path calculation. This is
+ not an accurate detection, it's just try to avoid the error at compile-time.
+ An accurate detection can be done at run-time:
+ 
+     bool is_double_math_correct(void) {
+         volatile double r = 43683.0;
+         r *= 1e21;
+         return r == 4.3683e25;
+     }
+ 
+ See also: utils.h in https://github.com/google/double-conversion/
+ */
+#if !defined(FLT_EVAL_METHOD) && defined(__FLT_EVAL_METHOD__)
+#    define FLT_EVAL_METHOD __FLT_EVAL_METHOD__
+#endif
+
+#if defined(FLT_EVAL_METHOD) && FLT_EVAL_METHOD != 0 && FLT_EVAL_METHOD != 1
+#    define PYYJSON_DOUBLE_MATH_CORRECT 0
+#elif defined(i386) || defined(__i386) || defined(__i386__) ||    \
+        defined(_X86_) || defined(__X86__) || defined(_M_IX86) || \
+        defined(__I86__) || defined(__IA32__) || defined(__THW_INTEL)
+#    if (defined(_MSC_VER) && defined(_M_IX86_FP) && _M_IX86_FP == 2) || \
+            (defined(__SSE2_MATH__) && __SSE2_MATH__)
+#        define PYYJSON_DOUBLE_MATH_CORRECT 1
+#    else
+#        define PYYJSON_DOUBLE_MATH_CORRECT 0
+#    endif
+#elif defined(__mc68000__) || defined(__pnacl__) || defined(__native_client__)
+#    define PYYJSON_DOUBLE_MATH_CORRECT 0
+#else
+#    define PYYJSON_DOUBLE_MATH_CORRECT 1
+#endif
+
+
 /* Helper for quickly write an err handle. */
 #define RETURN_ON_UNLIKELY_ERR(x) \
     do {                          \
@@ -280,6 +361,8 @@ static_assert(false, "false");
 #define _MinusOne (-1)
 #define ControlMax (32)
 
+/* Default padding. */
+#define TAIL_PADDING (512 / 8)
 
 /*==============================================================================
  * 128-bit Integer Utils

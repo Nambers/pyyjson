@@ -9,8 +9,12 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <threads.h>
+//
+#include "decode_utils_wrap.inl.c"
 
 thread_local u8 pyyjson_string_buffer[PYYJSON_STRING_BUFFER_SIZE];
+
+static_assert((PYYJSON_STRING_BUFFER_SIZE % 64) == 0, "(PYYJSON_STRING_BUFFER_SIZE % 64) == 0");
 
 force_inline PyObject *read_bytes(const u8 **ptr, u8 *write_buffer, bool is_key);
 force_inline PyObject *read_bytes_root_pretty(const char *dat, usize len);
@@ -528,7 +532,7 @@ force_noinline PyObject *read_root_single(const char *dat, usize len) {
         goto fail_string;
     }
     if (*cur == 't') {
-        if (likely(_read_true(&cur))) {
+        if (likely(_read_true_1(&cur, end))) {
             Py_Immortal_IncRef(Py_True);
             ret = Py_True;
             goto single_end;
@@ -536,7 +540,7 @@ force_noinline PyObject *read_root_single(const char *dat, usize len) {
         goto fail_literal_true;
     }
     if (*cur == 'f') {
-        if (likely(_read_false(&cur))) {
+        if (likely(_read_false_1(&cur, end))) {
             Py_Immortal_IncRef(Py_False);
             ret = Py_False;
             goto single_end;
@@ -544,12 +548,12 @@ force_noinline PyObject *read_root_single(const char *dat, usize len) {
         goto fail_literal_false;
     }
     if (*cur == 'n') {
-        if (likely(_read_null(&cur))) {
+        if (likely(_read_null_1(&cur, end))) {
             Py_Immortal_IncRef(Py_None);
             ret = Py_None;
             goto single_end;
         }
-        if (_read_nan(false, &cur)) {
+        if (_read_nan_1(false, &cur, end)) {
             ret = PyFloat_FromDouble(fabs(Py_NAN));
             if (likely(ret)) goto single_end;
         }
@@ -678,7 +682,6 @@ PyObject *yyjson_read_opts(const char *dat,
 #undef return_err
 }
 
-#include "decode_utils_wrap.inl.c"
 
 #include "decode_bytes.inl.c"
 

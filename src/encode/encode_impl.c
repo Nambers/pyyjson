@@ -220,7 +220,6 @@ force_inline PyFastTypes fast_type_check(PyObject *val) {
     }
 }
 
-#define TAIL_PADDING (512 / 8)
 
 
 /* 

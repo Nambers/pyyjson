@@ -1157,25 +1157,25 @@ arr_val_begin:
         goto fail_string;
     }
     if (*cur == 't') {
-        if (likely(_read_true(&cur) && pyyjson_decode_true(decode_obj_stack_info))) {
+        if (likely(_read_true_1(&cur, end) && pyyjson_decode_true(decode_obj_stack_info))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
         }
         goto fail_literal_true;
     }
     if (*cur == 'f') {
-        if (likely(_read_false(&cur) && pyyjson_decode_false(decode_obj_stack_info))) {
+        if (likely(_read_false_1(&cur, end) && pyyjson_decode_false(decode_obj_stack_info))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
         }
         goto fail_literal_false;
     }
     if (*cur == 'n') {
-        if (likely(_read_null(&cur) && pyyjson_decode_null(decode_obj_stack_info))) {
+        if (likely(_read_null_1(&cur, end) && pyyjson_decode_null(decode_obj_stack_info))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
         }
-        if (likely(_read_nan(false, &cur) && pyyjson_decode_nan(decode_obj_stack_info, false))) {
+        if (likely(_read_nan_1(false, &cur, end) && pyyjson_decode_nan(decode_obj_stack_info, false))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
         }
@@ -1317,25 +1317,25 @@ obj_val_begin:
         goto arr_begin;
     }
     if (*cur == 't') {
-        if (likely(_read_true(&cur) && pyyjson_decode_true(decode_obj_stack_info))) {
+        if (likely(_read_true_1(&cur, end) && pyyjson_decode_true(decode_obj_stack_info))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
         }
         goto fail_literal_true;
     }
     if (*cur == 'f') {
-        if (likely(_read_false(&cur) && pyyjson_decode_false(decode_obj_stack_info))) {
+        if (likely(_read_false_1(&cur, end) && pyyjson_decode_false(decode_obj_stack_info))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
         }
         goto fail_literal_false;
     }
     if (*cur == 'n') {
-        if (likely(_read_null(&cur) && pyyjson_decode_null(decode_obj_stack_info))) {
+        if (likely(_read_null_1(&cur, end) && pyyjson_decode_null(decode_obj_stack_info))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
         }
-        if (likely(_read_nan(false, &cur) && pyyjson_decode_nan(decode_obj_stack_info, false))) {
+        if (likely(_read_nan_1(false, &cur, end) && pyyjson_decode_nan(decode_obj_stack_info, false))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
         }
