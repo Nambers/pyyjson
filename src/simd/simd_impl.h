@@ -88,10 +88,81 @@ force_inline void write_simd(void *dst, SIMD_TYPE SIMD_VAR) {
 }
 
 /*
+ * write memory with length sizeof(SIMD_TYPE) to `dst`.
+ * The `dst` must be aligned.
+ */
+force_inline void write_aligned(void *dst, SIMD_TYPE SIMD_VAR) {
+#if SIMD_BIT_SIZE == 128
+    _mm_store_si128((__m128i *)dst, SIMD_VAR);
+#elif SIMD_BIT_SIZE == 256
+    _mm256_store_si256((__m256i *)dst, SIMD_VAR);
+#else
+    _mm512_store_si512(dst, SIMD_VAR);
+#endif
+}
+
+/*
+ * write memory with length sizeof(SIMD_TYPE) to dst.
+ */
+force_inline void write_128(void *dst, SIMD_128 x) {
+    _mm_storeu_si128((SIMD_128_IU *)dst, x);
+}
+
+force_inline SIMD_128 load_128(const void *src) {
+#if __SSE3__
+    return _mm_lddqu_si128((const SIMD_128_IU *)src);
+#else
+    return _mm_loadu_si128((const SIMD_128_IU *)src);
+#endif
+}
+
+force_inline SIMD_128 load_128_aligned(const void *src) {
+    return _mm_load_si128((const __m128i *)src);
+}
+
+force_inline SIMD_128 simd_and_128(SIMD_128 a, SIMD_128 b) {
+    return _mm_and_si128(a, b);
+}
+
+force_inline SIMD_128 simd_or_128(SIMD_128 a, SIMD_128 b) {
+    return _mm_or_si128(a, b);
+}
+
+force_inline SIMD_128 cmpgt_i32_128(SIMD_128 a, SIMD_128 b) {
+    return _mm_cmpgt_epi32(a, b);
+}
+
+force_inline SIMD_128 broadcast_8_128(i8 v) {
+    return _mm_set1_epi8(v);
+}
+
+force_inline SIMD_128 broadcast_16_128(i16 v) {
+    return _mm_set1_epi16(v);
+}
+
+force_inline SIMD_128 broadcast_32_128(i32 v) {
+    return _mm_set1_epi32(v);
+}
+
+force_inline SIMD_128 broadcast_64_128(i64 v) {
+#if defined(_MSC_VER) && !defined(_M_IX86)
+    return _mm_set1_epi64x(v);
+#else
+    return _mm_set1_epi64((__m64)v);
+#endif
+}
+
+#if __SSSE3__
+force_inline const void *read_rshift_mask_table(int row);
+#endif
+/*
  * Right shift 128 bits for the case imm8 cannot be determined at compile time.
  Shifted bits should be multiple of 8; imm8 is the number of "bytes" to shift.
  */
 force_inline SIMD_128 runtime_right_shift_128bits(SIMD_128 x, int imm8) {
+#if __SSSE3__
+    return _mm_shuffle_epi8(x, load_128_aligned(read_rshift_mask_table(imm8)));
+#else
     switch (imm8) {
         case 1: {
             return _mm_bsrli_si128(x, 1);
@@ -160,70 +231,6 @@ force_inline SIMD_128 runtime_right_shift_128bits(SIMD_128 x, int imm8) {
     }
     Py_UNREACHABLE();
     return x;
-}
-
-/*
- * write memory with length sizeof(SIMD_TYPE) to `dst`.
- * The `dst` must be aligned.
- */
-force_inline void write_aligned(void *dst, SIMD_TYPE SIMD_VAR) {
-#if SIMD_BIT_SIZE == 128
-    _mm_store_si128((__m128i *)dst, SIMD_VAR);
-#elif SIMD_BIT_SIZE == 256
-    _mm256_store_si256((__m256i *)dst, SIMD_VAR);
-#else
-    _mm512_store_si512(dst, SIMD_VAR);
-#endif
-}
-
-/*
- * write memory with length sizeof(SIMD_TYPE) to dst.
- */
-force_inline void write_128(void *dst, SIMD_128 x) {
-    _mm_storeu_si128((SIMD_128_IU *)dst, x);
-}
-
-force_inline SIMD_128 load_128(const void *src) {
-#if __SSE3__
-    return _mm_lddqu_si128((const SIMD_128_IU *)src);
-#else
-    return _mm_loadu_si128((const SIMD_128_IU *)src);
-#endif
-}
-
-force_inline SIMD_128 load_128_aligned(const void *src) {
-    return _mm_load_si128((const __m128i *)src);
-}
-
-force_inline SIMD_128 simd_and_128(SIMD_128 a, SIMD_128 b) {
-    return _mm_and_si128(a, b);
-}
-
-force_inline SIMD_128 simd_or_128(SIMD_128 a, SIMD_128 b) {
-    return _mm_or_si128(a, b);
-}
-
-force_inline SIMD_128 cmpgt_i32_128(SIMD_128 a, SIMD_128 b) {
-    return _mm_cmpgt_epi32(a, b);
-}
-
-force_inline SIMD_128 broadcast_8_128(i8 v) {
-    return _mm_set1_epi8(v);
-}
-
-force_inline SIMD_128 broadcast_16_128(i16 v) {
-    return _mm_set1_epi16(v);
-}
-
-force_inline SIMD_128 broadcast_32_128(i32 v) {
-    return _mm_set1_epi32(v);
-}
-
-force_inline SIMD_128 broadcast_64_128(i64 v) {
-#if defined(_MSC_VER) && !defined(_M_IX86)
-    return _mm_set1_epi64x(v);
-#else
-    return _mm_set1_epi64((__m64)v);
 #endif
 }
 
