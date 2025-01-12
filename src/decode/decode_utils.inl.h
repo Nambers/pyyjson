@@ -26,10 +26,10 @@ typedef struct DECODE_SRC_INFO {
  */
 force_inline bool READ_TO_HEX_U16(const _FROM_TYPE *cur, u16 *val) {
     u16 c0, c1, c2, c3, t0, t1;
-    assert(cur[0] <= 255);
-    assert(cur[1] <= 255);
-    assert(cur[2] <= 255);
-    assert(cur[3] <= 255);
+    assert(cur[0] <= U8MAX);
+    assert(cur[1] <= U8MAX);
+    assert(cur[2] <= U8MAX);
+    assert(cur[3] <= U8MAX);
     c0 = hex_conv_table[cur[0]];
     c1 = hex_conv_table[cur[1]];
     c2 = hex_conv_table[cur[2]];

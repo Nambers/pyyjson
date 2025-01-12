@@ -189,6 +189,7 @@
 #define REPEAT_32(x) REPEAT_16(x) REPEAT_16(x)
 #define REPEAT_64(x) REPEAT_32(x) REPEAT_32(x)
 
+#define PYYJSON_STATIC_CAST(type, expr) ((type)(expr))
 
 /*==============================================================================
  * Macros
@@ -413,6 +414,8 @@ force_inline void u128_mul_add(u64 a, u64 b, u64 c, u64 *hi, u64 *lo) {
 /* Used to write u64 literal for C89 which doesn't support "ULL" suffix. */
 #undef U64
 #define U64(hi, lo) ((((u64)hi##UL) << 32U) + lo##UL)
+
+#define U8MAX (255)
 
 /*==============================================================================
  * Power10 Lookup Table

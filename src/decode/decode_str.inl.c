@@ -15,7 +15,7 @@
 //
 // #include "simd/check_mask.inl.h"
 
-
+#define PYYJSON_DECODE_STR PYYJSON_CONCAT2(pyyjson_decode_str, COMPILE_UCS_LEVEL)
 #define READ_STR PYYJSON_CONCAT2(read_str, COMPILE_UCS_LEVEL)
 #define READ_ROOT PYYJSON_CONCAT2(read_root, COMPILE_UCS_LEVEL)
 #define READ_ROOT_SINGLE PYYJSON_CONCAT2(read_root_single, COMPILE_UCS_LEVEL)
@@ -1271,20 +1271,20 @@ force_inline bool CHECK_AND_RESERVE_STR_BUFFER(Py_ssize_t len, _FROM_TYPE **buff
 }
 
 /** Read JSON document (accept all style, but optimized for pretty). */
-force_noinline PyObject *READ_ROOT(PyUnicodeObject *unicode_root) {
+force_noinline PyObject *READ_ROOT(const _FROM_TYPE *dat, Py_ssize_t len) {
     // check unicode is valid
-    assert(PyUnicode_Check(unicode_root));
-    assert(((PyASCIIObject *)unicode_root)->state.kind == COMPILE_READ_UCS_LEVEL);
-    assert((((PyASCIIObject *)unicode_root)->state.ascii != false) == (COMPILE_UCS_LEVEL == 0));
-    Py_ssize_t len = ((PyASCIIObject *)unicode_root)->length;
-    assert(len > 0);
+    // assert(PyUnicode_Check(unicode_root));
+    // assert(((PyASCIIObject *)unicode_root)->state.kind == COMPILE_READ_UCS_LEVEL);
+    // assert((((PyASCIIObject *)unicode_root)->state.ascii != false) == (COMPILE_UCS_LEVEL == 0));
+    // Py_ssize_t len = ((PyASCIIObject *)unicode_root)->length;
+    // assert(len > 0);
     // init `dat` ptr
-    const _FROM_TYPE *const dat =
-#if COMPILE_UCS_LEVEL == 0
-            (u8 *)(((PyASCIIObject *)unicode_root) + 1);
-#else
-            (_FROM_TYPE *)(((PyCompactUnicodeObject *)unicode_root) + 1);
-#endif
+    //     const _FROM_TYPE *const dat =
+    // #if COMPILE_UCS_LEVEL == 0
+    //             (u8 *)(((PyASCIIObject *)unicode_root) + 1);
+    // #else
+    //             (_FROM_TYPE *)(((PyCompactUnicodeObject *)unicode_root) + 1);
+    // #endif
     //
     const _FROM_TYPE *cur = dat;
     const _FROM_TYPE *const end = cur + len;
@@ -1346,7 +1346,7 @@ arr_val_begin:
         cur++;
         goto arr_begin;
     }
-    if (*cur <= 255 && char_is_number(*cur)) {
+    if (*cur <= U8MAX && char_is_number(*cur)) {
         PyObject *number_obj = READ_NUMBER(&cur, end);
         if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
@@ -1698,7 +1698,7 @@ failed_cleanup:
 }
 
 /** Read single value JSON document. */
-force_noinline PyObject *READ_ROOT_SINGLE(PyUnicodeObject *unicode_root) {
+force_noinline PyObject *READ_ROOT_SINGLE(const _FROM_TYPE *dat, Py_ssize_t len) {
 #define return_err(_pos, _type, _msg)                                                             \
     do {                                                                                          \
         if (_type == JSONDecodeError) {                                                           \
@@ -1710,18 +1710,18 @@ force_noinline PyObject *READ_ROOT_SINGLE(PyUnicodeObject *unicode_root) {
     } while (0)
 
     // check unicode is valid
-    assert(PyUnicode_Check(unicode_root));
-    assert(((PyASCIIObject *)unicode_root)->state.kind == COMPILE_READ_UCS_LEVEL);
-    assert((((PyASCIIObject *)unicode_root)->state.ascii != false) == (COMPILE_UCS_LEVEL == 0));
-    Py_ssize_t len = ((PyASCIIObject *)unicode_root)->length;
+    // assert(PyUnicode_Check(unicode_root));
+    // assert(((PyASCIIObject *)unicode_root)->state.kind == COMPILE_READ_UCS_LEVEL);
+    // assert((((PyASCIIObject *)unicode_root)->state.ascii != false) == (COMPILE_UCS_LEVEL == 0));
+    // Py_ssize_t len = ((PyASCIIObject *)unicode_root)->length;
     assert(len > 0);
     // init `dat` ptr
-    const _FROM_TYPE *const dat =
-#if COMPILE_UCS_LEVEL == 0
-            (u8 *)(((PyASCIIObject *)unicode_root) + 1);
-#else
-            (_FROM_TYPE *)(((PyCompactUnicodeObject *)unicode_root) + 1);
-#endif
+    //     const _FROM_TYPE *const dat =
+    // #if COMPILE_UCS_LEVEL == 0
+    //             (u8 *)(((PyASCIIObject *)unicode_root) + 1);
+    // #else
+    //             (_FROM_TYPE *)(((PyCompactUnicodeObject *)unicode_root) + 1);
+    // #endif
     //
     const _FROM_TYPE *cur = dat;
     const _FROM_TYPE *const end = cur + len;
@@ -1730,7 +1730,7 @@ force_noinline PyObject *READ_ROOT_SINGLE(PyUnicodeObject *unicode_root) {
 
     PyObject *ret = NULL;
 
-    if (*cur <= 255 && char_is_number(*cur)) {
+    if (*cur <= U8MAX && char_is_number(*cur)) {
         ret = READ_NUMBER(&cur, end);
         if (likely(ret)) goto single_end;
         goto fail_number;
@@ -1821,6 +1821,48 @@ fail_cleanup:
 #undef return_err
 }
 
+force_noinline PyObject *PYYJSON_DECODE_STR(PyUnicodeObject *in_unicode) {
+    // some checks
+    assert(in_unicode);
+    PyASCIIObject *ascii_head = PYYJSON_STATIC_CAST(PyASCIIObject *, in_unicode);
+    assert((ascii_head->state.ascii ? 0 : ascii_head->state.kind) == COMPILE_UCS_LEVEL);
+    if (unlikely(!ascii_head->length)) {
+        PyErr_Format(JSONDecodeError, "input data is empty");
+        return NULL;
+    }
+#if COMPILE_UCS_LEVEL > 0
+    const _FROM_TYPE *buffer = PYYJSON_STATIC_CAST(_FROM_TYPE *, PYYJSON_STATIC_CAST(PyCompactUnicodeObject *, in_unicode) + 1);
+#else
+    const _FROM_TYPE *buffer = PYYJSON_STATIC_CAST(_FROM_TYPE *, ascii_head + 1);
+#endif
+    assert(buffer);
+    assert(ascii_head->length > 0);
+
+    const _FROM_TYPE *const end = buffer + ascii_head->length;
+    PyObject *ret;
+    assert(*end == 0);
+
+    /* skip empty contents before json document */
+    if (unlikely(*buffer <= U8MAX && char_is_space_or_comment(*buffer))) {
+        if (likely(*buffer <= U8MAX && char_is_space(*buffer))) {
+            while ((*++buffer) <= U8MAX && char_is_space(*buffer));
+        }
+        if (unlikely(buffer >= end)) {
+            PyErr_Format(JSONDecodeError, "input data is empty");
+            return NULL;
+        }
+    }
+
+    /* read json document */
+    if (likely(*buffer <= U8MAX && char_is_container(*buffer))) {
+        ret = READ_ROOT(buffer, end - buffer);
+    } else {
+        ret = READ_ROOT_SINGLE(buffer, end - buffer);
+    }
+
+    return ret;
+}
+
 #undef READ_INF_OR_NAN
 #undef READ_NUMBER
 #undef READ_INF_OR_NAN
@@ -1861,5 +1903,6 @@ fail_cleanup:
 #undef READ_ROOT_SINGLE
 #undef READ_ROOT
 #undef READ_STR
+#undef PYYJSON_DECODE_STR
 //
 #undef COMPILE_READ_UCS_LEVEL

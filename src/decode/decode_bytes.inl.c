@@ -1072,7 +1072,7 @@ read_finalize:
 }
 
 /** Read JSON document (accept all style, but optimized for pretty). */
-force_inline PyObject *read_bytes_root_pretty(const char *dat, usize len) {
+force_inline PyObject *read_bytes_root_pretty(const u8 *dat, usize len) {
 
     // container stack info
     DecodeCtnStackInfo _decode_ctn_info;
@@ -1486,9 +1486,8 @@ failed_cleanup:
 #undef return_err
 }
 
-
 /** Read single value JSON document. */
-force_noinline PyObject *read_root_single_bytes(const char *dat, usize len) {
+force_noinline PyObject *read_root_single_bytes(const u8 *dat, usize len) {
 #define return_err(_pos, _type, _msg)                                                             \
     do {                                                                                          \
         if (_type == JSONDecodeError) {                                                           \
@@ -1595,4 +1594,40 @@ fail_cleanup:
     Py_XDECREF(ret);
     return NULL;
 #undef return_err
+}
+
+force_noinline PyObject *pyyjson_decode_bytes(char *_buffer, Py_ssize_t len) {
+    // some checks
+    if (unlikely(!len)) {
+        PyErr_Format(JSONDecodeError, "input data is empty");
+        return NULL;
+    }
+    assert(_buffer);
+    assert(len > 0);
+
+    // use u8 from now
+    const u8 *buffer = (const u8 *)_buffer;
+    const u8 *const end = buffer + len;
+    PyObject *ret;
+    assert(*end == 0);
+
+    /* skip empty contents before json document */
+    if (unlikely(char_is_space_or_comment(*buffer))) {
+        if (likely(char_is_space(*buffer))) {
+            while (char_is_space(*++buffer));
+        }
+        if (unlikely(buffer >= end)) {
+            PyErr_Format(JSONDecodeError, "input data is empty");
+            return NULL;
+        }
+    }
+
+    /* read json document */
+    if (likely(char_is_container(*buffer))) {
+        ret = read_bytes_root_pretty(buffer, end - buffer);
+    } else {
+        ret = read_root_single_bytes(buffer, end - buffer);
+    }
+
+    return ret;
 }

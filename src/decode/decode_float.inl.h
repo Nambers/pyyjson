@@ -10,23 +10,23 @@
 
 /////////////////
 force_inline bool DIGI_IS_DIGIT(_FROM_TYPE d) {
-    return d <= 255 && _digi_is_digit((u8)d);
+    return d <= U8MAX && _digi_is_digit((u8)d);
 }
 
 force_inline bool DIGI_IS_DIGIT_OR_FP(_FROM_TYPE d) {
-    return d <= 255 && _digi_is_digit_or_fp((u8)d);
+    return d <= U8MAX && _digi_is_digit_or_fp((u8)d);
 }
 
 force_inline bool DIGI_IS_EXP(_FROM_TYPE d) {
-    return d <= 255 && _digi_is_exp((u8)d);
+    return d <= U8MAX && _digi_is_exp((u8)d);
 }
 
 force_inline bool DIGI_IS_SIGN(_FROM_TYPE d) {
-    return d <= 255 && _digi_is_sign((u8)d);
+    return d <= U8MAX && _digi_is_sign((u8)d);
 }
 
 force_inline bool DIGI_IS_FP(_FROM_TYPE d) {
-    return d <= 255 && _digi_is_fp((u8)d);
+    return d <= U8MAX && _digi_is_fp((u8)d);
 }
 
 #if PYYJSON_HAS_IEEE_754
@@ -35,7 +35,7 @@ force_inline bool DIGI_IS_FP(_FROM_TYPE d) {
 
 ////////////////
 force_inline bool DIGI_IS_NONZERO(_FROM_TYPE d) {
-    return d <= 255 && _digi_is_nonzero((u8)d);
+    return d <= U8MAX && _digi_is_nonzero((u8)d);
 }
 
 /** Set a bigint with floating point number string. */

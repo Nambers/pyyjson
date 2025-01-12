@@ -19,7 +19,7 @@ typedef PyObject *pyyjson_cache_type;
 
 extern pyyjson_cache_type AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
 
-PyObject *yyjson_read_opts(const char *dat, Py_ssize_t len);
+// PyObject *yyjson_read_opts(const char *dat, Py_ssize_t len);
 // bool is_lzcnt_supported(void);
 
 PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject *kwargs);
@@ -152,25 +152,6 @@ PyMODINIT_FUNC PyInit_pyyjson(void) {
 #endif
 
     return module;
-}
-
-PyObject *pyyjson_Decode(PyObject *self, PyObject *args, PyObject *kwargs) {
-    const char *string = NULL;
-    Py_ssize_t len = 0;
-    static const char *kwlist[] = {"s", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#", (char **)kwlist, &string, &len)) {
-        PyErr_SetString(PyExc_TypeError, "Invalid argument");
-        return NULL;
-    }
-
-    PyObject *root = yyjson_read_opts(string, len);
-    if (unlikely(!root)) {
-        if (!PyErr_Occurred()) {
-            PyErr_SetString(JSONDecodeError, "Failed to decode JSON: unknown error");
-        }
-    }
-
-    return root;
 }
 
 /* Runtime check if lzcnt is supported. */
