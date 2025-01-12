@@ -757,8 +757,83 @@ force_inline PyObject *DECODE_LOOP_DONE_MAKE_STRING(
 force_inline void READ_STR_TAIL(
         DECODE_SRC_INFO *restrict decode_src_info,
         DECODE_UNICODE_INFO *restrict decode_unicode_info,
-        ReadStrState *read_state) {
-    // TODO
+        ReadStrState *read_state,
+        int write_as, // one of 1,2,4
+        bool do_copy,
+        bool need_check_max_char) {
+// TODO
+#if SIMD_BIT_SIZE == 512
+
+#else
+    assert(decode_src_info->src + CHECK_COUNT_MAX > decode_src_info->src_end);
+    SIMD_TYPE SIMD_VAR;
+    const _FROM_TYPE *simd_load_head = decode_src_info->src_end - CHECK_COUNT_MAX;
+    SIMD_MASK_TYPE check_mask = CHECK_ESCAPE_IMPL_GET_MASK(simd_load_head, &SIMD_VAR);
+    Py_ssize_t invalid_head_count = decode_src_info->src - simd_load_head;
+    const void *tail_mask_addr = PYYJSON_CONCAT2(read_tail_mask_table, READ_BIT_SIZE)(invalid_head_count);
+    static_assert(sizeof(SIMD_MASK_TYPE) == sizeof(SIMD_TYPE), "sizeof(SIMD_MASK_TYPE) == sizeof(SIMD_TYPE)");
+    SIMD_MASK_TYPE tail_mask = load_simd_aligned(tail_mask_addr);
+    check_mask = SIMD_AND(tail_mask, check_mask);
+    // the read buffer is ended, there should be a '"' here
+    if (likely(!check_mask_zero(check_mask))) {
+        u32 done_count = GET_DONE_COUNT_FROM_MASK(check_mask);
+        decode_src_info->src = simd_load_head + done_count;
+        if (do_copy) {
+            if (write_as > COMPILE_READ_UCS_LEVEL) { // compile time determined
+
+                if (write_as == 2) { // compile time determined
+#    if COMPILE_READ_UCS_LEVEL <= 2
+                    assert(decode_unicode_info->unicode_ucs2);
+                    WRITE_SIMD_IMPL_TARGET2(GET_UCS2_WRITER(decode_unicode_info), SIMD_VAR);
+#    else
+                    assert(false);
+                    Py_UNREACHABLE();
+#    endif
+                } else {
+                    assert(write_as == 4);
+                    assert(decode_unicode_info->unicode_ucs4);
+                    WRITE_SIMD_IMPL_TARGET4(GET_UCS4_WRITER(decode_unicode_info), SIMD_VAR);
+                }
+
+            } else { // compile time determined
+                assert(write_as == COMPILE_READ_UCS_LEVEL);
+                write_simd(GET_CUR_WRITER(decode_unicode_info), SIMD_VAR);
+            }
+            // if we have blendv, write with blendv
+            // if not, write with runtime bitshift
+#    if PYYJSON_HAS_BLENDV
+
+#    else
+
+#    endif
+        }
+
+
+        MOVE_WRITER(decode_unicode_info, write_as, done_count);
+        SpecialCharReadResult escape_result = DO_SPECIAL(decode_src_info);
+        // *write_scan_flag = escape_result.flag;
+        if (likely(escape_result.flag == StrEnd)) {
+            if (need_check_max_char) CHECK_MAX_CHAR_IN_LOOP(SIMD_VAR, read_state, true, (Py_ssize_t)done_count);
+            read_state->scan_flag = StrEnd;
+            return;
+        }
+        if (unlikely(escape_result.flag == StrInvalid)) {
+            assert(PyErr_Occurred());
+            read_state->scan_flag = StrInvalid;
+            return;
+        }
+        // slow path (escape character)
+        PROCESS_ESCAPE(decode_unicode_info, read_state, decode_src_info, escape_result.value, write_as, do_copy);
+        // read_state->scan_flag = StrContinue;
+        if (need_check_max_char && read_state->max_char_type < COMPILE_UCS_LEVEL) {
+            CHECK_MAX_CHAR_IN_LOOP(SIMD_VAR, read_state, true, (Py_ssize_t)done_count);
+        }
+    } else {
+        // there is no '"' until the end, the string must be invalid
+        PyErr_SetString(JSONDecodeError, "Unexpected ending when reading string");
+        read_state->scan_flag = StrInvalid;
+    }
+#endif
 }
 
 /**
@@ -1197,7 +1272,7 @@ loop_4_t_t:;
 read_tail:;
     // this is the really *unlikely* case
     {
-        READ_STR_TAIL(&_decode_src_info, &_decode_unicode_info, &_read_state);
+        READ_STR_TAIL(&_decode_src_info, &_decode_unicode_info, &_read_state, PYYJSON_MAX(_read_state.max_char_type, COMPILE_READ_UCS_LEVEL), _read_state.need_copy, _read_state.max_char_type < COMPILE_UCS_LEVEL);
         if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
         goto done;
     }

@@ -74,6 +74,20 @@ force_inline SIMD_TYPE load_simd(const void *src) {
 }
 
 /*
+ * Load memory to a simd variable.
+ * This is aligned.
+ */
+force_inline SIMD_TYPE load_simd_aligned(const void *src) {
+#if SIMD_BIT_SIZE == 512
+    return _mm512_load_si512(src);
+#elif SIMD_BIT_SIZE == 256
+    return _mm256_load_si256((const __m256i *)src);
+#else
+    return _mm_load_si128((const __m128i *)src);
+#endif
+}
+
+/*
  * Write memory with length sizeof(SIMD_TYPE) to `dst`.
  * This is unaligned.
  */
@@ -369,6 +383,18 @@ force_inline bool check_mask_zero(SIMD_MASK_TYPE mask) {
 force_inline SIMD_128 blendv_128(SIMD_128 blend, SIMD_128 x, SIMD_128 mask) {
     return _mm_blendv_epi8(blend, x, mask);
 }
+
+/*
+ * Write a tail to `addr` using blendv, keeping its head content.
+ * [addr, addr + head_bytes) is left unchanged, while
+ * [addr + head_bytes, addr + 128 / 8) is written, and
+ * tailmask = load_128_aligned(read_tail_mask_table_8(head_bytes)).
+ */
+force_inline void blendv_writetail_128(SIMD_128 to_write, void *addr, SIMD_128 tailmask) {
+    SIMD_128 blend_A = load_128(addr);
+    SIMD_128 blended = blendv_128(blend_A, to_write, tailmask);
+    write_128(addr, blended);
+}
 #endif
 
 /*==============================================================================
@@ -445,6 +471,18 @@ force_inline SIMD_256 cmpeq0_8_256(SIMD_256 a) {
 
 force_inline SIMD_256 blendv_256(SIMD_256 blend, SIMD_256 SIMD_VAR, SIMD_256 mask) {
     return _mm256_blendv_epi8(blend, SIMD_VAR, mask);
+}
+
+/*
+ * Write a tail to `addr` using blendv, keeping its head content.
+ * [addr, addr + head_bytes) is left unchanged, while
+ * [addr + head_bytes, addr + 256 / 8) is written, and
+ * tailmask = load_256_aligned(read_tail_mask_table_8(head_bytes)).
+ */
+force_inline void blendv_writetail_256(SIMD_256 to_write, void *addr, SIMD_256 tailmask) {
+    SIMD_256 blend_A = load_256((const void *)addr);
+    SIMD_256 blended = blendv_256(blend_A, to_write, tailmask);
+    write_256(addr, blended);
 }
 
 force_inline void extract_256_two_parts(SIMD_256 y, SIMD_128 *restrict x1, SIMD_128 *restrict x2) {

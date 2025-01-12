@@ -29,6 +29,8 @@
 #        define SIMD_512 __m512i
 #        define HAS_SIMD 1
 
+#        define PYYJSON_HAS_BLENDV (SIMD_BIT_SIZE > 128) || __SSE4_1__
+
 #    elif TARGET_SIMD_ARCH == aarch
 // aarch64
 #    endif
