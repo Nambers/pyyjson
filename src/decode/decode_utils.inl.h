@@ -8,7 +8,9 @@
 #define _READ_TRUE PYYJSON_CONCAT2(_read_true, COMPILE_READ_UCS_LEVEL)
 #define _READ_FALSE PYYJSON_CONCAT2(_read_false, COMPILE_READ_UCS_LEVEL)
 #define _READ_NULL PYYJSON_CONCAT2(_read_null, COMPILE_READ_UCS_LEVEL)
+#define _READ_INF PYYJSON_CONCAT2(_read_inf, COMPILE_READ_UCS_LEVEL)
 #define _READ_NAN PYYJSON_CONCAT2(_read_nan, COMPILE_READ_UCS_LEVEL)
+#define READ_INF_OR_NAN PYYJSON_CONCAT2(read_inf_or_nan, COMPILE_READ_UCS_LEVEL)
 
 typedef struct DECODE_SRC_INFO {
     const _FROM_TYPE *src;
@@ -72,8 +74,54 @@ force_inline bool _READ_NULL(const _FROM_TYPE **restrict ptr, const _FROM_TYPE *
     return false;
 }
 
+/** Read 'Infinity' literal (ignoring case). */
+force_inline bool _READ_INF(const _FROM_TYPE **ptr, const _FROM_TYPE *end) {
+#define COMP_TWICE (COMPILE_READ_UCS_LEVEL == 4 && SIMD_BIT_SIZE < 256)
+    if (end > *ptr + 8) {
+        return false;
+    }
+    static const _FROM_TYPE _mask[16] = {
+            ~(_FROM_TYPE)0x20, ~(_FROM_TYPE)0x20, ~(_FROM_TYPE)0x20, ~(_FROM_TYPE)0x20,
+            ~(_FROM_TYPE)0x20, ~(_FROM_TYPE)0x20, ~(_FROM_TYPE)0x20, ~(_FROM_TYPE)0x20, 0};
+    static const _FROM_TYPE template[16] = {'I', 'N', 'F', 'I', 'N', 'I', 'T', 'Y', 0};
+#if COMP_TWICE
+    SIMD_128 slide1 = load_128((void *)*ptr);
+    SIMD_128 slide2 = load_128((void *)((*ptr) + 4));
+    SIMD_128 mask1 = load_128_aligned(_mask);
+    SIMD_128 mask2 = load_128_aligned(_mask + 4);
+    slide1 = simd_and_128(slide1, mask1);
+    slide2 = simd_and_128(slide2, mask2);
+    if (likely(0 == memcmp(&slide1, &template, 4 * sizeof(u32)) && 0 == memcmp(&slide2, &template[4], 4 * sizeof(u32)))) {
+        ptr += 8;
+        return true;
+    }
+    return false;
+#else // !COMP_TWICE
+#    if COMPILE_READ_UCS_LEVEL == 4
+    SIMD_256 slide = load_256((void *)*ptr);
+    SIMD_256 mask = load_256_aligned(_mask);
+    slide = simd_and_256(slide, mask);
+#    elif COMPILE_READ_UCS_LEVEL == 2
+    SIMD_128 slide = load_128((void *)*ptr);
+    SIMD_128 mask = load_128_aligned(_mask);
+    slide = simd_and_128(slide, mask);
+#    else
+    u64 slide = *(u64 *)*ptr;
+    u64 mask = *(u64 *)_mask;
+    slide = slide & mask;
+#    endif
+    // use memcmp and compiler optimization to avoid repeating the same code
+    if (likely(0 == memcmp(&slide, &template, sizeof(slide)))) {
+        ptr += 8;
+        return true;
+    }
+    return false;
+#endif // !COMP_TWICE
+#undef COMP_TWICE
+}
+
 /** Read 'NaN' literal (ignoring case). */
-force_inline bool _READ_NAN(bool sign, const _FROM_TYPE **restrict ptr, const _FROM_TYPE *restrict end) {
+force_inline bool _READ_NAN(const _FROM_TYPE **restrict ptr, const _FROM_TYPE *restrict end) {
     if (end > *ptr + 3) {
         return false;
     }
@@ -99,19 +147,23 @@ force_inline bool _READ_NAN(bool sign, const _FROM_TYPE **restrict ptr, const _F
         return true;
     }
 
-    // _FROM_TYPE *cur = (_FROM_TYPE *)*ptr;
-    // _FROM_TYPE **end = (_FROM_TYPE **)ptr;
-    // if ((cur[0] == 'N' || cur[0] == 'n') &&
-    //     (cur[1] == 'A' || cur[1] == 'a') &&
-    //     (cur[2] == 'N' || cur[2] == 'n')) {
-    //     cur += 3;
-    //     *end = cur;
-    //     return true;
-    // }
     return false;
 }
 
+/** Read 'Infinity' or 'NaN' literal (ignoring case). */
+force_inline PyObject *READ_INF_OR_NAN(bool sign, const _FROM_TYPE **ptr, const _FROM_TYPE *end) {
+    if (_READ_INF(ptr, end)) {
+        return PyFloat_FromDouble(sign ? -fabs(Py_HUGE_VAL) : fabs(Py_HUGE_VAL));
+    }
+    if (_READ_NAN(ptr, end)) {
+        return PyFloat_FromDouble(sign ? -fabs(Py_NAN) : fabs(Py_NAN));
+    }
+    return NULL;
+}
+
+#undef READ_INF_OR_NAN
 #undef _READ_NAN
+#undef _READ_INF
 #undef _READ_NULL
 #undef _READ_FALSE
 #undef _READ_TRUE

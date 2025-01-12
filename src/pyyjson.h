@@ -253,17 +253,18 @@
 #define PYYJSON_STRING_TYPE_UCS2 2
 #define PYYJSON_STRING_TYPE_UCS4 4
 
-
+#define PYYJSON_HAS_IEEE_754 0
+#ifndef PYYJSON_HAS_IEEE_754
 /* IEEE 754 floating-point binary representation */
-#if defined(DOUBLE_IS_LITTLE_ENDIAN_IEEE754) || defined(DOUBLE_IS_BIG_ENDIAN_IEEE754) || defined(DOUBLE_IS_ARM_MIXED_ENDIAN_IEEE754)
-#    define PYYJSON_HAS_IEEE_754 1
-#elif (FLT_RADIX == 2) && (DBL_MANT_DIG == 53) && (DBL_DIG == 15) && \
-        (DBL_MIN_EXP == -1021) && (DBL_MAX_EXP == 1024) &&           \
-        (DBL_MIN_10_EXP == -307) && (DBL_MAX_10_EXP == 308)
-#    define PYYJSON_HAS_IEEE_754 1
-#else
-#    define PYYJSON_HAS_IEEE_754 0
-static_assert(false, "false");
+#    if defined(DOUBLE_IS_LITTLE_ENDIAN_IEEE754) || defined(DOUBLE_IS_BIG_ENDIAN_IEEE754) || defined(DOUBLE_IS_ARM_MIXED_ENDIAN_IEEE754) || _PY_SHORT_FLOAT_REPR == 1
+#        define PYYJSON_HAS_IEEE_754 1
+#    elif (FLT_RADIX == 2) && (DBL_MANT_DIG == 53) && (DBL_DIG == 15) && \
+            (DBL_MIN_EXP == -1021) && (DBL_MAX_EXP == 1024) &&           \
+            (DBL_MIN_10_EXP == -307) && (DBL_MAX_10_EXP == 308)
+#        define PYYJSON_HAS_IEEE_754 1
+#    else
+#        define PYYJSON_HAS_IEEE_754 0
+#    endif
 #endif
 
 
@@ -409,6 +410,53 @@ force_inline void u128_mul_add(u64 a, u64 b, u64 c, u64 *hi, u64 *lo) {
 #endif
 }
 
+/* Used to write u64 literal for C89 which doesn't support "ULL" suffix. */
+#undef U64
+#define U64(hi, lo) ((((u64)hi##UL) << 32U) + lo##UL)
+
+/*==============================================================================
+ * Power10 Lookup Table
+ * These data are used by the floating-point number reader and writer.
+ *============================================================================*/
+
+/** Minimum decimal exponent in pow10_sig_table. */
+#define POW10_SIG_TABLE_MIN_EXP -343
+
+/** Maximum decimal exponent in pow10_sig_table. */
+#define POW10_SIG_TABLE_MAX_EXP 324
+
+/** Minimum exact decimal exponent in pow10_sig_table */
+#define POW10_SIG_TABLE_MIN_EXACT_EXP 0
+
+/** Maximum exact decimal exponent in pow10_sig_table */
+#define POW10_SIG_TABLE_MAX_EXACT_EXP 55
+
+/** Normalized significant 128 bits of pow10, no rounded up (size: 10.4KB).
+    This lookup table is used by both the double number reader and writer.
+    (generate with misc/make_tables.c) */
+extern const u64 pow10_sig_table[];
+
+/**
+ Get the cached pow10 value from pow10_sig_table.
+ @param exp10 The exponent of pow(10, e). This value must in range
+              POW10_SIG_TABLE_MIN_EXP to POW10_SIG_TABLE_MAX_EXP.
+ @param hi    The highest 64 bits of pow(10, e).
+ @param lo    The lower 64 bits after `hi`.
+ */
+force_inline void pow10_table_get_sig(i32 exp10, u64 *hi, u64 *lo) {
+    i32 idx = exp10 - (POW10_SIG_TABLE_MIN_EXP);
+    *hi = pow10_sig_table[idx * 2];
+    *lo = pow10_sig_table[idx * 2 + 1];
+}
+
+/**
+ Get the exponent (base 2) for highest 64 bits significand in pow10_sig_table.
+ */
+force_inline void pow10_table_get_exp(i32 exp10, i32 *exp2) {
+    /* e2 = floor(log2(pow(10, e))) - 64 + 1 */
+    /*    = floor(e * log2(10) - 63)         */
+    *exp2 = (exp10 * 217706 - 4128768) >> 16;
+}
 
 /*==============================================================================
  * Digit Character Matcher
@@ -460,25 +508,26 @@ static const u8 CHAR_TYPE_LINE_END = 1 << 6;
 /** Hexadecimal numeric character: [0-9a-fA-F]. */
 static const u8 CHAR_TYPE_HEX = 1 << 7;
 
-
 /** Digit type table (generate with misc/make_tables.c) */
-static const u8 digi_table[256] = {
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x04, 0x00, 0x08, 0x10, 0x00,
-        0x01, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
-        0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+extern const u8 digi_table[256];
+
+// static const u8 digi_table[256] = {
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x04, 0x00, 0x08, 0x10, 0x00,
+//         0x01, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+//         0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 /** Match a character with specified type. */
 force_inline bool digi_is_type(u8 d, u8 type) {
@@ -486,32 +535,32 @@ force_inline bool digi_is_type(u8 d, u8 type) {
 }
 
 /** Match a sign: '+', '-' */
-force_inline bool digi_is_sign(u8 d) {
+force_inline bool _digi_is_sign(u8 d) {
     return digi_is_type(d, (u8)(DIGI_TYPE_POS | DIGI_TYPE_NEG));
 }
 
 /** Match a none zero digit: [1-9] */
-force_inline bool digi_is_nonzero(u8 d) {
+force_inline bool _digi_is_nonzero(u8 d) {
     return digi_is_type(d, (u8)DIGI_TYPE_NONZERO);
 }
 
 /** Match a digit: [0-9] */
-force_inline bool digi_is_digit(u8 d) {
+force_inline bool _digi_is_digit(u8 d) {
     return digi_is_type(d, (u8)(DIGI_TYPE_ZERO | DIGI_TYPE_NONZERO));
 }
 
 /** Match an exponent sign: 'e', 'E'. */
-force_inline bool digi_is_exp(u8 d) {
+force_inline bool _digi_is_exp(u8 d) {
     return digi_is_type(d, (u8)DIGI_TYPE_EXP);
 }
 
 /** Match a floating point indicator: '.', 'e', 'E'. */
-force_inline bool digi_is_fp(u8 d) {
+force_inline bool _digi_is_fp(u8 d) {
     return digi_is_type(d, (u8)(DIGI_TYPE_DOT | DIGI_TYPE_EXP));
 }
 
 /** Match a digit or floating point indicator: [0-9], '.', 'e', 'E'. */
-force_inline bool digi_is_digit_or_fp(u8 d) {
+force_inline bool _digi_is_digit_or_fp(u8 d) {
     return digi_is_type(d, (u8)(DIGI_TYPE_ZERO | DIGI_TYPE_NONZERO |
                                 DIGI_TYPE_DOT | DIGI_TYPE_EXP));
 }

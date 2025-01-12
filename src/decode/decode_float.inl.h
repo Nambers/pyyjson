@@ -1,158 +1,47 @@
-#include "decode.h"
+#include "decode_float_utils.h"
 
+#define READ_NUMBER PYYJSON_CONCAT2(read_number, COMPILE_READ_UCS_LEVEL)
+#define DIGI_IS_DIGIT PYYJSON_CONCAT2(digi_is_digit, COMPILE_READ_UCS_LEVEL)
+#define DIGI_IS_DIGIT_OR_FP PYYJSON_CONCAT2(digi_is_digit_or_fp, COMPILE_READ_UCS_LEVEL)
+#define DIGI_IS_EXP PYYJSON_CONCAT2(digi_is_exp, COMPILE_READ_UCS_LEVEL)
+#define DIGI_IS_SIGN PYYJSON_CONCAT2(digi_is_sign, COMPILE_READ_UCS_LEVEL)
+#define DIGI_IS_FP PYYJSON_CONCAT2(digi_is_fp, COMPILE_READ_UCS_LEVEL)
+#define READ_INF_OR_NAN PYYJSON_CONCAT2(read_inf_or_nan, COMPILE_READ_UCS_LEVEL)
 
-force_inline bool pyyjson_decode_double(DecodeObjStackInfo *restrict decode_obj_stack_info, double val);
+/////////////////
+force_inline bool DIGI_IS_DIGIT(_FROM_TYPE d) {
+    return d <= 255 && _digi_is_digit((u8)d);
+}
 
-force_inline bool pyyjson_decode_longlong(DecodeObjStackInfo *restrict decode_obj_stack_info, i64 val);
+force_inline bool DIGI_IS_DIGIT_OR_FP(_FROM_TYPE d) {
+    return d <= 255 && _digi_is_digit_or_fp((u8)d);
+}
 
+force_inline bool DIGI_IS_EXP(_FROM_TYPE d) {
+    return d <= 255 && _digi_is_exp((u8)d);
+}
+
+force_inline bool DIGI_IS_SIGN(_FROM_TYPE d) {
+    return d <= 255 && _digi_is_sign((u8)d);
+}
+
+force_inline bool DIGI_IS_FP(_FROM_TYPE d) {
+    return d <= 255 && _digi_is_fp((u8)d);
+}
 
 #if PYYJSON_HAS_IEEE_754
+#    define DIGI_IS_NONZERO PYYJSON_CONCAT2(digi_is_nonzero, COMPILE_READ_UCS_LEVEL)
+#    define BIGINT_SET_BUF PYYJSON_CONCAT2(bigint_set_buf, COMPILE_READ_UCS_LEVEL)
 
-/*==============================================================================
- * BigInt For Floating Point Number Reader
- *
- * The bigint algorithm is used by floating-point number reader to get correctly
- * rounded result for numbers with lots of digits. This part of code is rarely
- * used for common numbers.
- *============================================================================*/
-
-/** Maximum exponent of exact pow10 */
-#    define U64_POW10_MAX_EXP 19
-
-/** Table: [ 10^0, ..., 10^19 ] (generate with misc/make_tables.c) */
-static const u64 u64_pow10_table[U64_POW10_MAX_EXP + 1] = {
-        U64(0x00000000, 0x00000001), U64(0x00000000, 0x0000000A),
-        U64(0x00000000, 0x00000064), U64(0x00000000, 0x000003E8),
-        U64(0x00000000, 0x00002710), U64(0x00000000, 0x000186A0),
-        U64(0x00000000, 0x000F4240), U64(0x00000000, 0x00989680),
-        U64(0x00000000, 0x05F5E100), U64(0x00000000, 0x3B9ACA00),
-        U64(0x00000002, 0x540BE400), U64(0x00000017, 0x4876E800),
-        U64(0x000000E8, 0xD4A51000), U64(0x00000918, 0x4E72A000),
-        U64(0x00005AF3, 0x107A4000), U64(0x00038D7E, 0xA4C68000),
-        U64(0x002386F2, 0x6FC10000), U64(0x01634578, 0x5D8A0000),
-        U64(0x0DE0B6B3, 0xA7640000), U64(0x8AC72304, 0x89E80000)};
-
-/** Maximum numbers of chunks used by a bigint (58 is enough here). */
-#    define BIGINT_MAX_CHUNKS 64
-
-/** Unsigned arbitrarily large integer */
-typedef struct bigint {
-    u32 used;                    /* used chunks count, should not be 0 */
-    u64 bits[BIGINT_MAX_CHUNKS]; /* chunks */
-} bigint;
-
-/**
- Evaluate 'big += val'.
- @param big A big number (can be 0).
- @param val An unsigned integer (can be 0).
- */
-force_inline void bigint_add_u64(bigint *big, u64 val) {
-    u32 idx, max;
-    u64 num = big->bits[0];
-    u64 add = num + val;
-    big->bits[0] = add;
-    if (likely((add >= num) || (add >= val))) return;
-    for ((void)(idx = 1), max = big->used; idx < max; idx++) {
-        if (likely(big->bits[idx] != U64_MAX)) {
-            big->bits[idx] += 1;
-            return;
-        }
-        big->bits[idx] = 0;
-    }
-    big->bits[big->used++] = 1;
-}
-
-/**
- Evaluate 'big *= val'.
- @param big A big number (can be 0).
- @param val An unsigned integer (cannot be 0).
- */
-force_inline void bigint_mul_u64(bigint *big, u64 val) {
-    u32 idx = 0, max = big->used;
-    u64 hi, lo, carry = 0;
-    for (; idx < max; idx++) {
-        if (big->bits[idx]) break;
-    }
-    for (; idx < max; idx++) {
-        u128_mul_add(big->bits[idx], val, carry, &hi, &lo);
-        big->bits[idx] = lo;
-        carry = hi;
-    }
-    if (carry) big->bits[big->used++] = carry;
-}
-
-/**
- Evaluate 'big *= 2^exp'.
- @param big A big number (can be 0).
- @param exp An exponent integer (can be 0).
- */
-force_inline void bigint_mul_pow2(bigint *big, u32 exp) {
-    u32 shft = exp % 64;
-    u32 move = exp / 64;
-    u32 idx = big->used;
-    if (unlikely(shft == 0)) {
-        for (; idx > 0; idx--) {
-            big->bits[idx + move - 1] = big->bits[idx - 1];
-        }
-        big->used += move;
-        while (move) big->bits[--move] = 0;
-    } else {
-        big->bits[idx] = 0;
-        for (; idx > 0; idx--) {
-            u64 num = big->bits[idx] << shft;
-            num |= big->bits[idx - 1] >> (64 - shft);
-            big->bits[idx + move] = num;
-        }
-        big->bits[move] = big->bits[0] << shft;
-        big->used += move + (big->bits[big->used + move] > 0);
-        while (move) big->bits[--move] = 0;
-    }
-}
-
-/**
- Evaluate 'big *= 10^exp'.
- @param big A big number (can be 0).
- @param exp An exponent integer (cannot be 0).
- */
-force_inline void bigint_mul_pow10(bigint *big, i32 exp) {
-    for (; exp >= U64_POW10_MAX_EXP; exp -= U64_POW10_MAX_EXP) {
-        bigint_mul_u64(big, u64_pow10_table[U64_POW10_MAX_EXP]);
-    }
-    if (exp) {
-        bigint_mul_u64(big, u64_pow10_table[exp]);
-    }
-}
-
-/**
- Compare two bigint.
- @return -1 if 'a < b', +1 if 'a > b', 0 if 'a == b'.
- */
-force_inline i32 bigint_cmp(bigint *a, bigint *b) {
-    u32 idx = a->used;
-    if (a->used < b->used) return -1;
-    if (a->used > b->used) return +1;
-    while (idx-- > 0) {
-        u64 av = a->bits[idx];
-        u64 bv = b->bits[idx];
-        if (av < bv) return -1;
-        if (av > bv) return +1;
-    }
-    return 0;
-}
-
-/**
- Evaluate 'big = val'.
- @param big A big number (can be 0).
- @param val An unsigned integer (can be 0).
- */
-force_inline void bigint_set_u64(bigint *big, u64 val) {
-    big->used = 1;
-    big->bits[0] = val;
+////////////////
+force_inline bool DIGI_IS_NONZERO(_FROM_TYPE d) {
+    return d <= 255 && _digi_is_nonzero((u8)d);
 }
 
 /** Set a bigint with floating point number string. */
-static force_noinline void bigint_set_buf(bigint *big, u64 sig, i32 *exp,
-                                          const u8 *sig_cut, const u8 *sig_end, const u8 *dot_pos) {
+static force_noinline void BIGINT_SET_BUF(
+        bigint *big, u64 sig, i32 *exp,
+        const _FROM_TYPE *sig_cut, const _FROM_TYPE *sig_end, const _FROM_TYPE *dot_pos) {
 
     if (unlikely(!sig_cut)) {
         /* no digit cut, set significant part only */
@@ -161,8 +50,8 @@ static force_noinline void bigint_set_buf(bigint *big, u64 sig, i32 *exp,
 
     } else {
         /* some digits were cut, read them from 'sig_cut' to 'sig_end' */
-        const u8 *hdr = sig_cut;
-        const u8 *cur = hdr;
+        const _FROM_TYPE *hdr = sig_cut;
+        const _FROM_TYPE *cur = hdr;
         u32 len = 0;
         u64 val = 0;
         bool dig_big_cut = false;
@@ -182,7 +71,7 @@ static force_noinline void bigint_set_buf(bigint *big, u64 sig, i32 *exp,
         big->bits[0] = sig;
         while (cur < sig_end) {
             if (likely(cur != dot_pos)) {
-                val = val * 10 + (u8)(*cur++ - '0');
+                val = val * 10 + (u64)(*cur++ - '0');
                 len++;
                 if (unlikely(cur == sig_end && dig_big_cut)) {
                     /* The last digit must be non-zero,    */
@@ -203,78 +92,8 @@ static force_noinline void bigint_set_buf(bigint *big, u64 sig, i32 *exp,
 }
 
 /*==============================================================================
- * Diy Floating Point
- *============================================================================*/
-
-/** "Do It Yourself Floating Point" struct. */
-typedef struct diy_fp {
-    u64 sig; /* significand */
-    i32 exp; /* exponent, base 2 */
-    i32 pad; /* padding, useless */
-} diy_fp;
-
-/** Get cached rounded diy_fp with pow(10, e) The input value must in range
-    [POW10_SIG_TABLE_MIN_EXP, POW10_SIG_TABLE_MAX_EXP]. */
-force_inline diy_fp diy_fp_get_cached_pow10(i32 exp10) {
-    diy_fp fp;
-    u64 sig_ext;
-    pow10_table_get_sig(exp10, &fp.sig, &sig_ext);
-    pow10_table_get_exp(exp10, &fp.exp);
-    fp.sig += (sig_ext >> 63);
-    return fp;
-}
-
-/** Returns fp * fp2. */
-force_inline diy_fp diy_fp_mul(diy_fp fp, diy_fp fp2) {
-    u64 hi, lo;
-    u128_mul(fp.sig, fp2.sig, &hi, &lo);
-    fp.sig = hi + (lo >> 63);
-    fp.exp += fp2.exp + 64;
-    return fp;
-}
-
-/** Convert diy_fp to IEEE-754 raw value. */
-force_inline u64 diy_fp_to_ieee_raw(diy_fp fp) {
-    u64 sig = fp.sig;
-    i32 exp = fp.exp;
-    u32 lz_bits;
-    if (unlikely(fp.sig == 0)) return 0;
-
-    lz_bits = u64_lz_bits(sig);
-    sig <<= lz_bits;
-    sig >>= F64_BITS - F64_SIG_FULL_BITS;
-    exp -= (i32)lz_bits;
-    exp += F64_BITS - F64_SIG_FULL_BITS;
-    exp += F64_SIG_BITS;
-
-    if (unlikely(exp >= F64_MAX_BIN_EXP)) {
-        /* overflow */
-        return F64_RAW_INF;
-    } else if (likely(exp >= F64_MIN_BIN_EXP - 1)) {
-        /* normal */
-        exp += F64_EXP_BIAS;
-        return ((u64)exp << F64_SIG_BITS) | (sig & F64_SIG_MASK);
-    } else if (likely(exp >= F64_MIN_BIN_EXP - F64_SIG_FULL_BITS)) {
-        /* subnormal */
-        return sig >> (F64_MIN_BIN_EXP - exp - 1);
-    } else {
-        /* underflow */
-        return 0;
-    }
-}
-
-/*==============================================================================
  * JSON Number Reader (IEEE-754)
  *============================================================================*/
-
-/** Maximum exact pow10 exponent for double value. */
-#    define F64_POW10_EXP_MAX_EXACT 22
-
-/** Cached pow10 table. */
-static const f64 f64_pow10_table[] = {
-        1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12,
-        1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22};
-
 /**
  Read a JSON number.
  
@@ -284,8 +103,7 @@ static const f64 f64_pow10_table[] = {
     number is infinite, the return value is based on flag.
  3. This function (with inline attribute) may generate a lot of instructions.
  */
-force_inline PyObject *read_number(const u8 **ptr) {
-
+force_inline PyObject *READ_NUMBER(const _FROM_TYPE **ptr, const _FROM_TYPE *buffer_end) {
 #    define return_err(_end, _msg)                                                  \
         do {                                                                        \
             PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, _end - hdr); \
@@ -322,22 +140,22 @@ force_inline PyObject *read_number(const u8 **ptr) {
             return_f64_bin(F64_RAW_INF); \
         } while (false)
 
-    const u8 *sig_cut = NULL; /* significant part cutting position for long number */
-    const u8 *sig_end = NULL; /* significant part ending position */
-    const u8 *dot_pos = NULL; /* decimal point position */
+    const _FROM_TYPE *sig_cut = NULL; /* significant part cutting position for long number */
+    const _FROM_TYPE *sig_end = NULL; /* significant part ending position */
+    const _FROM_TYPE *dot_pos = NULL; /* decimal point position */
 
     u64 sig = 0; /* significant part of the number */
     i32 exp = 0; /* exponent part of the number */
 
-    bool exp_sign;   /* temporary exponent sign from literal part */
-    i64 exp_sig = 0; /* temporary exponent number from significant part */
-    i64 exp_lit = 0; /* temporary exponent number from exponent literal part */
-    u64 num;         /* temporary number for reading */
-    const u8 *tmp;   /* temporary cursor for reading */
+    bool exp_sign;         /* temporary exponent sign from literal part */
+    i64 exp_sig = 0;       /* temporary exponent number from significant part */
+    i64 exp_lit = 0;       /* temporary exponent number from exponent literal part */
+    u64 num;               /* temporary number for reading */
+    const _FROM_TYPE *tmp; /* temporary cursor for reading */
 
-    const u8 *hdr = *ptr;
-    const u8 *cur = *ptr;
-    const u8 **end = ptr;
+    const _FROM_TYPE *hdr = *ptr;
+    const _FROM_TYPE *cur = *ptr;
+    const _FROM_TYPE **end = ptr;
     bool sign;
 
     /* read number as raw string if has `YYJSON_READ_NUMBER_AS_RAW` flag */
@@ -349,44 +167,42 @@ force_inline PyObject *read_number(const u8 **ptr) {
     cur += sign;
 
     /* begin with a leading zero or non-digit */
-    if (unlikely(!digi_is_nonzero(*cur))) { /* 0 or non-digit char */
+    if (unlikely(!DIGI_IS_NONZERO(*cur))) { /* 0 or non-digit char */
         if (unlikely(*cur != '0')) {        /* non-digit char */
-            //if (has_read_flag(ALLOW_INF_AND_NAN)) {
-            PyObject *number_obj = read_inf_or_nan(sign, &cur);
+            PyObject *number_obj = READ_INF_OR_NAN(sign, &cur, buffer_end);
             if (likely(number_obj)) {
                 *end = cur;
                 return number_obj;
             }
-            //}
             if (unlikely(!PyErr_Occurred())) {
                 return_err(cur, "no digit after minus sign");
             }
             return NULL;
         }
         /* begin with 0 */
-        if (likely(!digi_is_digit_or_fp(*++cur))) return_0();
+        if (likely(!DIGI_IS_DIGIT_OR_FP(*++cur))) return_0();
         if (likely(*cur == '.')) {
             dot_pos = cur++;
-            if (unlikely(!digi_is_digit(*cur))) {
+            if (unlikely(!DIGI_IS_DIGIT(*cur))) {
                 return_err(cur, "no digit after decimal point");
             }
             while (unlikely(*cur == '0')) cur++;
-            if (likely(digi_is_digit(*cur))) {
+            if (likely(DIGI_IS_DIGIT(*cur))) {
                 /* first non-zero digit after decimal point */
                 sig = (u64)(*cur - '0'); /* read first digit */
                 cur--;
                 goto digi_frac_1; /* continue read fraction part */
             }
         }
-        if (unlikely(digi_is_digit(*cur))) {
+        if (unlikely(DIGI_IS_DIGIT(*cur))) {
             return_err(cur - 1, "number with leading zero is not allowed");
         }
-        if (unlikely(digi_is_exp(*cur))) { /* 0 with any exponent is still 0 */
-            cur += (usize)1 + digi_is_sign(cur[1]);
-            if (unlikely(!digi_is_digit(*cur))) {
+        if (unlikely(DIGI_IS_EXP(*cur))) { /* 0 with any exponent is still 0 */
+            cur += (usize)1 + DIGI_IS_SIGN(cur[1]);
+            if (unlikely(!DIGI_IS_DIGIT(*cur))) {
                 return_err(cur, "no digit after exponent sign");
             }
-            while (digi_is_digit(*++cur));
+            while (DIGI_IS_DIGIT(*++cur));
         }
         return_f64_bin(0);
     }
@@ -411,7 +227,7 @@ force_inline PyObject *read_number(const u8 **ptr) {
 
 
     cur += 19; /* skip continuous 19 digits */
-    if (!digi_is_digit_or_fp(*cur)) {
+    if (!DIGI_IS_DIGIT_OR_FP(*cur)) {
         /* this number is an integer consisting of 19 digits */
         if (sign && (sig > ((u64)1 << 63))) { /* overflow */
             // if (has_read_flag(BIGNUM_AS_RAW)) return_raw();
@@ -424,7 +240,7 @@ force_inline PyObject *read_number(const u8 **ptr) {
 
     /* process first non-digit character */
 #    define expr_sepr(i)                                   \
-        digi_sepr_##i : if (likely(!digi_is_fp(cur[i]))) { \
+        digi_sepr_##i : if (likely(!DIGI_IS_FP(cur[i]))) { \
             cur += i;                                      \
             return_i64(sig);                               \
         }                                                  \
@@ -446,7 +262,7 @@ force_inline PyObject *read_number(const u8 **ptr) {
 #    undef expr_frac
 
     cur += 20;                                    /* skip 19 digits and 1 decimal point */
-    if (!digi_is_digit(*cur)) goto digi_frac_end; /* fraction part end */
+    if (!DIGI_IS_DIGIT(*cur)) goto digi_frac_end; /* fraction part end */
     goto digi_frac_more;                          /* read more digits in fraction part */
 
 
@@ -460,8 +276,8 @@ force_inline PyObject *read_number(const u8 **ptr) {
 
     /* read more digits in integral part */
 digi_intg_more:
-    if (digi_is_digit(*cur)) {
-        if (!digi_is_digit_or_fp(cur[1])) {
+    if (DIGI_IS_DIGIT(*cur)) {
+        if (!DIGI_IS_DIGIT_OR_FP(cur[1])) {
             /* this number is an integer consisting of 20 digits */
             num = (u64)(*cur - '0');
             if ((sig < (U64_MAX / 10)) ||
@@ -478,14 +294,14 @@ digi_intg_more:
         }
     }
 
-    if (digi_is_exp(*cur)) {
+    if (DIGI_IS_EXP(*cur)) {
         dot_pos = cur;
         goto digi_exp_more;
     }
 
     if (*cur == '.') {
         dot_pos = cur++;
-        if (!digi_is_digit(*cur)) {
+        if (!DIGI_IS_DIGIT(*cur)) {
             return_err(cur, "no digit after decimal point");
         }
     }
@@ -495,17 +311,17 @@ digi_intg_more:
 digi_frac_more:
     sig_cut = cur;        /* too large to fit in u64, excess digits need to be cut */
     sig += (*cur >= '5'); /* round */
-    while (digi_is_digit(*++cur));
+    while (DIGI_IS_DIGIT(*++cur));
     if (!dot_pos) {
-        // if (!digi_is_fp(*cur) && has_read_flag(BIGNUM_AS_RAW)) {
+        // if (!DIGI_IS_FP(*cur) && has_read_flag(BIGNUM_AS_RAW)) {
         //     return_raw(); /* it's a large integer */
         // }
         dot_pos = cur;
         if (*cur == '.') {
-            if (!digi_is_digit(*++cur)) {
+            if (!DIGI_IS_DIGIT(*++cur)) {
                 return_err(cur, "no digit after decimal point");
             }
-            while (digi_is_digit(*cur)) cur++;
+            while (DIGI_IS_DIGIT(*cur)) cur++;
         }
     }
     exp_sig = (i64)(dot_pos - sig_cut);
@@ -520,7 +336,7 @@ digi_frac_more:
         sig_end = cur;
     }
 
-    if (digi_is_exp(*cur)) goto digi_exp_more;
+    if (DIGI_IS_EXP(*cur)) goto digi_exp_more;
     goto digi_exp_finish;
 
 
@@ -531,7 +347,7 @@ digi_frac_end:
     }
     sig_end = cur;
     exp_sig = -(i64)((u64)(cur - dot_pos) - 1);
-    if (likely(!digi_is_exp(*cur))) {
+    if (likely(!DIGI_IS_EXP(*cur))) {
         if (unlikely(exp_sig < F64_MIN_DEC_EXP - 19)) {
             return_f64_bin(0); /* underflow */
         }
@@ -545,16 +361,16 @@ digi_frac_end:
     /* read exponent part */
 digi_exp_more:
     exp_sign = (*++cur == '-');
-    cur += digi_is_sign(*cur);
-    if (unlikely(!digi_is_digit(*cur))) {
+    cur += DIGI_IS_SIGN(*cur);
+    if (unlikely(!DIGI_IS_DIGIT(*cur))) {
         return_err(cur, "no digit after exponent sign");
     }
     while (*cur == '0') cur++;
 
     /* read exponent literal */
     tmp = cur;
-    while (digi_is_digit(*cur)) {
-        exp_lit = (i64)((u8)(*cur++ - '0') + (u64)exp_lit * 10);
+    while (DIGI_IS_DIGIT(*cur)) {
+        exp_lit = (i64)((u64)(*cur++ - '0') + (u64)exp_lit * 10);
     }
     if (unlikely(cur - tmp >= U64_SAFE_DIG)) {
         if (exp_sign) {
@@ -848,7 +664,7 @@ digi_finish:
         fp_upper.sig += 1; /* add half ulp */
 
         /* compare with bigint */
-        bigint_set_buf(&big_full, sig, &exp, sig_cut, sig_end, dot_pos);
+        BIGINT_SET_BUF(&big_full, sig, &exp, sig_cut, sig_end, dot_pos);
         bigint_set_u64(&big_comp, fp_upper.sig);
         if (exp >= 0) {
             bigint_mul_pow10(&big_full, +exp);
@@ -882,15 +698,21 @@ digi_finish:
 #    undef return_raw
 }
 
+#    undef BIGINT_SET_BUF
+#    undef DIGI_IS_NONZERO
 
-#else /* FP_READER */
+#else /* !PYYJSON_HAS_IEEE_754 */
 
+#    if COMPILE_READ_UCS_LEVEL > 1
+#        define DOWNGRADE_STRING PYYJSON_CONCAT2(downgrade_string, COMPILE_READ_UCS_LEVEL)
+force_inline void DOWNGRADE_STRING(const void *src_start, Py_ssize_t copy_count, int max_char_type, void *write_buffer_head);
+#    endif
 /**
  Read a JSON number.
  This is a fallback function if the custom number reader is disabled.
  This function use libc's strtod() to read floating-point number.
  */
-force_inline PyObject *read_number(const u8 **ptr) {
+force_inline PyObject *READ_NUMBER(const _FROM_TYPE **ptr, const _FROM_TYPE *buffer_end) {
 
 #    define return_err(_end, _msg)                                                  \
         do {                                                                        \
@@ -929,21 +751,20 @@ force_inline PyObject *read_number(const u8 **ptr) {
         } while (false)
 
     u64 sig, num;
-    const u8 *hdr = *ptr;
-    const u8 *cur = *ptr;
-    const u8 **end = ptr;
-    const u8 *dot = NULL;
-    const u8 *f64_end = NULL;
+    const _FROM_TYPE *hdr = *ptr;
+    const _FROM_TYPE *cur = *ptr;
+    const _FROM_TYPE **end = ptr;
+    const _FROM_TYPE *dot = NULL;
     bool sign;
 
     sign = (*hdr == '-');
     cur += sign;
-    sig = (u8)(*cur - '0');
+    sig = (u64)(*cur - '0');
 
     /* read first digit, check leading zero */
-    if (unlikely(!digi_is_digit(*cur))) {
+    if (unlikely(!DIGI_IS_DIGIT(*cur))) {
         // if (has_read_flag(ALLOW_INF_AND_NAN)) {
-        PyObject *number_obj = read_inf_or_nan(sign, &cur);
+        PyObject *number_obj = READ_INF_OR_NAN(sign, &cur, buffer_end);
         if (likely(number_obj)) {
             *end = cur;
             return number_obj;
@@ -956,10 +777,10 @@ force_inline PyObject *read_number(const u8 **ptr) {
     }
     if (*cur == '0') {
         cur++;
-        if (unlikely(digi_is_digit(*cur))) {
+        if (unlikely(DIGI_IS_DIGIT(*cur))) {
             return_err(cur - 1, "number with leading zero is not allowed");
         }
-        if (!digi_is_fp(*cur)) return_0();
+        if (!DIGI_IS_FP(*cur)) return_0();
         goto read_double;
     }
 
@@ -975,9 +796,9 @@ force_inline PyObject *read_number(const u8 **ptr) {
 
     /* here are 19 continuous digits, skip them */
     cur += 19;
-    if (digi_is_digit(cur[0]) && !digi_is_digit_or_fp(cur[1])) {
+    if (DIGI_IS_DIGIT(cur[0]) && !DIGI_IS_DIGIT_OR_FP(cur[1])) {
         /* this number is an integer consisting of 20 digits */
-        num = (u8)(*cur - '0');
+        num = (u64)(*cur - '0');
         if ((sig < (U64_MAX / 10)) ||
             (sig == (U64_MAX / 10) && num <= (U64_MAX % 10))) {
             sig = num + sig * 10;
@@ -992,7 +813,7 @@ force_inline PyObject *read_number(const u8 **ptr) {
 
 intg_end:
     /* continuous digits ended */
-    if (!digi_is_digit_or_fp(*cur)) {
+    if (!DIGI_IS_DIGIT_OR_FP(*cur)) {
         /* this number is an integer consisting of 1 to 19 digits */
         if (sign && (sig > ((u64)1 << 63))) {
             // if (has_read_flag(BIGNUM_AS_RAW)) return_raw();
@@ -1003,31 +824,31 @@ intg_end:
 
 read_double:
     /* this number should be read as double */
-    while (digi_is_digit(*cur)) cur++;
-    // if (!digi_is_fp(*cur) && has_read_flag(BIGNUM_AS_RAW)) {
+    while (DIGI_IS_DIGIT(*cur)) cur++;
+    // if (!DIGI_IS_FP(*cur) && has_read_flag(BIGNUM_AS_RAW)) {
     //     return_raw(); /* it's a large integer */
     // }
     if (*cur == '.') {
         /* skip fraction part */
         dot = cur;
         cur++;
-        if (!digi_is_digit(*cur)) {
+        if (!DIGI_IS_DIGIT(*cur)) {
             return_err(cur, "no digit after decimal point");
         }
         cur++;
-        while (digi_is_digit(*cur)) cur++;
+        while (DIGI_IS_DIGIT(*cur)) cur++;
     }
-    if (digi_is_exp(*cur)) {
+    if (DIGI_IS_EXP(*cur)) {
         /* skip exponent part */
-        cur += 1 + digi_is_sign(cur[1]);
-        if (!digi_is_digit(*cur)) {
+        cur += 1 + DIGI_IS_SIGN(cur[1]);
+        if (!DIGI_IS_DIGIT(*cur)) {
             return_err(cur, "no digit after exponent sign");
         }
         cur++;
-        while (digi_is_digit(*cur)) cur++;
+        while (DIGI_IS_DIGIT(*cur)) cur++;
     }
 
-    /*
+/*
      libc's strtod() is used to parse the floating-point number.
      
      Note that the decimal point character used by strtod() is locale-dependent,
@@ -1039,21 +860,57 @@ read_double:
      Here strtod() is called twice for different locales, but if another thread
      happens calls setlocale() between two strtod(), parsing may still fail.
      */
-    // pyyjson_number_op* op_float_final = (pyyjson_number_op*)*op;
-    double f = strtod((const char *)hdr, (char **)&f64_end);
-    if (unlikely(f64_end != cur)) {
+#    if COMPILE_READ_UCS_LEVEL > 1
+    // need to copy [hdr, cur) to a new u8 buffer
+    u8 _tmpbuf[256];
+    bool need_dealloc = false;
+    u8 *tmpbuf_ptr = _tmpbuf + TAIL_PADDING;
+    static_assert(256 > 2 * TAIL_PADDING, "256 > 2 * TAIL_PADDING");
+    const usize _valid_length = 256 - 2 * TAIL_PADDING;
+    usize _tmplength = cur - hdr;
+    if (unlikely(_tmplength >= _valid_length)) {
+        tmpbuf_ptr = malloc(_tmplength + 2 * TAIL_PADDING);
+        if (!tmpbuf_ptr) {
+            PyErr_NoMemory();
+            return NULL;
+        }
+        tmpbuf_ptr += TAIL_PADDING;
+    }
+    DOWNGRADE_STRING(hdr, _tmplength, 1, tmpbuf_ptr);
+    tmpbuf_ptr[_tmplength] = 0;
+    const u8 *hdr_for_strtod = tmpbuf_ptr;
+    const u8 *cur_for_strtod = tmpbuf_ptr + _tmplength;
+    const u8 *dot_for_strtod = dot ? tmpbuf_ptr + (dot - hdr) : NULL;
+#    else
+    bool need_dealloc = false;
+    const u8 *hdr_for_strtod = hdr;
+    const u8 *cur_for_strtod = cur;
+    const u8 *dot_for_strtod = dot;
+    // a dumb variable erased at compile time
+    const u8 *const tmpbuf_ptr = (const u8 *)TAIL_PADDING;
+#    endif
+    const u8 *f64_end = NULL;
+    double f = strtod((const char *)hdr_for_strtod, (char **)&f64_end);
+    if (unlikely(f64_end != cur_for_strtod)) {
         /* replace '.' with ',' for locale */
-        bool cut = (*cur == ',');
-        if (cut) *(u8 *)cur = ' ';
-        if (dot) *(u8 *)dot = ',';
-        // op_float_final->data.
-        f = strtod((const char *)hdr, (char **)&f64_end);
+        bool cut = (*cur_for_strtod == ',');
+        if (cut) *(u8 *)cur_for_strtod = ' ';
+        if (dot_for_strtod) *(u8 *)dot_for_strtod = ',';
+        f = strtod((const char *)hdr_for_strtod, (char **)&f64_end);
+        if (need_dealloc) {
+            free((void *)(tmpbuf_ptr - TAIL_PADDING));
+            need_dealloc = false;
+        }
         /* restore ',' to '.' */
-        if (cut) *(u8 *)cur = ',';
-        if (dot) *(u8 *)dot = '.';
-        if (unlikely(f64_end != cur)) {
+        if (cut) *(u8 *)cur_for_strtod = ',';
+        if (dot_for_strtod) *(u8 *)dot_for_strtod = '.';
+        if (unlikely(f64_end != cur_for_strtod)) {
             return_err(hdr, "strtod() failed to parse the number");
         }
+    }
+    if (need_dealloc) {
+        free((void *)(tmpbuf_ptr - TAIL_PADDING));
+        // need_dealloc = false;
     }
     if (unlikely(f >= HUGE_VAL || f <= -HUGE_VAL)) {
         return_inf();
@@ -1061,7 +918,6 @@ read_double:
 
     *end = cur;
     return PyFloat_FromDouble(f);
-
 #    undef return_err
 #    undef return_0
 #    undef return_i64
@@ -1071,4 +927,15 @@ read_double:
 #    undef return_raw
 }
 
-#endif /* FP_READER */
+#    if COMPILE_READ_UCS_LEVEL > 1
+#        undef DOWNGRADE_STRING
+#    endif
+#endif /* !PYYJSON_HAS_IEEE_754 */
+
+#undef READ_INF_OR_NAN
+#undef DIGI_IS_FP
+#undef DIGI_IS_SIGN
+#undef DIGI_IS_EXP
+#undef DIGI_IS_DIGIT_OR_FP
+#undef DIGI_IS_DIGIT
+#undef READ_NUMBER

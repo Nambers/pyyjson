@@ -1141,7 +1141,7 @@ arr_val_begin:
         goto arr_begin;
     }
     if (char_is_number(*cur)) {
-        PyObject *number_obj = read_number(&cur);
+        PyObject *number_obj = read_number_1(&cur, end);
         if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
@@ -1175,7 +1175,7 @@ arr_val_begin:
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
         }
-        if (likely(_read_nan_1(false, &cur, end) && pyyjson_decode_nan(decode_obj_stack_info, false))) {
+        if (likely(_read_nan_1(&cur, end) && pyyjson_decode_nan(decode_obj_stack_info, false))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
         }
@@ -1192,7 +1192,7 @@ arr_val_begin:
         goto arr_val_begin;
     }
     if ((*cur == 'i' || *cur == 'I' || *cur == 'N')) {
-        PyObject *number_obj = read_inf_or_nan(false, &cur);
+        PyObject *number_obj = read_inf_or_nan_1(false, &cur, end);
         if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
@@ -1301,7 +1301,7 @@ obj_val_begin:
         goto fail_string;
     }
     if (char_is_number(*cur)) {
-        PyObject *number_obj = read_number(&cur);
+        PyObject *number_obj = read_number_1(&cur, end);
         if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
@@ -1335,7 +1335,7 @@ obj_val_begin:
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
         }
-        if (likely(_read_nan_1(false, &cur, end) && pyyjson_decode_nan(decode_obj_stack_info, false))) {
+        if (likely(_read_nan_1(&cur, end) && pyyjson_decode_nan(decode_obj_stack_info, false))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
         }
@@ -1346,7 +1346,7 @@ obj_val_begin:
         goto obj_val_begin;
     }
     if ((*cur == 'i' || *cur == 'I' || *cur == 'N')) {
-        PyObject *number_obj = read_inf_or_nan(false, &cur);
+        PyObject *number_obj = read_inf_or_nan_1(false, &cur, end);
         if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
@@ -1482,6 +1482,117 @@ failed_cleanup:
     if (unlikely(decode_obj_stack_info->result_stack_end - decode_obj_stack_info->result_stack > PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE)) {
         free(decode_obj_stack_info->result_stack);
     }
+    return NULL;
+#undef return_err
+}
+
+
+/** Read single value JSON document. */
+force_noinline PyObject *read_root_single_bytes(const char *dat, usize len) {
+#define return_err(_pos, _type, _msg)                                                             \
+    do {                                                                                          \
+        if (_type == JSONDecodeError) {                                                           \
+            PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, ((u8 *)_pos) - (u8 *)dat); \
+        } else {                                                                                  \
+            PyErr_SetString(_type, _msg);                                                         \
+        }                                                                                         \
+        goto fail_cleanup;                                                                        \
+    } while (0)
+
+    const u8 *cur = (const u8 *)dat;
+    const u8 *const end = cur + len;
+
+    PyObject *ret = NULL;
+
+    if (char_is_number(*cur)) {
+        ret = read_number_1(&cur, end);
+        if (likely(ret)) goto single_end;
+        goto fail_number;
+    }
+    if (*cur == '"') {
+        u8 *write_buffer;
+        bool dynamic = false;
+        if (unlikely(4 * len > PYYJSON_STRING_BUFFER_SIZE)) {
+            write_buffer = malloc(4 * len);
+            if (unlikely(!write_buffer)) goto fail_alloc;
+            dynamic = true;
+        } else {
+            write_buffer = pyyjson_string_buffer;
+        }
+        ret = read_bytes(&cur, write_buffer, false);
+        if (dynamic) free(write_buffer);
+        if (likely(ret)) goto single_end;
+        goto fail_string;
+    }
+    if (*cur == 't') {
+        if (likely(_read_true_1(&cur, end))) {
+            Py_Immortal_IncRef(Py_True);
+            ret = Py_True;
+            goto single_end;
+        }
+        goto fail_literal_true;
+    }
+    if (*cur == 'f') {
+        if (likely(_read_false_1(&cur, end))) {
+            Py_Immortal_IncRef(Py_False);
+            ret = Py_False;
+            goto single_end;
+        }
+        goto fail_literal_false;
+    }
+    if (*cur == 'n') {
+        if (likely(_read_null_1(&cur, end))) {
+            Py_Immortal_IncRef(Py_None);
+            ret = Py_None;
+            goto single_end;
+        }
+        if (_read_nan_1(&cur, end)) {
+            ret = PyFloat_FromDouble(fabs(Py_NAN));
+            if (likely(ret)) goto single_end;
+        }
+        goto fail_literal_null;
+    }
+    {
+        ret = read_inf_or_nan_1(false, &cur, end);
+        if (likely(ret)) goto single_end;
+    }
+    goto fail_character;
+
+single_end:
+    assert(ret);
+    if (unlikely(cur < end)) {
+        while (char_is_space(*cur)) cur++;
+        if (unlikely(cur < end)) goto fail_garbage;
+    }
+    return ret;
+
+fail_string:
+    return_err(cur, JSONDecodeError, "invalid string");
+fail_number:
+    return_err(cur, JSONDecodeError, "invalid number");
+fail_alloc:
+    return_err(cur, PyExc_MemoryError,
+               "memory allocation failed");
+fail_literal_true:
+    return_err(cur, JSONDecodeError,
+               "invalid literal, expected a valid literal such as 'true'");
+fail_literal_false:
+    return_err(cur, JSONDecodeError,
+               "invalid literal, expected a valid literal such as 'false'");
+fail_literal_null:
+    return_err(cur, JSONDecodeError,
+               "invalid literal, expected a valid literal such as 'null'");
+fail_character:
+    return_err(cur, JSONDecodeError,
+               "unexpected character, expected a valid root value");
+fail_comment:
+    return_err(cur, JSONDecodeError,
+               "unclosed multiline comment");
+fail_garbage:
+    return_err(cur, JSONDecodeError,
+               "unexpected content after document");
+fail_cleanup:
+    Py_XDECREF(ret);
     return NULL;
 #undef return_err
 }

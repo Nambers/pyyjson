@@ -18,6 +18,7 @@
 
 #define READ_STR PYYJSON_CONCAT2(read_str, COMPILE_UCS_LEVEL)
 #define READ_ROOT PYYJSON_CONCAT2(read_root, COMPILE_UCS_LEVEL)
+#define READ_ROOT_SINGLE PYYJSON_CONCAT2(read_root_single, COMPILE_UCS_LEVEL)
 #define READ_STR_IN_LOOP PYYJSON_CONCAT2(read_str_in_loop, COMPILE_UCS_LEVEL)
 #define READ_STR_TAIL PYYJSON_CONCAT2(read_str_tail, COMPILE_UCS_LEVEL)
 #define READ_TO_HEX_U16 PYYJSON_CONCAT3(read, READ_BIT_SIZE, to_hex_u16)
@@ -50,6 +51,10 @@
 #define _READ_TRUE PYYJSON_CONCAT2(_read_true, COMPILE_READ_UCS_LEVEL)
 #define _READ_FALSE PYYJSON_CONCAT2(_read_false, COMPILE_READ_UCS_LEVEL)
 #define _READ_NULL PYYJSON_CONCAT2(_read_null, COMPILE_READ_UCS_LEVEL)
+#define _READ_INF PYYJSON_CONCAT2(_read_inf, COMPILE_READ_UCS_LEVEL)
+#define _READ_NAN PYYJSON_CONCAT2(_read_nan, COMPILE_READ_UCS_LEVEL)
+#define READ_INF_OR_NAN PYYJSON_CONCAT2(read_inf_or_nan, COMPILE_READ_UCS_LEVEL)
+#define READ_NUMBER PYYJSON_CONCAT2(read_number, COMPILE_READ_UCS_LEVEL)
 
 force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restrict src, SIMD_TYPE *restrict SIMD_VAR);
 force_inline u32 GET_DONE_COUNT_FROM_MASK(SIMD_MASK_TYPE mask);
@@ -1341,8 +1346,8 @@ arr_val_begin:
         cur++;
         goto arr_begin;
     }
-    if (char_is_number(*cur)) {
-        PyObject *number_obj = read_number(&cur);
+    if (*cur <= 255 && char_is_number(*cur)) {
+        PyObject *number_obj = READ_NUMBER(&cur, end);
         if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
@@ -1350,6 +1355,7 @@ arr_val_begin:
         goto fail_number;
     }
     if (*cur == '"') {
+        cur++;
         PyObject *str_obj = READ_STR(&cur, end, string_buffer_head, false);
         if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
@@ -1376,7 +1382,7 @@ arr_val_begin:
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
         }
-        if (likely(_read_nan_1(false, &cur, end) && pyyjson_decode_nan(decode_obj_stack_info, false))) {
+        if (likely(_READ_NAN(&cur, end) && pyyjson_decode_nan(decode_obj_stack_info, false))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
         }
@@ -1393,7 +1399,7 @@ arr_val_begin:
         goto arr_val_begin;
     }
     if ((*cur == 'i' || *cur == 'I' || *cur == 'N')) {
-        PyObject *number_obj = read_inf_or_nan(false, &cur);
+        PyObject *number_obj = READ_INF_OR_NAN(false, &cur, end);
         if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
@@ -1460,6 +1466,7 @@ obj_key_begin:
     })
 #endif
     if (likely(*cur == '"')) {
+        cur++;
         PyObject *str_obj = READ_STR(&cur, end, string_buffer_head, true);
         ;
         if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
@@ -1495,6 +1502,7 @@ obj_key_end:
 
 obj_val_begin:
     if (*cur == '"') {
+        cur++;
         PyObject *str_obj = READ_STR(&cur, end, string_buffer_head, false);
         ;
         if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
@@ -1504,7 +1512,7 @@ obj_val_begin:
         goto fail_string;
     }
     if (char_is_number(*cur)) {
-        PyObject *number_obj = read_number(&cur);
+        PyObject *number_obj = READ_NUMBER(&cur, end);
         if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
@@ -1538,7 +1546,7 @@ obj_val_begin:
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
         }
-        if (likely(_read_nan_1(false, &cur, end) && pyyjson_decode_nan(decode_obj_stack_info, false))) {
+        if (likely(_READ_NAN(&cur, end) && pyyjson_decode_nan(decode_obj_stack_info, false))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
         }
@@ -1549,7 +1557,7 @@ obj_val_begin:
         goto obj_val_begin;
     }
     if ((*cur == 'i' || *cur == 'I' || *cur == 'N')) {
-        PyObject *number_obj = read_inf_or_nan(false, &cur);
+        PyObject *number_obj = READ_INF_OR_NAN(false, &cur, end);
         if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
@@ -1689,6 +1697,135 @@ failed_cleanup:
 #undef return_err
 }
 
+/** Read single value JSON document. */
+force_noinline PyObject *READ_ROOT_SINGLE(PyUnicodeObject *unicode_root) {
+#define return_err(_pos, _type, _msg)                                                             \
+    do {                                                                                          \
+        if (_type == JSONDecodeError) {                                                           \
+            PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, ((u8 *)_pos) - (u8 *)dat); \
+        } else {                                                                                  \
+            PyErr_SetString(_type, _msg);                                                         \
+        }                                                                                         \
+        goto fail_cleanup;                                                                        \
+    } while (0)
+
+    // check unicode is valid
+    assert(PyUnicode_Check(unicode_root));
+    assert(((PyASCIIObject *)unicode_root)->state.kind == COMPILE_READ_UCS_LEVEL);
+    assert((((PyASCIIObject *)unicode_root)->state.ascii != false) == (COMPILE_UCS_LEVEL == 0));
+    Py_ssize_t len = ((PyASCIIObject *)unicode_root)->length;
+    assert(len > 0);
+    // init `dat` ptr
+    const _FROM_TYPE *const dat =
+#if COMPILE_UCS_LEVEL == 0
+            (u8 *)(((PyASCIIObject *)unicode_root) + 1);
+#else
+            (_FROM_TYPE *)(((PyCompactUnicodeObject *)unicode_root) + 1);
+#endif
+    //
+    const _FROM_TYPE *cur = dat;
+    const _FROM_TYPE *const end = cur + len;
+    // const u8 *cur = (const u8 *)dat;
+    // const u8 *const end = cur + len;
+
+    PyObject *ret = NULL;
+
+    if (*cur <= 255 && char_is_number(*cur)) {
+        ret = READ_NUMBER(&cur, end);
+        if (likely(ret)) goto single_end;
+        goto fail_number;
+    }
+    if (*cur == '"') {
+        // u8 *write_buffer;
+        _FROM_TYPE *string_buffer_head;
+        bool need_dealloc = false;
+        CHECK_AND_RESERVE_STR_BUFFER(len, &string_buffer_head, &need_dealloc);
+        cur++;
+        ret = READ_STR(&cur, end, string_buffer_head, false);
+        if (need_dealloc) {
+            free((void *)((u8 *)string_buffer_head - TAIL_PADDING));
+        }
+        if (likely(ret)) goto single_end;
+        goto fail_string;
+    }
+    if (*cur == 't') {
+        if (likely(_READ_TRUE(&cur, end))) {
+            Py_Immortal_IncRef(Py_True);
+            ret = Py_True;
+            goto single_end;
+        }
+        goto fail_literal_true;
+    }
+    if (*cur == 'f') {
+        if (likely(_READ_FALSE(&cur, end))) {
+            Py_Immortal_IncRef(Py_False);
+            ret = Py_False;
+            goto single_end;
+        }
+        goto fail_literal_false;
+    }
+    if (*cur == 'n') {
+        if (likely(_READ_NULL(&cur, end))) {
+            Py_Immortal_IncRef(Py_None);
+            ret = Py_None;
+            goto single_end;
+        }
+        if (_READ_NAN(&cur, end)) {
+            ret = PyFloat_FromDouble(fabs(Py_NAN));
+            if (likely(ret)) goto single_end;
+        }
+        goto fail_literal_null;
+    }
+    {
+        ret = READ_INF_OR_NAN(false, &cur, end);
+        if (likely(ret)) goto single_end;
+    }
+    goto fail_character;
+
+single_end:
+    assert(ret);
+    if (unlikely(cur < end)) {
+        while (char_is_space(*cur)) cur++;
+        if (unlikely(cur < end)) goto fail_garbage;
+    }
+    return ret;
+
+fail_string:
+    return_err(cur, JSONDecodeError, "invalid string");
+fail_number:
+    return_err(cur, JSONDecodeError, "invalid number");
+fail_alloc:
+    return_err(cur, PyExc_MemoryError,
+               "memory allocation failed");
+fail_literal_true:
+    return_err(cur, JSONDecodeError,
+               "invalid literal, expected a valid literal such as 'true'");
+fail_literal_false:
+    return_err(cur, JSONDecodeError,
+               "invalid literal, expected a valid literal such as 'false'");
+fail_literal_null:
+    return_err(cur, JSONDecodeError,
+               "invalid literal, expected a valid literal such as 'null'");
+fail_character:
+    return_err(cur, JSONDecodeError,
+               "unexpected character, expected a valid root value");
+fail_comment:
+    return_err(cur, JSONDecodeError,
+               "unclosed multiline comment");
+fail_garbage:
+    return_err(cur, JSONDecodeError,
+               "unexpected content after document");
+fail_cleanup:
+    Py_XDECREF(ret);
+    return NULL;
+#undef return_err
+}
+
+#undef READ_INF_OR_NAN
+#undef READ_NUMBER
+#undef READ_INF_OR_NAN
+#undef _READ_NAN
+#undef _READ_INF
 #undef _READ_NULL
 #undef _READ_FALSE
 #undef _READ_TRUE
@@ -1721,6 +1858,7 @@ failed_cleanup:
 #undef READ_TO_HEX_U16
 #undef READ_STR_TAIL
 #undef READ_STR_IN_LOOP
+#undef READ_ROOT_SINGLE
 #undef READ_ROOT
 #undef READ_STR
 //
