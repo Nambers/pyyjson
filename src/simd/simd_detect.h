@@ -12,8 +12,6 @@
 #            define SIMD_BIT_SIZE 128
 #        endif
 
-#        define SIMD_32 __m128i
-#        define SIMD_64 __m128i
 #        define SIMD_128 __m128i
 #        if defined(_MSC_VER)
 #            define SIMD_128_IU __m128i
