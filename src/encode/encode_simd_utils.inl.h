@@ -30,10 +30,8 @@ force_inline void WRITE_SIMD_256_WITH_WRITEMASK(_TARGET_TYPE *dst, SIMD_256 y, S
 #endif // COMPILE_READ_UCS_LEVEL == 1 && SIMD_BIT_SIZE == 256
 
 #if SIMD_BIT_SIZE == 256 && COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
-force_inline void BACK_WRITE_SIMD256_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_256 y, Py_ssize_t len) {
-#    define MASK_TABLE_READER PYYJSON_CONCAT2(read_tail_mask_table, WRITE_BIT_SIZE)
-#    define MASK_WRITER PYYJSON_CONCAT2(write_simd_256_with_writemask, COMPILE_WRITE_UCS_LEVEL)
-#    define ELEVATOR PYYJSON_CONCAT5(elevate, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL, to, SIMD_BIT_SIZE)
+force_inline void BACK_WRITE_SIMD256_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_256 y, Py_ssize_t len, UnicodeVector *vec) {
+    // vec is not used, only for verifying addr
 #    if COMPILE_READ_UCS_LEVEL == 1 && COMPILE_WRITE_UCS_LEVEL == 4
     // 1->4
     // 64(128)->256
@@ -42,43 +40,63 @@ force_inline void BACK_WRITE_SIMD256_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_256 y
     SIMD_128 x1, x2, x3, x4;
     split_tail_len_four_parts(len, CHECK_COUNT_MAX, &part1, &part2, &part3, &part4);
     extract_256_four_parts(SIMD_VAR, &x1, &x2, &x3, &x4);
+    // NOTE: for this case (x86_64 and COMPILE_WRITE_UCS_LEVEL is 4),
+    // `write_simd_256_with_writemask_4` uses `_mm256_maskstore_epi32` to write.
+    // There will be no invalid write as long as the mask table is correct.
+    // also note that CHECK_COUNT_MAX / 4 * sizeof(u32) == SIMD_BIT_SIZE / 8 == 32
+    static const Py_ssize_t write_count_max = CHECK_COUNT_MAX / 4; // is 8
     // 0
-    ;
-    writemask = load_256_aligned(MASK_TABLE_READER(CHECK_COUNT_MAX / 4 - part1));
-    MASK_WRITER(dst, ELEVATOR(x1), writemask);
-    dst += CHECK_COUNT_MAX / 4;
+    writemask = load_256_aligned(read_tail_mask_table_32(write_count_max - part1));
+    assert(part1 || testz_256(writemask));
+    write_simd_256_with_writemask_4(dst, elevate_1_4_to_256(x1), writemask);
+    dst += write_count_max;
     // 1
-    writemask = load_256_aligned(MASK_TABLE_READER(CHECK_COUNT_MAX / 4 - part2));
-    MASK_WRITER(dst, ELEVATOR(x2), writemask);
-    dst += CHECK_COUNT_MAX / 4;
+    writemask = load_256_aligned(read_tail_mask_table_32(write_count_max - part2));
+    assert(part2 || testz_256(writemask));
+    write_simd_256_with_writemask_4(dst, elevate_1_4_to_256(x2), writemask);
+    dst += write_count_max;
     // 2
-    writemask = load_256_aligned(MASK_TABLE_READER(CHECK_COUNT_MAX / 4 - part3));
-    MASK_WRITER(dst, ELEVATOR(x3), writemask);
-    dst += CHECK_COUNT_MAX / 4;
+    writemask = load_256_aligned(read_tail_mask_table_32(write_count_max - part3));
+    assert(part3 || testz_256(writemask));
+    write_simd_256_with_writemask_4(dst, elevate_1_4_to_256(x3), writemask);
+    dst += write_count_max;
     // 3
-    writemask = load_256_aligned(MASK_TABLE_READER(CHECK_COUNT_MAX / 4 - part4));
-    MASK_WRITER(dst, ELEVATOR(x4), writemask);
-    dst += CHECK_COUNT_MAX / 4;
-#    else  // COMPILE_READ_UCS_LEVEL != 1 || COMPILE_WRITE_UCS_LEVEL != 4
+    writemask = load_256_aligned(read_tail_mask_table_32(write_count_max - part4));
+    assert(part4 || testz_256(writemask));
+    write_simd_256_with_writemask_4(dst, elevate_1_4_to_256(x4), writemask);
+    dst += write_count_max;
+#    else // COMPILE_READ_UCS_LEVEL != 1 || COMPILE_WRITE_UCS_LEVEL != 4
+#        define MASK_TABLE_READER PYYJSON_CONCAT2(read_tail_mask_table, WRITE_BIT_SIZE)
+#        define MASK_WRITER PYYJSON_CONCAT2(write_simd_256_with_writemask, COMPILE_WRITE_UCS_LEVEL)
+#        define ELEVATOR PYYJSON_CONCAT5(elevate, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL, to, SIMD_BIT_SIZE)
     // 128->256
     SIMD_256 writemask;
     Py_ssize_t part1, part2;
     SIMD_128 x1, x2;
     split_tail_len_two_parts(len, CHECK_COUNT_MAX, &part1, &part2);
     extract_256_two_parts(y, &x1, &x2);
+    // NOTE: for the case COMPILE_WRITE_UCS_LEVEL is 4 (x86_64),
+    // MASK_WRITER, i.e. `write_simd_256_with_writemask_4`
+    // uses `_mm256_maskstore_epi32` to write.
+    // There will be no invalid write as long as the mask table is correct.
     // 0
-
-    writemask = load_256_aligned(MASK_TABLE_READER(CHECK_COUNT_MAX / 2 - part1));
-    MASK_WRITER(dst, ELEVATOR(x1), writemask);
+    if (COMPILE_WRITE_UCS_LEVEL == 4 || part1) {
+        assert(COMPILE_WRITE_UCS_LEVEL == 4 || (Py_ssize_t)dst >= (Py_ssize_t)vec);
+        writemask = load_256_aligned(MASK_TABLE_READER(CHECK_COUNT_MAX / 2 - part1));
+        MASK_WRITER(dst, ELEVATOR(x1), writemask);
+    }
     dst += CHECK_COUNT_MAX / 2;
     // 1
-    writemask = load_256_aligned(MASK_TABLE_READER(CHECK_COUNT_MAX / 2 - part2));
-    MASK_WRITER(dst, ELEVATOR(x2), writemask);
+    if (COMPILE_WRITE_UCS_LEVEL == 4 || part2) {
+        assert(COMPILE_WRITE_UCS_LEVEL == 4 || (Py_ssize_t)dst >= (Py_ssize_t)vec);
+        writemask = load_256_aligned(MASK_TABLE_READER(CHECK_COUNT_MAX / 2 - part2));
+        MASK_WRITER(dst, ELEVATOR(x2), writemask);
+    }
     dst += CHECK_COUNT_MAX / 2;
+#        undef ELEVATOR
+#        undef MASK_TABLE_READER
+#        undef MASK_WRITER
 #    endif // COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL
-#    undef ELEVATOR
-#    undef MASK_TABLE_READER
-#    undef MASK_WRITER
 }
 #endif // SIMD_BIT_SIZE == 256 && COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
 

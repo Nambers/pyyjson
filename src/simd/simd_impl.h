@@ -415,6 +415,10 @@ force_inline SIMD_256 broadcast_16_256(i16 v) {
 force_inline SIMD_256 broadcast_32_256(i32 v) {
     return _mm256_set1_epi32(v);
 }
+
+force_inline bool testz_256(SIMD_256 y) {
+    return (bool)_mm256_testz_si256(y, y);
+}
 #endif
 
 /*==============================================================================
@@ -425,7 +429,7 @@ force_inline SIMD_256 elevate_1_2_to_256(SIMD_128 x) {
     return _mm256_cvtepu8_epi16(x);
 }
 
-force_inline SIMD_256 elevate_1_4_to_256(SIMD_64 x) {
+force_inline SIMD_256 elevate_1_4_to_256(SIMD_128 x) {
     return _mm256_cvtepu8_epi32(x);
 }
 

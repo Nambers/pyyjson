@@ -164,7 +164,6 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
     __m256i y;
     const _FROM_TYPE *load_start = src + len - CHECK_COUNT_MAX;
     _TARGET_TYPE *store_start = _WRITER(vec) + len - CHECK_COUNT_MAX;
-    assert((Py_ssize_t)store_start >= (Py_ssize_t)vec);
     __m256i mask, check_mask;
 #    define MASK_READER PYYJSON_CONCAT2(read_tail_mask_table, READ_BIT_SIZE)
     mask = load_256_aligned(MASK_READER(CHECK_COUNT_MAX - len));
@@ -173,10 +172,10 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
     check_mask = simd_and_256(check_mask, mask);
     if (likely(check_mask_zero(check_mask))) {
 #    if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
+        assert((Py_ssize_t)store_start >= (Py_ssize_t)vec);
         WRITE_SIMD_256_WITH_WRITEMASK(store_start, y, mask);
 #    else
-        // TODO FIX THIS, WRONG IMPLEMENTATION
-        BACK_WRITE_SIMD256_WITH_TAIL_LEN(store_start, y, len);
+        BACK_WRITE_SIMD256_WITH_TAIL_LEN(store_start, y, len, vec);
 #    endif
         _WRITER(vec) += len;
     } else {
