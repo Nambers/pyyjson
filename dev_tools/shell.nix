@@ -13,4 +13,5 @@ let
 in
 pkgs.mkShell {
   packages = pkgs.callPackage ./packages.nix { };
+  hardeningDisable = [ "fortify" ];
 }
