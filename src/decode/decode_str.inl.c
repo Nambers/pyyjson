@@ -17,6 +17,7 @@
 
 #define PYYJSON_DECODE_STR PYYJSON_CONCAT2(pyyjson_decode_str, COMPILE_UCS_LEVEL)
 #define READ_STR PYYJSON_CONCAT2(read_str, COMPILE_UCS_LEVEL)
+#define FAST_SKIP_SPACES PYYJSON_CONCAT2(fast_skip_spaces, COMPILE_UCS_LEVEL)
 #define READ_ROOT PYYJSON_CONCAT2(read_root, COMPILE_UCS_LEVEL)
 #define READ_ROOT_SINGLE PYYJSON_CONCAT2(read_root_single, COMPILE_UCS_LEVEL)
 #define READ_STR_IN_LOOP PYYJSON_CONCAT2(read_str_in_loop, COMPILE_UCS_LEVEL)
@@ -1406,6 +1407,36 @@ fail:;
     return NULL;
 }
 
+force_inline void FAST_SKIP_SPACES(const _FROM_TYPE **cur_addr, const _FROM_TYPE *end) {
+#define SET1 PYYJSON_CONCAT3(broadcast, READ_BIT_SIZE, SIMD_BIT_SIZE)
+    const SIMD_TYPE template = SET1(' ');
+#undef SET1
+    const _FROM_TYPE *cur = *cur_addr;
+loop:;
+    if (likely(cur + CHECK_COUNT_MAX < end)) {
+        SIMD_TYPE SIMD_VAR = load_simd((const void *)cur);
+#define CMPNEQ PYYJSON_CONCAT3(cmpneq, READ_BIT_SIZE, SIMD_BIT_SIZE)
+        SIMD_MASK_TYPE m = (SIMD_MASK_TYPE)CMPNEQ(SIMD_VAR, template);
+#undef CMPNEQ
+        if (check_mask_zero(m)) {
+            cur += CHECK_COUNT_MAX;
+            goto loop;
+        } else {
+            u32 done_count = GET_DONE_COUNT_FROM_MASK(m);
+            cur += done_count;
+        }
+    } else {
+        static _FROM_TYPE _t[2] = {' ', ' '};
+        while (true) REPEAT_CALL_16({
+            if (likely(cur + 2 <= end && 0 == memcmp((const void *)cur, (const void *)_t, sizeof(_t)))) cur += 2;
+            else
+                break;
+        })
+        if (*cur == ' ') cur++;
+    }
+    *cur_addr = cur;
+}
+
 force_inline bool CHECK_AND_RESERVE_STR_BUFFER(Py_ssize_t len, _FROM_TYPE **buffer_head_addr, bool *need_dealloc) {
     // consider the max length of the buffer we need
     // assume that each string has an escape of ucs4, we need buffer with size
@@ -1484,19 +1515,20 @@ arr_begin:
     if (*cur == '\n') cur++;
 
 arr_val_begin:
-#if PYYJSON_IS_REAL_GCC
-    while (true) REPEAT_CALL_16({
-        if (byte_match_2((void *)cur, "  ")) cur += 2;
-        else
-            break;
-    })
-#else
-    while (true) REPEAT_CALL_16({
-        if (likely(byte_match_2(cur, "  "))) cur += 2;
-        else
-            break;
-    })
-#endif
+    FAST_SKIP_SPACES(&cur, end);
+    // #if PYYJSON_IS_REAL_GCC
+    //     while (true) REPEAT_CALL_16({
+    //         if (byte_match_2((void *)cur, "  ")) cur += 2;
+    //         else
+    //             break;
+    //     })
+    // #else
+    //     while (true) REPEAT_CALL_16({
+    //         if (likely(byte_match_2(cur, "  "))) cur += 2;
+    //         else
+    //             break;
+    //     })
+    // #endif
 
     if (*cur == '{') {
         cur++;
@@ -1572,7 +1604,7 @@ arr_val_begin:
 arr_val_end:;
     {
         static _FROM_TYPE _t[2] = {',', '\n'};
-        if (0 == memcmp((void *)cur, _t, sizeof(_t))) {
+        if (cur < end && 0 == memcmp((void *)cur, _t, sizeof(_t))) {
             cur += 2;
             goto arr_val_begin;
         }
@@ -1615,19 +1647,21 @@ obj_begin:
     if (*cur == '\n') cur++;
 
 obj_key_begin:
-#if PYYJSON_IS_REAL_GCC
-    while (true) REPEAT_CALL_16({
-        if (byte_match_2((void *)cur, "  ")) cur += 2;
-        else
-            break;
-    })
-#else
-    while (true) REPEAT_CALL_16({
-        if (likely(byte_match_2(cur, "  "))) cur += 2;
-        else
-            break;
-    })
-#endif
+    FAST_SKIP_SPACES(&cur, end);
+
+    // #if PYYJSON_IS_REAL_GCC
+    //     while (true) REPEAT_CALL_16({
+    //         if (byte_match_2((void *)cur, "  ")) cur += 2;
+    //         else
+    //             break;
+    //     })
+    // #else
+    //     while (true) REPEAT_CALL_16({
+    //         if (likely(byte_match_2(cur, "  "))) cur += 2;
+    //         else
+    //             break;
+    //     })
+    // #endif
     if (likely(*cur == '"')) {
         cur++;
         PyObject *str_obj = READ_STR(&cur, end, string_buffer_head, true);
@@ -2066,6 +2100,7 @@ force_noinline PyObject *PYYJSON_DECODE_STR(PyUnicodeObject *in_unicode) {
 #undef READ_STR_IN_LOOP
 #undef READ_ROOT_SINGLE
 #undef READ_ROOT
+#undef FAST_SKIP_SPACES
 #undef READ_STR
 #undef PYYJSON_DECODE_STR
 //

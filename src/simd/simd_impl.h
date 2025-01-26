@@ -276,6 +276,18 @@ force_inline SIMD_128 cmpeq_32_128(SIMD_128 a, SIMD_128 b) {
     return _mm_cmpeq_epi32(a, b);
 }
 
+force_inline SIMD_128 cmpneq_8_128(SIMD_128 a, SIMD_128 b) {
+    return _mm_cmpeq_epi8(_mm_cmpeq_epi8(a, b), _mm_setzero_si128());
+}
+
+force_inline SIMD_128 cmpneq_16_128(SIMD_128 a, SIMD_128 b) {
+    return _mm_cmpeq_epi16(_mm_cmpeq_epi16(a, b), _mm_setzero_si128());
+}
+
+force_inline SIMD_128 cmpneq_32_128(SIMD_128 a, SIMD_128 b) {
+    return _mm_cmpeq_epi32(_mm_cmpeq_epi32(a, b), _mm_setzero_si128());
+}
+
 force_inline SIMD_128 satureate_minus_128(SIMD_128 a, SIMD_128 b) {
     return _mm_subs_epu8(a, b);
 }
@@ -451,6 +463,18 @@ force_inline bool testz_256(SIMD_256 y) {
  * AVX2 only SIMD code
  *============================================================================*/
 #if __AVX2__
+force_inline SIMD_256 cmpneq_8_256(SIMD_256 a, SIMD_256 b) {
+    return _mm256_cmpeq_epi8(_mm256_cmpeq_epi8(a, b), _mm256_setzero_si256());
+}
+
+force_inline SIMD_256 cmpneq_16_256(SIMD_256 a, SIMD_256 b) {
+    return _mm256_cmpeq_epi16(_mm256_cmpeq_epi16(a, b), _mm256_setzero_si256());
+}
+
+force_inline SIMD_256 cmpneq_32_256(SIMD_256 a, SIMD_256 b) {
+    return _mm256_cmpeq_epi32(_mm256_cmpeq_epi32(a, b), _mm256_setzero_si256());
+}
+
 force_inline SIMD_256 elevate_1_2_to_256(SIMD_128 x) {
     return _mm256_cvtepu8_epi16(x);
 }
@@ -536,6 +560,22 @@ force_inline SIMD_512 simd_and_512(SIMD_512 a, SIMD_512 b) {
     return _mm512_and_si512(a, b);
 }
 
+force_inline u16 cmpneq_32_512(SIMD_512 a, SIMD_512 b) {
+    return (u16)_mm512_cmpneq_epi32_mask(a, b);
+}
+
+force_inline SIMD_512 broadcast_8_512(i8 v) {
+    return _mm512_set1_epi8(v);
+}
+
+force_inline SIMD_512 broadcast_16_512(i16 v) {
+    return _mm512_set1_epi16(v);
+}
+
+force_inline SIMD_512 broadcast_32_512(i32 v) {
+    return _mm512_set1_epi32(v);
+}
+
 force_inline SIMD_512 elevate_2_4_to_512(SIMD_256 y) {
     return _mm512_cvtepu16_epi32(y);
 }
@@ -563,6 +603,14 @@ force_inline void extract_512_four_parts(SIMD_512 z, SIMD_128 *restrict x1, SIMD
 #if __AVX512BW__
 force_inline SIMD_512 elevate_1_2_to_512(SIMD_256 y) {
     return _mm512_cvtepu8_epi16(y);
+}
+
+force_inline u64 cmpneq_8_512(SIMD_512 a, SIMD_512 b) {
+    return (u64)_mm512_cmpneq_epi8_mask(a, b);
+}
+
+force_inline u32 cmpneq_16_512(SIMD_512 a, SIMD_512 b) {
+    return (u32)_mm512_cmpneq_epi16_mask(a, b);
 }
 #endif
 
