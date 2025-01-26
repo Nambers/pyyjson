@@ -77,7 +77,7 @@ force_inline bool _READ_NULL(const _FROM_TYPE **restrict ptr, const _FROM_TYPE *
 /** Read 'Infinity' literal (ignoring case). */
 force_inline bool _READ_INF(const _FROM_TYPE **ptr, const _FROM_TYPE *end) {
 #define COMP_TWICE (COMPILE_READ_UCS_LEVEL == 4 && SIMD_BIT_SIZE < 256)
-    if (end > *ptr + 8) {
+    if (end < *ptr + 8) {
         return false;
     }
     static const _FROM_TYPE _mask[16] = {
@@ -112,7 +112,7 @@ force_inline bool _READ_INF(const _FROM_TYPE **ptr, const _FROM_TYPE *end) {
 #    endif
     // use memcmp and compiler optimization to avoid repeating the same code
     if (likely(0 == memcmp(&slide, &template, sizeof(slide)))) {
-        ptr += 8;
+        *ptr += 8;
         return true;
     }
     return false;
@@ -122,7 +122,7 @@ force_inline bool _READ_INF(const _FROM_TYPE **ptr, const _FROM_TYPE *end) {
 
 /** Read 'NaN' literal (ignoring case). */
 force_inline bool _READ_NAN(const _FROM_TYPE **restrict ptr, const _FROM_TYPE *restrict end) {
-    if (end > *ptr + 3) {
+    if (end < *ptr + 3) {
         return false;
     }
     // it is safe to load *end, so here we load `4 * sizeof(_FROM_TYPE)` bytes
@@ -143,7 +143,7 @@ force_inline bool _READ_NAN(const _FROM_TYPE **restrict ptr, const _FROM_TYPE *r
 #endif
     // use memcmp and compiler optimization to avoid repeating the same code
     if (likely(0 == memcmp(&slide, &template, sizeof(slide)))) {
-        ptr += 3;
+        *ptr += 3;
         return true;
     }
 

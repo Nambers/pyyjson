@@ -27,11 +27,19 @@
 #        define SIMD_512 __m512i
 #        define HAS_SIMD 1
 
-#        define PYYJSON_HAS_BLENDV (SIMD_BIT_SIZE > 128) || __SSE4_1__
-
+#        if (SIMD_BIT_SIZE > 128) || __SSE4_1__
+#            define PYYJSON_HAS_BLENDV 1
+#        else
+#            define PYYJSON_HAS_BLENDV 0
+#        endif
 #    elif TARGET_SIMD_ARCH == aarch
-// aarch64
+#            define PYYJSON_HAS_BLENDV 0
+// aarch64 TODO
+#    else
+#        error "unsupported architecture"
 #    endif
+#else
+#    error "cannot detect SIMD feature"
 #endif
 
 #endif // PYYJSON_SIMD_DETECT_H

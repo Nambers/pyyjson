@@ -6,7 +6,7 @@ import sys
 import unittest
 
 
-if __name__ == "__main__":
+def main():
     faulthandler.enable()
     parser = argparse.ArgumentParser()
     # ignore list
@@ -59,3 +59,7 @@ if __name__ == "__main__":
     sys.path.append(os.path.dirname(cur_path))
     result = runner.run(suite)
     exit(0 if result.wasSuccessful() else 1)
+
+
+if __name__ == "__main__":
+    main()

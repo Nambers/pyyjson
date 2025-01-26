@@ -5,12 +5,15 @@
 #if COMPILE_READ_UCS_LEVEL == 4
 #    define _FROM_TYPE u32
 #    define READ_BIT_SIZE 32
+#    define READ_512_MASK_TYPE u16
 #elif COMPILE_READ_UCS_LEVEL == 2
 #    define _FROM_TYPE u16
 #    define READ_BIT_SIZE 16
+#    define READ_512_MASK_TYPE u32
 #elif COMPILE_READ_UCS_LEVEL == 1
 #    define _FROM_TYPE u8
 #    define READ_BIT_SIZE 8
+#    define READ_512_MASK_TYPE u64
 #else
 #    error "COMPILE_READ_UCS_LEVEL must be 1, 2 or 4"
 #endif

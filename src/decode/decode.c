@@ -578,6 +578,10 @@ force_inline u32 read_b4_unicode(u32 uni) {
 
 #include "decode_float_wrap.inl.c"
 
+#include "simd/write_utils_wrap.inl.c"
+
+#include "simd/readwrite_utils_wrap.inl.c"
+
 #define COMPILE_UCS_LEVEL 0
 #include "decode_str.inl.c"
 #undef COMPILE_UCS_LEVEL
@@ -593,8 +597,6 @@ force_inline u32 read_b4_unicode(u32 uni) {
 #define COMPILE_UCS_LEVEL 4
 #include "decode_str.inl.c"
 #undef COMPILE_UCS_LEVEL
-
-#include "simd/readwrite_utils_wrap.inl.c"
 
 #include "decode_bytes.inl.c"
 

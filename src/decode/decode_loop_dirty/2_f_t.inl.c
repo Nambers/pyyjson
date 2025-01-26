@@ -40,13 +40,13 @@ if (_read_state.need_copy) {
     }
 } else {
     // check max char is dirty without any escape, max_char_type must have been updated
-#if !defined(NDEBUG)
+// #if !defined(NDEBUG)
     if (_read_state.max_char_type < COMPILE_UCS_LEVEL) {
-        assert(false);
+        // assert(false);
         // 2_f_t (self), not really dirty.
         goto loop_2_f_t;
     }
-#endif
+// #endif
     // 2_f_f
     goto loop_2_f_f;
 }

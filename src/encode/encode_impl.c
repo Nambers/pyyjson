@@ -494,4 +494,5 @@ fail:;
 
 #include "simd/check_mask_wrap.inl.c"
 
+#include "simd/write_utils_wrap.inl.c"
 #include "simd/readwrite_utils_wrap.inl.c"

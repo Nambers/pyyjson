@@ -15,13 +15,13 @@
 // knowledge before loop: max_char_type < COMPILE_UCS_LEVEL == 4
 
 assert(_read_state.need_copy);
-#if !defined(NDEBUG)
+// #if !defined(NDEBUG)
 if (_read_state.max_char_type < PYYJSON_STRING_TYPE_UCS4) {
-    assert(false);
+    // assert(false);
     // 2_t_t (self), not really dirty
     goto loop_4_t_t;
 }
-#endif
+// #endif
 assert(_read_state.max_char_type == PYYJSON_STRING_TYPE_UCS4);
 // 4_t_f
 goto loop_4_t_f;
