@@ -1416,7 +1416,7 @@ loop:;
     if (likely(cur + CHECK_COUNT_MAX < end)) {
         SIMD_TYPE SIMD_VAR = load_simd((const void *)cur);
 #define CMPNEQ PYYJSON_CONCAT3(cmpneq, READ_BIT_SIZE, SIMD_BIT_SIZE)
-        SIMD_MASK_TYPE m = (SIMD_MASK_TYPE)CMPNEQ(SIMD_VAR, template);
+        SIMD_MASK_TYPE m = CMPNEQ(SIMD_VAR, template);
 #undef CMPNEQ
         if (check_mask_zero(m)) {
             cur += CHECK_COUNT_MAX;
