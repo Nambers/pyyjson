@@ -3,6 +3,8 @@ name: "Run test on Windows"
 on:
   workflow_dispatch:
   push:
+    branches:
+      - "dev"
     paths:
       - "src/**"
       - "test/**"
