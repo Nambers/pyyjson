@@ -30,6 +30,7 @@ endif()
 # ------------------------------------------------------------------------------
 # Build Options for tests and docs
 option(ASAN_ENABLED "Build with asan" OFF)
+option(BUILD_BENCHMARK "Build benchmarks" ON)
 
 # option(YYJSON_BUILD_TESTS "Build all tests" OFF)
 # option(YYJSON_BUILD_FUZZER "Build fuzzer" OFF)
@@ -81,7 +82,7 @@ add_definitions(-DYYJSON_DISABLE_UTILS=1)
 
 # ------------------------------------------------------------------------------
 # Library
-add_library(pyyjson SHARED
+set(SRC_FILES
     src/decode/decode.c
     src/pyyjson.c
     src/encode/encode_impl.c
@@ -92,6 +93,15 @@ add_library(pyyjson SHARED
     src/float/tables.c
     src/ryu/d2s.c
 )
+
+if(BUILD_BENCHMARK)
+    set(SRC_FILES ${SRC_FILES} src/benchmark.c)
+endif()
+
+add_library(pyyjson SHARED
+    ${SRC_FILES}
+)
+
 target_include_directories(pyyjson PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src> ${Python3_INCLUDE_DIRS})
 
 # set_target_properties(pyyjson PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PYYJSON_SOVERSION})
@@ -105,10 +115,6 @@ include(XcodeProperty)
 
 if(XCODE)
     set(YYJSON_FLAGS "-Wall -Wextra -Werror -pedantic -pedantic-errors")
-
-    if(YYJSON_ENABLE_FASTMATH)
-        set(YYJSON_FLAGS "${YYJSON_FLAGS} -ffast-math")
-    endif()
 
     set_default_xcode_property(pyyjson)
     set_xcode_deployment_version(pyyjson "10.13" "12.0" "12.0" "4.0")
@@ -124,10 +130,6 @@ if(XCODE)
 elseif(MSVC)
     set(YYJSON_FLAGS "/utf-8")
 
-    if(YYJSON_ENABLE_FASTMATH)
-        set(YYJSON_FLAGS "${YYJSON_FLAGS} /fp:fast")
-    endif()
-
     target_compile_options(pyyjson PRIVATE $<$<C_COMPILER_ID:MSVC>:${YYJSON_FLAGS}>)
     target_compile_options(pyyjson PRIVATE $<$<CXX_COMPILER_ID:MSVC>:${YYJSON_FLAGS}>)
 
@@ -137,10 +139,6 @@ elseif(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|Intel")
         set(YYJSON_FLAGS "-Wno-constant-logical-operand")
     else()
         set(YYJSON_FLAGS "")
-    endif()
-
-    if(YYJSON_ENABLE_FASTMATH)
-        set(YYJSON_FLAGS "-ffast-math")
     endif()
 
     if(CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
@@ -160,6 +158,10 @@ elseif(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|Intel")
         endif()
 
         message("Debug mode, enabling debug symbols")
+    endif()
+    if(BUILD_BENCHMARK)
+        message("ENABLE BENCHMARK")
+        target_compile_definitions(pyyjson PRIVATE PYYJSON_BUILD_BENCHMARK=1)
     endif()
 
     target_compile_options(pyyjson PRIVATE $<$<COMPILE_LANGUAGE:C>:${YYJSON_FLAGS}>)
@@ -183,8 +185,6 @@ message("CMAKE_C_COMPILER_ID = ${CMAKE_C_COMPILER_ID}")
 # Werror for Release build
 # TODO move this to GNU|Clang
 message("CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
-
-
 
 message("CMAKE_SYSTEM_PROCESSOR = ${CMAKE_SYSTEM_PROCESSOR}")
 
