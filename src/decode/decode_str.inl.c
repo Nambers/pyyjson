@@ -394,7 +394,7 @@ force_noinline u32 DECODE_ESCAPE_UNICODE(DECODE_SRC_INFO *restrict decode_src_in
                     PyErr_SetString(JSONDecodeError, "Invalid high surrogate in string");
                     return (u32)0xffffffff;
                 }
-                if (unlikely(decode_src_info->src + 6 > decode_src_info->src_end || !byte_match_2(decode_src_info->src, "\\u"))) {
+                if (unlikely(decode_src_info->src + 6 > decode_src_info->src_end || decode_src_info->src[0] != '\\' || decode_src_info->src[1] != 'u')) {
                     PyErr_SetString(JSONDecodeError, "No low surrogate in string");
                     return (u32)0xffffffff;
                 }
@@ -887,15 +887,16 @@ force_inline void READ_STR_TAIL(
     // the read buffer is ended, there should be a '"' here
     if (likely(!check_mask_zero(check_mask))) {
         u32 done_count = GET_DONE_COUNT_FROM_MASK(check_mask);
-        decode_src_info->src = simd_load_head + done_count;
         //
         Py_ssize_t really_write_count = (Py_ssize_t)done_count - invalid_head_count;
         if (do_copy && really_write_count) {
             // assert(really_write_count >= 0);
             PROCESS_TAIL_COPY(write_as, really_write_count, decode_src_info, decode_unicode_info);
         }
-        //
+        // move reader and writer
+        decode_src_info->src += really_write_count;
         MOVE_WRITER(decode_unicode_info, write_as, really_write_count);
+        //
         SpecialCharReadResult escape_result = DO_SPECIAL(decode_src_info);
         // *write_scan_flag = escape_result.flag;
         if (likely(escape_result.flag == StrEnd)) {
@@ -1407,7 +1408,7 @@ fail:;
     return NULL;
 }
 
-force_inline void FAST_SKIP_SPACES(const _FROM_TYPE **cur_addr, const _FROM_TYPE *end) {
+force_noinline void FAST_SKIP_SPACES(const _FROM_TYPE **cur_addr, const _FROM_TYPE *end) {
 #define SET1 PYYJSON_CONCAT3(broadcast, READ_BIT_SIZE, SIMD_BIT_SIZE)
     const SIMD_TYPE template = SET1(' ');
 #undef SET1
@@ -1435,6 +1436,7 @@ loop:;
         if (*cur == ' ') cur++;
     }
     *cur_addr = cur;
+    assert(*cur != ' ');
 }
 
 force_inline bool CHECK_AND_RESERVE_STR_BUFFER(Py_ssize_t len, _FROM_TYPE **buffer_head_addr, bool *need_dealloc) {
@@ -1515,7 +1517,11 @@ arr_begin:
     if (*cur == '\n') cur++;
 
 arr_val_begin:
-    FAST_SKIP_SPACES(&cur, end);
+    if (cur < end && cur[0] == ' ') {
+        cur++;
+        if (*cur == ' ')
+            FAST_SKIP_SPACES(&cur, end);
+    }
     // #if PYYJSON_IS_REAL_GCC
     //     while (true) REPEAT_CALL_16({
     //         if (byte_match_2((void *)cur, "  ")) cur += 2;
@@ -1587,7 +1593,9 @@ arr_val_begin:
         goto fail_trailing_comma;
     }
     if (char_is_space(*cur)) {
-        while (char_is_space(*++cur));
+        FAST_SKIP_SPACES(&cur, end);
+        if (char_is_space(*cur)) cur++;
+        // while (char_is_space(*++cur));
         goto arr_val_begin;
     }
     if ((*cur == 'i' || *cur == 'I' || *cur == 'N')) {
@@ -1618,7 +1626,10 @@ arr_val_end:;
         goto arr_end;
     }
     if (char_is_space(*cur)) {
-        while (char_is_space(*++cur));
+        cur++;
+        if (*cur == ' ') FAST_SKIP_SPACES(&cur, end);
+        if (char_is_space(*cur)) cur++;
+        // while (char_is_space(*++cur));
         goto arr_val_end;
     }
 
@@ -1647,8 +1658,11 @@ obj_begin:
     if (*cur == '\n') cur++;
 
 obj_key_begin:
-    FAST_SKIP_SPACES(&cur, end);
-
+    if (cur < end && cur[0] == ' ') {
+        cur++;
+        if (*cur == ' ')
+            FAST_SKIP_SPACES(&cur, end);
+    }
     // #if PYYJSON_IS_REAL_GCC
     //     while (true) REPEAT_CALL_16({
     //         if (byte_match_2((void *)cur, "  ")) cur += 2;
@@ -1677,22 +1691,29 @@ obj_key_begin:
         goto fail_trailing_comma;
     }
     if (char_is_space(*cur)) {
-        while (char_is_space(*++cur));
+        FAST_SKIP_SPACES(&cur, end);
+        if (char_is_space(*cur)) cur++;
+        // while (char_is_space(*++cur));
         goto obj_key_begin;
     }
     goto fail_character_obj_key;
 
-obj_key_end:
-    if (byte_match_2((void *)cur, ": ")) {
-        cur += 2;
-        goto obj_val_begin;
+obj_key_end:;
+    {
+        static _FROM_TYPE _t[2] = {':', ' '};
+        if (cur < end && 0 == memcmp((const void *)cur, (const void *)_t, sizeof(_t))) {
+            cur += 2;
+            goto obj_val_begin;
+        }
     }
     if (*cur == ':') {
         cur++;
         goto obj_val_begin;
     }
     if (char_is_space(*cur)) {
-        while (char_is_space(*++cur));
+        FAST_SKIP_SPACES(&cur, end);
+        if (char_is_space(*cur)) cur++;
+        // while (char_is_space(*++cur));
         goto obj_key_end;
     }
     goto fail_character_obj_sep;
@@ -1750,7 +1771,9 @@ obj_val_begin:
         goto fail_literal_null;
     }
     if (char_is_space(*cur)) {
-        while (char_is_space(*++cur));
+        FAST_SKIP_SPACES(&cur, end);
+        if (char_is_space(*cur)) cur++;
+        // while (char_is_space(*++cur));
         goto obj_val_begin;
     }
     if ((*cur == 'i' || *cur == 'I' || *cur == 'N')) {
@@ -1764,10 +1787,13 @@ obj_val_begin:
 
     goto fail_character_val;
 
-obj_val_end:
-    if (byte_match_2((void *)cur, ",\n")) {
-        cur += 2;
-        goto obj_key_begin;
+obj_val_end:;
+    {
+        static _FROM_TYPE _t[2] = {',', '\n'};
+        if (cur < end && 0 == memcmp((const void *)cur, (const void *)_t, sizeof(_t))) {
+            cur += 2;
+            goto obj_key_begin;
+        }
     }
     if (likely(*cur == ',')) {
         cur++;
@@ -1778,7 +1804,9 @@ obj_val_end:
         goto obj_end;
     }
     if (char_is_space(*cur)) {
-        while (char_is_space(*++cur));
+        FAST_SKIP_SPACES(&cur, end);
+        if (char_is_space(*cur)) cur++;
+        // while (char_is_space(*++cur));
         goto obj_val_end;
     }
 
@@ -1803,7 +1831,9 @@ obj_end:
 doc_end:
     /* check invalid contents after json document */
     if (unlikely(cur < end)) {
-        while (char_is_space(*cur)) cur++;
+        FAST_SKIP_SPACES(&cur, end);
+        if (char_is_space(*cur)) cur++;
+        // while (char_is_space(*cur)) cur++;
         if (unlikely(cur < end)) goto fail_garbage;
     }
 
@@ -1982,7 +2012,9 @@ force_noinline PyObject *READ_ROOT_SINGLE(const _FROM_TYPE *dat, Py_ssize_t len)
 single_end:
     assert(ret);
     if (unlikely(cur < end)) {
-        while (char_is_space(*cur)) cur++;
+        FAST_SKIP_SPACES(&cur, end);
+        if (char_is_space(*cur)) cur++;
+        // while (char_is_space(*cur)) cur++;
         if (unlikely(cur < end)) goto fail_garbage;
     }
     return ret;
