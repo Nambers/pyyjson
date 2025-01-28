@@ -12,10 +12,17 @@ LARGE_INTEGER _get_frequency(void) {
 }
 
 usize perf_counter(void) {
-    static LARGE_INTEGER frequency = _get_frequency();
+    static LARGE_INTEGER *frequency = NULL;
+    if (!frequency) {
+        frequency = (LARGE_INTEGER *)malloc(sizeof(LARGE_INTEGER));
+        if (!frequency) {
+            return 0;
+        }
+        *frequency = _get_frequency();
+    }
     LARGE_INTEGER counter;
     QueryPerformanceCounter(&counter);
-    return (usize)((counter.QuadPart * 1000000000LL) / frequency.QuadPart);
+    return (usize)((counter.QuadPart * 1000000000LL) / frequency->QuadPart);
 }
 
 #else
