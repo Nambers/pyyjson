@@ -887,10 +887,11 @@ force_inline void READ_STR_TAIL(
     const _FROM_TYPE *simd_load_head = decode_src_info->src_end - CHECK_COUNT_MAX;
     SIMD_MASK_TYPE check_mask = CHECK_ESCAPE_IMPL_GET_MASK(simd_load_head, &SIMD_VAR);
     Py_ssize_t invalid_head_count = decode_src_info->src - simd_load_head;
+    SIMD_MASK_TYPE tail_mask;
     // process `check_mask`, removing the invalid head content
     {
         const void *tail_mask_addr = PYYJSON_CONCAT2(read_tail_mask_table, READ_BIT_SIZE)(invalid_head_count);
-        SIMD_MASK_TYPE tail_mask = load_simd_aligned(tail_mask_addr);
+        tail_mask = load_simd_aligned(tail_mask_addr);
         check_mask = SIMD_AND(tail_mask, check_mask);
     }
     // the read buffer is ended, there should be a '"' here
@@ -899,7 +900,6 @@ force_inline void READ_STR_TAIL(
         //
         Py_ssize_t really_write_count = (Py_ssize_t)done_count - invalid_head_count;
         if (do_copy && really_write_count) {
-            // assert(really_write_count >= 0);
             PROCESS_TAIL_COPY(write_as, really_write_count, decode_src_info, decode_unicode_info);
         }
         // move reader and writer
@@ -908,7 +908,10 @@ force_inline void READ_STR_TAIL(
         // get the special value (expecting '"')
         SpecialCharReadResult escape_result = DO_SPECIAL(decode_src_info);
         if (likely(escape_result.flag == StrEnd)) {
-            if (need_check_max_char) CHECK_MAX_CHAR_IN_LOOP(SIMD_VAR, read_state, true, (Py_ssize_t)done_count);
+            if (need_check_max_char) {
+                // the first `invalid_head_count` unicodes are not valid, remove this part using AND with tail_mask
+                CHECK_MAX_CHAR_IN_LOOP(SIMD_AND(SIMD_VAR, tail_mask), read_state, true, (Py_ssize_t)done_count);
+            }
             read_state->scan_flag = StrEnd;
             read_state->state_dirty = true;
             return;
@@ -922,7 +925,8 @@ force_inline void READ_STR_TAIL(
         // slow path (escape character)
         PROCESS_ESCAPE(decode_unicode_info, read_state, decode_src_info, escape_result.value, write_as, do_copy);
         if (need_check_max_char && read_state->max_char_type < COMPILE_UCS_LEVEL) {
-            CHECK_MAX_CHAR_IN_LOOP(SIMD_VAR, read_state, true, (Py_ssize_t)done_count);
+            // the first `invalid_head_count` unicodes are not valid, remove this part using AND with tail_mask
+            CHECK_MAX_CHAR_IN_LOOP(SIMD_AND(SIMD_VAR, tail_mask), read_state, true, (Py_ssize_t)done_count);
         }
     } else {
         // there is no '"' until the end, the string must be invalid
