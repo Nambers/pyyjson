@@ -1,6 +1,7 @@
 // requires: WRITE
 
 #include "simd_impl.h"
+#include "mask_table.h"
 
 #define WRITE_PARTIAL_HEAD PYYJSON_CONCAT2(write_partial_head, COMPILE_WRITE_UCS_LEVEL)
 #define WRITE_PARTIAL_TAIL PYYJSON_CONCAT2(write_partial_tail, COMPILE_WRITE_UCS_LEVEL)

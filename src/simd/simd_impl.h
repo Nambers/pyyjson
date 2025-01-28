@@ -772,4 +772,27 @@ force_inline SIMD_REAL_QUARTER_TYPE zip_simd_32_to_8(SIMD_TYPE SIMD_VAR) {
 #endif
 }
 
+/*==============================================================================
+ * Half/quarter write.
+ *============================================================================*/
+force_inline void write_real_quarter(void *dst, SIMD_REAL_QUARTER_TYPE quat) {
+#if SIMD_BIT_SIZE == 512
+    write_128(dst, quat);
+#elif SIMD_BIT_SIZE == 256
+    *(u64 *)dst = quat;
+#else
+    *(u32 *)dst = quat;
+#endif
+}
+
+force_inline void write_real_half(void *dst, SIMD_REAL_HALF_TYPE half) {
+#if SIMD_BIT_SIZE == 512
+    write_256(dst, half);
+#elif SIMD_BIT_SIZE == 256
+    write_128(dst, half);
+#else
+    *(u64 *)dst = half;
+#endif
+}
+
 #endif // ENCODE_SIMD_IMPL_H
