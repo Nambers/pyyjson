@@ -57,6 +57,7 @@
 #define _READ_NAN PYYJSON_CONCAT2(_read_nan, COMPILE_READ_UCS_LEVEL)
 #define READ_INF_OR_NAN PYYJSON_CONCAT2(read_inf_or_nan, COMPILE_READ_UCS_LEVEL)
 #define READ_NUMBER PYYJSON_CONCAT2(read_number, COMPILE_READ_UCS_LEVEL)
+#define CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512 PYYJSON_CONCAT2(check_escape_tail_impl_get_mask_512, COMPILE_READ_UCS_LEVEL)
 
 force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restrict src, SIMD_TYPE *restrict SIMD_VAR);
 force_inline u32 GET_DONE_COUNT_FROM_MASK(SIMD_MASK_TYPE mask);
@@ -876,7 +877,47 @@ force_inline void READ_STR_TAIL(
         bool need_check_max_char) {
 // TODO
 #if SIMD_BIT_SIZE == 512
-
+    // load use maskz
+#    define _MASKZ_LOADU PYYJSON_SIMPLE_CONCAT2(_mm512_maskz_loadu_epi, READ_BIT_SIZE)
+    u64 rw_mask, tail_mask;
+    rw_mask = ((u64)1 << (usize)(decode_src_info->src_end - decode_src_info->src)) - 1;
+    SIMD_512 z = _MASKZ_LOADU(rw_mask, (const void *)decode_src_info->src);
+#    undef _MASKZ_LOADU
+    tail_mask = CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(z, rw_mask);
+    if (likely(!check_mask_zero(tail_mask))) {
+        u32 done_count = GET_DONE_COUNT_FROM_MASK(tail_mask);
+        if (do_copy && done_count) {
+            PROCESS_TAIL_COPY(write_as, (Py_ssize_t)done_count, decode_src_info, decode_unicode_info);
+        }
+        // move reader and writer
+        decode_src_info->src += done_count;
+        MOVE_WRITER(decode_unicode_info, write_as, done_count);
+        // get the special value (expecting '"')
+        SpecialCharReadResult escape_result = DO_SPECIAL(decode_src_info);
+        if (likely(escape_result.flag == StrEnd)) {
+            if (need_check_max_char) {
+                CHECK_MAX_CHAR_IN_LOOP(SIMD_VAR, read_state, true, (Py_ssize_t)done_count);
+            }
+            read_state->scan_flag = StrEnd;
+            read_state->state_dirty = true;
+            return;
+        }
+        if (unlikely(escape_result.flag == StrInvalid)) {
+            assert(PyErr_Occurred());
+            read_state->scan_flag = StrInvalid;
+            read_state->state_dirty = true;
+            return;
+        }
+        // slow path (escape character)
+        PROCESS_ESCAPE(decode_unicode_info, read_state, decode_src_info, escape_result.value, write_as, do_copy);
+        if (need_check_max_char && read_state->max_char_type < COMPILE_UCS_LEVEL) {
+            CHECK_MAX_CHAR_IN_LOOP(SIMD_VAR, read_state, true, (Py_ssize_t)done_count);
+        }
+    } else {
+        // there is no '"' until the end, the string must be invalid
+        PyErr_SetString(JSONDecodeError, "Unexpected ending when reading string");
+        read_state->scan_flag = StrInvalid;
+    }
 #else
     static_assert(sizeof(SIMD_MASK_TYPE) == sizeof(SIMD_TYPE), "sizeof(SIMD_MASK_TYPE) == sizeof(SIMD_TYPE)");
     // load backward
@@ -1375,6 +1416,7 @@ read_tail:;
         READ_STR_TAIL(&_decode_src_info, &_decode_unicode_info, &_read_state, PYYJSON_MAX(_read_state.max_char_type, COMPILE_READ_UCS_LEVEL), _read_state.need_copy, _read_state.max_char_type < COMPILE_UCS_LEVEL);
         if (likely(_read_state.scan_flag == StrEnd)) goto done;
         if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
+        _read_state.state_dirty = false;
         goto read_tail;
     }
 done:;
@@ -2079,7 +2121,7 @@ force_noinline PyObject *PYYJSON_DECODE_STR(PyUnicodeObject *in_unicode) {
     return ret;
 }
 
-#undef READ_INF_OR_NAN
+#undef CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512
 #undef READ_NUMBER
 #undef READ_INF_OR_NAN
 #undef _READ_NAN

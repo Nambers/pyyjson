@@ -73,7 +73,7 @@ force_inline u32 GET_DONE_COUNT_FROM_MASK(SIMD_MASK_TYPE mask) {
 #if SIMD_BIT_SIZE == 512
     bit_mask = mask;
     assert(bit_mask);
-    u32 done_count = u64_tz_bits(bit_mask) / sizeof(_FROM_TYPE);
+    u32 done_count = u64_tz_bits(bit_mask);// / sizeof(_FROM_TYPE);
 #elif SIMD_BIT_SIZE == 256
     // for bit size < 512, we don't have cmp_epu8, the mask is calculated by subs_epu8
     // so we have to cmpeq with zero to get the real bit mask.
@@ -102,7 +102,7 @@ force_inline u32 GET_DONE_COUNT_FROM_MASK(SIMD_MASK_TYPE mask) {
 }
 
 #if SIMD_BIT_SIZE == 512
-force_inline SIMD_MASK_TYPE CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(SIMD_512 z, SIMD_MASK_TYPE rw_mask) {
+force_inline SIMD_MASK_TYPE CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(SIMD_512 z, u64 rw_mask) {
 #    define CUR_QUOTE PYYJSON_SIMPLE_CONCAT2(_Quote_i, READ_BIT_SIZE)
 #    define CUR_SLASH PYYJSON_SIMPLE_CONCAT2(_Slash_i, READ_BIT_SIZE)
 #    define CUR_CONTROL_MAX PYYJSON_SIMPLE_CONCAT2(_ControlMax_i, READ_BIT_SIZE)
