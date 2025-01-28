@@ -86,6 +86,7 @@ class TestDecode(unittest.TestCase):
             [155, {}, 2.3, "a", None, True, False, [], {}, 11],
             ("a", 1, 2.3, 2.3, None, True, False, [], {}),
             {"啊啊啊": "ß", "ü": ["\uff02", "\u00f8"]},
+            {"啊啊啊": "ß", "AnswerText": "This information is not held centrally.\r\n"},
             dict({a: b for a in range(10) for b in range(10)}),
             [[[[[[[[[[[[[[]]]]]]], [[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]],
             collections.OrderedDict(x=1),

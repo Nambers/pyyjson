@@ -44,7 +44,6 @@
 #define GET_DONE_COUNT_FROM_MASK PYYJSON_CONCAT2(get_done_count_from_mask, COMPILE_READ_UCS_LEVEL)
 #define WRITE_SIMD_IMPL_TARGET2 PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, 2)
 #define WRITE_SIMD_IMPL_TARGET4 PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, 4)
-#define DOWNGRADE_STRING PYYJSON_CONCAT2(downgrade_string, COMPILE_READ_UCS_LEVEL)
 #define UCS_BELOW_2_DIRTY PYYJSON_CONCAT2(ucs_below_2_dirty, COMPILE_UCS_LEVEL)
 #define UCS_BELOW_4_DIRTY PYYJSON_CONCAT2(ucs_below_4_dirty, COMPILE_UCS_LEVEL)
 #define COPY_WITH_ELEVATE_TO_2 PYYJSON_CONCAT2(copy_with_elevate_to_2, COMPILE_UCS_LEVEL)
@@ -621,82 +620,6 @@ force_inline void READ_STR_IN_LOOP(
     }
 }
 
-#if COMPILE_UCS_LEVEL > 1
-force_inline void DOWNGRADE_STRING(const void *src_start, Py_ssize_t copy_count, int max_char_type, void *write_buffer_head) {
-#    if COMPILE_UCS_LEVEL == 2
-    assert(max_char_type == 0 || max_char_type == 1);
-    // zip u16 buffer to u8 buffer.
-    const _FROM_TYPE *src = (const _FROM_TYPE *)src_start;
-    u8 *dst = (u8 *)write_buffer_head;
-    SIMD_TYPE SIMD_VAR;
-    while (copy_count >= CHECK_COUNT_MAX) {
-        SIMD_TYPE SIMD_VAR = load_simd((const void *)src);
-        SIMD_REAL_HALF_TYPE half_val = zip_simd_16_to_8(SIMD_VAR);
-        write_real_half(dst, half_val);
-        // *(SIMD_REAL_HALF_TYPE *)dst = half_val;
-        copy_count -= CHECK_COUNT_MAX;
-        dst += CHECK_COUNT_MAX;
-        src += CHECK_COUNT_MAX;
-    }
-    if (copy_count) {
-        Py_ssize_t additional = CHECK_COUNT_MAX - copy_count;
-        src -= additional;
-        dst -= additional;
-        SIMD_TYPE SIMD_VAR = load_simd((const void *)src);
-        SIMD_REAL_HALF_TYPE half_val = zip_simd_16_to_8(SIMD_VAR);
-        write_real_half(dst, half_val);
-        // *(SIMD_REAL_HALF_TYPE *)dst = half_val;
-    }
-#    else // COMPILE_UCS_LEVEL == 4
-    const _FROM_TYPE *src = (const _FROM_TYPE *)src_start;
-    if (max_char_type == 2) {
-        u16 *dst = (u16 *)write_buffer_head;
-        SIMD_TYPE SIMD_VAR;
-        while (copy_count >= CHECK_COUNT_MAX) {
-            SIMD_TYPE SIMD_VAR = load_simd((const void *)src);
-            SIMD_REAL_HALF_TYPE half_val = zip_simd_32_to_16(SIMD_VAR);
-            write_real_half(dst, half_val);
-            // *(SIMD_REAL_HALF_TYPE *)dst = half_val;
-            copy_count -= CHECK_COUNT_MAX;
-            dst += CHECK_COUNT_MAX;
-            src += CHECK_COUNT_MAX;
-        }
-        if (copy_count) {
-            Py_ssize_t additional = CHECK_COUNT_MAX - copy_count;
-            src -= additional;
-            dst -= additional;
-            SIMD_TYPE SIMD_VAR = load_simd((const void *)src);
-            SIMD_REAL_HALF_TYPE half_val = zip_simd_32_to_16(SIMD_VAR);
-            write_real_half(dst, half_val);
-            // *(SIMD_REAL_HALF_TYPE *)dst = half_val;
-        }
-    } else {
-        assert(max_char_type <= 1);
-        u8 *dst = (u8 *)write_buffer_head;
-        SIMD_TYPE SIMD_VAR;
-        while (copy_count >= CHECK_COUNT_MAX) {
-            SIMD_TYPE SIMD_VAR = load_simd((const void *)src);
-            SIMD_REAL_QUARTER_TYPE quar_val = zip_simd_32_to_8(SIMD_VAR);
-            write_real_quarter(dst, quar_val);
-            // *(SIMD_REAL_QUARTER_TYPE *)dst = quar_val;
-            copy_count -= CHECK_COUNT_MAX;
-            dst += CHECK_COUNT_MAX;
-            src += CHECK_COUNT_MAX;
-        }
-        if (copy_count) {
-            Py_ssize_t additional = CHECK_COUNT_MAX - copy_count;
-            src -= additional;
-            dst -= additional;
-            SIMD_TYPE SIMD_VAR = load_simd((const void *)src);
-            SIMD_REAL_QUARTER_TYPE quar_val = zip_simd_32_to_8(SIMD_VAR);
-            write_real_quarter(dst, quar_val);
-            // *(SIMD_REAL_QUARTER_TYPE *)dst = quar_val;
-        }
-    }
-#    endif
-}
-#endif
-
 force_inline PyObject *DECODE_LOOP_DONE_MAKE_STRING(
         DECODE_SRC_INFO *restrict decode_src_info,
         DECODE_UNICODE_INFO *restrict decode_unicode_info,
@@ -714,9 +637,16 @@ force_inline PyObject *DECODE_LOOP_DONE_MAKE_STRING(
             return make_string((const u8 *)decode_src_info->src_start, copy_count, max_char_type, is_key);
         } else {
 #if COMPILE_UCS_LEVEL > 1
-            // need to zip the buffer down to `max_char_type`.
-            // use simd to make this faster.
-            DOWNGRADE_STRING((const void *)decode_src_info->src_start, copy_count, max_char_type, (_FROM_TYPE *)decode_unicode_info->write_head);
+// need to zip the buffer down to `max_char_type`.
+// use simd to make this faster.
+#    if COMPILE_UCS_LEVEL == 4
+            if (max_char_type == 2) downgrade_string_4_2(decode_src_info->src_start, copy_count, (u16 *)decode_unicode_info->write_head);
+            else
+#    endif
+#    define DOWNGRADER PYYJSON_CONCAT3(downgrade_string, COMPILE_UCS_LEVEL, 1)
+                DOWNGRADER(decode_src_info->src_start, copy_count, (u8 *)decode_unicode_info->write_head);
+#    undef DOWNGRADER
+            // DOWNGRADE_STRING((const void *)decode_src_info->src_start, copy_count, max_char_type, (_FROM_TYPE *)decode_unicode_info->write_head);
             // create unicode from the writer.
             return make_string((const u8 *)decode_unicode_info->write_head, copy_count, max_char_type, is_key);
 #else
@@ -736,7 +666,8 @@ force_inline PyObject *DECODE_LOOP_DONE_MAKE_STRING(
 #if COMPILE_UCS_LEVEL == 4
             // downgrade insitu
             Py_ssize_t copy_count = UNICODE_DECODE_GET_COPY_COUNT(decode_unicode_info);
-            DOWNGRADE_STRING((const void *)decode_unicode_info->write_head, copy_count, 2, (_FROM_TYPE *)decode_unicode_info->write_head);
+            downgrade_string_4_2(decode_unicode_info->write_head, copy_count, (u16 *)decode_unicode_info->write_head);
+            // DOWNGRADE_STRING((const void *)decode_unicode_info->write_head, copy_count, 2, (_FROM_TYPE *)decode_unicode_info->write_head);
             return make_string((const u8 *)decode_unicode_info->write_head, copy_count, 2, is_key);
 #else
             if (UCS_BELOW_2_DIRTY(decode_unicode_info)) {
@@ -749,7 +680,10 @@ force_inline PyObject *DECODE_LOOP_DONE_MAKE_STRING(
 #if COMPILE_UCS_LEVEL > 1
             // downgrade insitu
             Py_ssize_t copy_count = UNICODE_DECODE_GET_COPY_COUNT(decode_unicode_info);
-            DOWNGRADE_STRING((const void *)decode_unicode_info->write_head, copy_count, 1, (_FROM_TYPE *)decode_unicode_info->write_head);
+#    define DOWNGRADER PYYJSON_CONCAT3(downgrade_string, COMPILE_READ_UCS_LEVEL, 1)
+            DOWNGRADER(decode_unicode_info->write_head, copy_count, (u8 *)decode_unicode_info->write_head);
+#    undef DOWNGRADER
+            // DOWNGRADE_STRING((const void *)decode_unicode_info->write_head, copy_count, 1, (_FROM_TYPE *)decode_unicode_info->write_head);
             return make_string((const u8 *)decode_unicode_info->write_head, copy_count, 1, is_key);
 #else
             return make_string((const u8 *)decode_unicode_info->write_head, decode_unicode_info->unicode_ucs1 - (u8 *)decode_unicode_info->write_head, 1, is_key);
@@ -2134,7 +2068,6 @@ force_noinline PyObject *PYYJSON_DECODE_STR(PyUnicodeObject *in_unicode) {
 #undef COPY_WITH_ELEVATE_TO_2
 #undef UCS_BELOW_4_DIRTY
 #undef UCS_BELOW_2_DIRTY
-#undef DOWNGRADE_STRING
 #undef WRITE_SIMD_IMPL_TARGET4
 #undef WRITE_SIMD_IMPL_TARGET2
 #undef GET_DONE_COUNT_FROM_MASK

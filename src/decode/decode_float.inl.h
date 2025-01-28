@@ -703,10 +703,6 @@ digi_finish:
 
 #else /* !PYYJSON_HAS_IEEE_754 */
 
-#    if COMPILE_READ_UCS_LEVEL > 1
-#        define DOWNGRADE_STRING PYYJSON_CONCAT2(downgrade_string, COMPILE_READ_UCS_LEVEL)
-force_inline void DOWNGRADE_STRING(const void *src_start, Py_ssize_t copy_count, int max_char_type, void *write_buffer_head);
-#    endif
 /**
  Read a JSON number.
  This is a fallback function if the custom number reader is disabled.
@@ -876,7 +872,9 @@ read_double:
         }
         tmpbuf_ptr += TAIL_PADDING;
     }
-    DOWNGRADE_STRING(hdr, _tmplength, 1, tmpbuf_ptr);
+#        define DOWNGRADER PYYJSON_CONCAT3(downgrade_string, COMPILE_READ_UCS_LEVEL, 1)
+    DOWNGRADER(hdr, _tmplength, tmpbuf_ptr);
+#        undef DOWNGRADER
     tmpbuf_ptr[_tmplength] = 0;
     const u8 *hdr_for_strtod = tmpbuf_ptr;
     const u8 *cur_for_strtod = tmpbuf_ptr + _tmplength;
@@ -927,9 +925,6 @@ read_double:
 #    undef return_raw
 }
 
-#    if COMPILE_READ_UCS_LEVEL > 1
-#        undef DOWNGRADE_STRING
-#    endif
 #endif /* !PYYJSON_HAS_IEEE_754 */
 
 #undef READ_INF_OR_NAN
