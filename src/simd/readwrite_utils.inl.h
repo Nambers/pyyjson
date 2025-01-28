@@ -78,7 +78,7 @@ force_inline void TAIL_WRITE_SIMD_IMPL(const _FROM_TYPE *src, _TARGET_TYPE *dst,
 #    undef _MASKZ_LOADU
 #else
     const _FROM_TYPE *load_start = src + tail_count - CHECK_COUNT_MAX;
-    SIMD_TYPE SIMD_VAR = load_simd((const void *)src);
+    SIMD_TYPE SIMD_VAR = load_simd((const void *)load_start);
 #endif
 #if _NEED_RUNTIME_SHIFT
     static_assert(SIMD_BIT_SIZE == 128, "SIMD_BIT_SIZE == 128");
