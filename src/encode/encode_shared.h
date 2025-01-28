@@ -1,7 +1,6 @@
 #ifndef PYYJSON_ENCODE_SHARED_H
 #define PYYJSON_ENCODE_SHARED_H
 
-#include "encode.h"
 #include "pyyjson.h"
 #include <stddef.h>
 
@@ -75,6 +74,8 @@ force_inline Py_ssize_t get_indent_char_count(Py_ssize_t cur_nested_depth, Py_ss
 /*==============================================================================
  * Python Utils
  *============================================================================*/
+
+extern PyObject *JSONEncodeError;
 
 force_inline void *get_unicode_data(PyObject *unicode) {
     if (((PyASCIIObject *)unicode)->state.ascii) {
