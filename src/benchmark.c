@@ -140,3 +140,36 @@ PyObject *run_unicode_accumulate_benchmark(PyObject *self, PyObject *args, PyObj
 fail:;
     return NULL;
 }
+
+PyObject *run_object_accumulate_benchmark(PyObject *self, PyObject *args, PyObject *kwargs) {
+    PyObject *callable;
+    usize repeat;
+    PyObject *call_args;
+    static const char *kwlist[] = {"func", "repeat", "args", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OKO", (char **)kwlist, &callable, &repeat, &call_args)) {
+        PyErr_SetString(PyExc_TypeError, "Invalid argument");
+        goto fail;
+    }
+    if (!PyCallable_Check(callable)) {
+        PyErr_SetString(PyExc_TypeError, "First argument must be callable");
+        goto fail;
+    }
+    usize total = 0;
+    for (usize i = 0; i < repeat; i++) {
+        usize start = perf_counter();
+        PyObject *result = PyObject_Call(callable, call_args, NULL);
+        usize end = perf_counter();
+        if (unlikely(!result)) {
+            if (!PyErr_Occurred()) {
+                PyErr_SetString(PyExc_RuntimeError, "Failed to call callable");
+            }
+            goto fail;
+        } else {
+            Py_DECREF(result);
+        }
+        total += end - start;
+    }
+    return PyLong_FromUnsignedLongLong(total);
+fail:;
+    return NULL;
+}

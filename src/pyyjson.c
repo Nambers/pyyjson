@@ -28,6 +28,7 @@ PyObject *pyyjson_FileEncode(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *pyyjson_DecodeFile(PyObject *self, PyObject *args, PyObject *kwargs);
 #if PYYJSON_BUILD_BENCHMARK
 PyObject *run_unicode_accumulate_benchmark(PyObject *self, PyObject *args, PyObject *kwargs);
+PyObject *run_object_accumulate_benchmark(PyObject *self, PyObject *args, PyObject *kwargs);
 #endif
 
 PyObject *JSONDecodeError = NULL;
@@ -42,6 +43,7 @@ static PyMethodDef pyyjson_Methods[] = {
         {"loads", (PyCFunction)pyyjson_Decode, METH_VARARGS | METH_KEYWORDS, "Converts JSON as string to dict object structure."},
 #if PYYJSON_BUILD_BENCHMARK
         {"run_unicode_accumulate_benchmark", (PyCFunction)run_unicode_accumulate_benchmark, METH_VARARGS | METH_KEYWORDS, "Benchmark."},
+        {"run_object_accumulate_benchmark", (PyCFunction)run_object_accumulate_benchmark, METH_VARARGS | METH_KEYWORDS, "Benchmark."},
 #endif
         // {"dump", (PyCFunction)pyyjson_FileEncode, METH_VARARGS | METH_KEYWORDS, "Converts arbitrary object recursively into JSON file. "},
         // {"load", (PyCFunction)pyyjson_DecodeFile, METH_VARARGS | METH_KEYWORDS, "Converts JSON as file to dict object structure."},
