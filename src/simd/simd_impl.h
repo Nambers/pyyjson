@@ -734,21 +734,6 @@ force_inline SIMD_REAL_QUARTER_TYPE zip_simd_32_to_8(SIMD_TYPE SIMD_VAR) {
 #if SIMD_BIT_SIZE == 512
     pyyjson_align(64) static const u8 t1[64] = {
             0, 4, 8, 12,
-            16, 20, 24, 28,
-            32, 36, 40, 44,
-            48, 52, 56, 60,
-            // seperate
-            0x80, 0x80,
-            0x80, 0x80,
-            0x80, 0x80,
-            0x80, 0x80,
-            0x80, 0x80,
-            0x80, 0x80,
-            0x80, 0x80,
-            0x80, 0x80,
-            // seperate
-            0x80, 0x80,
-            0x80, 0x80,
             0x80, 0x80,
             0x80, 0x80,
             0x80, 0x80,
@@ -758,14 +743,31 @@ force_inline SIMD_REAL_QUARTER_TYPE zip_simd_32_to_8(SIMD_TYPE SIMD_VAR) {
             // seperate
             0x80, 0x80,
             0x80, 0x80,
+            0, 4, 8, 12,
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80,
+            // seperate
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80,
+            0x80, 0x80,
+            0, 4, 8, 12,
+            0x80, 0x80,
+            0x80, 0x80,
+            // seperate
             0x80, 0x80,
             0x80, 0x80,
             0x80, 0x80,
             0x80, 0x80,
             0x80, 0x80,
-            0x80, 0x80};
+            0x80, 0x80,
+            0, 4, 8, 12};
     SIMD_512 z1 = _mm512_shuffle_epi8(z, load_512_aligned(t1));
-    return SIMD_EXTRACT_QUARTER(z1, 0);
+    SIMD_128 x1, x2, x3, x4;
+    extract_512_four_parts(z1, &x1, &x2, &x3, &x4);
+    return simd_or_128(simd_or_128(x1, x2), simd_or_128(x3, x4));
 #elif SIMD_BIT_SIZE == 256
     return zip_256_32_to_8(y);
 #elif __SSSE3__
