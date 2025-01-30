@@ -1,12 +1,6 @@
-# Copyright (C) 2019 Yaoyuan <ibireme@gmail.com>.
-# Released under the MIT License:
-# https://github.com/ibireme/yyjson/blob/master/LICENSE
-# modified by authors of 0ph1uch1/pyyjson
-
 cmake_minimum_required(VERSION 3.18)
-project(pyyjson VERSION 0.9.0 LANGUAGES C CXX)
+project(pyyjson VERSION 0.9.0 LANGUAGES C)
 set(CMAKE_C_STANDARD 17)
-set(CMAKE_CXX_STANDARD 17)
 set(PYYJSON_SOVERSION 0)
 
 # ------------------------------------------------------------------------------
@@ -14,7 +8,7 @@ set(PYYJSON_SOVERSION 0)
 find_package(Python3 COMPONENTS Development)
 
 # check for python3
-if((NOT Python3_INCLUDE_DIRS) OR (NOT Python3_LIBRARIES))
+if((NOT Python3_INCLUDE_DIRS) OR(NOT Python3_LIBRARIES))
     message(FATAL_ERROR "Python3 not found")
 endif()
 
@@ -30,7 +24,10 @@ endif()
 # ------------------------------------------------------------------------------
 # Build Options for tests and docs
 option(ASAN_ENABLED "Build with asan" OFF)
+
+# TODO
 option(BUILD_BENCHMARK "Build benchmarks" ON)
+option(BUILD_TEST "Build tests" ON)
 
 # option(YYJSON_BUILD_TESTS "Build all tests" OFF)
 # option(YYJSON_BUILD_FUZZER "Build fuzzer" OFF)
@@ -81,111 +78,15 @@ add_definitions(-DYYJSON_DISABLE_UTILS=1)
 # add_definitions(-DPYYJSON_USE_XXHASH=1)
 
 # ------------------------------------------------------------------------------
-# Library
-set(SRC_FILES
-    src/decode/decode.c
-    src/pyyjson.c
-    src/encode/encode_impl.c
-    src/unicode/utils.c
-    src/simd/cvt.c
-    src/simd/mask_table.c
-    src/tls.c
-    src/float/tables.c
-    src/ryu/d2s.c
-)
+# Libraries
 
-if(BUILD_BENCHMARK)
-    set(SRC_FILES ${SRC_FILES} src/benchmark.c)
-endif()
+# common definitions
+add_library(commonBuild INTERFACE)
+target_link_libraries(commonBuild INTERFACE ${Python3_LIBRARIES})
+target_include_directories(commonBuild INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src> ${Python3_INCLUDE_DIRS})
 
-add_library(pyyjson SHARED
-    ${SRC_FILES}
-)
-
-target_include_directories(pyyjson PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src> ${Python3_INCLUDE_DIRS})
-
-# set_target_properties(pyyjson PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PYYJSON_SOVERSION})
-target_link_libraries(pyyjson PUBLIC ${Python3_LIBRARIES})
-set_target_properties(pyyjson PROPERTIES PREFIX "")
-
-# ------------------------------------------------------------------------------
-# Project Config
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-include(XcodeProperty)
-
-if(XCODE)
-    set(YYJSON_FLAGS "-Wall -Wextra -Werror -pedantic -pedantic-errors")
-
-    set_default_xcode_property(pyyjson)
-    set_xcode_deployment_version(pyyjson "10.13" "12.0" "12.0" "4.0")
-
-    set_xcode_property(pyyjson GCC_C_LANGUAGE_STANDARD "c89")
-    set_xcode_property(pyyjson CLANG_CXX_LANGUAGE_STANDARD "c++98")
-
-    set_xcode_property(pyyjson OTHER_CFLAGS[variant=Debug] ${YYJSON_FLAGS})
-    set_xcode_property(pyyjson OTHER_CFLAGS[variant=MinSizeRel] ${YYJSON_FLAGS})
-    set_xcode_property(pyyjson OTHER_CFLAGS[variant=RelWithDebInfo] ${YYJSON_FLAGS})
-    set_xcode_property(pyyjson OTHER_CFLAGS[variant=Release] ${YYJSON_FLAGS})
-
-elseif(MSVC)
-    set(YYJSON_FLAGS "/utf-8")
-
-    target_compile_options(pyyjson PRIVATE $<$<C_COMPILER_ID:MSVC>:${YYJSON_FLAGS}>)
-    target_compile_options(pyyjson PRIVATE $<$<CXX_COMPILER_ID:MSVC>:${YYJSON_FLAGS}>)
-
-elseif(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|Intel")
-    if(CMAKE_C_COMPILER_ID MATCHES Clang)
-        # https://github.com/llvm/llvm-project/issues/63963
-        set(YYJSON_FLAGS "-Wno-constant-logical-operand")
-    else()
-        set(YYJSON_FLAGS "")
-    endif()
-
-    if(CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
-        message("Release mode with debug info, enabling maximal optimization and debug symbols")
-        target_compile_options(pyyjson PRIVATE -Werror -pedantic -pedantic-errors -O3)
-    elseif(CMAKE_BUILD_TYPE MATCHES ".*Rel.*")
-        message("Release mode, enabling maximal optimization")
-        target_compile_options(pyyjson PRIVATE -Werror -pedantic -pedantic-errors -O3)
-    else()
-        target_compile_options(pyyjson PRIVATE -O0)
-
-        if(ASAN_ENABLED)
-            message("ENABLE ASAN")
-            target_link_libraries(pyyjson PRIVATE asan)
-            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
-            target_compile_definitions(pyyjson PRIVATE PYYJSON_ASAN_CHECK=1)
-        endif()
-
-        message("Debug mode, enabling debug symbols")
-    endif()
-    if(BUILD_BENCHMARK)
-        message("ENABLE BENCHMARK")
-        target_compile_definitions(pyyjson PRIVATE PYYJSON_BUILD_BENCHMARK=1)
-    endif()
-
-    target_compile_options(pyyjson PRIVATE $<$<COMPILE_LANGUAGE:C>:${YYJSON_FLAGS}>)
-    target_compile_options(pyyjson PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${YYJSON_FLAGS}>)
-endif()
-
-include(CheckIncludeFile)
-check_include_file(stdint.h YYJSON_HAS_STDINT_H)
-check_include_file(stdbool.h YYJSON_HAS_STDBOOL_H)
-
-# if(BUILD_SHARED_LIBS)
-if(WIN32)
-    target_compile_definitions(pyyjson PUBLIC
-        $<BUILD_INTERFACE:YYJSON_EXPORTS>
-        $<INSTALL_INTERFACE:YYJSON_IMPORTS>)
-endif()
-
-# endif()
 message("CMAKE_C_COMPILER_ID = ${CMAKE_C_COMPILER_ID}")
-
-# Werror for Release build
-# TODO move this to GNU|Clang
 message("CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
-
 message("CMAKE_SYSTEM_PROCESSOR = ${CMAKE_SYSTEM_PROCESSOR}")
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "(^aarch64)|(^arm64)|(^ARM64)")
@@ -202,27 +103,138 @@ else()
 endif()
 
 if(PYYJSON_DETECT_SIMD)
-    target_compile_definitions(pyyjson PRIVATE PYYJSON_DETECT_SIMD=1 TARGET_SIMD_ARCH=${TARGET_SIMD_ARCH})
-endif()
-
-if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
+    target_compile_definitions(commonBuild INTERFACE PYYJSON_DETECT_SIMD=1 TARGET_SIMD_ARCH=${TARGET_SIMD_ARCH})
 else()
+    # TODO cannot detect simd
 endif()
 
+if(BUILD_BENCHMARK)
+    message("ENABLE BENCHMARK")
+    target_compile_definitions(commonBuild INTERFACE PYYJSON_BUILD_BENCHMARK=1)
+endif()
+
+if(ASAN_ENABLED)
+    message("ENABLE ASAN")
+    target_compile_definitions(commonBuild INTERFACE PYYJSON_ASAN_CHECK=1)
+
+    if(MSVC)
+        target_compile_options(commonBuild INTERFACE /fsanitize=address)
+        target_link_options(commonBuild INTERFACE /fsanitize=address)
+    else()
+        target_compile_options(commonBuild INTERFACE -fsanitize=address)
+        target_link_options(commonBuild INTERFACE -fsanitize=address)
+    endif()
+endif()
+
+# set pyyjson src files
+set(SRC_FILES
+    src/decode/decode.c
+    src/pyyjson.c
+    src/encode/encode_impl.c
+    src/unicode/utils.c
+    src/simd/cvt.c
+    src/simd/mask_table.c
+    src/tls.c
+    src/float/tables.c
+    src/ryu/d2s.c
+)
+
+if(BUILD_BENCHMARK)
+    set(SRC_FILES ${SRC_FILES} src/benchmark.c)
+endif()
+
+# TODO
+if(BUILD_TEST)
+    set(SRC_FILES ${SRC_FILES} src/ctests/test.c)
+endif()
+
+# add library pyyjson
+add_library(pyyjson SHARED ${SRC_FILES})
+target_link_libraries(pyyjson PRIVATE commonBuild)
+set_target_properties(pyyjson PROPERTIES PREFIX "")
+
+# set_target_properties(pyyjson PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PYYJSON_SOVERSION})
+
+# ------------------------------------------------------------------------------
+# Project Config
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(XcodeProperty)
+
+if(XCODE)
+    set(PYYJSON_FLAGS)
+    list(APPEND PYYJSON_FLAGS "-Wall" "-Wextra" "-Werror" "-pedantic" "-pedantic-errors")
+
+    set_default_xcode_property(commonBuild)
+    set_xcode_deployment_version(commonBuild "10.13" "12.0" "12.0" "4.0")
+
+    set_xcode_property(commonBuild GCC_C_LANGUAGE_STANDARD "c17")
+
+    # set_xcode_property(pyyjson CLANG_CXX_LANGUAGE_STANDARD "c++98")
+    set_xcode_property(commonBuild OTHER_CFLAGS[variant=Debug] ${PYYJSON_FLAGS})
+    set_xcode_property(commonBuild OTHER_CFLAGS[variant=MinSizeRel] ${PYYJSON_FLAGS})
+    set_xcode_property(commonBuild OTHER_CFLAGS[variant=RelWithDebInfo] ${PYYJSON_FLAGS})
+    set_xcode_property(commonBuild OTHER_CFLAGS[variant=Release] ${PYYJSON_FLAGS})
+
+elseif(MSVC)
+    set(PYYJSON_FLAGS)
+    list(APPEND PYYJSON_FLAGS "/utf-8")
+
+    target_compile_options(commonBuild INTERFACE $<$<C_COMPILER_ID:MSVC>:${PYYJSON_FLAGS}>)
+    target_compile_options(commonBuild INTERFACE $<$<CXX_COMPILER_ID:MSVC>:${PYYJSON_FLAGS}>)
+
+elseif(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|Intel")
+    set(PYYJSON_FLAGS)
+
+    if(CMAKE_C_COMPILER_ID MATCHES Clang)
+        # https://github.com/llvm/llvm-project/issues/63963
+        list(APPEND PYYJSON_FLAGS "-Wno-constant-logical-operand")
+    endif()
+
+    if(CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
+        message("Release mode with debug info, enabling maximal optimization and debug symbols")
+        target_compile_options(commonBuild INTERFACE -Werror -pedantic -pedantic-errors)
+    elseif(CMAKE_BUILD_TYPE MATCHES ".*Rel.*")
+        message("Release mode, enabling maximal optimization")
+        target_compile_options(commonBuild INTERFACE -Werror -pedantic -pedantic-errors)
+    else()
+        target_compile_options(commonBuild INTERFACE -O0)
+
+        message("Debug mode, enabling debug symbols")
+    endif()
+
+    target_compile_options(commonBuild INTERFACE $<$<COMPILE_LANGUAGE:C>:${PYYJSON_FLAGS}>)
+    # target_compile_options(commonBuild INTERFACE $<$<COMPILE_LANGUAGE:CXX>:${PYYJSON_FLAGS}>)
+endif()
+
+include(CheckIncludeFile)
+check_include_file(stdint.h YYJSON_HAS_STDINT_H)
+check_include_file(stdbool.h YYJSON_HAS_STDBOOL_H)
+
+if(WIN32)
+    target_compile_definitions(pyyjson PUBLIC
+        $<BUILD_INTERFACE:YYJSON_EXPORTS>
+        $<INSTALL_INTERFACE:YYJSON_IMPORTS>)
+endif()
+
+# if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+# elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
+# else()
+# endif()
 if(MSVC)
     # TODO remove this
-    # target_compile_options(pyyjson PRIVATE /arch:AVX512F /arch:AVX512BW)
-    # target_compile_options(pyyjson PRIVATE /arch:AVX2)
-    target_compile_options(pyyjson PRIVATE)
+    # target_compile_options(commonBuild INTERFACE /arch:AVX512F /arch:AVX512BW)
+    # target_compile_options(commonBuild INTERFACE /arch:AVX2)
+    target_compile_options(commonBuild INTERFACE)
 else()
     # TODO remove this
-    # target_compile_options(pyyjson PRIVATE -march=native)
-    # target_compile_options(pyyjson PRIVATE -mavx512f -mavx512bw)
-    # target_compile_options(pyyjson PRIVATE -mavx2)
-    # target_compile_options(pyyjson PRIVATE -msse4.1 -msse4.2)
-    target_compile_options(pyyjson PRIVATE)
+    # target_compile_options(commonBuild INTERFACE -march=native)
+    # target_compile_options(commonBuild INTERFACE -mavx512f -mavx512bw)
+    # target_compile_options(commonBuild INTERFACE -mavx2)
+
+    # target_compile_options(commonBuild INTERFACE -msse4.1 -msse4.2)
+    target_compile_options(commonBuild INTERFACE)
 endif()
+
 # ------------------------------------------------------------------------------
 # Install
 if(APPLE)
