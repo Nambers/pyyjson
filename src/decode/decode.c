@@ -247,36 +247,38 @@ force_inline bool init_decode_ctn_stack_info(DecodeCtnStackInfo *restrict decode
 #    define PYYJSON_TRACE_OP(x) (void)0
 #endif
 
-force_noinline bool _pyyjson_decode_obj_stack_resize(DecodeObjStackInfo *restrict decode_obj_stack_info) {
-    // resize
-    if (likely(PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE == decode_obj_stack_info->result_stack_end - decode_obj_stack_info->result_stack)) {
-        void *new_buffer = malloc(sizeof(PyObject *) * (PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE << 1));
-        if (unlikely(!new_buffer)) {
-            PyErr_NoMemory();
-            return false;
-        }
-        memcpy(new_buffer, decode_obj_stack_info->result_stack, sizeof(PyObject *) * PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE);
-        decode_obj_stack_info->result_stack = (PyObject **)new_buffer;
-        decode_obj_stack_info->cur_write_result_addr = decode_obj_stack_info->result_stack + PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE;
-        decode_obj_stack_info->result_stack_end = decode_obj_stack_info->result_stack + (PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE << 1);
-    } else {
-        Py_ssize_t old_capacity = decode_obj_stack_info->result_stack_end - decode_obj_stack_info->result_stack;
-        if (unlikely((PY_SSIZE_T_MAX >> 1) < old_capacity)) {
-            PyErr_NoMemory();
-            return false;
-        }
-        Py_ssize_t new_capacity = old_capacity << 1;
-        void *new_buffer = realloc(decode_obj_stack_info->result_stack, sizeof(PyObject *) * new_capacity);
-        if (unlikely(!new_buffer)) {
-            PyErr_NoMemory();
-            return false;
-        }
-        decode_obj_stack_info->result_stack = (PyObject **)new_buffer;
-        decode_obj_stack_info->cur_write_result_addr = decode_obj_stack_info->result_stack + old_capacity;
-        decode_obj_stack_info->result_stack_end = decode_obj_stack_info->result_stack + new_capacity;
-    }
-    return true;
-}
+
+bool _pyyjson_decode_obj_stack_resize(DecodeObjStackInfo *restrict decode_obj_stack_info);
+//  {
+//     // resize
+//     if (likely(PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE == decode_obj_stack_info->result_stack_end - decode_obj_stack_info->result_stack)) {
+//         void *new_buffer = malloc(sizeof(PyObject *) * (PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE << 1));
+//         if (unlikely(!new_buffer)) {
+//             PyErr_NoMemory();
+//             return false;
+//         }
+//         memcpy(new_buffer, decode_obj_stack_info->result_stack, sizeof(PyObject *) * PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE);
+//         decode_obj_stack_info->result_stack = (PyObject **)new_buffer;
+//         decode_obj_stack_info->cur_write_result_addr = decode_obj_stack_info->result_stack + PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE;
+//         decode_obj_stack_info->result_stack_end = decode_obj_stack_info->result_stack + (PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE << 1);
+//     } else {
+//         Py_ssize_t old_capacity = decode_obj_stack_info->result_stack_end - decode_obj_stack_info->result_stack;
+//         if (unlikely((PY_SSIZE_T_MAX >> 1) < old_capacity)) {
+//             PyErr_NoMemory();
+//             return false;
+//         }
+//         Py_ssize_t new_capacity = old_capacity << 1;
+//         void *new_buffer = realloc(decode_obj_stack_info->result_stack, sizeof(PyObject *) * new_capacity);
+//         if (unlikely(!new_buffer)) {
+//             PyErr_NoMemory();
+//             return false;
+//         }
+//         decode_obj_stack_info->result_stack = (PyObject **)new_buffer;
+//         decode_obj_stack_info->cur_write_result_addr = decode_obj_stack_info->result_stack + old_capacity;
+//         decode_obj_stack_info->result_stack_end = decode_obj_stack_info->result_stack + new_capacity;
+//     }
+//     return true;
+// }
 
 force_inline bool pyyjson_push_obj(DecodeObjStackInfo *restrict decode_obj_stack_info, PyObject *obj) {
     static_assert(((Py_ssize_t)PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE << 1) > 0, "(PYYJSON_DECODE_OBJSTACK_BUFFER_SIZE << 1) > 0");
@@ -287,13 +289,6 @@ force_inline bool pyyjson_push_obj(DecodeObjStackInfo *restrict decode_obj_stack
     *decode_obj_stack_info->cur_write_result_addr++ = obj;
     return true;
 }
-
-// force_inline bool pyyjson_decode_string(DecodeObjStackInfo *restrict decode_obj_stack_info, const u8 *unicode_str, Py_ssize_t len, int type_flag, bool is_key) {
-//     PYYJSON_TRACE_OP(PYYJSON_OP_STRING);
-//     PyObject *new_val = make_string(unicode_str, len, type_flag, is_key);
-//     RETURN_ON_UNLIKELY_ERR(!new_val);
-//     return pyyjson_push_obj(decode_obj_stack_info, new_val);
-// }
 
 force_inline bool pyyjson_decode_double(DecodeObjStackInfo *restrict decode_obj_stack_info, double val) {
     PYYJSON_TRACE_OP(PYYJSON_OP_NUMBER);
@@ -607,7 +602,7 @@ force_inline u32 read_b4_unicode(u32 uni) {
 // force_noinline PyObject *read_root_2(PyUnicodeObject *unicode_root);
 // force_noinline PyObject *read_root_4(PyUnicodeObject *unicode_root);
 
-PyObject *pyyjson_Decode(PyObject *self, PyObject *args, PyObject *kwargs) {
+PyObject *SIMD_NAME_MODIFIER(pyyjson_Decode)(PyObject *self, PyObject *args, PyObject *kwargs) {
     // const char *string = NULL;
     // Py_ssize_t len = 0;
     static const char *kwlist[] = {"s", NULL};

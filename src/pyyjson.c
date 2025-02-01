@@ -162,6 +162,25 @@ PyMODINIT_FUNC PyInit_pyyjson(void) {
     return module;
 }
 
+#if BUILD_MULTI_LIB
+PyObject *pyyjson_Encode_avx512(PyObject *self, PyObject *args, PyObject *kwargs);
+PyObject *pyyjson_Encode_avx2(PyObject *self, PyObject *args, PyObject *kwargs);
+PyObject *pyyjson_Encode_sse4_2(PyObject *self, PyObject *args, PyObject *kwargs);
+PyObject *pyyjson_Encode_sse2(PyObject *self, PyObject *args, PyObject *kwargs);
+
+int get_simd_feature() {
+    // TODO
+    return 0;
+}
+
+PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject *kwargs) {
+    // TODO
+    int simd_feature = get_simd_feature();
+    return pyyjson_Encode_sse2(self, args, kwargs);
+}
+#endif
+
+
 /* Runtime check if lzcnt is supported. */
 // bool is_lzcnt_supported(void) {
 //     int info[4];

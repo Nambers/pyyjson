@@ -1487,7 +1487,7 @@ failed_cleanup:
 }
 
 /** Read single value JSON document. */
-force_noinline PyObject *read_root_single_bytes(const u8 *dat, usize len) {
+static force_noinline PyObject *read_root_single_bytes(const u8 *dat, usize len) {
 #define return_err(_pos, _type, _msg)                                                             \
     do {                                                                                          \
         if (_type == JSONDecodeError) {                                                           \
@@ -1596,7 +1596,7 @@ fail_cleanup:
 #undef return_err
 }
 
-force_noinline PyObject *pyyjson_decode_bytes(char *_buffer, Py_ssize_t len) {
+static force_noinline PyObject *pyyjson_decode_bytes(char *_buffer, Py_ssize_t len) {
     // some checks
     if (unlikely(!len)) {
         PyErr_Format(JSONDecodeError, "input data is empty");

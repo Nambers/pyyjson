@@ -147,28 +147,28 @@ force_inline int pydict_next(PyObject *op, Py_ssize_t *ppos, PyObject **pkey,
  * Constants
  *============================================================================*/
 
-pyyjson_align(64) const i8 _Quote_i8[64] = {REPEAT_64(_Quote)};
-pyyjson_align(64) const i16 _Quote_i16[32] = {REPEAT_32(_Quote)};
-pyyjson_align(64) const i32 _Quote_i32[16] = {REPEAT_16(_Quote)};
-pyyjson_align(64) const i8 _Slash_i8[64] = {REPEAT_64(_Slash)};
-pyyjson_align(64) const i16 _Slash_i16[32] = {REPEAT_32(_Slash)};
-pyyjson_align(64) const i32 _Slash_i32[16] = {REPEAT_16(_Slash)};
-pyyjson_align(64) const i8 _MinusOne_i8[64] = {REPEAT_64(_MinusOne)};
-pyyjson_align(64) const i16 _MinusOne_i16[32] = {REPEAT_32(_MinusOne)};
-pyyjson_align(64) const i32 _MinusOne_i32[16] = {REPEAT_16(_MinusOne)};
-pyyjson_align(64) const i8 _ControlMax_i8[64] = {REPEAT_64(ControlMax)};
-pyyjson_align(64) const i16 _ControlMax_i16[32] = {REPEAT_32(ControlMax)};
-pyyjson_align(64) const i32 _ControlMax_i32[16] = {REPEAT_16(ControlMax)};
-pyyjson_align(64) const i8 _Seven_i8[64] = {REPEAT_64(7)};
-pyyjson_align(64) const i16 _Seven_i16[32] = {REPEAT_32(7)};
-pyyjson_align(64) const i32 _Seven_i32[16] = {REPEAT_16(7)};
-pyyjson_align(64) const i8 _Eleven_i8[64] = {REPEAT_64(11)};
-pyyjson_align(64) const i16 _Eleven_i16[32] = {REPEAT_32(11)};
-pyyjson_align(64) const i32 _Eleven_i32[16] = {REPEAT_16(11)};
-pyyjson_align(64) const i8 _Fourteen_i8[64] = {REPEAT_64(14)};
-pyyjson_align(64) const i16 _Fourteen_i16[32] = {REPEAT_32(14)};
-pyyjson_align(64) const i32 _Fourteen_i32[16] = {REPEAT_16(14)};
-pyyjson_align(64) const i32 _All_0XFF[16] = {REPEAT_16(-1)};
+pyyjson_align(64) static const i8 _Quote_i8[64] = {REPEAT_64(_Quote)};
+pyyjson_align(64) static const i16 _Quote_i16[32] = {REPEAT_32(_Quote)};
+pyyjson_align(64) static const i32 _Quote_i32[16] = {REPEAT_16(_Quote)};
+pyyjson_align(64) static const i8 _Slash_i8[64] = {REPEAT_64(_Slash)};
+pyyjson_align(64) static const i16 _Slash_i16[32] = {REPEAT_32(_Slash)};
+pyyjson_align(64) static const i32 _Slash_i32[16] = {REPEAT_16(_Slash)};
+pyyjson_align(64) static const i8 _MinusOne_i8[64] = {REPEAT_64(_MinusOne)};
+pyyjson_align(64) static const i16 _MinusOne_i16[32] = {REPEAT_32(_MinusOne)};
+pyyjson_align(64) static const i32 _MinusOne_i32[16] = {REPEAT_16(_MinusOne)};
+pyyjson_align(64) static const i8 _ControlMax_i8[64] = {REPEAT_64(ControlMax)};
+pyyjson_align(64) static const i16 _ControlMax_i16[32] = {REPEAT_32(ControlMax)};
+pyyjson_align(64) static const i32 _ControlMax_i32[16] = {REPEAT_16(ControlMax)};
+// pyyjson_align(64) const i8 _Seven_i8[64] = {REPEAT_64(7)};
+// pyyjson_align(64) const i16 _Seven_i16[32] = {REPEAT_32(7)};
+// pyyjson_align(64) const i32 _Seven_i32[16] = {REPEAT_16(7)};
+// pyyjson_align(64) const i8 _Eleven_i8[64] = {REPEAT_64(11)};
+// pyyjson_align(64) const i16 _Eleven_i16[32] = {REPEAT_32(11)};
+// pyyjson_align(64) const i32 _Eleven_i32[16] = {REPEAT_16(11)};
+// pyyjson_align(64) const i8 _Fourteen_i8[64] = {REPEAT_64(14)};
+// pyyjson_align(64) const i16 _Fourteen_i16[32] = {REPEAT_32(14)};
+// pyyjson_align(64) const i32 _Fourteen_i32[16] = {REPEAT_16(14)};
+// pyyjson_align(64) const i32 _All_0XFF[16] = {REPEAT_16(-1)};
 
 /*==============================================================================
  * Writer

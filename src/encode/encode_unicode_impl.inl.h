@@ -76,7 +76,7 @@ static _TARGET_TYPE _CONTROL_SEQ_TABLE[(_Slash + 1) * 8] = {
 #endif // COMPILE_READ_UCS_LEVEL == 1 && COMPILE_INDENT_LEVEL == 0
 
 
-force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(UnicodeVector **restrict vec_addr, const _FROM_TYPE *restrict src, Py_ssize_t len, Py_ssize_t additional_len) {
+static force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(UnicodeVector **restrict vec_addr, const _FROM_TYPE *restrict src, Py_ssize_t len, Py_ssize_t additional_len) {
     UnicodeVector *vec = *vec_addr;
     _TARGET_TYPE *writer = _WRITER(vec);
     const _FROM_TYPE *src_end = src + len;

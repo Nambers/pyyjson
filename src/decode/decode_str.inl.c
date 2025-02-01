@@ -362,7 +362,7 @@ force_inline bool VERIFY_ESCAPE_HEX(DECODE_SRC_INFO *decode_src_info) {
 }
 
 /* noinline this to reduce binary size */
-force_noinline u32 DECODE_ESCAPE_UNICODE(DECODE_SRC_INFO *restrict decode_src_info) {
+static force_noinline u32 DECODE_ESCAPE_UNICODE(DECODE_SRC_INFO *restrict decode_src_info) {
     // escape
     switch (*++decode_src_info->src) { // clang-format off
         case '"':  decode_src_info->src++; return '"';
@@ -447,7 +447,7 @@ force_inline SpecialCharReadResult DO_SPECIAL(DECODE_SRC_INFO *restrict decode_s
     }
 }
 
-force_noinline void PROCESS_ESCAPE(
+static force_noinline void PROCESS_ESCAPE(
         DECODE_UNICODE_INFO *decode_unicode_info,
         ReadStrState *read_state,
         DECODE_SRC_INFO *decode_src_info,
@@ -1371,7 +1371,7 @@ fail:;
     return NULL;
 }
 
-force_noinline void FAST_SKIP_SPACES(const _FROM_TYPE **cur_addr, const _FROM_TYPE *end) {
+force_inline void FAST_SKIP_SPACES(const _FROM_TYPE **cur_addr, const _FROM_TYPE *end) {
 #define SET1 PYYJSON_CONCAT3(broadcast, READ_BIT_SIZE, SIMD_BIT_SIZE)
     const SIMD_TYPE template = SET1(' ');
 #undef SET1
@@ -1427,7 +1427,7 @@ force_inline bool CHECK_AND_RESERVE_STR_BUFFER(Py_ssize_t len, _FROM_TYPE **buff
 }
 
 /** Read JSON document (accept all style, but optimized for pretty). */
-force_noinline PyObject *READ_ROOT(const _FROM_TYPE *dat, Py_ssize_t len) {
+static force_noinline PyObject *READ_ROOT(const _FROM_TYPE *dat, Py_ssize_t len) {
     // check unicode is valid
     // assert(PyUnicode_Check(unicode_root));
     // assert(((PyASCIIObject *)unicode_root)->state.kind == COMPILE_READ_UCS_LEVEL);
@@ -1888,7 +1888,7 @@ failed_cleanup:
 }
 
 /** Read single value JSON document. */
-force_noinline PyObject *READ_ROOT_SINGLE(const _FROM_TYPE *dat, Py_ssize_t len) {
+static force_noinline PyObject *READ_ROOT_SINGLE(const _FROM_TYPE *dat, Py_ssize_t len) {
 #define return_err(_pos, _type, _msg)                                                             \
     do {                                                                                          \
         if (_type == JSONDecodeError) {                                                           \

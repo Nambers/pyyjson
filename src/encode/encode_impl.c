@@ -393,7 +393,7 @@ force_inline PyObject *pyyjson_dumps_single_constant(PyFastTypes py_type) {
 }
 
 /* Entrance for python code. */
-force_noinline PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject *kwargs) {
+PyObject *SIMD_NAME_MODIFIER(pyyjson_Encode)(PyObject *self, PyObject *args, PyObject *kwargs) {
     PyObject *obj;
     int option_digit = 0;
     usize indent = 0;
@@ -447,15 +447,15 @@ dumps_container:;
 
     switch (indent) {
         case 0: {
-            ret = pyyjson_dumps_obj_0_0(obj);
+            ret = SIMD_NAME_MODIFIER(pyyjson_dumps_obj_0_0)(obj);
             break;
         }
         case 2: {
-            ret = pyyjson_dumps_obj_2_0(obj);
+            ret = SIMD_NAME_MODIFIER(pyyjson_dumps_obj_2_0)(obj);
             break;
         }
         case 4: {
-            ret = pyyjson_dumps_obj_4_0(obj);
+            ret = SIMD_NAME_MODIFIER(pyyjson_dumps_obj_4_0)(obj);
             break;
         }
         default: {

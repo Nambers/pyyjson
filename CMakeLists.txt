@@ -27,7 +27,18 @@ option(ASAN_ENABLED "Build with asan" OFF)
 
 # TODO
 option(BUILD_BENCHMARK "Build benchmarks" ON)
-option(BUILD_TEST "Build tests" ON)
+option(BUILD_TEST "Build tests" OFF)
+option(BUILD_SHIPPING_SIMD "Build all simd for shipping" ON)
+option(BUILD_AVX512 "Force build avx512, non-shipping" OFF)
+option(BUILD_AVX2 "Force build avx2, non-shipping" OFF)
+option(BUILD_SSE4 "Force build sse4, non-shipping" OFF)
+option(BUILD_NATIVE "Force build with -march=native, non-shipping" OFF)
+
+if(BUILD_SHIPPING_SIMD)
+    set(BUILD_MULTI_LIB 1)
+else()
+    set(BUILD_MULTI_LIB 0)
+endif()
 
 # option(YYJSON_BUILD_TESTS "Build all tests" OFF)
 # option(YYJSON_BUILD_FUZZER "Build fuzzer" OFF)
@@ -84,6 +95,7 @@ add_definitions(-DYYJSON_DISABLE_UTILS=1)
 add_library(commonBuild INTERFACE)
 target_link_libraries(commonBuild INTERFACE ${Python3_LIBRARIES})
 target_include_directories(commonBuild INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src> ${Python3_INCLUDE_DIRS})
+target_compile_definitions(commonBuild INTERFACE BUILD_MULTI_LIB=${BUILD_MULTI_LIB})
 
 message("CMAKE_C_COMPILER_ID = ${CMAKE_C_COMPILER_ID}")
 message("CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
@@ -126,32 +138,69 @@ if(ASAN_ENABLED)
     endif()
 endif()
 
+# ------------------------------------------------------------------------------
+# setting up pyyjson
+
 # set pyyjson src files
 set(SRC_FILES
-    src/decode/decode.c
     src/pyyjson.c
-    src/encode/encode_impl.c
     src/unicode/utils.c
-    src/simd/cvt.c
     src/simd/mask_table.c
     src/tls.c
     src/float/tables.c
     src/ryu/d2s.c
+    src/decode/utils.c
+)
+
+set(SRC_WITH_SIMD
+    src/decode/decode.c
+    src/encode/encode_impl.c
+    src/simd/cvt.c
+)
+
+set(SRC_TEST
+    src/ctests/test.c
 )
 
 if(BUILD_BENCHMARK)
     set(SRC_FILES ${SRC_FILES} src/benchmark.c)
 endif()
 
-# TODO
-if(BUILD_TEST)
-    set(SRC_FILES ${SRC_FILES} src/ctests/test.c)
-endif()
-
 # add library pyyjson
-add_library(pyyjson SHARED ${SRC_FILES})
-target_link_libraries(pyyjson PRIVATE commonBuild)
-set_target_properties(pyyjson PROPERTIES PREFIX "")
+if(BUILD_SHIPPING_SIMD)
+    if("${TARGET_SIMD_ARCH}" STREQUAL "x86")
+        add_library(pyyjson_common OBJECT ${SRC_FILES})
+        target_link_libraries(pyyjson_common PUBLIC commonBuild)
+        add_library(pyyjson_avx512 OBJECT ${SRC_WITH_SIMD})
+        target_link_libraries(pyyjson_avx512 PUBLIC pyyjson_common)
+        add_library(pyyjson_avx2 OBJECT ${SRC_WITH_SIMD})
+        target_link_libraries(pyyjson_avx2 PUBLIC pyyjson_common)
+
+        # add_library(pyyjson_sse4 OBJECT ${SRC_WITH_SIMD})
+        # target_link_libraries(pyyjson_sse4 PUBLIC pyyjson_common)
+        add_library(pyyjson_sse2 OBJECT ${SRC_WITH_SIMD})
+        target_link_libraries(pyyjson_sse2 PUBLIC pyyjson_common)
+        add_library(pyyjson SHARED $<TARGET_OBJECTS:pyyjson_avx512> $<TARGET_OBJECTS:pyyjson_avx2> $<TARGET_OBJECTS:pyyjson_common>)
+        if(MSVC)
+            target_compile_options(pyyjson_avx512 PRIVATE /arch:AVX512F /arch:AVX512BW)
+            target_compile_options(pyyjson_avx2 PRIVATE /arch:AVX2)
+
+        # target_compile_options(pyyjson_sse4 PRIVATE /arch:SSE4.2)
+        else()
+            target_compile_options(pyyjson_avx512 PRIVATE -mavx512f -mavx512bw)
+            target_compile_options(pyyjson_avx2 PRIVATE -mavx2)
+
+            # target_compile_options(pyyjson_sse4 PRIVATE -msse4.1 -msse4.2)
+        endif()
+    else()
+        message(FATAL_ERROR "TARGET_SIMD_ARCH=${TARGET_SIMD_ARCH} not supported")
+        # TODO
+    endif()
+else()
+    add_library(pyyjson SHARED ${SRC_FILES} ${SRC_WITH_SIMD})
+    target_link_libraries(pyyjson PRIVATE commonBuild)
+    set_target_properties(pyyjson PROPERTIES PREFIX "")
+endif()
 
 # set_target_properties(pyyjson PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PYYJSON_SOVERSION})
 
@@ -168,8 +217,9 @@ if(XCODE)
     set_xcode_deployment_version(commonBuild "10.13" "12.0" "12.0" "4.0")
 
     set_xcode_property(commonBuild GCC_C_LANGUAGE_STANDARD "c17")
+    set_xcode_property(commonBuild CLANG_C_LANGUAGE_STANDARD "c17")
 
-    # set_xcode_property(pyyjson CLANG_CXX_LANGUAGE_STANDARD "c++98")
+    # set_xcode_property(commonBuild CLANG_CXX_LANGUAGE_STANDARD "c++98")
     set_xcode_property(commonBuild OTHER_CFLAGS[variant=Debug] ${PYYJSON_FLAGS})
     set_xcode_property(commonBuild OTHER_CFLAGS[variant=MinSizeRel] ${PYYJSON_FLAGS})
     set_xcode_property(commonBuild OTHER_CFLAGS[variant=RelWithDebInfo] ${PYYJSON_FLAGS})
@@ -203,6 +253,7 @@ elseif(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|Intel")
     endif()
 
     target_compile_options(commonBuild INTERFACE $<$<COMPILE_LANGUAGE:C>:${PYYJSON_FLAGS}>)
+
     # target_compile_options(commonBuild INTERFACE $<$<COMPILE_LANGUAGE:CXX>:${PYYJSON_FLAGS}>)
 endif()
 
@@ -211,7 +262,7 @@ check_include_file(stdint.h YYJSON_HAS_STDINT_H)
 check_include_file(stdbool.h YYJSON_HAS_STDBOOL_H)
 
 if(WIN32)
-    target_compile_definitions(pyyjson PUBLIC
+    target_compile_definitions(commonBuild INTERFACE
         $<BUILD_INTERFACE:YYJSON_EXPORTS>
         $<INSTALL_INTERFACE:YYJSON_IMPORTS>)
 endif()
