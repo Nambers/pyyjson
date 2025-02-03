@@ -176,7 +176,7 @@ PyObject *pyyjson_Decode_avx2(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *pyyjson_Decode_sse4_2(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *pyyjson_Decode_sse2(PyObject *self, PyObject *args, PyObject *kwargs);
 
-int get_simd_feature() {
+int get_simd_feature(void) {
     // TODO
     return 0;
 }
