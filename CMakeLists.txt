@@ -181,11 +181,12 @@ if(BUILD_SHIPPING_SIMD)
         add_library(pyyjson_sse2 OBJECT ${SRC_WITH_SIMD})
         target_link_libraries(pyyjson_sse2 PUBLIC pyyjson_common)
         add_library(pyyjson SHARED $<TARGET_OBJECTS:pyyjson_avx512> $<TARGET_OBJECTS:pyyjson_avx2> $<TARGET_OBJECTS:pyyjson_sse2> $<TARGET_OBJECTS:pyyjson_common>)
+
         if(MSVC)
-            target_compile_options(pyyjson_avx512 PRIVATE /arch:AVX512F /arch:AVX512BW)
+            # MSVC does not support precise SIMD feature settings like /arch:SSE4.2, /arch:AVX512F
+            target_compile_options(pyyjson_avx512 PRIVATE /arch:AVX512)
             target_compile_options(pyyjson_avx2 PRIVATE /arch:AVX2)
 
-        # target_compile_options(pyyjson_sse4 PRIVATE /arch:SSE4.2)
         else()
             target_compile_options(pyyjson_avx512 PRIVATE -mavx512f -mavx512bw)
             target_compile_options(pyyjson_avx2 PRIVATE -mavx2)
@@ -194,6 +195,7 @@ if(BUILD_SHIPPING_SIMD)
         endif()
     else()
         message(FATAL_ERROR "TARGET_SIMD_ARCH=${TARGET_SIMD_ARCH} not supported")
+
         # TODO
     endif()
 else()
