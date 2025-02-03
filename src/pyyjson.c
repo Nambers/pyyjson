@@ -102,7 +102,11 @@ static void module_free(void *m) {
 }
 
 #if PY_MINOR_VERSION >= 13
-void _init_PyNone_Type(PyTypeObject *none_type);
+PyTypeObject *PyNone_Type = NULL;
+
+void _init_PyNone_Type(PyTypeObject *none_type) {
+    PyNone_Type = none_type;
+}
 #endif
 
 

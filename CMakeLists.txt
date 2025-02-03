@@ -12,6 +12,9 @@ if((NOT Python3_INCLUDE_DIRS) OR(NOT Python3_LIBRARIES))
     message(FATAL_ERROR "Python3 not found")
 endif()
 
+message("Python3_INCLUDE_DIRS = ${Python3_INCLUDE_DIRS}")
+message("Python3_LIBRARIES = ${Python3_LIBRARIES}")
+
 # ------------------------------------------------------------------------------
 # Build Type
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
@@ -181,6 +184,7 @@ if(BUILD_SHIPPING_SIMD)
         add_library(pyyjson_sse2 OBJECT ${SRC_WITH_SIMD})
         target_link_libraries(pyyjson_sse2 PUBLIC pyyjson_common)
         add_library(pyyjson SHARED $<TARGET_OBJECTS:pyyjson_avx512> $<TARGET_OBJECTS:pyyjson_avx2> $<TARGET_OBJECTS:pyyjson_sse2> $<TARGET_OBJECTS:pyyjson_common>)
+        target_link_libraries(pyyjson PUBLIC ${Python3_LIBRARIES})
 
         if(MSVC)
             # MSVC does not support precise SIMD feature settings like /arch:SSE4.2, /arch:AVX512F

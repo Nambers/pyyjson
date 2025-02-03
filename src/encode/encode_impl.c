@@ -182,11 +182,7 @@ force_inline bool init_stack_vars(EncodeStackVars *stack_vars, PyObject *in_obj)
 
 #if PY_MINOR_VERSION >= 13
 // _PyNone_Type is hidden in Python 3.13
-static PyTypeObject *PyNone_Type = NULL;
-
-void _init_PyNone_Type(PyTypeObject *none_type) {
-    PyNone_Type = none_type;
-}
+extern PyTypeObject *PyNone_Type;
 #else
 #    define PyNone_Type &_PyNone_Type
 #endif
