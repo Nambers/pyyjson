@@ -739,4 +739,8 @@ force_inline void split_tail_len_four_parts(Py_ssize_t tail_len, Py_ssize_t chec
     *part1 = p1;
 }
 
+/* typedefs */
+typedef PyObject *pyyjson_cache_type;
+
+
 #endif // PYYJSON_H

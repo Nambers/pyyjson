@@ -1,4 +1,5 @@
 #include "decode.h"
+#include <threads.h>
 
 bool _pyyjson_decode_obj_stack_resize(DecodeObjStackInfo *restrict decode_obj_stack_info) {
     // resize
@@ -30,3 +31,6 @@ bool _pyyjson_decode_obj_stack_resize(DecodeObjStackInfo *restrict decode_obj_st
     }
     return true;
 }
+
+thread_local u8 pyyjson_string_buffer[PYYJSON_STRING_BUFFER_SIZE];
+pyyjson_cache_type AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];

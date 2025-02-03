@@ -600,9 +600,9 @@ force_inline EncodeValJumpFlag ENCODE_PROCESS_VAL(
 #undef CTN_SIZE_GROW
 }
 
-#define PYYJSON_DUMPS_OBJ SIMD_NAME_MODIFIER(PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL))
+#define PYYJSON_DUMPS_OBJ PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_noinline PyObject *
+static force_noinline PyObject *
 PYYJSON_DUMPS_OBJ(
 #if COMPILE_UCS_LEVEL > 0
         EncodeValJumpFlag jump_flag,
@@ -739,17 +739,17 @@ dict_pair_begin:;
         {
 #if COMPILE_UCS_LEVEL < 1
             if (unlikely(stack_vars->unicode_info.cur_ucs_type == 1)) {
-                return SIMD_NAME_MODIFIER(PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1))(JumpFlag_Elevate1_Key, stack_vars);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(JumpFlag_Elevate1_Key, stack_vars);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 2
             if (unlikely(stack_vars->unicode_info.cur_ucs_type == 2)) {
-                return SIMD_NAME_MODIFIER(PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2))(JumpFlag_Elevate2_Key, stack_vars);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(JumpFlag_Elevate2_Key, stack_vars);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 4
             if (unlikely(stack_vars->unicode_info.cur_ucs_type == 4)) {
-                return SIMD_NAME_MODIFIER(PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4))(JumpFlag_Elevate4_Key, stack_vars);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(JumpFlag_Elevate4_Key, stack_vars);
             }
 #endif
         }
@@ -774,17 +774,17 @@ dict_pair_begin:;
             }
 #if COMPILE_UCS_LEVEL < 1
             case JumpFlag_Elevate1_ObjVal: {
-                return SIMD_NAME_MODIFIER(PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1))(JumpFlag_Elevate1_ObjVal, stack_vars);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(JumpFlag_Elevate1_ObjVal, stack_vars);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 2
             case JumpFlag_Elevate2_ObjVal: {
-                return SIMD_NAME_MODIFIER(PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2))(JumpFlag_Elevate2_ObjVal, stack_vars);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(JumpFlag_Elevate2_ObjVal, stack_vars);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 4
             case JumpFlag_Elevate4_ObjVal: {
-                return SIMD_NAME_MODIFIER(PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4))(JumpFlag_Elevate4_ObjVal, stack_vars);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(JumpFlag_Elevate4_ObjVal, stack_vars);
             }
 #endif
             default: {
@@ -847,17 +847,17 @@ arr_val_begin:;
             }
 #if COMPILE_UCS_LEVEL < 1
             case JumpFlag_Elevate1_ArrVal: {
-                return SIMD_NAME_MODIFIER(PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1))(JumpFlag_Elevate1_ArrVal, stack_vars);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(JumpFlag_Elevate1_ArrVal, stack_vars);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 2
             case JumpFlag_Elevate2_ArrVal: {
-                return SIMD_NAME_MODIFIER(PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2))(JumpFlag_Elevate2_ArrVal, stack_vars);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(JumpFlag_Elevate2_ArrVal, stack_vars);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 4
             case JumpFlag_Elevate4_ArrVal: {
-                return SIMD_NAME_MODIFIER(PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4))(JumpFlag_Elevate4_ArrVal, stack_vars);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(JumpFlag_Elevate4_ArrVal, stack_vars);
             }
 #endif
             default: {
@@ -920,17 +920,17 @@ tuple_val_begin:;
             }
 #if COMPILE_UCS_LEVEL < 1
             case JumpFlag_Elevate1_ArrVal: {
-                return SIMD_NAME_MODIFIER(PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1))(JumpFlag_Elevate1_ArrVal, stack_vars);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(JumpFlag_Elevate1_ArrVal, stack_vars);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 2
             case JumpFlag_Elevate2_ArrVal: {
-                return SIMD_NAME_MODIFIER(PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2))(JumpFlag_Elevate2_ArrVal, stack_vars);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(JumpFlag_Elevate2_ArrVal, stack_vars);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 4
             case JumpFlag_Elevate4_ArrVal: {
-                return SIMD_NAME_MODIFIER(PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4))(JumpFlag_Elevate4_ArrVal, stack_vars);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(JumpFlag_Elevate4_ArrVal, stack_vars);
             }
 #endif
             default: {

@@ -121,34 +121,34 @@ force_inline void memorize_ucs2_to_ucs4(UnicodeVector *vec, UnicodeInfo *unicode
 force_inline void ascii_elevate2(UnicodeVector *vec, UnicodeInfo *unicode_info) {
     u8 *start = ((u8 *)GET_VEC_ASCII_START(vec));
     u16 *write_start = ((u16 *)GET_VEC_COMPACT_START(vec));
-    long_back_elevate_1_2(write_start, start, unicode_info->ascii_size);
+    SIMD_NAME_MODIFIER(long_back_elevate_1_2)(write_start, start, unicode_info->ascii_size);
 }
 
 force_inline void ascii_elevate4(UnicodeVector *vec, UnicodeInfo *unicode_info) {
     u8 *start = ((u8 *)GET_VEC_ASCII_START(vec));
     u32 *write_start = ((u32 *)GET_VEC_COMPACT_START(vec));
-    long_back_elevate_1_4(write_start, start, unicode_info->ascii_size);
+    SIMD_NAME_MODIFIER(long_back_elevate_1_4)(write_start, start, unicode_info->ascii_size);
 }
 
 force_inline void ucs1_elevate2(UnicodeVector *vec, UnicodeInfo *unicode_info) {
     Py_ssize_t offset = unicode_info->ascii_size;
     u8 *start = ((u8 *)GET_VEC_COMPACT_START(vec)) + offset;
     u16 *write_start = ((u16 *)GET_VEC_COMPACT_START(vec)) + offset;
-    long_back_elevate_1_2(write_start, start, unicode_info->u8_size);
+    SIMD_NAME_MODIFIER(long_back_elevate_1_2)(write_start, start, unicode_info->u8_size);
 }
 
 force_inline void ucs1_elevate4(UnicodeVector *vec, UnicodeInfo *unicode_info) {
     Py_ssize_t offset = unicode_info->ascii_size;
     u8 *start = ((u8 *)GET_VEC_COMPACT_START(vec)) + offset;
     u32 *write_start = ((u32 *)GET_VEC_COMPACT_START(vec)) + offset;
-    long_back_elevate_1_4(write_start, start, unicode_info->u8_size);
+    SIMD_NAME_MODIFIER(long_back_elevate_1_4)(write_start, start, unicode_info->u8_size);
 }
 
 force_inline void ucs2_elevate4(UnicodeVector *vec, UnicodeInfo *unicode_info) {
     Py_ssize_t offset = unicode_info->ascii_size + unicode_info->u8_size;
     u16 *start = ((u16 *)GET_VEC_COMPACT_START(vec)) + offset;
     u32 *write_start = ((u32 *)GET_VEC_COMPACT_START(vec)) + offset;
-    long_back_elevate_2_4(write_start, start, unicode_info->u16_size);
+    SIMD_NAME_MODIFIER(long_back_elevate_2_4)(write_start, start, unicode_info->u16_size);
 }
 
 force_inline void ascii_elevate1(UnicodeVector *vec, UnicodeInfo *unicode_info) {
@@ -447,15 +447,15 @@ dumps_container:;
 
     switch (indent) {
         case 0: {
-            ret = SIMD_NAME_MODIFIER(pyyjson_dumps_obj_0_0)(obj);
+            ret = pyyjson_dumps_obj_0_0(obj);
             break;
         }
         case 2: {
-            ret = SIMD_NAME_MODIFIER(pyyjson_dumps_obj_2_0)(obj);
+            ret = pyyjson_dumps_obj_2_0(obj);
             break;
         }
         case 4: {
-            ret = SIMD_NAME_MODIFIER(pyyjson_dumps_obj_4_0)(obj);
+            ret = pyyjson_dumps_obj_4_0(obj);
             break;
         }
         default: {

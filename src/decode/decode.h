@@ -48,8 +48,6 @@ typedef struct DecodeCtnStackInfo {
 
 extern PyObject *JSONDecodeError;
 
-typedef PyObject *pyyjson_cache_type;
-
 typedef enum ReadStrScanFlag {
     StrContinue,
     StrInvalid,

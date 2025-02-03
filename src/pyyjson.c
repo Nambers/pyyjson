@@ -167,6 +167,10 @@ PyObject *pyyjson_Encode_avx512(PyObject *self, PyObject *args, PyObject *kwargs
 PyObject *pyyjson_Encode_avx2(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *pyyjson_Encode_sse4_2(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *pyyjson_Encode_sse2(PyObject *self, PyObject *args, PyObject *kwargs);
+PyObject *pyyjson_Decode_avx512(PyObject *self, PyObject *args, PyObject *kwargs);
+PyObject *pyyjson_Decode_avx2(PyObject *self, PyObject *args, PyObject *kwargs);
+PyObject *pyyjson_Decode_sse4_2(PyObject *self, PyObject *args, PyObject *kwargs);
+PyObject *pyyjson_Decode_sse2(PyObject *self, PyObject *args, PyObject *kwargs);
 
 int get_simd_feature() {
     // TODO
@@ -178,6 +182,13 @@ PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject *kwargs) {
     int simd_feature = get_simd_feature();
     return pyyjson_Encode_sse2(self, args, kwargs);
 }
+
+PyObject* pyyjson_Decode(PyObject *self, PyObject *args, PyObject *kwargs) {
+    // TODO
+    int simd_feature = get_simd_feature();
+    return pyyjson_Decode_sse2(self, args, kwargs);
+}
+
 #endif
 
 

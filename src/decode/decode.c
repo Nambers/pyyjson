@@ -12,7 +12,7 @@
 //
 #include "decode_utils_wrap.inl.c"
 
-thread_local u8 pyyjson_string_buffer[PYYJSON_STRING_BUFFER_SIZE];
+extern thread_local u8 pyyjson_string_buffer[PYYJSON_STRING_BUFFER_SIZE];
 
 static_assert((PYYJSON_STRING_BUFFER_SIZE % 64) == 0, "(PYYJSON_STRING_BUFFER_SIZE % 64) == 0");
 
@@ -118,7 +118,7 @@ force_inline void Py_Immortal_IncRef(PyObject *op) {
     PYYJSON_PY_INCREF_DEBUG();
 }
 
-pyyjson_cache_type AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
+extern pyyjson_cache_type AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
 
 force_inline void add_key_cache(pyyjson_hash_t hash, PyObject *obj) {
     assert(PyUnicode_GET_LENGTH(obj) * PyUnicode_KIND(obj) <= 64);
