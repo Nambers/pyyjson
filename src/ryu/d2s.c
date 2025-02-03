@@ -31,6 +31,7 @@
 
 #include <assert.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -311,6 +312,7 @@ static inline floating_decimal_64 d2d(const uint64_t ieeeMantissa, const uint32_
     return fd;
 }
 
+// this function is modified to write float more human readable
 static inline int to_chars(const floating_decimal_64 v, const bool sign, char *const result) {
     // Step 5: Print the decimal representation.
     int index = 0;
@@ -320,6 +322,25 @@ static inline int to_chars(const floating_decimal_64 v, const bool sign, char *c
 
     uint64_t output = v.mantissa;
     const uint32_t olength = decimalLength17(output);
+
+    const ptrdiff_t tmpLimit = (ptrdiff_t)v.exponent + olength;
+    // 1234e7 => 12340000000.0
+    const bool expendTailPosExp = v.exponent >= 0 && tmpLimit <= 16;
+    // 1234e-2 = 12.34
+    const bool expendTailNegExp = (tmpLimit > 0 && tmpLimit <= 16) && !expendTailPosExp;
+    index += expendTailNegExp;
+    // 1234e-6 = 0.001234
+    const bool expendTailNegExpEx = (tmpLimit > -5 && tmpLimit <= 0) && !expendTailNegExp && !expendTailPosExp;
+    // skip the reserved space for the decimal point
+    const bool skipDecimalPoint = expendTailPosExp || expendTailNegExp || expendTailNegExpEx;
+
+    if (expendTailNegExpEx) {
+        result[index] = '0';
+        result[index + 1] = '.';
+        size_t ofs = 2 - v.exponent - olength;
+        memset(result + index + 2, '0', ofs - 2);
+        index += ofs;
+    }
 
 #ifdef RYU_DEBUG
     printf("DIGITS=%" PRIu64 "\n", v.mantissa);
@@ -336,6 +357,9 @@ static inline int to_chars(const floating_decimal_64 v, const bool sign, char *c
     // result[index] = '0' + output % 10;
 
     uint32_t i = 0;
+
+    // --- Wirte Mentissa ---
+
     // We prefer 32-bit operations, even on 64-bit platforms.
     // We have at most 17 digits, and uint32_t can store 9 digits.
     // If output doesn't fit into uint32_t, we cut off 8 digits,
@@ -353,10 +377,10 @@ static inline int to_chars(const floating_decimal_64 v, const bool sign, char *c
         const uint32_t c1 = (c / 100) << 1;
         const uint32_t d0 = (d % 100) << 1;
         const uint32_t d1 = (d / 100) << 1;
-        memcpy(result + index + olength - 1, DIGIT_TABLE + c0, 2);
-        memcpy(result + index + olength - 3, DIGIT_TABLE + c1, 2);
-        memcpy(result + index + olength - 5, DIGIT_TABLE + d0, 2);
-        memcpy(result + index + olength - 7, DIGIT_TABLE + d1, 2);
+        memcpy(result + index + olength - 1 - skipDecimalPoint, DIGIT_TABLE + c0, 2);
+        memcpy(result + index + olength - 3 - skipDecimalPoint, DIGIT_TABLE + c1, 2);
+        memcpy(result + index + olength - 5 - skipDecimalPoint, DIGIT_TABLE + d0, 2);
+        memcpy(result + index + olength - 7 - skipDecimalPoint, DIGIT_TABLE + d1, 2);
         i += 8;
     }
     uint32_t output2 = (uint32_t)output;
@@ -369,24 +393,39 @@ static inline int to_chars(const floating_decimal_64 v, const bool sign, char *c
         output2 /= 10000;
         const uint32_t c0 = (c % 100) << 1;
         const uint32_t c1 = (c / 100) << 1;
-        memcpy(result + index + olength - i - 1, DIGIT_TABLE + c0, 2);
-        memcpy(result + index + olength - i - 3, DIGIT_TABLE + c1, 2);
+        memcpy(result + index + olength - i - 1 - skipDecimalPoint, DIGIT_TABLE + c0, 2);
+        memcpy(result + index + olength - i - 3 - skipDecimalPoint, DIGIT_TABLE + c1, 2);
         i += 4;
     }
     if (output2 >= 100) {
         const uint32_t c = (output2 % 100) << 1;
         output2 /= 100;
-        memcpy(result + index + olength - i - 1, DIGIT_TABLE + c, 2);
+        memcpy(result + index + olength - i - 1 - skipDecimalPoint, DIGIT_TABLE + c, 2);
         i += 2;
     }
     if (output2 >= 10) {
         const uint32_t c = output2 << 1;
         // We can't use memcpy here: the decimal dot goes between these two digits.
-        result[index + olength - i] = DIGIT_TABLE[c + 1];
+        result[index + olength - i - skipDecimalPoint] = DIGIT_TABLE[c + 1];
         result[index] = DIGIT_TABLE[c];
     } else {
         result[index] = (char)('0' + output2);
     }
+
+    // --- write decimal point ---
+
+    if (expendTailPosExp) {
+        memset(result + index + olength, '0', v.exponent);
+        result[index + olength + v.exponent] = '.';
+        result[index + olength + v.exponent + 1] = '0';
+        return index + olength + v.exponent + 2;
+    }
+    if (expendTailNegExp) {
+        memmove(result + index - 1, result + index, v.exponent + olength);
+        result[index - 1 + v.exponent + olength] = '.';
+        return index + olength;
+    }
+    if (expendTailNegExpEx) return index + olength;
 
     // Print decimal point if needed.
     if (olength > 1) {
@@ -396,8 +435,10 @@ static inline int to_chars(const floating_decimal_64 v, const bool sign, char *c
         ++index;
     }
 
+    // --- write exponent ---
+
     // Print the exponent.
-    result[index++] = 'E';
+    result[index++] = 'e';
     int32_t exp = v.exponent + (int32_t)olength - 1;
     if (exp < 0) {
         result[index++] = '-';
@@ -493,17 +534,4 @@ int d2s_buffered_n(double f, char *result) {
     }
 
     return to_chars(v, ieeeSign, result);
-}
-
-void d2s_buffered(double f, char *result) {
-    const int index = d2s_buffered_n(f, result);
-
-    // Terminate the string.
-    result[index] = '\0';
-}
-
-char *d2s(double f) {
-    char *const result = (char *)malloc(25);
-    d2s_buffered(f, result);
-    return result;
 }
