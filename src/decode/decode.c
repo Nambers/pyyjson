@@ -101,7 +101,7 @@ force_inline void Py_Immortal_IncRef(PyObject *op) {
 #if PY_MINOR_VERSION >= 12
 #    if SIZEOF_VOID_P > 4
     // Portable saturated add, branching on the carry flag and set low bits
-#        ifndef NDEBUG
+#        if !defined(NDEBUG) && PY_MINOR_VERSION < 14
     assert(0 > (int32_t)op->ob_refcnt_split[PY_BIG_ENDIAN]);
 #        endif // NDEBUG
 #    else      // SIZEOF_VOID_P > 4
