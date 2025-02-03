@@ -10,14 +10,6 @@ let
       x = (
         (pkgs.enableDebugging py).override {
           self = x;
-          packageOverrides = (
-            self: super:
-            lib.optionalAttrs py.isPy39 {
-              # for py39 there is an upstream bug
-              # https://github.com/NixOS/nixpkgs/issues/353830
-              setuptools = pkgs.callPackage ./py39setuptools.nix { inherit super; };
-            }
-          );
         }
       );
     in
