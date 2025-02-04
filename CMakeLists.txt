@@ -92,6 +92,10 @@ add_definitions(-DYYJSON_DISABLE_UTILS=1)
 # add_definitions(-DPYYJSON_USE_XXHASH=1)
 
 # ------------------------------------------------------------------------------
+# Global settings
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# ------------------------------------------------------------------------------
 # Libraries
 
 # common definitions
