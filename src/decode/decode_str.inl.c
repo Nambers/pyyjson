@@ -218,32 +218,6 @@ force_inline void COPY_WITH_ELEVATE_TO_4(DECODE_UNICODE_INFO *decode_unicode_inf
 #endif
 }
 
-// #if COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_UCS4
-// force_inline bool _checkmax_ucs4(SIMD_TYPE SIMD_VAR, ReadStrState *read_state) {
-// #    if SIMD_BIT_SIZE == 512
-//     SIMD_512 t = _mm512_set1_epi32(65535);
-//     __mmask16 mask = _mm512_cmpgt_epu32_mask(SIMD_VAR, t);
-//     if (unlikely(mask != 0)) {
-//         update_max_char_type(read_state, PYYJSON_STRING_TYPE_UCS4);
-//         return false;
-//     }
-//     return true;
-// #    else
-// #        define CMPGT PYYJSON_CONCAT2(cmpgt_i32, SIMD_BIT_SIZE)
-// #        define BROADCAST PYYJSON_CONCAT2(broadcast_32, SIMD_BIT_SIZE)
-//     SIMD_TYPE t = BROADCAST(65535);
-//     SIMD_TYPE mask = CMPGT(SIMD_VAR, t);
-//     if (unlikely(!check_mask_zero(mask))) {
-//         update_max_char_type(read_state, PYYJSON_STRING_TYPE_UCS4);
-//         return false;
-//     }
-//     return true;
-// #        undef BROADCAST
-// #        undef CMPGT
-// #    endif
-// }
-// #endif
-
 force_inline void CHECK_MAX_CHAR_IN_LOOP(
         SIMD_TYPE SIMD_VAR,
         ReadStrState *restrict read_state,
@@ -264,7 +238,7 @@ force_inline void CHECK_MAX_CHAR_IN_LOOP(
     }
 #define CHECKER PYYJSON_SIMPLE_CONCAT3(_ucs, COMPILE_READ_UCS_LEVEL, _checkmax)
     switch (read_state->max_char_type) {
-        case PYYJSON_STRING_TYPE_ASCII: { // TODO
+        case PYYJSON_STRING_TYPE_ASCII: {
 #if COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_UCS4
             CHECKER(SIMD_VAR, read_state, 0xffff, PYYJSON_STRING_TYPE_UCS4) &&
 #endif
@@ -275,7 +249,7 @@ force_inline void CHECK_MAX_CHAR_IN_LOOP(
             break;
         }
 #if COMPILE_UCS_LEVEL > PYYJSON_STRING_TYPE_LATIN1
-        case PYYJSON_STRING_TYPE_LATIN1: { // TODO
+        case PYYJSON_STRING_TYPE_LATIN1: {
 #    if COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_UCS4
             CHECKER(SIMD_VAR, read_state, 0xffff, PYYJSON_STRING_TYPE_UCS4) &&
 #    endif
@@ -284,7 +258,7 @@ force_inline void CHECK_MAX_CHAR_IN_LOOP(
         }
 #endif
 #if COMPILE_UCS_LEVEL > PYYJSON_STRING_TYPE_UCS2
-        case PYYJSON_STRING_TYPE_UCS2: { // TODO
+        case PYYJSON_STRING_TYPE_UCS2: {
             CHECKER(SIMD_VAR, read_state, 0xffff, PYYJSON_STRING_TYPE_UCS4);
             break;
         }
@@ -726,80 +700,6 @@ force_inline void PROCESS_TAIL_COPY(
     TAIL_WRITER(decode_src_info->src, decode_unicode_info->unicode_ucs4, really_write_count);
     // decode_unicode_info->unicode_ucs4 += really_write_count;
 #undef TAIL_WRITER
-    //     if (!really_write_count) return;
-    //     switch (write_as / COMPILE_READ_UCS_LEVEL) {
-    //         case 1: {
-    //             // write_as equal to COMPILE_READ_UCS_LEVEL
-    //             // no elevate
-    //             // TODO
-    //             break;
-    //         }
-    //         case 2: {
-    // // 2->4 or 1->2
-    // #define EXTRACTOR PYYJSON_CONCAT3(extract, SIMD_BIT_SIZE, two_parts)
-    // #if COMPILE_READ_UCS_LEVEL == 1
-    // #    define ELEVATOR PYYJSON_CONCAT2(elevate_1_2_to, SIMD_BIT_SIZE)
-    // #else
-    // #    define ELEVATOR PYYJSON_CONCAT2(elevate_2_4_to, SIMD_BIT_SIZE)
-    // #endif
-    // // TODO
-    // #define TAIL_PARTIAL_WRITER
-    //             assert(write_as == COMPILE_READ_UCS_LEVEL * 2);
-    //             SIMD_HALF_TYPE base[2];
-    //             SIMD_TYPE elv[2];
-    //             Py_ssize_t split_count[2];
-    //             const Py_ssize_t _PerWrite = CHECK_COUNT_MAX / 2;
-    //             EXTRACTOR(SIMD_VAR, &base[0], &base[1]);
-    //             split_tail_len_two_parts(really_write_count, CHECK_COUNT_MAX, &split_count[0], &split_count[1]);
-    //             elv[0] = ELEVATOR(base[0]);
-    //             elv[1] = ELEVATOR(base[1]);
-    //             TAIL_PARTIAL_WRITER(dst, elv[0], split_count[0]);
-    //             move_voidp_n_bytes(dst, _PerWrite * COMPILE_READ_UCS_LEVEL * 2);
-    //             TAIL_PARTIAL_WRITER(dst, elv[1], split_count[1]);
-    //             move_voidp_n_bytes(dst, _PerWrite * COMPILE_READ_UCS_LEVEL * 2);
-    // #undef TAIL_PARTIAL_WRITER
-    // #undef ELEVATOR
-    // #undef EXTRACTOR
-    //             break;
-    //         }
-    //         case 4: {
-    //             // 1->4
-    //             // TODO
-    //             break;
-    //         }
-    //     }
-    //     if (write_as > COMPILE_READ_UCS_LEVEL) {
-    //         if (write_as == 2) { // 1->2
-    // #if COMPILE_READ_UCS_LEVEL <= 2
-    //             // TODO
-    //             assert(decode_unicode_info->unicode_ucs2);
-    //             WRITE_SIMD_IMPL_TARGET2(GET_UCS2_WRITER(decode_unicode_info), SIMD_VAR);
-    // #else
-    //             assert(false);
-    //             Py_UNREACHABLE();
-    // #endif
-    //         } else {
-    //             // 1/2 -> 4
-    //             assert(write_as == 4);
-    //             assert(decode_unicode_info->unicode_ucs4);
-    //             u32 *store_start = GET_UCS4_WRITER(decode_unicode_info) - invalid_head_count;
-    //             // TODO
-    //             // WRITE_SIMD_IMPL_TARGET4(GET_UCS4_WRITER(decode_unicode_info), SIMD_VAR);
-    //         }
-    //     } else {
-    //         // n -> n
-    //         assert(write_as == COMPILE_READ_UCS_LEVEL);
-    //         u8 *store_start = ((u8 *)GET_CUR_WRITER(decode_unicode_info)) - invalid_head_count * COMPILE_READ_UCS_LEVEL;
-    //         // TODO
-    //         // write_simd(, SIMD_VAR);
-    //     }
-    //     // if we have blendv, write with blendv
-    //     // if not, write with runtime bitshift
-    // #if PYYJSON_HAS_BLENDV
-
-    // #else
-
-    // #endif
 }
 
 force_inline void READ_STR_TAIL(
@@ -809,7 +709,6 @@ force_inline void READ_STR_TAIL(
         int write_as, // one of 1,2,4
         bool do_copy,
         bool need_check_max_char) {
-// TODO
 #if SIMD_BIT_SIZE == 512
     // load use maskz
 #    define _MASKZ_LOADU PYYJSON_SIMPLE_CONCAT2(_mm512_maskz_loadu_epi, READ_BIT_SIZE)

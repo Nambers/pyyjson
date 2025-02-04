@@ -24,9 +24,6 @@ typedef PyObject *pyyjson_cache_type;
 
 extern pyyjson_cache_type AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
 
-// PyObject *yyjson_read_opts(const char *dat, Py_ssize_t len);
-// bool is_lzcnt_supported(void);
-
 PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *pyyjson_Decode(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *pyyjson_FileEncode(PyObject *self, PyObject *args, PyObject *kwargs);
@@ -35,11 +32,10 @@ PyObject *pyyjson_DecodeFile(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *run_unicode_accumulate_benchmark(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *run_object_accumulate_benchmark(PyObject *self, PyObject *args, PyObject *kwargs);
 #endif
+PyObject *pyyjson_print_current_features(PyObject *self, PyObject *);
 
 PyObject *JSONDecodeError = NULL;
 PyObject *JSONEncodeError = NULL;
-
-// bool lzcnt_supported = 0;
 
 static PyMethodDef pyyjson_Methods[] = {
         {"encode", (PyCFunction)pyyjson_Encode, METH_VARARGS | METH_KEYWORDS, "Converts arbitrary object recursively into JSON."},
@@ -50,6 +46,7 @@ static PyMethodDef pyyjson_Methods[] = {
         {"run_unicode_accumulate_benchmark", (PyCFunction)run_unicode_accumulate_benchmark, METH_VARARGS | METH_KEYWORDS, "Benchmark."},
         {"run_object_accumulate_benchmark", (PyCFunction)run_object_accumulate_benchmark, METH_VARARGS | METH_KEYWORDS, "Benchmark."},
 #endif
+        {"print_current_features", pyyjson_print_current_features, METH_NOARGS, "Prints current features."},
         // {"dump", (PyCFunction)pyyjson_FileEncode, METH_VARARGS | METH_KEYWORDS, "Converts arbitrary object recursively into JSON file. "},
         // {"load", (PyCFunction)pyyjson_DecodeFile, METH_VARARGS | METH_KEYWORDS, "Converts JSON as file to dict object structure."},
         {NULL, NULL, 0, NULL} /* Sentinel */
@@ -158,9 +155,6 @@ PyMODINIT_FUNC PyInit_pyyjson(void) {
         return NULL;
     }
 
-    // feature checks.
-    // lzcnt_supported = is_lzcnt_supported();
-
     // do pyyjson internal init.
     memset(AssociativeKeyCache, 0, sizeof(AssociativeKeyCache));
 
@@ -192,8 +186,8 @@ PyObject *pyyjson_Decode_sse2(PyObject *self, PyObject *args, PyObject *kwargs);
 
 
 int CurrentSIMDFeatureLevel = -1;
-PyCFunctionWithKeywords pyyjson_encode_interface = NULL;
-PyCFunctionWithKeywords pyyjson_decode_interface = NULL;
+PyCFunctionWithKeywords _pyyjson_encode_interface = NULL;
+PyCFunctionWithKeywords _pyyjson_decode_interface = NULL;
 
 X86SIMDFeatureLevel get_simd_feature(void) {
     int info[4];
@@ -222,23 +216,23 @@ force_inline void _update_simd_features(void) {
         X86SIMDFeatureLevel simd_feature = get_simd_feature();
         switch (simd_feature) {
             case X86SIMDFeatureLevelSSE2: {
-                pyyjson_encode_interface = pyyjson_Encode_sse2;
-                pyyjson_decode_interface = pyyjson_Decode_sse2;
+                _pyyjson_encode_interface = pyyjson_Encode_sse2;
+                _pyyjson_decode_interface = pyyjson_Decode_sse2;
                 break;
             }
             // case X86SIMDFeatureLevelSSE4_2: {
-            //     pyyjson_encode_interface = pyyjson_Encode_sse4_2;
-            //     pyyjson_decode_interface = pyyjson_Decode_sse4_2;
+            //     _pyyjson_encode_interface = pyyjson_Encode_sse4_2;
+            //     _pyyjson_decode_interface = pyyjson_Decode_sse4_2;
             //     break;
             // }
             case X86SIMDFeatureLevelAVX2: {
-                pyyjson_encode_interface = pyyjson_Encode_avx2;
-                pyyjson_decode_interface = pyyjson_Decode_avx2;
+                _pyyjson_encode_interface = pyyjson_Encode_avx2;
+                _pyyjson_decode_interface = pyyjson_Decode_avx2;
                 break;
             }
             case X86SIMDFeatureLevelAVX512: {
-                pyyjson_encode_interface = pyyjson_Encode_avx512;
-                pyyjson_decode_interface = pyyjson_Decode_avx512;
+                _pyyjson_encode_interface = pyyjson_Encode_avx512;
+                _pyyjson_decode_interface = pyyjson_Decode_avx512;
                 break;
             }
             default: {
@@ -251,15 +245,56 @@ force_inline void _update_simd_features(void) {
 }
 
 PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject *kwargs) {
-    // TODO
     _update_simd_features();
-    return pyyjson_encode_interface(self, args, kwargs);
+    assert(_pyyjson_encode_interface);
+    return _pyyjson_encode_interface(self, args, kwargs);
 }
 
 PyObject *pyyjson_Decode(PyObject *self, PyObject *args, PyObject *kwargs) {
-    // TODO
     _update_simd_features();
-    return pyyjson_decode_interface(self, args, kwargs);
+    assert(_pyyjson_decode_interface);
+    return _pyyjson_decode_interface(self, args, kwargs);
 }
 
 #endif
+
+
+PyObject *pyyjson_print_current_features(PyObject *self, PyObject *args) {
+    // TODO change to returning a dict with all build info
+#if BUILD_MULTI_LIB
+    _update_simd_features();
+    switch (CurrentSIMDFeatureLevel) {
+        case X86SIMDFeatureLevelSSE2: {
+            printf("SIMD: SSE2\n");
+            break;
+        }
+        // case X86SIMDFeatureLevelSSE4_2: {
+        //     printf("SIMD: SSE4.2\n");
+        //     break;
+        // }
+        case X86SIMDFeatureLevelAVX2: {
+            printf("SIMD: AVX2\n");
+            break;
+        }
+        case X86SIMDFeatureLevelAVX512: {
+            printf("SIMD: AVX512\n");
+            break;
+        }
+        default: {
+            printf("SIMD: Unknown\n");
+            break;
+        }
+    }
+#else
+#    if SIMD_BIT_SIZE == 512
+    printf("SIMD: AVX512\n");
+#    elif SIMD_BIT_SIZE == 256
+    printf("SIMD: AVX2\n");
+// #elif __SSE4_2__
+// printf("SIMD: SSE4.2\n");
+#    else
+    printf("SIMD: SSE2\n");
+#    endif
+#endif
+    Py_RETURN_NONE;
+}
