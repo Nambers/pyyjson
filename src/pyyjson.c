@@ -4,12 +4,17 @@
 
 #if defined(_MSC_VER)
 #    include <intrin.h>
-#    define cpuid(info, x) __cpuidex(info, x, 0)
+#    define cpuid_count(info, x) __cpuidex(info, x, 0)
+#    define cpuid(info, x) __cpuid(info, x)
 #else
 #    include <cpuid.h>
 
-void cpuid(int info[4], int x) {
+force_inline void cpuid_count(int *info, int x) {
     __cpuid_count(x, 0, info[0], info[1], info[2], info[3]);
+}
+
+force_inline void cpuid(int *info, int x) {
+    __cpuid(x, info[0], info[1], info[2], info[3]);
 }
 #endif
 
@@ -167,42 +172,94 @@ PyMODINIT_FUNC PyInit_pyyjson(void) {
 }
 
 #if BUILD_MULTI_LIB
+
+typedef enum X86SIMDFeatureLevel {
+    X86SIMDFeatureLevelSSE2 = 0,
+    X86SIMDFeatureLevelSSE4_2 = 1,
+    X86SIMDFeatureLevelAVX2 = 2,
+    X86SIMDFeatureLevelAVX512 = 3,
+    X86SIMDFeatureLevelMAX = 4,
+} X86SIMDFeatureLevel;
+
 PyObject *pyyjson_Encode_avx512(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *pyyjson_Encode_avx2(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *pyyjson_Encode_sse4_2(PyObject *self, PyObject *args, PyObject *kwargs);
+// PyObject *pyyjson_Encode_sse4_2(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *pyyjson_Encode_sse2(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *pyyjson_Decode_avx512(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *pyyjson_Decode_avx2(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *pyyjson_Decode_sse4_2(PyObject *self, PyObject *args, PyObject *kwargs);
+// PyObject *pyyjson_Decode_sse4_2(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *pyyjson_Decode_sse2(PyObject *self, PyObject *args, PyObject *kwargs);
 
-int get_simd_feature(void) {
-    // TODO
-    return 0;
+
+int CurrentSIMDFeatureLevel = -1;
+PyCFunctionWithKeywords pyyjson_encode_interface = NULL;
+PyCFunctionWithKeywords pyyjson_decode_interface = NULL;
+
+X86SIMDFeatureLevel get_simd_feature(void) {
+    int info[4];
+    cpuid_count(info, 7);
+    int ebx = info[1];
+    //
+    if ((ebx & (1 << 16)) && (ebx & (1 << 30))) // AVX512F(16) and AVX512BW(30)
+        return X86SIMDFeatureLevelAVX512;
+
+    // check AVX2
+    if (ebx & (1 << 5)) // AVX2(5)
+        return X86SIMDFeatureLevelAVX2;
+
+    // check SSE4.2, not used for now
+    // cpuid(info, 1);
+    // int ecx = info[2];
+    // if (ecx & (1 << 20)) // SSE4.2(20)
+    //     return X86SIMDFeatureLevelSSE4_2;
+
+    //
+    return X86SIMDFeatureLevelSSE2;
+}
+
+force_inline void _update_simd_features(void) {
+    if (unlikely(CurrentSIMDFeatureLevel == -1)) {
+        X86SIMDFeatureLevel simd_feature = get_simd_feature();
+        switch (simd_feature) {
+            case X86SIMDFeatureLevelSSE2: {
+                pyyjson_encode_interface = pyyjson_Encode_sse2;
+                pyyjson_decode_interface = pyyjson_Decode_sse2;
+                break;
+            }
+            // case X86SIMDFeatureLevelSSE4_2: {
+            //     pyyjson_encode_interface = pyyjson_Encode_sse4_2;
+            //     pyyjson_decode_interface = pyyjson_Decode_sse4_2;
+            //     break;
+            // }
+            case X86SIMDFeatureLevelAVX2: {
+                pyyjson_encode_interface = pyyjson_Encode_avx2;
+                pyyjson_decode_interface = pyyjson_Decode_avx2;
+                break;
+            }
+            case X86SIMDFeatureLevelAVX512: {
+                pyyjson_encode_interface = pyyjson_Encode_avx512;
+                pyyjson_decode_interface = pyyjson_Decode_avx512;
+                break;
+            }
+            default: {
+                assert(false);
+            }
+        }
+        // mark as ready
+        CurrentSIMDFeatureLevel = (int)simd_feature;
+    }
 }
 
 PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject *kwargs) {
     // TODO
-    int simd_feature = get_simd_feature();
-    return pyyjson_Encode_sse2(self, args, kwargs);
+    _update_simd_features();
+    return pyyjson_encode_interface(self, args, kwargs);
 }
 
-PyObject* pyyjson_Decode(PyObject *self, PyObject *args, PyObject *kwargs) {
+PyObject *pyyjson_Decode(PyObject *self, PyObject *args, PyObject *kwargs) {
     // TODO
-    int simd_feature = get_simd_feature();
-    return pyyjson_Decode_sse2(self, args, kwargs);
+    _update_simd_features();
+    return pyyjson_decode_interface(self, args, kwargs);
 }
 
 #endif
-
-
-/* Runtime check if lzcnt is supported. */
-// bool is_lzcnt_supported(void) {
-//     int info[4];
-//     cpuid(info, 0);
-//     if (info[0] >= 7) {
-//         cpuid(info, 7);
-//         return (info[1] & (1 << 5)) != 0;
-//     }
-//     return false;
-// }
