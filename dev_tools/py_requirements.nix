@@ -24,6 +24,7 @@ with pypkgs;
       pname = "orjson";
       version = "3.10.11";
       pyproject = true;
+      useFetchCargoVendor = true;
 
       disabled = pythonOlder "3.8";
 
@@ -34,10 +35,10 @@ with pypkgs;
         hash = "sha256-RJcTyLf2pLb1kHd7+5K9dGMWja4KFdKIwdRAp6Ud+Ps=";
       };
 
-      cargoDeps = pkgs.rustPlatform.fetchCargoTarball {
+      cargoDeps = pkgs.rustPlatform.fetchCargoVendor {
         inherit src;
         name = "${pname}-${version}";
-        hash = "sha256-HlvsV3Bsxa4Ud1+RrEnDWKX82DRyfgBS7GvK9827/wE=";
+        hash = "sha256-sxUp3q9S1PmwUmbmXWj235MB+qAFzTCu8x1OXOzVUpY=";
       };
 
       maturinBuildFlags = [ "--interpreter ${python.executable}" ];
