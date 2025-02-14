@@ -881,7 +881,7 @@ loop_1_f_f:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/1_f_f.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
@@ -914,7 +914,7 @@ loop_1_f_t:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/1_f_t.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
@@ -947,7 +947,7 @@ loop_1_t_f:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/1_t_f.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
@@ -980,7 +980,7 @@ loop_1_t_t:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/1_t_t.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
@@ -1013,7 +1013,7 @@ loop_2_f_f:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/2_f_f.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
@@ -1046,7 +1046,7 @@ loop_2_f_t:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/2_f_t.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
@@ -1079,7 +1079,7 @@ loop_2_t_f:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/2_t_f.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
@@ -1112,7 +1112,7 @@ loop_2_t_t:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/2_t_t.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
@@ -1145,7 +1145,7 @@ loop_4_f_f:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/4_f_f.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
@@ -1178,7 +1178,7 @@ loop_4_f_t:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/4_f_t.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
@@ -1235,7 +1235,7 @@ loop_4_t_t:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/4_t_t.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
