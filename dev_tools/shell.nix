@@ -4,12 +4,14 @@
 let
   nix_pyenv_directory = ".nix-pyenv";
   # define version
-  use_minor_ver = import ./pyver.nix;
+  pythonVerConfig = import ./pyver.nix;
+  curVer = pythonVerConfig.curVer;
+  leastVer = pythonVerConfig.minSupportVer;
   drvs = pkgs.callPackage ./_drvs.nix { };
   using_pythons = drvs.using_pythons;
-  using_python = builtins.elemAt using_pythons (use_minor_ver - 9);
+  using_python = builtins.elemAt using_pythons (curVer - leastVer);
   pyenvs = drvs.pyenvs;
-  pyenv = builtins.elemAt pyenvs (use_minor_ver - 9);
+  pyenv = builtins.elemAt pyenvs (curVer - leastVer);
 in
 pkgs.mkShell {
   packages = pkgs.callPackage ./packages.nix { };

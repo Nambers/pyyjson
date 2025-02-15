@@ -3,7 +3,10 @@
 }:
 let
   lib = pkgs.lib;
-  supportedVers = lib.importJSON ./supported_versions.json;
+  pythonVerConfig = import ./pyver.nix;
+  maxSupportVer = pythonVerConfig.maxSupportVer;
+  minSupportVer = pythonVerConfig.minSupportVer;
+  supportedVers = builtins.genList (x: minSupportVer + x) (maxSupportVer - minSupportVer + 1);
   using_pythons_map =
     py:
     let

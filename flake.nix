@@ -31,7 +31,9 @@
           let
             defaultShell = pkgs.callPackage ./dev_tools/shell.nix { };
             _drvs = pkgs.callPackage ./dev_tools/_drvs.nix { };
-            use_minor_ver = import ./dev_tools/pyver.nix;
+            pythonVerConfig = import ./dev_tools/pyver.nix;
+            curVer = pythonVerConfig.curVer;
+            leastVer = pythonVerConfig.minSupportVer;
             inputDerivation = defaultShell.inputDerivation;
           in
           {
@@ -41,8 +43,8 @@
                 inherit inputDerivation;
                 inherit (_drvs) pyenvs;
                 nix_pyenv_directory = ".nix-pyenv";
-                pyenv = builtins.elemAt _drvs.pyenvs (use_minor_ver - 9);
-                using_python = builtins.elemAt _drvs.using_pythons (use_minor_ver - 9);
+                pyenv = builtins.elemAt _drvs.pyenvs (curVer - leastVer);
+                using_python = builtins.elemAt _drvs.using_pythons (curVer - leastVer);
               };
             };
           };
