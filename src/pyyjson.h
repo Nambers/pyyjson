@@ -189,6 +189,7 @@
 #define REPEAT_32(x) REPEAT_16(x) REPEAT_16(x)
 #define REPEAT_64(x) REPEAT_32(x) REPEAT_32(x)
 
+#define PYYJSON_STATIC_CAST(type, expr) ((type)(expr))
 
 /*==============================================================================
  * Macros
@@ -253,18 +254,99 @@
 #define PYYJSON_STRING_TYPE_UCS2 2
 #define PYYJSON_STRING_TYPE_UCS4 4
 
-
+#ifndef PYYJSON_HAS_IEEE_754
 /* IEEE 754 floating-point binary representation */
-#if defined(DOUBLE_IS_LITTLE_ENDIAN_IEEE754) || defined(DOUBLE_IS_BIG_ENDIAN_IEEE754) || defined(DOUBLE_IS_ARM_MIXED_ENDIAN_IEEE754)
-#    define PYYJSON_HAS_IEEE_754 1
-#elif (FLT_RADIX == 2) && (DBL_MANT_DIG == 53) && (DBL_DIG == 15) && \
-        (DBL_MIN_EXP == -1021) && (DBL_MAX_EXP == 1024) &&           \
-        (DBL_MIN_10_EXP == -307) && (DBL_MAX_10_EXP == 308)
-#    define PYYJSON_HAS_IEEE_754 1
-#else
-#    define PYYJSON_HAS_IEEE_754 0
-static_assert(false, "false");
+#    if defined(DOUBLE_IS_LITTLE_ENDIAN_IEEE754) || defined(DOUBLE_IS_BIG_ENDIAN_IEEE754) || defined(DOUBLE_IS_ARM_MIXED_ENDIAN_IEEE754) || _PY_SHORT_FLOAT_REPR == 1
+#        define PYYJSON_HAS_IEEE_754 1
+#    elif (FLT_RADIX == 2) && (DBL_MANT_DIG == 53) && (DBL_DIG == 15) && \
+            (DBL_MIN_EXP == -1021) && (DBL_MAX_EXP == 1024) &&           \
+            (DBL_MIN_10_EXP == -307) && (DBL_MAX_10_EXP == 308)
+#        define PYYJSON_HAS_IEEE_754 1
+#    else
+#        define PYYJSON_HAS_IEEE_754 0
+#    endif
 #endif
+
+
+/**
+ Microsoft Visual C++ 6.0 doesn't support converting number from u64 to f64:
+ error C2520: conversion from unsigned __int64 to double not implemented.
+ */
+#ifndef PYYJSON_U64_TO_F64_NO_IMPL
+#    if (0 < PYYJSON_MSC_VER) && (PYYJSON_MSC_VER <= 1200)
+#        define PYYJSON_U64_TO_F64_NO_IMPL 1
+#    else
+#        define PYYJSON_U64_TO_F64_NO_IMPL 0
+#    endif
+#endif
+
+
+/* int128 type */
+#if defined(__SIZEOF_INT128__) && (__SIZEOF_INT128__ == 16) && \
+        (defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER))
+#    define PYYJSON_HAS_INT128 1
+/** 128-bit integer, used by floating-point number reader and writer. */
+__extension__ typedef __int128 i128;
+__extension__ typedef unsigned __int128 u128;
+#else
+#    define PYYJSON_HAS_INT128 0
+#endif
+
+
+/*
+ Correct rounding in double number computations.
+ 
+ On the x86 architecture, some compilers may use x87 FPU instructions for
+ floating-point arithmetic. The x87 FPU loads all floating point number as
+ 80-bit double-extended precision internally, then rounds the result to original
+ precision, which may produce inaccurate results. For a more detailed
+ explanation, see the paper: https://arxiv.org/abs/cs/0701192
+ 
+ Here are some examples of double precision calculation error:
+ 
+     2877.0 / 1e6   == 0.002877,  but x87 returns 0.0028770000000000002
+     43683.0 * 1e21 == 4.3683e25, but x87 returns 4.3683000000000004e25
+ 
+ Here are some examples of compiler flags to generate x87 instructions on x86:
+ 
+     clang -m32 -mno-sse
+     gcc/icc -m32 -mfpmath=387
+     msvc /arch:SSE or /arch:IA32
+ 
+ If we are sure that there's no similar error described above, we can define the
+ PYYJSON_DOUBLE_MATH_CORRECT as 1 to enable the fast path calculation. This is
+ not an accurate detection, it's just try to avoid the error at compile-time.
+ An accurate detection can be done at run-time:
+ 
+     bool is_double_math_correct(void) {
+         volatile double r = 43683.0;
+         r *= 1e21;
+         return r == 4.3683e25;
+     }
+ 
+ See also: utils.h in https://github.com/google/double-conversion/
+ */
+#if !defined(FLT_EVAL_METHOD) && defined(__FLT_EVAL_METHOD__)
+#    define FLT_EVAL_METHOD __FLT_EVAL_METHOD__
+#endif
+
+#if defined(FLT_EVAL_METHOD) && FLT_EVAL_METHOD != 0 && FLT_EVAL_METHOD != 1
+#    define PYYJSON_DOUBLE_MATH_CORRECT 0
+#elif defined(i386) || defined(__i386) || defined(__i386__) ||    \
+        defined(_X86_) || defined(__X86__) || defined(_M_IX86) || \
+        defined(__I86__) || defined(__IA32__) || defined(__THW_INTEL)
+#    if (defined(_MSC_VER) && defined(_M_IX86_FP) && _M_IX86_FP == 2) || \
+            (defined(__SSE2_MATH__) && __SSE2_MATH__)
+#        define PYYJSON_DOUBLE_MATH_CORRECT 1
+#    else
+#        define PYYJSON_DOUBLE_MATH_CORRECT 0
+#    endif
+#elif defined(__mc68000__) || defined(__pnacl__) || defined(__native_client__)
+#    define PYYJSON_DOUBLE_MATH_CORRECT 0
+#else
+#    define PYYJSON_DOUBLE_MATH_CORRECT 1
+#endif
+
 
 /* Helper for quickly write an err handle. */
 #define RETURN_ON_UNLIKELY_ERR(x) \
@@ -280,6 +362,8 @@ static_assert(false, "false");
 #define _MinusOne (-1)
 #define ControlMax (32)
 
+/* Default padding. */
+#define TAIL_PADDING (512 / 8)
 
 /*==============================================================================
  * 128-bit Integer Utils
@@ -326,6 +410,55 @@ force_inline void u128_mul_add(u64 a, u64 b, u64 c, u64 *hi, u64 *lo) {
 #endif
 }
 
+/* Used to write u64 literal for C89 which doesn't support "ULL" suffix. */
+#undef U64
+#define U64(hi, lo) ((((u64)hi##UL) << 32U) + lo##UL)
+
+#define U8MAX (255)
+
+/*==============================================================================
+ * Power10 Lookup Table
+ * These data are used by the floating-point number reader and writer.
+ *============================================================================*/
+
+/** Minimum decimal exponent in pow10_sig_table. */
+#define POW10_SIG_TABLE_MIN_EXP -343
+
+/** Maximum decimal exponent in pow10_sig_table. */
+#define POW10_SIG_TABLE_MAX_EXP 324
+
+/** Minimum exact decimal exponent in pow10_sig_table */
+#define POW10_SIG_TABLE_MIN_EXACT_EXP 0
+
+/** Maximum exact decimal exponent in pow10_sig_table */
+#define POW10_SIG_TABLE_MAX_EXACT_EXP 55
+
+/** Normalized significant 128 bits of pow10, no rounded up (size: 10.4KB).
+    This lookup table is used by both the double number reader and writer.
+    (generate with misc/make_tables.c) */
+extern const u64 pow10_sig_table[];
+
+/**
+ Get the cached pow10 value from pow10_sig_table.
+ @param exp10 The exponent of pow(10, e). This value must in range
+              POW10_SIG_TABLE_MIN_EXP to POW10_SIG_TABLE_MAX_EXP.
+ @param hi    The highest 64 bits of pow(10, e).
+ @param lo    The lower 64 bits after `hi`.
+ */
+force_inline void pow10_table_get_sig(i32 exp10, u64 *hi, u64 *lo) {
+    i32 idx = exp10 - (POW10_SIG_TABLE_MIN_EXP);
+    *hi = pow10_sig_table[idx * 2];
+    *lo = pow10_sig_table[idx * 2 + 1];
+}
+
+/**
+ Get the exponent (base 2) for highest 64 bits significand in pow10_sig_table.
+ */
+force_inline void pow10_table_get_exp(i32 exp10, i32 *exp2) {
+    /* e2 = floor(log2(pow(10, e))) - 64 + 1 */
+    /*    = floor(e * log2(10) - 63)         */
+    *exp2 = (exp10 * 217706 - 4128768) >> 16;
+}
 
 /*==============================================================================
  * Digit Character Matcher
@@ -377,25 +510,26 @@ static const u8 CHAR_TYPE_LINE_END = 1 << 6;
 /** Hexadecimal numeric character: [0-9a-fA-F]. */
 static const u8 CHAR_TYPE_HEX = 1 << 7;
 
-
 /** Digit type table (generate with misc/make_tables.c) */
-static const u8 digi_table[256] = {
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x04, 0x00, 0x08, 0x10, 0x00,
-        0x01, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
-        0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+extern const u8 digi_table[256];
+
+// static const u8 digi_table[256] = {
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x04, 0x00, 0x08, 0x10, 0x00,
+//         0x01, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+//         0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 /** Match a character with specified type. */
 force_inline bool digi_is_type(u8 d, u8 type) {
@@ -403,32 +537,32 @@ force_inline bool digi_is_type(u8 d, u8 type) {
 }
 
 /** Match a sign: '+', '-' */
-force_inline bool digi_is_sign(u8 d) {
+force_inline bool _digi_is_sign(u8 d) {
     return digi_is_type(d, (u8)(DIGI_TYPE_POS | DIGI_TYPE_NEG));
 }
 
 /** Match a none zero digit: [1-9] */
-force_inline bool digi_is_nonzero(u8 d) {
+force_inline bool _digi_is_nonzero(u8 d) {
     return digi_is_type(d, (u8)DIGI_TYPE_NONZERO);
 }
 
 /** Match a digit: [0-9] */
-force_inline bool digi_is_digit(u8 d) {
+force_inline bool _digi_is_digit(u8 d) {
     return digi_is_type(d, (u8)(DIGI_TYPE_ZERO | DIGI_TYPE_NONZERO));
 }
 
 /** Match an exponent sign: 'e', 'E'. */
-force_inline bool digi_is_exp(u8 d) {
+force_inline bool _digi_is_exp(u8 d) {
     return digi_is_type(d, (u8)DIGI_TYPE_EXP);
 }
 
 /** Match a floating point indicator: '.', 'e', 'E'. */
-force_inline bool digi_is_fp(u8 d) {
+force_inline bool _digi_is_fp(u8 d) {
     return digi_is_type(d, (u8)(DIGI_TYPE_DOT | DIGI_TYPE_EXP));
 }
 
 /** Match a digit or floating point indicator: [0-9], '.', 'e', 'E'. */
-force_inline bool digi_is_digit_or_fp(u8 d) {
+force_inline bool _digi_is_digit_or_fp(u8 d) {
     return digi_is_type(d, (u8)(DIGI_TYPE_ZERO | DIGI_TYPE_NONZERO |
                                 DIGI_TYPE_DOT | DIGI_TYPE_EXP));
 }
@@ -547,5 +681,66 @@ force_inline u32 u64_tz_bits(u64 v) {
     return table[((v & (~v + 1)) * U64(0x022FDD63, 0xCC95386D)) >> 58];
 #endif
 }
+
+/*==============================================================================
+ * Utils
+ *============================================================================*/
+
+/** Returns whether the size is power of 2 (size should not be 0). */
+force_inline bool size_is_pow2(usize size) {
+    return (size & (size - 1)) == 0;
+}
+
+/** Align size upwards (may overflow). */
+force_inline usize size_align_up(usize size, usize align) {
+    if (size_is_pow2(align)) {
+        return (size + (align - 1)) & ~(align - 1);
+    } else {
+        return size + align - (size + align - 1) % align - 1;
+    }
+}
+
+/*
+ * Split tail length into multi parts.
+ */
+force_inline void split_tail_len_two_parts(Py_ssize_t tail_len, Py_ssize_t check_count, Py_ssize_t *restrict part1, Py_ssize_t *restrict part2) {
+    assert(tail_len > 0 && tail_len < check_count);
+    assert(check_count / 2 * 2 == check_count);
+    const Py_ssize_t check_half = check_count / 2;
+    Py_ssize_t p1, p2;
+    p2 = tail_len > check_half ? check_half : tail_len;
+    p1 = tail_len - p2;
+    assert(p1 >= 0 && p2 >= 0);
+    assert(p1 <= check_half && p2 <= check_half);
+    assert(p1 + p2 == tail_len);
+    *part2 = p2;
+    *part1 = p1;
+}
+
+force_inline void split_tail_len_four_parts(Py_ssize_t tail_len, Py_ssize_t check_count, Py_ssize_t *restrict part1, Py_ssize_t *restrict part2, Py_ssize_t *restrict part3, Py_ssize_t *restrict part4) {
+    assert(tail_len > 0 && tail_len < check_count);
+    assert(check_count / 4 * 4 == check_count);
+    const Py_ssize_t orig_tail_len = tail_len;
+    const Py_ssize_t check_quad = check_count / 4;
+    Py_ssize_t p1, p2, p3, p4;
+    p4 = tail_len > check_quad ? check_quad : tail_len;
+    tail_len -= p4;
+    p3 = tail_len > check_quad ? check_quad : tail_len;
+    tail_len -= p3;
+    p2 = tail_len > check_quad ? check_quad : tail_len;
+    tail_len -= p2;
+    p1 = tail_len;
+    assert(p1 >= 0 && p2 >= 0 && p3 >= 0 && p4 >= 0);
+    assert(p1 <= check_quad && p2 <= check_quad && p3 <= check_quad && p4 <= check_quad);
+    assert(p1 + p2 + p3 + p4 == orig_tail_len);
+    *part4 = p4;
+    *part3 = p3;
+    *part2 = p2;
+    *part1 = p1;
+}
+
+/* typedefs */
+typedef PyObject *pyyjson_cache_type;
+
 
 #endif // PYYJSON_H

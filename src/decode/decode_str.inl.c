@@ -15,9 +15,13 @@
 //
 // #include "simd/check_mask.inl.h"
 
-
+#define PYYJSON_DECODE_STR PYYJSON_CONCAT2(pyyjson_decode_str, COMPILE_UCS_LEVEL)
 #define READ_STR PYYJSON_CONCAT2(read_str, COMPILE_UCS_LEVEL)
+#define FAST_SKIP_SPACES PYYJSON_CONCAT2(fast_skip_spaces, COMPILE_UCS_LEVEL)
+#define READ_ROOT PYYJSON_CONCAT2(read_root, COMPILE_UCS_LEVEL)
+#define READ_ROOT_SINGLE PYYJSON_CONCAT2(read_root_single, COMPILE_UCS_LEVEL)
 #define READ_STR_IN_LOOP PYYJSON_CONCAT2(read_str_in_loop, COMPILE_UCS_LEVEL)
+#define PROCESS_TAIL_COPY PYYJSON_CONCAT2(process_tail_copy, COMPILE_UCS_LEVEL)
 #define READ_STR_TAIL PYYJSON_CONCAT2(read_str_tail, COMPILE_UCS_LEVEL)
 #define READ_TO_HEX_U16 PYYJSON_CONCAT3(read, READ_BIT_SIZE, to_hex_u16)
 #define DECODE_UNICODE_INFO PYYJSON_CONCAT2(DecodeUnicodeInfo, COMPILE_UCS_LEVEL)
@@ -40,12 +44,19 @@
 #define GET_DONE_COUNT_FROM_MASK PYYJSON_CONCAT2(get_done_count_from_mask, COMPILE_READ_UCS_LEVEL)
 #define WRITE_SIMD_IMPL_TARGET2 PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, 2)
 #define WRITE_SIMD_IMPL_TARGET4 PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, 4)
-#define DOWNGRADE_STRING PYYJSON_CONCAT2(downgrade_string, COMPILE_READ_UCS_LEVEL)
 #define UCS_BELOW_2_DIRTY PYYJSON_CONCAT2(ucs_below_2_dirty, COMPILE_UCS_LEVEL)
 #define UCS_BELOW_4_DIRTY PYYJSON_CONCAT2(ucs_below_4_dirty, COMPILE_UCS_LEVEL)
 #define COPY_WITH_ELEVATE_TO_2 PYYJSON_CONCAT2(copy_with_elevate_to_2, COMPILE_UCS_LEVEL)
 #define COPY_WITH_ELEVATE_TO_4 PYYJSON_CONCAT2(copy_with_elevate_to_4, COMPILE_UCS_LEVEL)
-
+#define CHECK_AND_RESERVE_STR_BUFFER PYYJSON_CONCAT2(check_and_reserve_str_buffer, COMPILE_UCS_LEVEL)
+#define _READ_TRUE PYYJSON_CONCAT2(_read_true, COMPILE_READ_UCS_LEVEL)
+#define _READ_FALSE PYYJSON_CONCAT2(_read_false, COMPILE_READ_UCS_LEVEL)
+#define _READ_NULL PYYJSON_CONCAT2(_read_null, COMPILE_READ_UCS_LEVEL)
+#define _READ_INF PYYJSON_CONCAT2(_read_inf, COMPILE_READ_UCS_LEVEL)
+#define _READ_NAN PYYJSON_CONCAT2(_read_nan, COMPILE_READ_UCS_LEVEL)
+#define READ_INF_OR_NAN PYYJSON_CONCAT2(read_inf_or_nan, COMPILE_READ_UCS_LEVEL)
+#define READ_NUMBER PYYJSON_CONCAT2(read_number, COMPILE_READ_UCS_LEVEL)
+#define CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512 PYYJSON_CONCAT2(check_escape_tail_impl_get_mask_512, COMPILE_READ_UCS_LEVEL)
 
 force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restrict src, SIMD_TYPE *restrict SIMD_VAR);
 force_inline u32 GET_DONE_COUNT_FROM_MASK(SIMD_MASK_TYPE mask);
@@ -182,7 +193,7 @@ force_inline bool UCS_BELOW_4_DIRTY(DECODE_UNICODE_INFO *decode_unicode_info) {
 force_inline void COPY_WITH_ELEVATE_TO_2(DECODE_UNICODE_INFO *decode_unicode_info) {
 #if COMPILE_UCS_LEVEL < 2
     assert(decode_unicode_info->ucs1_len > 0);
-    long_back_elevate_1_2((u16 *)decode_unicode_info->write_head, (u8 *)decode_unicode_info->write_head, decode_unicode_info->ucs1_len);
+    SIMD_NAME_MODIFIER(long_back_elevate_1_2)((u16 *)decode_unicode_info->write_head, (u8 *)decode_unicode_info->write_head, decode_unicode_info->ucs1_len);
 #else
     assert(false);
     Py_UNREACHABLE();
@@ -193,45 +204,19 @@ force_inline void COPY_WITH_ELEVATE_TO_4(DECODE_UNICODE_INFO *decode_unicode_inf
 #if COMPILE_UCS_LEVEL < 2
     if (decode_unicode_info->ucs2_len > 0) {
         u16 *head_u16 = (u16 *)decode_unicode_info->write_head + decode_unicode_info->ucs1_len;
-        long_back_elevate_2_4(((u32 *)decode_unicode_info->write_head) + decode_unicode_info->ucs1_len, head_u16, decode_unicode_info->ucs2_len);
+        SIMD_NAME_MODIFIER(long_back_elevate_2_4)(((u32 *)decode_unicode_info->write_head) + decode_unicode_info->ucs1_len, head_u16, decode_unicode_info->ucs2_len);
     }
     if (decode_unicode_info->ucs1_len > 0) {
-        long_back_elevate_1_4((u32 *)decode_unicode_info->write_head, (u8 *)decode_unicode_info->write_head, decode_unicode_info->ucs1_len);
+        SIMD_NAME_MODIFIER(long_back_elevate_1_4)((u32 *)decode_unicode_info->write_head, (u8 *)decode_unicode_info->write_head, decode_unicode_info->ucs1_len);
     }
 #elif COMPILE_UCS_LEVEL == 2
     assert(decode_unicode_info->ucs2_len > 0);
-    long_back_elevate_2_4((u32 *)decode_unicode_info->write_head, (u16 *)decode_unicode_info->write_head, decode_unicode_info->ucs2_len);
+    SIMD_NAME_MODIFIER(long_back_elevate_2_4)((u32 *)decode_unicode_info->write_head, (u16 *)decode_unicode_info->write_head, decode_unicode_info->ucs2_len);
 #else
     assert(false);
     Py_UNREACHABLE();
 #endif
 }
-
-// #if COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_UCS4
-// force_inline bool _checkmax_ucs4(SIMD_TYPE SIMD_VAR, ReadStrState *read_state) {
-// #    if SIMD_BIT_SIZE == 512
-//     SIMD_512 t = _mm512_set1_epi32(65535);
-//     __mmask16 mask = _mm512_cmpgt_epu32_mask(SIMD_VAR, t);
-//     if (unlikely(mask != 0)) {
-//         update_max_char_type(read_state, PYYJSON_STRING_TYPE_UCS4);
-//         return false;
-//     }
-//     return true;
-// #    else
-// #        define CMPGT PYYJSON_CONCAT2(cmpgt_i32, SIMD_BIT_SIZE)
-// #        define BROADCAST PYYJSON_CONCAT2(broadcast_32, SIMD_BIT_SIZE)
-//     SIMD_TYPE t = BROADCAST(65535);
-//     SIMD_TYPE mask = CMPGT(SIMD_VAR, t);
-//     if (unlikely(!check_mask_zero(mask))) {
-//         update_max_char_type(read_state, PYYJSON_STRING_TYPE_UCS4);
-//         return false;
-//     }
-//     return true;
-// #        undef BROADCAST
-// #        undef CMPGT
-// #    endif
-// }
-// #endif
 
 force_inline void CHECK_MAX_CHAR_IN_LOOP(
         SIMD_TYPE SIMD_VAR,
@@ -253,7 +238,7 @@ force_inline void CHECK_MAX_CHAR_IN_LOOP(
     }
 #define CHECKER PYYJSON_SIMPLE_CONCAT3(_ucs, COMPILE_READ_UCS_LEVEL, _checkmax)
     switch (read_state->max_char_type) {
-        case PYYJSON_STRING_TYPE_ASCII: { // TODO
+        case PYYJSON_STRING_TYPE_ASCII: {
 #if COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_UCS4
             CHECKER(SIMD_VAR, read_state, 0xffff, PYYJSON_STRING_TYPE_UCS4) &&
 #endif
@@ -264,7 +249,7 @@ force_inline void CHECK_MAX_CHAR_IN_LOOP(
             break;
         }
 #if COMPILE_UCS_LEVEL > PYYJSON_STRING_TYPE_LATIN1
-        case PYYJSON_STRING_TYPE_LATIN1: { // TODO
+        case PYYJSON_STRING_TYPE_LATIN1: {
 #    if COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_UCS4
             CHECKER(SIMD_VAR, read_state, 0xffff, PYYJSON_STRING_TYPE_UCS4) &&
 #    endif
@@ -273,7 +258,7 @@ force_inline void CHECK_MAX_CHAR_IN_LOOP(
         }
 #endif
 #if COMPILE_UCS_LEVEL > PYYJSON_STRING_TYPE_UCS2
-        case PYYJSON_STRING_TYPE_UCS2: { // TODO
+        case PYYJSON_STRING_TYPE_UCS2: {
             CHECKER(SIMD_VAR, read_state, 0xffff, PYYJSON_STRING_TYPE_UCS4);
             break;
         }
@@ -351,7 +336,7 @@ force_inline bool VERIFY_ESCAPE_HEX(DECODE_SRC_INFO *decode_src_info) {
 }
 
 /* noinline this to reduce binary size */
-force_noinline u32 DECODE_ESCAPE_UNICODE(DECODE_SRC_INFO *restrict decode_src_info) {
+static force_noinline u32 DECODE_ESCAPE_UNICODE(DECODE_SRC_INFO *restrict decode_src_info) {
     // escape
     switch (*++decode_src_info->src) { // clang-format off
         case '"':  decode_src_info->src++; return '"';
@@ -383,7 +368,7 @@ force_noinline u32 DECODE_ESCAPE_UNICODE(DECODE_SRC_INFO *restrict decode_src_in
                     PyErr_SetString(JSONDecodeError, "Invalid high surrogate in string");
                     return (u32)0xffffffff;
                 }
-                if (unlikely(decode_src_info->src + 6 > decode_src_info->src_end || !byte_match_2(decode_src_info->src, "\\u"))) {
+                if (unlikely(decode_src_info->src + 6 > decode_src_info->src_end || decode_src_info->src[0] != '\\' || decode_src_info->src[1] != 'u')) {
                     PyErr_SetString(JSONDecodeError, "No low surrogate in string");
                     return (u32)0xffffffff;
                 }
@@ -436,7 +421,7 @@ force_inline SpecialCharReadResult DO_SPECIAL(DECODE_SRC_INFO *restrict decode_s
     }
 }
 
-force_noinline void PROCESS_ESCAPE(
+static force_noinline void PROCESS_ESCAPE(
         DECODE_UNICODE_INFO *decode_unicode_info,
         ReadStrState *read_state,
         DECODE_SRC_INFO *decode_src_info,
@@ -581,7 +566,6 @@ force_inline void READ_STR_IN_LOOP(
         decode_src_info->src += CHECK_COUNT_MAX;
         MOVE_WRITER(decode_unicode_info, write_as, CHECK_COUNT_MAX);
         if (need_check_max_char) CHECK_MAX_CHAR_IN_LOOP(SIMD_VAR, read_state, false, CHECK_COUNT_MAX); // compile time determined
-        // read_state->scan_flag = StrContinue;
     } else {
         // this is not an *unlikely* case
         // for example, for short keys less than 16 bytes,
@@ -590,95 +574,25 @@ force_inline void READ_STR_IN_LOOP(
         decode_src_info->src += done_count;
         MOVE_WRITER(decode_unicode_info, write_as, done_count);
         SpecialCharReadResult escape_result = DO_SPECIAL(decode_src_info);
-        // *write_scan_flag = escape_result.flag;
         if (likely(escape_result.flag == StrEnd)) {
             if (need_check_max_char) CHECK_MAX_CHAR_IN_LOOP(SIMD_VAR, read_state, true, (Py_ssize_t)done_count);
             read_state->scan_flag = StrEnd;
+            read_state->state_dirty = true;
             return;
         }
         if (unlikely(escape_result.flag == StrInvalid)) {
             assert(PyErr_Occurred());
             read_state->scan_flag = StrInvalid;
+            read_state->state_dirty = true;
             return;
         }
         // slow path (escape character)
         PROCESS_ESCAPE(decode_unicode_info, read_state, decode_src_info, escape_result.value, write_as, do_copy);
-        // read_state->scan_flag = StrContinue;
         if (need_check_max_char && read_state->max_char_type < COMPILE_UCS_LEVEL) {
             CHECK_MAX_CHAR_IN_LOOP(SIMD_VAR, read_state, true, (Py_ssize_t)done_count);
         }
     }
 }
-
-#if COMPILE_UCS_LEVEL > 1
-force_inline void DOWNGRADE_STRING(const void *src_start, Py_ssize_t copy_count, int max_char_type, void *write_buffer_head) {
-#    if COMPILE_UCS_LEVEL == 2
-    assert(max_char_type == 0 || max_char_type == 1);
-    // zip u16 buffer to u8 buffer.
-    const _FROM_TYPE *src = (const _FROM_TYPE *)src_start;
-    u8 *dst = (u8 *)write_buffer_head;
-    SIMD_TYPE SIMD_VAR;
-    while (copy_count >= CHECK_COUNT_MAX) {
-        SIMD_TYPE SIMD_VAR = load_simd((const void *)src);
-        SIMD_REAL_HALF_TYPE half_val = zip_simd_16_to_8(SIMD_VAR);
-        *(SIMD_REAL_HALF_TYPE *)dst = half_val;
-        copy_count -= CHECK_COUNT_MAX;
-        dst += CHECK_COUNT_MAX;
-        src += CHECK_COUNT_MAX;
-    }
-    if (copy_count) {
-        Py_ssize_t additional = CHECK_COUNT_MAX - copy_count;
-        src -= additional;
-        dst -= additional;
-        SIMD_TYPE SIMD_VAR = load_simd((const void *)src);
-        SIMD_REAL_HALF_TYPE half_val = zip_simd_16_to_8(SIMD_VAR);
-        *(SIMD_REAL_HALF_TYPE *)dst = half_val;
-    }
-#    else // COMPILE_UCS_LEVEL == 4
-    const _FROM_TYPE *src = (const _FROM_TYPE *)src_start;
-    if (max_char_type == 2) {
-        u16 *dst = (u16 *)write_buffer_head;
-        SIMD_TYPE SIMD_VAR;
-        while (copy_count >= CHECK_COUNT_MAX) {
-            SIMD_TYPE SIMD_VAR = load_simd((const void *)src);
-            SIMD_REAL_HALF_TYPE half_val = zip_simd_32_to_16(SIMD_VAR);
-            *(SIMD_REAL_HALF_TYPE *)dst = half_val;
-            copy_count -= CHECK_COUNT_MAX;
-            dst += CHECK_COUNT_MAX;
-            src += CHECK_COUNT_MAX;
-        }
-        if (copy_count) {
-            Py_ssize_t additional = CHECK_COUNT_MAX - copy_count;
-            src -= additional;
-            dst -= additional;
-            SIMD_TYPE SIMD_VAR = load_simd((const void *)src);
-            SIMD_REAL_HALF_TYPE half_val = zip_simd_32_to_16(SIMD_VAR);
-            *(SIMD_REAL_HALF_TYPE *)dst = half_val;
-        }
-    } else {
-        assert(max_char_type == 1);
-        u8 *dst = (u8 *)write_buffer_head;
-        SIMD_TYPE SIMD_VAR;
-        while (copy_count >= CHECK_COUNT_MAX) {
-            SIMD_TYPE SIMD_VAR = load_simd((const void *)src);
-            SIMD_REAL_QUARTER_TYPE quar_val = zip_simd_32_to_8(SIMD_VAR);
-            *(SIMD_REAL_QUARTER_TYPE *)dst = quar_val;
-            copy_count -= CHECK_COUNT_MAX;
-            dst += CHECK_COUNT_MAX;
-            src += CHECK_COUNT_MAX;
-        }
-        if (copy_count) {
-            Py_ssize_t additional = CHECK_COUNT_MAX - copy_count;
-            src -= additional;
-            dst -= additional;
-            SIMD_TYPE SIMD_VAR = load_simd((const void *)src);
-            SIMD_REAL_QUARTER_TYPE quar_val = zip_simd_32_to_8(SIMD_VAR);
-            *(SIMD_REAL_QUARTER_TYPE *)dst = quar_val;
-        }
-    }
-#    endif
-}
-#endif
 
 force_inline PyObject *DECODE_LOOP_DONE_MAKE_STRING(
         DECODE_SRC_INFO *restrict decode_src_info,
@@ -697,9 +611,16 @@ force_inline PyObject *DECODE_LOOP_DONE_MAKE_STRING(
             return make_string((const u8 *)decode_src_info->src_start, copy_count, max_char_type, is_key);
         } else {
 #if COMPILE_UCS_LEVEL > 1
-            // need to zip the buffer down to `max_char_type`.
-            // use simd to make this faster.
-            DOWNGRADE_STRING((const void *)decode_src_info->src_start, copy_count, max_char_type, (_FROM_TYPE *)decode_unicode_info->write_head);
+// need to zip the buffer down to `max_char_type`.
+// use simd to make this faster.
+#    if COMPILE_UCS_LEVEL == 4
+            if (max_char_type == 2) downgrade_string_4_2(decode_src_info->src_start, copy_count, (u16 *)decode_unicode_info->write_head);
+            else
+#    endif
+#    define DOWNGRADER PYYJSON_CONCAT3(downgrade_string, COMPILE_UCS_LEVEL, 1)
+                DOWNGRADER(decode_src_info->src_start, copy_count, (u8 *)decode_unicode_info->write_head);
+#    undef DOWNGRADER
+            // DOWNGRADE_STRING((const void *)decode_src_info->src_start, copy_count, max_char_type, (_FROM_TYPE *)decode_unicode_info->write_head);
             // create unicode from the writer.
             return make_string((const u8 *)decode_unicode_info->write_head, copy_count, max_char_type, is_key);
 #else
@@ -714,28 +635,32 @@ force_inline PyObject *DECODE_LOOP_DONE_MAKE_STRING(
                 COPY_WITH_ELEVATE_TO_4(decode_unicode_info);
             }
             // not dirty now
-            return make_string((const u8 *)decode_unicode_info->write_head, decode_unicode_info->ucs4_len, 4, is_key);
+            return make_string((const u8 *)decode_unicode_info->write_head, decode_unicode_info->unicode_ucs4 - (u32 *)decode_unicode_info->write_head, 4, is_key);
         } else if (max_char_type == 2) {
 #if COMPILE_UCS_LEVEL == 4
             // downgrade insitu
             Py_ssize_t copy_count = UNICODE_DECODE_GET_COPY_COUNT(decode_unicode_info);
-            DOWNGRADE_STRING((const void *)decode_unicode_info->write_head, copy_count, 2, (_FROM_TYPE *)decode_unicode_info->write_head);
+            downgrade_string_4_2(decode_unicode_info->write_head, copy_count, (u16 *)decode_unicode_info->write_head);
+            // DOWNGRADE_STRING((const void *)decode_unicode_info->write_head, copy_count, 2, (_FROM_TYPE *)decode_unicode_info->write_head);
             return make_string((const u8 *)decode_unicode_info->write_head, copy_count, 2, is_key);
 #else
             if (UCS_BELOW_2_DIRTY(decode_unicode_info)) {
                 COPY_WITH_ELEVATE_TO_2(decode_unicode_info);
             }
             // not dirty now
-            return make_string((const u8 *)decode_unicode_info->write_head, decode_unicode_info->ucs2_len, 2, is_key);
+            return make_string((const u8 *)decode_unicode_info->write_head, decode_unicode_info->unicode_ucs2 - (u16 *)decode_unicode_info->write_head, 2, is_key);
 #endif
         } else if (max_char_type <= 1) {
 #if COMPILE_UCS_LEVEL > 1
             // downgrade insitu
             Py_ssize_t copy_count = UNICODE_DECODE_GET_COPY_COUNT(decode_unicode_info);
-            DOWNGRADE_STRING((const void *)decode_unicode_info->write_head, copy_count, 1, (_FROM_TYPE *)decode_unicode_info->write_head);
+#    define DOWNGRADER PYYJSON_CONCAT3(downgrade_string, COMPILE_READ_UCS_LEVEL, 1)
+            DOWNGRADER(decode_unicode_info->write_head, copy_count, (u8 *)decode_unicode_info->write_head);
+#    undef DOWNGRADER
+            // DOWNGRADE_STRING((const void *)decode_unicode_info->write_head, copy_count, 1, (_FROM_TYPE *)decode_unicode_info->write_head);
             return make_string((const u8 *)decode_unicode_info->write_head, copy_count, 1, is_key);
 #else
-            return make_string((const u8 *)decode_unicode_info->write_head, decode_unicode_info->ucs1_len, 1, is_key);
+            return make_string((const u8 *)decode_unicode_info->write_head, decode_unicode_info->unicode_ucs1 - (u8 *)decode_unicode_info->write_head, 1, is_key);
 #endif
         } else {
             assert(false);
@@ -745,11 +670,144 @@ force_inline PyObject *DECODE_LOOP_DONE_MAKE_STRING(
     }
 }
 
+force_inline void PROCESS_TAIL_COPY(
+        int write_as,
+        int really_write_count,
+        DECODE_SRC_INFO *restrict decode_src_info,
+        DECODE_UNICODE_INFO *restrict decode_unicode_info) {
+#if COMPILE_UCS_LEVEL <= 1
+    if (write_as <= 1) {
+        assert(decode_unicode_info->unicode_ucs1);
+#    define TAIL_WRITER PYYJSON_CONCAT3(tail_write_simd_impl, COMPILE_READ_UCS_LEVEL, 1)
+        TAIL_WRITER(decode_src_info->src, decode_unicode_info->unicode_ucs1, really_write_count);
+        // decode_unicode_info->unicode_ucs1 += really_write_count;
+#    undef TAIL_WRITER
+        return;
+    }
+#endif
+#if COMPILE_UCS_LEVEL <= 2
+    if (write_as == 2) {
+#    define TAIL_WRITER PYYJSON_CONCAT3(tail_write_simd_impl, COMPILE_READ_UCS_LEVEL, 2)
+        assert(decode_unicode_info->unicode_ucs2);
+        TAIL_WRITER(decode_src_info->src, decode_unicode_info->unicode_ucs2, really_write_count);
+        // decode_unicode_info->unicode_ucs2 += really_write_count;
+#    undef TAIL_WRITER
+        return;
+    }
+#endif
+#define TAIL_WRITER PYYJSON_CONCAT3(tail_write_simd_impl, COMPILE_READ_UCS_LEVEL, 4)
+    assert(decode_unicode_info->unicode_ucs4);
+    TAIL_WRITER(decode_src_info->src, decode_unicode_info->unicode_ucs4, really_write_count);
+    // decode_unicode_info->unicode_ucs4 += really_write_count;
+#undef TAIL_WRITER
+}
+
 force_inline void READ_STR_TAIL(
         DECODE_SRC_INFO *restrict decode_src_info,
         DECODE_UNICODE_INFO *restrict decode_unicode_info,
-        ReadStrState *read_state) {
-    // TODO
+        ReadStrState *read_state,
+        int write_as, // one of 1,2,4
+        bool do_copy,
+        bool need_check_max_char) {
+#if SIMD_BIT_SIZE == 512
+    // load use maskz
+#    define _MASKZ_LOADU PYYJSON_SIMPLE_CONCAT2(_mm512_maskz_loadu_epi, READ_BIT_SIZE)
+    u64 rw_mask, tail_mask;
+    rw_mask = ((u64)1 << (usize)(decode_src_info->src_end - decode_src_info->src)) - 1;
+    SIMD_512 z = _MASKZ_LOADU(rw_mask, (const void *)decode_src_info->src);
+#    undef _MASKZ_LOADU
+    tail_mask = CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(z, rw_mask);
+    if (likely(!check_mask_zero(tail_mask))) {
+        u32 done_count = GET_DONE_COUNT_FROM_MASK(tail_mask);
+        if (do_copy && done_count) {
+            PROCESS_TAIL_COPY(write_as, (Py_ssize_t)done_count, decode_src_info, decode_unicode_info);
+        }
+        // move reader and writer
+        decode_src_info->src += done_count;
+        MOVE_WRITER(decode_unicode_info, write_as, done_count);
+        // get the special value (expecting '"')
+        SpecialCharReadResult escape_result = DO_SPECIAL(decode_src_info);
+        if (likely(escape_result.flag == StrEnd)) {
+            if (need_check_max_char) {
+                CHECK_MAX_CHAR_IN_LOOP(SIMD_VAR, read_state, true, (Py_ssize_t)done_count);
+            }
+            read_state->scan_flag = StrEnd;
+            read_state->state_dirty = true;
+            return;
+        }
+        if (unlikely(escape_result.flag == StrInvalid)) {
+            assert(PyErr_Occurred());
+            read_state->scan_flag = StrInvalid;
+            read_state->state_dirty = true;
+            return;
+        }
+        // slow path (escape character)
+        PROCESS_ESCAPE(decode_unicode_info, read_state, decode_src_info, escape_result.value, write_as, do_copy);
+        if (need_check_max_char && read_state->max_char_type < COMPILE_UCS_LEVEL) {
+            CHECK_MAX_CHAR_IN_LOOP(SIMD_VAR, read_state, true, (Py_ssize_t)done_count);
+        }
+    } else {
+        // there is no '"' until the end, the string must be invalid
+        PyErr_SetString(JSONDecodeError, "Unexpected ending when reading string");
+        read_state->scan_flag = StrInvalid;
+    }
+#else
+    static_assert(sizeof(SIMD_MASK_TYPE) == sizeof(SIMD_TYPE), "sizeof(SIMD_MASK_TYPE) == sizeof(SIMD_TYPE)");
+    // load backward
+    assert(decode_src_info->src + CHECK_COUNT_MAX > decode_src_info->src_end);
+    SIMD_TYPE SIMD_VAR;
+    // simd_load_head points to the addr to load
+    // always assume that the 32 bytes before `src` is readable
+    const _FROM_TYPE *simd_load_head = decode_src_info->src_end - CHECK_COUNT_MAX;
+    SIMD_MASK_TYPE check_mask = CHECK_ESCAPE_IMPL_GET_MASK(simd_load_head, &SIMD_VAR);
+    Py_ssize_t invalid_head_count = decode_src_info->src - simd_load_head;
+    SIMD_MASK_TYPE tail_mask;
+    // process `check_mask`, removing the invalid head content
+    {
+        const void *tail_mask_addr = PYYJSON_CONCAT2(read_tail_mask_table, READ_BIT_SIZE)(invalid_head_count);
+        tail_mask = load_simd_aligned(tail_mask_addr);
+        check_mask = SIMD_AND(tail_mask, check_mask);
+    }
+    // the read buffer is ended, there should be a '"' here
+    if (likely(!check_mask_zero(check_mask))) {
+        u32 done_count = GET_DONE_COUNT_FROM_MASK(check_mask);
+        //
+        Py_ssize_t really_write_count = (Py_ssize_t)done_count - invalid_head_count;
+        if (do_copy && really_write_count) {
+            PROCESS_TAIL_COPY(write_as, really_write_count, decode_src_info, decode_unicode_info);
+        }
+        // move reader and writer
+        decode_src_info->src += really_write_count;
+        MOVE_WRITER(decode_unicode_info, write_as, really_write_count);
+        // get the special value (expecting '"')
+        SpecialCharReadResult escape_result = DO_SPECIAL(decode_src_info);
+        if (likely(escape_result.flag == StrEnd)) {
+            if (need_check_max_char) {
+                // the first `invalid_head_count` unicodes are not valid, remove this part using AND with tail_mask
+                CHECK_MAX_CHAR_IN_LOOP(SIMD_AND(SIMD_VAR, tail_mask), read_state, true, (Py_ssize_t)done_count);
+            }
+            read_state->scan_flag = StrEnd;
+            read_state->state_dirty = true;
+            return;
+        }
+        if (unlikely(escape_result.flag == StrInvalid)) {
+            assert(PyErr_Occurred());
+            read_state->scan_flag = StrInvalid;
+            read_state->state_dirty = true;
+            return;
+        }
+        // slow path (escape character)
+        PROCESS_ESCAPE(decode_unicode_info, read_state, decode_src_info, escape_result.value, write_as, do_copy);
+        if (need_check_max_char && read_state->max_char_type < COMPILE_UCS_LEVEL) {
+            // the first `invalid_head_count` unicodes are not valid, remove this part using AND with tail_mask
+            CHECK_MAX_CHAR_IN_LOOP(SIMD_AND(SIMD_VAR, tail_mask), read_state, true, (Py_ssize_t)done_count);
+        }
+    } else {
+        // there is no '"' until the end, the string must be invalid
+        PyErr_SetString(JSONDecodeError, "Unexpected ending when reading string");
+        read_state->scan_flag = StrInvalid;
+    }
+#endif
 }
 
 /**
@@ -761,7 +819,7 @@ force_inline void READ_STR_TAIL(
  @param msg The error message pointer.
  @return Whether success.
  */
-force_noinline PyObject *READ_STR(
+force_inline PyObject *READ_STR(
         const _FROM_TYPE **restrict reader_addr, /*IN-OUT*/
         const _FROM_TYPE *_reader_end,
         _FROM_TYPE *_temp_write_buffer,
@@ -823,7 +881,7 @@ loop_1_f_f:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/1_f_f.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
@@ -856,7 +914,7 @@ loop_1_f_t:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/1_f_t.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
@@ -889,7 +947,7 @@ loop_1_t_f:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/1_t_f.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
@@ -922,7 +980,7 @@ loop_1_t_t:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/1_t_t.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
@@ -955,7 +1013,7 @@ loop_2_f_f:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/2_f_f.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
@@ -988,7 +1046,7 @@ loop_2_f_t:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/2_f_t.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
@@ -1021,7 +1079,7 @@ loop_2_t_f:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/2_t_f.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
@@ -1054,7 +1112,7 @@ loop_2_t_t:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/2_t_t.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
@@ -1087,7 +1145,7 @@ loop_4_f_f:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/4_f_f.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
@@ -1120,7 +1178,7 @@ loop_4_f_t:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/4_f_t.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
@@ -1136,7 +1194,7 @@ loop_4_t_f:;
         // need_check_max_char == false
         // this implies max_char_type == 4 >= COMPILE_UCS_LEVEL
         // also, **won't goto other labels from here**
-        assert(_read_state.max_char_type >= COMPILE_UCS_LEVEL && COMPILE_UCS_LEVEL <= 2);
+        assert(_read_state.max_char_type >= COMPILE_UCS_LEVEL && _read_state.max_char_type == 4);
         // BEGIN
         assert(_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX);
         while (_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX) {
@@ -1177,7 +1235,7 @@ loop_4_t_t:;
                 // escape, or max char updated
 
                 // clang-format off
-                #include "decode_loop_dirty/4_t_t.inl.c"
+                #include "decode_loop_dirty.inl.h"
                 // clang-format on
             }
         }
@@ -1188,9 +1246,11 @@ loop_4_t_t:;
 read_tail:;
     // this is the really *unlikely* case
     {
-        READ_STR_TAIL(&_decode_src_info, &_decode_unicode_info, &_read_state);
+        READ_STR_TAIL(&_decode_src_info, &_decode_unicode_info, &_read_state, PYYJSON_MAX(_read_state.max_char_type, COMPILE_READ_UCS_LEVEL), _read_state.need_copy, _read_state.max_char_type < COMPILE_UCS_LEVEL);
+        if (likely(_read_state.scan_flag == StrEnd)) goto done;
         if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-        goto done;
+        _read_state.state_dirty = false;
+        goto read_tail;
     }
 done:;
     ret = DECODE_LOOP_DONE_MAKE_STRING(
@@ -1199,33 +1259,6 @@ done:;
             _read_state.need_copy,
             _read_state.max_char_type,
             is_key);
-    // if (_read_state.need_copy) {
-    //     // fast path for not using the write buffer.
-    //     // create unicode directly from the reader.
-    //     if (max_char_type == COMPILE_UCS_LEVEL || COMPILE_UCS_LEVEL == 1) {
-    //         // simplest case, copy the buffer directly to the unicode object.
-    //         // for COMPILE_UCS_LEVEL == 1: since max_char_type <= COMPILE_UCS_LEVEL == 1, this is also a copy-only case.
-    //         ret = make_string((const u8 *)reader_start, reader - reader_start, max_char_type, is_key);
-    //         if (unlikely(!ret)) goto fail;
-    //         goto success_cleanup;
-    //     } else {
-    //         // need to zip the buffer down to `max_char_type`.
-    //         // use simd to make this faster.
-    //         DOWNGRADE_STRING((const void *)reader_start, reader - reader_start, max_char_type, dst_start);
-    //         // create unicode from the write buffer.
-    //         ret = make_string((const u8 *)dst_start, reader - reader_start, max_char_type, is_key);
-    //         if (unlikely(!ret)) goto fail;
-    //         goto success_cleanup;
-    //     }
-    // } else {
-    //     if (!(max_char_type == COMPILE_UCS_LEVEL || COMPILE_UCS_LEVEL == 1)) {
-    //         // downgrade write buffer insitu
-    //         DOWNGRADE_STRING((const void *)dst_start, writer - dst_start, max_char_type, dst_start);
-    //     }
-    //     ret = make_string((const u8 *)dst_start, writer - dst_start, max_char_type, is_key);
-    //     if (unlikely(!ret)) goto fail;
-    //     goto success_cleanup;
-    // }
     if (unlikely(!ret)) goto fail;
 
 success_cleanup:;
@@ -1237,11 +1270,703 @@ fail:;
     return NULL;
 }
 
+force_inline void FAST_SKIP_SPACES(const _FROM_TYPE **cur_addr, const _FROM_TYPE *end) {
+#define SET1 PYYJSON_CONCAT3(broadcast, READ_BIT_SIZE, SIMD_BIT_SIZE)
+    const SIMD_TYPE template = SET1(' ');
+#undef SET1
+    const _FROM_TYPE *cur = *cur_addr;
+loop:;
+    if (likely(cur + CHECK_COUNT_MAX < end)) {
+        SIMD_TYPE SIMD_VAR = load_simd((const void *)cur);
+#define CMPNEQ PYYJSON_CONCAT3(cmpneq, READ_BIT_SIZE, SIMD_BIT_SIZE)
+        SIMD_MASK_TYPE m = CMPNEQ(SIMD_VAR, template);
+#undef CMPNEQ
+        if (check_mask_zero(m)) {
+            cur += CHECK_COUNT_MAX;
+            goto loop;
+        } else {
+            u32 done_count = GET_DONE_COUNT_FROM_MASK(m);
+            cur += done_count;
+        }
+    } else {
+        static _FROM_TYPE _t[2] = {' ', ' '};
+        while (true) REPEAT_CALL_16({
+            if (likely(cur + 2 <= end && 0 == memcmp((const void *)cur, (const void *)_t, sizeof(_t)))) cur += 2;
+            else
+                break;
+        })
+        if (*cur == ' ') cur++;
+    }
+    *cur_addr = cur;
+    assert(*cur != ' ');
+}
+
+force_inline bool CHECK_AND_RESERVE_STR_BUFFER(Py_ssize_t len, _FROM_TYPE **buffer_head_addr, bool *need_dealloc) {
+    // consider the max length of the buffer we need
+    // assume that each string has an escape of ucs4, we need buffer with size
+    // sizeof(ucs4) * len == 4 * len
+    // reserve additional TAIL_PADDING bytes before and after the buffer for convenience,
+    // i.e. additional 2 * TAIL_PADDING bytes
+    if (len > ((Py_ssize_t)PY_SSIZE_T_MAX - TAIL_PADDING * 2) / 4) {
+        return false;
+    }
+    static_assert(((Py_ssize_t)PYYJSON_STRING_BUFFER_SIZE - TAIL_PADDING * 2) > 4, "((Py_ssize_t)PYYJSON_STRING_BUFFER_SIZE - 128) > 4");
+    Py_ssize_t new_buffer_size = 4 * len + 2 * TAIL_PADDING;
+    if (new_buffer_size > PYYJSON_STRING_BUFFER_SIZE) {
+        // malloc new buffer
+        u8 *new_buffer = (u8 *)malloc(new_buffer_size);
+        if (!new_buffer) return false;
+        *buffer_head_addr = (_FROM_TYPE *)(new_buffer + TAIL_PADDING);
+        *need_dealloc = true;
+    } else {
+        *buffer_head_addr = (_FROM_TYPE *)(pyyjson_string_buffer + TAIL_PADDING);
+        *need_dealloc = false;
+    }
+    return true;
+}
+
+/** Read JSON document (accept all style, but optimized for pretty). */
+static force_noinline PyObject *READ_ROOT(const _FROM_TYPE *dat, Py_ssize_t len) {
+    // check unicode is valid
+    // assert(PyUnicode_Check(unicode_root));
+    // assert(((PyASCIIObject *)unicode_root)->state.kind == COMPILE_READ_UCS_LEVEL);
+    // assert((((PyASCIIObject *)unicode_root)->state.ascii != false) == (COMPILE_UCS_LEVEL == 0));
+    // Py_ssize_t len = ((PyASCIIObject *)unicode_root)->length;
+    // assert(len > 0);
+    // init `dat` ptr
+    //     const _FROM_TYPE *const dat =
+    // #if COMPILE_UCS_LEVEL == 0
+    //             (u8 *)(((PyASCIIObject *)unicode_root) + 1);
+    // #else
+    //             (_FROM_TYPE *)(((PyCompactUnicodeObject *)unicode_root) + 1);
+    // #endif
+    //
+    const _FROM_TYPE *cur = dat;
+    const _FROM_TYPE *const end = cur + len;
+    // container stack info
+    DecodeCtnStackInfo _decode_ctn_info;
+    DecodeCtnStackInfo *decode_ctn_info = &_decode_ctn_info;
+    // object stack info
+    DecodeObjStackInfo _decode_obj_stack_info;
+    DecodeObjStackInfo *const decode_obj_stack_info = &_decode_obj_stack_info;
+    memset(decode_ctn_info, 0, sizeof(DecodeCtnStackInfo));
+    memset(decode_obj_stack_info, 0, sizeof(DecodeObjStackInfo));
+    // init
+    if (!init_decode_ctn_stack_info(decode_ctn_info) || !init_decode_obj_stack_info(decode_obj_stack_info)) goto failed_cleanup;
+    _FROM_TYPE *string_buffer_head;
+    bool need_dealloc = false;
+    if (unlikely(!CHECK_AND_RESERVE_STR_BUFFER(len, &string_buffer_head, &need_dealloc))) {
+        goto fail_alloc;
+    }
+
+    if (*cur++ == '{') {
+        set_decode_ctn(decode_ctn_info->ctn, 0, false);
+        if (*cur == '\n') cur++;
+        goto obj_key_begin;
+    } else {
+        set_decode_ctn(decode_ctn_info->ctn, 0, true);
+        if (*cur == '\n') cur++;
+        goto arr_val_begin;
+    }
+
+arr_begin:
+    /* save current container */
+    /* create a new array value, save parent container offset */
+    if (unlikely(!ctn_grow_check(decode_ctn_info))) goto fail_ctn_grow;
+    set_decode_ctn(decode_ctn_info->ctn, 0, true);
+
+    /* push the new array value as current container */
+    if (*cur == '\n') cur++;
+
+arr_val_begin:
+    if (cur < end && cur[0] == ' ') {
+        cur++;
+        if (*cur == ' ')
+            FAST_SKIP_SPACES(&cur, end);
+    }
+    // #if PYYJSON_IS_REAL_GCC
+    //     while (true) REPEAT_CALL_16({
+    //         if (byte_match_2((void *)cur, "  ")) cur += 2;
+    //         else
+    //             break;
+    //     })
+    // #else
+    //     while (true) REPEAT_CALL_16({
+    //         if (likely(byte_match_2(cur, "  "))) cur += 2;
+    //         else
+    //             break;
+    //     })
+    // #endif
+
+    if (*cur == '{') {
+        cur++;
+        goto obj_begin;
+    }
+    if (*cur == '[') {
+        cur++;
+        goto arr_begin;
+    }
+    if (*cur <= U8MAX && char_is_number(*cur)) {
+        PyObject *number_obj = READ_NUMBER(&cur, end);
+        if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
+            incr_decode_ctn_size(decode_ctn_info->ctn);
+            goto arr_val_end;
+        }
+        goto fail_number;
+    }
+    if (*cur == '"') {
+        cur++;
+        PyObject *str_obj = READ_STR(&cur, end, string_buffer_head, false);
+        if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
+            incr_decode_ctn_size(decode_ctn_info->ctn);
+            goto arr_val_end;
+        }
+        goto fail_string;
+    }
+    if (*cur == 't') {
+        if (likely(_READ_TRUE(&cur, end) && pyyjson_decode_true(decode_obj_stack_info))) {
+            incr_decode_ctn_size(decode_ctn_info->ctn);
+            goto arr_val_end;
+        }
+        goto fail_literal_true;
+    }
+    if (*cur == 'f') {
+        if (likely(_READ_FALSE(&cur, end) && pyyjson_decode_false(decode_obj_stack_info))) {
+            incr_decode_ctn_size(decode_ctn_info->ctn);
+            goto arr_val_end;
+        }
+        goto fail_literal_false;
+    }
+    if (*cur == 'n') {
+        if (likely(_READ_NULL(&cur, end) && pyyjson_decode_null(decode_obj_stack_info))) {
+            incr_decode_ctn_size(decode_ctn_info->ctn);
+            goto arr_val_end;
+        }
+        if (likely(_READ_NAN(&cur, end) && pyyjson_decode_nan(decode_obj_stack_info, false))) {
+            incr_decode_ctn_size(decode_ctn_info->ctn);
+            goto arr_val_end;
+        }
+        goto fail_literal_null;
+    }
+    if (*cur == ']') {
+        cur++;
+        if (likely(get_decode_ctn_len(decode_ctn_info->ctn) == 0)) goto arr_end;
+        while (*cur != ',') cur--;
+        goto fail_trailing_comma;
+    }
+    if (char_is_space(*cur)) {
+        FAST_SKIP_SPACES(&cur, end);
+        if (char_is_space(*cur)) cur++;
+        // while (char_is_space(*++cur));
+        goto arr_val_begin;
+    }
+    if ((*cur == 'i' || *cur == 'I' || *cur == 'N')) {
+        PyObject *number_obj = READ_INF_OR_NAN(false, &cur, end);
+        if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
+            incr_decode_ctn_size(decode_ctn_info->ctn);
+            goto arr_val_end;
+        }
+        goto fail_character_val;
+    }
+
+    goto fail_character_val;
+
+arr_val_end:;
+    {
+        static _FROM_TYPE _t[2] = {',', '\n'};
+        if (cur < end && 0 == memcmp((void *)cur, _t, sizeof(_t))) {
+            cur += 2;
+            goto arr_val_begin;
+        }
+    }
+    if (*cur == ',') {
+        cur++;
+        goto arr_val_begin;
+    }
+    if (*cur == ']') {
+        cur++;
+        goto arr_end;
+    }
+    if (char_is_space(*cur)) {
+        cur++;
+        if (*cur == ' ') FAST_SKIP_SPACES(&cur, end);
+        if (char_is_space(*cur)) cur++;
+        // while (char_is_space(*++cur));
+        goto arr_val_end;
+    }
+
+    goto fail_character_arr_end;
+
+arr_end:
+    assert(decode_ctn_is_arr(decode_ctn_info->ctn));
+    if (!pyyjson_decode_arr(decode_obj_stack_info, get_decode_ctn_len(decode_ctn_info->ctn))) goto failed_cleanup;
+    /* pop parent as current container */
+    if (unlikely(decode_ctn_info->ctn-- == decode_ctn_info->ctn_start)) {
+        goto doc_end;
+    }
+
+    incr_decode_ctn_size(decode_ctn_info->ctn);
+    if (*cur == '\n') cur++;
+    if (!decode_ctn_is_arr(decode_ctn_info->ctn)) {
+        goto obj_val_end;
+    } else {
+        goto arr_val_end;
+    }
+
+obj_begin:
+    /* push container */
+    if (unlikely(!ctn_grow_check(decode_ctn_info))) goto fail_ctn_grow;
+    set_decode_ctn(decode_ctn_info->ctn, 0, false);
+    if (*cur == '\n') cur++;
+
+obj_key_begin:
+    if (cur < end && cur[0] == ' ') {
+        cur++;
+        if (*cur == ' ')
+            FAST_SKIP_SPACES(&cur, end);
+    }
+    // #if PYYJSON_IS_REAL_GCC
+    //     while (true) REPEAT_CALL_16({
+    //         if (byte_match_2((void *)cur, "  ")) cur += 2;
+    //         else
+    //             break;
+    //     })
+    // #else
+    //     while (true) REPEAT_CALL_16({
+    //         if (likely(byte_match_2(cur, "  "))) cur += 2;
+    //         else
+    //             break;
+    //     })
+    // #endif
+    if (likely(*cur == '"')) {
+        cur++;
+        PyObject *str_obj = READ_STR(&cur, end, string_buffer_head, true);
+        ;
+        if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
+            goto obj_key_end;
+        }
+        goto fail_string;
+    }
+    if (likely(*cur == '}')) {
+        cur++;
+        if (likely(get_decode_ctn_len(decode_ctn_info->ctn) == 0)) goto obj_end;
+        goto fail_trailing_comma;
+    }
+    if (char_is_space(*cur)) {
+        FAST_SKIP_SPACES(&cur, end);
+        if (char_is_space(*cur)) cur++;
+        // while (char_is_space(*++cur));
+        goto obj_key_begin;
+    }
+    goto fail_character_obj_key;
+
+obj_key_end:;
+    {
+        static _FROM_TYPE _t[2] = {':', ' '};
+        if (cur < end && 0 == memcmp((const void *)cur, (const void *)_t, sizeof(_t))) {
+            cur += 2;
+            goto obj_val_begin;
+        }
+    }
+    if (*cur == ':') {
+        cur++;
+        goto obj_val_begin;
+    }
+    if (char_is_space(*cur)) {
+        FAST_SKIP_SPACES(&cur, end);
+        if (char_is_space(*cur)) cur++;
+        // while (char_is_space(*++cur));
+        goto obj_key_end;
+    }
+    goto fail_character_obj_sep;
+
+obj_val_begin:
+    if (*cur == '"') {
+        cur++;
+        PyObject *str_obj = READ_STR(&cur, end, string_buffer_head, false);
+        ;
+        if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
+            incr_decode_ctn_size(decode_ctn_info->ctn);
+            goto obj_val_end;
+        }
+        goto fail_string;
+    }
+    if (char_is_number(*cur)) {
+        PyObject *number_obj = READ_NUMBER(&cur, end);
+        if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
+            incr_decode_ctn_size(decode_ctn_info->ctn);
+            goto obj_val_end;
+        }
+        goto fail_number;
+    }
+    if (*cur == '{') {
+        cur++;
+        goto obj_begin;
+    }
+    if (*cur == '[') {
+        cur++;
+        goto arr_begin;
+    }
+    if (*cur == 't') {
+        if (likely(_READ_TRUE(&cur, end) && pyyjson_decode_true(decode_obj_stack_info))) {
+            incr_decode_ctn_size(decode_ctn_info->ctn);
+            goto obj_val_end;
+        }
+        goto fail_literal_true;
+    }
+    if (*cur == 'f') {
+        if (likely(_READ_FALSE(&cur, end) && pyyjson_decode_false(decode_obj_stack_info))) {
+            incr_decode_ctn_size(decode_ctn_info->ctn);
+            goto obj_val_end;
+        }
+        goto fail_literal_false;
+    }
+    if (*cur == 'n') {
+        if (likely(_READ_NULL(&cur, end) && pyyjson_decode_null(decode_obj_stack_info))) {
+            incr_decode_ctn_size(decode_ctn_info->ctn);
+            goto obj_val_end;
+        }
+        if (likely(_READ_NAN(&cur, end) && pyyjson_decode_nan(decode_obj_stack_info, false))) {
+            incr_decode_ctn_size(decode_ctn_info->ctn);
+            goto obj_val_end;
+        }
+        goto fail_literal_null;
+    }
+    if (char_is_space(*cur)) {
+        FAST_SKIP_SPACES(&cur, end);
+        if (char_is_space(*cur)) cur++;
+        // while (char_is_space(*++cur));
+        goto obj_val_begin;
+    }
+    if ((*cur == 'i' || *cur == 'I' || *cur == 'N')) {
+        PyObject *number_obj = READ_INF_OR_NAN(false, &cur, end);
+        if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
+            incr_decode_ctn_size(decode_ctn_info->ctn);
+            goto obj_val_end;
+        }
+        goto fail_character_val;
+    }
+
+    goto fail_character_val;
+
+obj_val_end:;
+    {
+        static _FROM_TYPE _t[2] = {',', '\n'};
+        if (cur < end && 0 == memcmp((const void *)cur, (const void *)_t, sizeof(_t))) {
+            cur += 2;
+            goto obj_key_begin;
+        }
+    }
+    if (likely(*cur == ',')) {
+        cur++;
+        goto obj_key_begin;
+    }
+    if (likely(*cur == '}')) {
+        cur++;
+        goto obj_end;
+    }
+    if (char_is_space(*cur)) {
+        FAST_SKIP_SPACES(&cur, end);
+        if (char_is_space(*cur)) cur++;
+        // while (char_is_space(*++cur));
+        goto obj_val_end;
+    }
+
+    goto fail_character_obj_end;
+
+obj_end:
+    assert(!decode_ctn_is_arr(decode_ctn_info->ctn));
+    if (unlikely(!pyyjson_decode_obj(decode_obj_stack_info, get_decode_ctn_len(decode_ctn_info->ctn)))) goto failed_cleanup;
+    /* pop container */
+    /* point to the next value */
+    if (unlikely(decode_ctn_info->ctn-- == decode_ctn_info->ctn_start)) {
+        goto doc_end;
+    }
+    incr_decode_ctn_size(decode_ctn_info->ctn);
+    if (*cur == '\n') cur++;
+    if (decode_ctn_is_arr(decode_ctn_info->ctn)) {
+        goto arr_val_end;
+    } else {
+        goto obj_val_end;
+    }
+
+doc_end:
+    /* check invalid contents after json document */
+    if (unlikely(cur < end)) {
+        FAST_SKIP_SPACES(&cur, end);
+        if (char_is_space(*cur)) cur++;
+        // while (char_is_space(*cur)) cur++;
+        if (unlikely(cur < end)) goto fail_garbage;
+    }
+
+success:;
+    PyObject *obj = *decode_obj_stack_info->result_stack;
+    assert(decode_ctn_info->ctn == decode_ctn_info->ctn_start - 1);
+    assert(decode_obj_stack_info->cur_write_result_addr == decode_obj_stack_info->result_stack + 1);
+    assert(obj && !PyErr_Occurred());
+    assert(obj->ob_refcnt == 1);
+    // free string buffer
+    if (need_dealloc) {
+        free((void *)((u8 *)string_buffer_head - TAIL_PADDING));
+    }
+    // free obj stack buffer if allocated dynamically
+    if (unlikely(decode_obj_stack_info->result_stack_end - decode_obj_stack_info->result_stack > PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE)) {
+        free(decode_obj_stack_info->result_stack);
+    }
+
+    return obj;
+
+#define return_err(_pos, _type, _msg)                                                                             \
+    do {                                                                                                          \
+        if (_type == JSONDecodeError) {                                                                           \
+            PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, ((_FROM_TYPE *)_pos) - (_FROM_TYPE *)dat); \
+        } else {                                                                                                  \
+            PyErr_SetString(_type, _msg);                                                                         \
+        }                                                                                                         \
+        goto failed_cleanup;                                                                                      \
+    } while (0)
+
+fail_string:
+    return_err(cur, JSONDecodeError, "invalid string");
+fail_number:
+    return_err(cur, JSONDecodeError, "invalid number");
+fail_alloc:
+    return_err(cur, PyExc_MemoryError,
+               "memory allocation failed");
+fail_trailing_comma:
+    return_err(cur, JSONDecodeError,
+               "trailing comma is not allowed");
+fail_literal_true:
+    return_err(cur, JSONDecodeError,
+               "invalid literal, expected a valid literal such as 'true'");
+fail_literal_false:
+    return_err(cur, JSONDecodeError,
+               "invalid literal, expected a valid literal such as 'false'");
+fail_literal_null:
+    return_err(cur, JSONDecodeError,
+               "invalid literal, expected a valid literal such as 'null'");
+fail_character_val:
+    return_err(cur, JSONDecodeError,
+               "unexpected character, expected a valid JSON value");
+fail_character_arr_end:
+    return_err(cur, JSONDecodeError,
+               "unexpected character, expected a comma or a closing bracket");
+fail_character_obj_key:
+    return_err(cur, JSONDecodeError,
+               "unexpected character, expected a string for object key");
+fail_character_obj_sep:
+    return_err(cur, JSONDecodeError,
+               "unexpected character, expected a colon after object key");
+fail_character_obj_end:
+    return_err(cur, JSONDecodeError,
+               "unexpected character, expected a comma or a closing brace");
+fail_comment:
+    return_err(cur, JSONDecodeError,
+               "unclosed multiline comment");
+fail_garbage:
+    return_err(cur, JSONDecodeError,
+               "unexpected content after document");
+fail_ctn_grow:
+    return_err(cur, JSONDecodeError,
+               "max recursion exceeded");
+
+failed_cleanup:
+    for (PyObject **obj_ptr = decode_obj_stack_info->result_stack; obj_ptr < decode_obj_stack_info->cur_write_result_addr; obj_ptr++) {
+        Py_XDECREF(*obj_ptr);
+    }
+    // free string buffer
+    if (need_dealloc) {
+        free((void *)((u8 *)string_buffer_head - TAIL_PADDING));
+    }
+    // free obj stack buffer if allocated dynamically
+    if (unlikely(decode_obj_stack_info->result_stack_end - decode_obj_stack_info->result_stack > PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE)) {
+        free(decode_obj_stack_info->result_stack);
+    }
+    return NULL;
+#undef return_err
+}
+
+/** Read single value JSON document. */
+static force_noinline PyObject *READ_ROOT_SINGLE(const _FROM_TYPE *dat, Py_ssize_t len) {
+#define return_err(_pos, _type, _msg)                                                             \
+    do {                                                                                          \
+        if (_type == JSONDecodeError) {                                                           \
+            PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, ((u8 *)_pos) - (u8 *)dat); \
+        } else {                                                                                  \
+            PyErr_SetString(_type, _msg);                                                         \
+        }                                                                                         \
+        goto fail_cleanup;                                                                        \
+    } while (0)
+
+    // check unicode is valid
+    // assert(PyUnicode_Check(unicode_root));
+    // assert(((PyASCIIObject *)unicode_root)->state.kind == COMPILE_READ_UCS_LEVEL);
+    // assert((((PyASCIIObject *)unicode_root)->state.ascii != false) == (COMPILE_UCS_LEVEL == 0));
+    // Py_ssize_t len = ((PyASCIIObject *)unicode_root)->length;
+    assert(len > 0);
+    // init `dat` ptr
+    //     const _FROM_TYPE *const dat =
+    // #if COMPILE_UCS_LEVEL == 0
+    //             (u8 *)(((PyASCIIObject *)unicode_root) + 1);
+    // #else
+    //             (_FROM_TYPE *)(((PyCompactUnicodeObject *)unicode_root) + 1);
+    // #endif
+    //
+    const _FROM_TYPE *cur = dat;
+    const _FROM_TYPE *const end = cur + len;
+    // const u8 *cur = (const u8 *)dat;
+    // const u8 *const end = cur + len;
+
+    PyObject *ret = NULL;
+
+    if (*cur <= U8MAX && char_is_number(*cur)) {
+        ret = READ_NUMBER(&cur, end);
+        if (likely(ret)) goto single_end;
+        goto fail_number;
+    }
+    if (*cur == '"') {
+        // u8 *write_buffer;
+        _FROM_TYPE *string_buffer_head;
+        bool need_dealloc = false;
+        CHECK_AND_RESERVE_STR_BUFFER(len, &string_buffer_head, &need_dealloc);
+        cur++;
+        ret = READ_STR(&cur, end, string_buffer_head, false);
+        if (need_dealloc) {
+            free((void *)((u8 *)string_buffer_head - TAIL_PADDING));
+        }
+        if (likely(ret)) goto single_end;
+        goto fail_string;
+    }
+    if (*cur == 't') {
+        if (likely(_READ_TRUE(&cur, end))) {
+            Py_Immortal_IncRef(Py_True);
+            ret = Py_True;
+            goto single_end;
+        }
+        goto fail_literal_true;
+    }
+    if (*cur == 'f') {
+        if (likely(_READ_FALSE(&cur, end))) {
+            Py_Immortal_IncRef(Py_False);
+            ret = Py_False;
+            goto single_end;
+        }
+        goto fail_literal_false;
+    }
+    if (*cur == 'n') {
+        if (likely(_READ_NULL(&cur, end))) {
+            Py_Immortal_IncRef(Py_None);
+            ret = Py_None;
+            goto single_end;
+        }
+        if (_READ_NAN(&cur, end)) {
+            ret = PyFloat_FromDouble(fabs(Py_NAN));
+            if (likely(ret)) goto single_end;
+        }
+        goto fail_literal_null;
+    }
+    {
+        ret = READ_INF_OR_NAN(false, &cur, end);
+        if (likely(ret)) goto single_end;
+    }
+    goto fail_character;
+
+single_end:
+    assert(ret);
+    if (unlikely(cur < end)) {
+        FAST_SKIP_SPACES(&cur, end);
+        if (char_is_space(*cur)) cur++;
+        // while (char_is_space(*cur)) cur++;
+        if (unlikely(cur < end)) goto fail_garbage;
+    }
+    return ret;
+
+fail_string:
+    return_err(cur, JSONDecodeError, "invalid string");
+fail_number:
+    return_err(cur, JSONDecodeError, "invalid number");
+fail_alloc:
+    return_err(cur, PyExc_MemoryError,
+               "memory allocation failed");
+fail_literal_true:
+    return_err(cur, JSONDecodeError,
+               "invalid literal, expected a valid literal such as 'true'");
+fail_literal_false:
+    return_err(cur, JSONDecodeError,
+               "invalid literal, expected a valid literal such as 'false'");
+fail_literal_null:
+    return_err(cur, JSONDecodeError,
+               "invalid literal, expected a valid literal such as 'null'");
+fail_character:
+    return_err(cur, JSONDecodeError,
+               "unexpected character, expected a valid root value");
+fail_comment:
+    return_err(cur, JSONDecodeError,
+               "unclosed multiline comment");
+fail_garbage:
+    return_err(cur, JSONDecodeError,
+               "unexpected content after document");
+fail_cleanup:
+    Py_XDECREF(ret);
+    return NULL;
+#undef return_err
+}
+
+static force_noinline PyObject *PYYJSON_DECODE_STR(PyUnicodeObject *in_unicode) {
+    // some checks
+    assert(in_unicode);
+    PyASCIIObject *ascii_head = PYYJSON_STATIC_CAST(PyASCIIObject *, in_unicode);
+    assert((ascii_head->state.ascii ? 0 : ascii_head->state.kind) == COMPILE_UCS_LEVEL);
+    if (unlikely(!ascii_head->length)) {
+        PyErr_Format(JSONDecodeError, "input data is empty");
+        return NULL;
+    }
+#if COMPILE_UCS_LEVEL > 0
+    const _FROM_TYPE *buffer = PYYJSON_STATIC_CAST(_FROM_TYPE *, PYYJSON_STATIC_CAST(PyCompactUnicodeObject *, in_unicode) + 1);
+#else
+    const _FROM_TYPE *buffer = PYYJSON_STATIC_CAST(_FROM_TYPE *, ascii_head + 1);
+#endif
+    assert(buffer);
+    assert(ascii_head->length > 0);
+
+    const _FROM_TYPE *const end = buffer + ascii_head->length;
+    PyObject *ret;
+    assert(*end == 0);
+
+    /* skip empty contents before json document */
+    if (unlikely(*buffer <= U8MAX && char_is_space_or_comment(*buffer))) {
+        if (likely(*buffer <= U8MAX && char_is_space(*buffer))) {
+            while ((*++buffer) <= U8MAX && char_is_space(*buffer));
+        }
+        if (unlikely(buffer >= end)) {
+            PyErr_Format(JSONDecodeError, "input data is empty");
+            return NULL;
+        }
+    }
+
+    /* read json document */
+    if (likely(*buffer <= U8MAX && char_is_container(*buffer))) {
+        ret = READ_ROOT(buffer, end - buffer);
+    } else {
+        ret = READ_ROOT_SINGLE(buffer, end - buffer);
+    }
+
+    return ret;
+}
+
+#undef CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512
+#undef READ_NUMBER
+#undef READ_INF_OR_NAN
+#undef _READ_NAN
+#undef _READ_INF
+#undef _READ_NULL
+#undef _READ_FALSE
+#undef _READ_TRUE
+#undef CHECK_AND_RESERVE_STR_BUFFER
 #undef COPY_WITH_ELEVATE_TO_4
 #undef COPY_WITH_ELEVATE_TO_2
 #undef UCS_BELOW_4_DIRTY
 #undef UCS_BELOW_2_DIRTY
-#undef DOWNGRADE_STRING
 #undef WRITE_SIMD_IMPL_TARGET4
 #undef WRITE_SIMD_IMPL_TARGET2
 #undef GET_DONE_COUNT_FROM_MASK
@@ -1264,7 +1989,12 @@ fail:;
 #undef DECODE_UNICODE_INFO
 #undef READ_TO_HEX_U16
 #undef READ_STR_TAIL
+#undef PROCESS_TAIL_COPY
 #undef READ_STR_IN_LOOP
+#undef READ_ROOT_SINGLE
+#undef READ_ROOT
+#undef FAST_SKIP_SPACES
 #undef READ_STR
+#undef PYYJSON_DECODE_STR
 //
 #undef COMPILE_READ_UCS_LEVEL

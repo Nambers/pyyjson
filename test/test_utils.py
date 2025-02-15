@@ -90,7 +90,7 @@ def check_obj_same(self: "unittest.TestCase", a, b):
         for ka, va in a.items():
             vb = b.get(ka)
             if vb is None and va is not None:
-                self.fail("key mismatch")
+                self.fail(f"key mismatch: {ka} not found in second dict, len(ka) = {len(ka)}")
             check_obj_same(self, va, vb)
         return
     if isinstance(a, (int, float)):

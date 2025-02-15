@@ -602,7 +602,7 @@ force_inline EncodeValJumpFlag ENCODE_PROCESS_VAL(
 
 #define PYYJSON_DUMPS_OBJ PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_noinline PyObject *
+static force_noinline PyObject *
 PYYJSON_DUMPS_OBJ(
 #if COMPILE_UCS_LEVEL > 0
         EncodeValJumpFlag jump_flag,

@@ -107,7 +107,7 @@ force_inline void _long_back_elevate_2_4_small_tail_1(u16 **read_end_addr, u32 *
 #endif // SIMD_BIT_SIZE
 
 
-void long_back_elevate_1_2(u16 *restrict write_start, u8 *restrict read_start, Py_ssize_t len) {
+void SIMD_NAME_MODIFIER(long_back_elevate_1_2)(u16 *restrict write_start, u8 *restrict read_start, Py_ssize_t len) {
     // only 128 -> 256 and 256 -> 512 should consider aligness.
     // 64(128) -> 128 cannot be aligned anyway.
     u8 *read_end = read_start + len;
@@ -196,7 +196,7 @@ elevate_both_not_aligned:;
 #endif
 }
 
-void long_back_elevate_1_4(u32 *restrict write_start, u8 *restrict read_start, Py_ssize_t len) {
+void SIMD_NAME_MODIFIER(long_back_elevate_1_4)(u32 *restrict write_start, u8 *restrict read_start, Py_ssize_t len) {
     // only 128 -> 512 should consider aligness.
     // 32/64(128) -> 128/256 cannot be aligned anyway.
     u8 *read_end = read_start + len;
@@ -308,7 +308,7 @@ elevate_both_not_aligned:;
 #endif
 }
 
-void long_back_elevate_2_4(u32 *restrict write_start, u16 *restrict read_start, Py_ssize_t len) {
+void SIMD_NAME_MODIFIER(long_back_elevate_2_4)(u32 *restrict write_start, u16 *restrict read_start, Py_ssize_t len) {
     // TODO
     // only 128 -> 256 and 256 -> 512 should consider aligness.
     // 64(128) -> 128 cannot be aligned anyway.

@@ -121,34 +121,34 @@ force_inline void memorize_ucs2_to_ucs4(UnicodeVector *vec, UnicodeInfo *unicode
 force_inline void ascii_elevate2(UnicodeVector *vec, UnicodeInfo *unicode_info) {
     u8 *start = ((u8 *)GET_VEC_ASCII_START(vec));
     u16 *write_start = ((u16 *)GET_VEC_COMPACT_START(vec));
-    long_back_elevate_1_2(write_start, start, unicode_info->ascii_size);
+    SIMD_NAME_MODIFIER(long_back_elevate_1_2)(write_start, start, unicode_info->ascii_size);
 }
 
 force_inline void ascii_elevate4(UnicodeVector *vec, UnicodeInfo *unicode_info) {
     u8 *start = ((u8 *)GET_VEC_ASCII_START(vec));
     u32 *write_start = ((u32 *)GET_VEC_COMPACT_START(vec));
-    long_back_elevate_1_4(write_start, start, unicode_info->ascii_size);
+    SIMD_NAME_MODIFIER(long_back_elevate_1_4)(write_start, start, unicode_info->ascii_size);
 }
 
 force_inline void ucs1_elevate2(UnicodeVector *vec, UnicodeInfo *unicode_info) {
     Py_ssize_t offset = unicode_info->ascii_size;
     u8 *start = ((u8 *)GET_VEC_COMPACT_START(vec)) + offset;
     u16 *write_start = ((u16 *)GET_VEC_COMPACT_START(vec)) + offset;
-    long_back_elevate_1_2(write_start, start, unicode_info->u8_size);
+    SIMD_NAME_MODIFIER(long_back_elevate_1_2)(write_start, start, unicode_info->u8_size);
 }
 
 force_inline void ucs1_elevate4(UnicodeVector *vec, UnicodeInfo *unicode_info) {
     Py_ssize_t offset = unicode_info->ascii_size;
     u8 *start = ((u8 *)GET_VEC_COMPACT_START(vec)) + offset;
     u32 *write_start = ((u32 *)GET_VEC_COMPACT_START(vec)) + offset;
-    long_back_elevate_1_4(write_start, start, unicode_info->u8_size);
+    SIMD_NAME_MODIFIER(long_back_elevate_1_4)(write_start, start, unicode_info->u8_size);
 }
 
 force_inline void ucs2_elevate4(UnicodeVector *vec, UnicodeInfo *unicode_info) {
     Py_ssize_t offset = unicode_info->ascii_size + unicode_info->u8_size;
     u16 *start = ((u16 *)GET_VEC_COMPACT_START(vec)) + offset;
     u32 *write_start = ((u32 *)GET_VEC_COMPACT_START(vec)) + offset;
-    long_back_elevate_2_4(write_start, start, unicode_info->u16_size);
+    SIMD_NAME_MODIFIER(long_back_elevate_2_4)(write_start, start, unicode_info->u16_size);
 }
 
 force_inline void ascii_elevate1(UnicodeVector *vec, UnicodeInfo *unicode_info) {
@@ -182,11 +182,7 @@ force_inline bool init_stack_vars(EncodeStackVars *stack_vars, PyObject *in_obj)
 
 #if PY_MINOR_VERSION >= 13
 // _PyNone_Type is hidden in Python 3.13
-static PyTypeObject *PyNone_Type = NULL;
-
-void _init_PyNone_Type(PyTypeObject *none_type) {
-    PyNone_Type = none_type;
-}
+extern PyTypeObject *PyNone_Type;
 #else
 #    define PyNone_Type &_PyNone_Type
 #endif
@@ -220,7 +216,6 @@ force_inline PyFastTypes fast_type_check(PyObject *val) {
     }
 }
 
-#define TAIL_PADDING (512 / 8)
 
 
 /* 
@@ -394,7 +389,7 @@ force_inline PyObject *pyyjson_dumps_single_constant(PyFastTypes py_type) {
 }
 
 /* Entrance for python code. */
-force_noinline PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject *kwargs) {
+PyObject *SIMD_NAME_MODIFIER(pyyjson_Encode)(PyObject *self, PyObject *args, PyObject *kwargs) {
     PyObject *obj;
     int option_digit = 0;
     usize indent = 0;
@@ -495,4 +490,5 @@ fail:;
 
 #include "simd/check_mask_wrap.inl.c"
 
+#include "simd/write_utils_wrap.inl.c"
 #include "simd/readwrite_utils_wrap.inl.c"

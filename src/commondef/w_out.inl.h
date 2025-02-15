@@ -1,3 +1,5 @@
 #undef WRITE_BIT_SIZE
 #undef _TARGET_TYPE
 #undef _WRITER
+#undef WRITE_SUPPORT_MASK_WRITE
+#undef READ_512_MASK_TYPE
