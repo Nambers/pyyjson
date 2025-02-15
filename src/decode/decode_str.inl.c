@@ -442,7 +442,7 @@ static force_noinline void PROCESS_ESCAPE(
         // should be in range of `COMPILE_READ_UCS_LEVEL`
         assert(write_as == COMPILE_READ_UCS_LEVEL);
         Py_ssize_t copy_count = UNICODE_DECODE_GET_COPY_COUNT(decode_unicode_info);
-        memcpy(decode_unicode_info->write_head, decode_src_info->src_start, COMPILE_READ_UCS_LEVEL * copy_count);
+        pyyjson_memcpy(decode_unicode_info->write_head, decode_src_info->src_start, COMPILE_READ_UCS_LEVEL * copy_count);
         read_state->state_dirty = true;
         // write need_copy as true, so in following loops we know that a copy is needed
         read_state->need_copy = true;

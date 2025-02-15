@@ -2,6 +2,7 @@
 #include "decode.h"
 
 #include "pyyjson.h"
+#include "simd/memcpy.h"
 #include "tls.h"
 #include "xxhash.h"
 #include <assert.h>
@@ -190,7 +191,7 @@ force_inline PyObject *make_string(const u8 *unicode_str, Py_ssize_t len, int ty
 
     obj = PyUnicode_New(len, max_char);
     if (obj == NULL) return NULL;
-    memcpy(PyUnicode_DATA(obj), unicode_str, real_len);
+    pyyjson_memcpy(PyUnicode_DATA(obj), unicode_str, real_len);
     if (should_cache) {
         add_key_cache(hash, obj);
     }

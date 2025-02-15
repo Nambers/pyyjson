@@ -1,5 +1,6 @@
 #include "encode_shared.h"
 #include "simd/cvt.h"
+#include "simd/memcpy.h"
 #include "simd/simd_detect.h"
 #include "simd/simd_impl.h"
 #include "tls.h"
@@ -216,8 +217,6 @@ force_inline PyFastTypes fast_type_check(PyObject *val) {
     }
 }
 
-
-
 /* 
  * Some utility functions only related to *write*, like vector reserve, writing number
  * need macro: COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4.
@@ -335,7 +334,7 @@ force_inline PyObject *pyyjson_dumps_single_long(PyObject *val) {
         ret = PyUnicode_New(buffer_end - buffer, 127);
         RETURN_ON_UNLIKELY_ERR(!ret);
         u8 *writer = (u8 *)(((PyASCIIObject *)ret) + 1);
-        memcpy(writer, buffer, buffer_end - buffer);
+        pyyjson_memcpy(writer, buffer, buffer_end - buffer);
         writer[buffer_end - buffer] = 0;
     }
     return ret;
@@ -351,7 +350,7 @@ force_inline PyObject *pyyjson_dumps_single_float(PyObject *val) {
     if (unlikely(!unicode)) return NULL;
     // assert(unicode);
     char *write_pos = (char *)(((PyASCIIObject *)unicode) + 1);
-    memcpy((void *)write_pos, buffer, size);
+    pyyjson_memcpy((void *)write_pos, buffer, size);
     write_pos[size] = 0;
     return unicode;
 }
@@ -490,5 +489,5 @@ fail:;
 
 #include "simd/check_mask_wrap.inl.c"
 
-#include "simd/write_utils_wrap.inl.c"
 #include "simd/readwrite_utils_wrap.inl.c"
+#include "simd/write_utils_wrap.inl.c"

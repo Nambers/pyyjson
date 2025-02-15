@@ -177,7 +177,7 @@ skip_ascii_end:
         *ptr = src + 1;
         return make_string(src_start, src - src_start, PYYJSON_STRING_TYPE_ASCII, is_key);
     } else if (src != src_start) {
-        memcpy(temp_string_buf, src_start, src - src_start);
+        pyyjson_memcpy(temp_string_buf, src_start, src - src_start);
         len_ucs1 = src - src_start;
         dst += len_ucs1;
     }

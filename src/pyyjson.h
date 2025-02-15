@@ -247,6 +247,7 @@
 #define PYYJSON_SIMPLE_CONCAT3(a, b, c) PYYJSON_SIMPLE_CONCAT3_EX(a, b, c)
 
 #define PYYJSON_MAX(x, y) ((x) > (y) ? (x) : (y))
+#define PYYJSON_MIN(x, y) ((x) < (y) ? (x) : (y))
 
 /* String type macros */
 #define PYYJSON_STRING_TYPE_ASCII 0
