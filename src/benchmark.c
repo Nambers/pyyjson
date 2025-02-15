@@ -154,6 +154,10 @@ PyObject *run_object_accumulate_benchmark(PyObject *self, PyObject *args, PyObje
         PyErr_SetString(PyExc_TypeError, "First argument must be callable");
         goto fail;
     }
+    if (!PyTuple_Check(call_args)) {
+        PyErr_SetString(PyExc_TypeError, "Third argument must be tuple");
+        goto fail;
+    }
     usize total = 0;
     for (usize i = 0; i < repeat; i++) {
         usize start = perf_counter();
@@ -169,6 +173,40 @@ PyObject *run_object_accumulate_benchmark(PyObject *self, PyObject *args, PyObje
         }
         total += end - start;
     }
+    return PyLong_FromUnsignedLongLong(total);
+fail:;
+    return NULL;
+}
+
+PyObject *run_object_benchmark(PyObject *self, PyObject *args, PyObject *kwargs) {
+    PyObject *callable;
+    PyObject *call_args;
+    static const char *kwlist[] = {"func", "args", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO", (char **)kwlist, &callable, &call_args)) {
+        PyErr_SetString(PyExc_TypeError, "Invalid argument");
+        goto fail;
+    }
+    if (!PyCallable_Check(callable)) {
+        PyErr_SetString(PyExc_TypeError, "First argument must be callable");
+        goto fail;
+    }
+    if (!PyTuple_Check(call_args)) {
+        PyErr_SetString(PyExc_TypeError, "Second argument must be tuple");
+        goto fail;
+    }
+    usize start = perf_counter();
+    PyObject *result = PyObject_Call(callable, call_args, NULL);
+    usize end = perf_counter();
+    if (unlikely(!result)) {
+        if (!PyErr_Occurred()) {
+            PyErr_SetString(PyExc_RuntimeError, "Failed to call callable");
+        }
+        goto fail;
+    } else {
+        Py_DECREF(result);
+    }
+    usize total;
+    total = end - start;
     return PyLong_FromUnsignedLongLong(total);
 fail:;
     return NULL;
