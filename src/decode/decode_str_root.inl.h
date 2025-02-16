@@ -7,7 +7,9 @@
 
 /** Read JSON document (accept all style, but optimized for pretty). */
 static force_noinline PyObject *READ_ROOT_IMPL(const _FROM_TYPE *dat, Py_ssize_t len) {
-    static _FROM_TYPE _dotReturn[2] = {',', '\n'};
+    static _FROM_TYPE _DotReturn[2] = {',', '\n'};
+    static _FROM_TYPE _DotSpace[2] = {',', ' '};
+    static _FROM_TYPE _ColonSpace[2] = {':', ' '};
 
     const _FROM_TYPE *cur = dat;
     const _FROM_TYPE *const end = cur + len;
@@ -48,10 +50,11 @@ arr_begin:
 
 arr_val_begin:
 #if DECODE_READ_PRETTY
-    if (cur < end && cur[0] == ' ') {
-        cur++;
-        if (*cur == ' ')
-            FAST_SKIP_SPACES(&cur, end);
+    // assume that we jumped from arr_val_end, already skipped a dot and a return
+    if (*cur == ' ') {
+        // cur++;
+        // if (*cur == ' ')
+        FAST_SKIP_SPACES(&cur, end);
     }
     // #if PYYJSON_IS_REAL_GCC
     //     while (true) REPEAT_CALL_16({
@@ -124,10 +127,17 @@ arr_val_begin:
         while (*cur != ',') cur--;
         goto fail_trailing_comma;
     }
-    if (char_is_space(*cur)) {
-        FAST_SKIP_SPACES(&cur, end);
-        if (char_is_space(*cur)) cur++;
-        // while (char_is_space(*++cur));
+    if (*cur <= U8MAX && char_is_space(*cur)) {
+        // read pretty:
+        //   the ",\n" and white spaces after them are all read out,
+        //   this case is unlikely.
+        // read minify:
+        //   the ", " or "," is read out, this case is unlikely
+        // guess it occurs when the document is using some `CHAR_TYPE_SPACE` characters
+        // other than space itself as indent, like, tabs.
+        do {
+            cur++;
+        } while (*cur <= U8MAX && char_is_space(*cur));
         goto arr_val_begin;
     }
     if ((*cur == 'i' || *cur == 'I' || *cur == 'N')) {
@@ -143,11 +153,15 @@ arr_val_begin:
 
 arr_val_end:;
 #if DECODE_READ_PRETTY
-    if (CMP_2_CHARS_EQ(cur, _dotReturn, end)) {
+    // ",\n"
+    if (CMP_2_CHARS_EQ(cur, _DotReturn, end)) {
+#else
+    // ", "
+    if (CMP_2_CHARS_EQ(cur, _DotSpace, end)) {
+#endif
         cur += 2;
         goto arr_val_begin;
     }
-#endif
     if (*cur == ',') {
         cur++;
         goto arr_val_begin;
@@ -156,11 +170,16 @@ arr_val_end:;
         cur++;
         goto arr_end;
     }
-    if (char_is_space(*cur)) {
+    if (*cur <= U8MAX && char_is_space(*cur)) {
+        // unlikely case, we expect a "," or "]" but not found right after the value
         cur++;
         if (*cur == ' ') FAST_SKIP_SPACES(&cur, end);
-        if (char_is_space(*cur)) cur++;
-        // while (char_is_space(*++cur));
+        if (*cur <= U8MAX && char_is_space(*cur)) {
+            do {
+                cur++;
+            } while (*cur <= U8MAX && char_is_space(*cur));
+        }
+        //
         goto arr_val_end;
     }
 
@@ -190,10 +209,10 @@ obj_begin:
 
 obj_key_begin:
 #if DECODE_READ_PRETTY
-    if (cur < end && cur[0] == ' ') {
-        cur++;
-        if (*cur == ' ')
-            FAST_SKIP_SPACES(&cur, end);
+    if (*cur == ' ') {
+        // cur++;
+        // if (*cur == ' ')
+        FAST_SKIP_SPACES(&cur, end);
     }
     // #if PYYJSON_IS_REAL_GCC
     //     while (true) REPEAT_CALL_16({
@@ -224,32 +243,40 @@ obj_key_begin:
         if (likely(get_decode_ctn_len(decode_ctn_info->ctn) == 0)) goto obj_end;
         goto fail_trailing_comma;
     }
-    if (char_is_space(*cur)) {
-        FAST_SKIP_SPACES(&cur, end);
-        if (char_is_space(*cur)) cur++;
-        // while (char_is_space(*++cur));
+    if (*cur <= U8MAX && char_is_space(*cur)) {
+        // for both read pretty and minify:
+        //   likely occurs when the document is using some `CHAR_TYPE_SPACE` characters
+        //   other than space as indent.
+        //   see the comment in `arr_val_begin` for more details.
+        do {
+            cur++;
+        } while (*cur <= U8MAX && char_is_space(*cur));
         goto obj_key_begin;
     }
     goto fail_character_obj_key;
 
 obj_key_end:;
-#if DECODE_READ_PRETTY
-    {
-        static _FROM_TYPE _t[2] = {':', ' '};
-        if (CMP_2_CHARS_EQ(cur, _t, end)) {
-            cur += 2;
-            goto obj_val_begin;
-        }
+    // #if DECODE_READ_PRETTY
+    // ": "
+    if (CMP_2_CHARS_EQ(cur, _ColonSpace, end)) {
+        cur += 2;
+        goto obj_val_begin;
     }
-#endif
+    // #endif
     if (*cur == ':') {
         cur++;
         goto obj_val_begin;
     }
-    if (char_is_space(*cur)) {
-        FAST_SKIP_SPACES(&cur, end);
-        if (char_is_space(*cur)) cur++;
-        // while (char_is_space(*++cur));
+    if (*cur <= U8MAX && char_is_space(*cur)) {
+        // unlikely case, we expect a colon here
+        cur++;
+        if (*cur == ' ') FAST_SKIP_SPACES(&cur, end);
+        if (*cur <= U8MAX && char_is_space(*cur)) {
+            do {
+                cur++;
+            } while (*cur <= U8MAX && char_is_space(*cur));
+        }
+        //
         goto obj_key_end;
     }
     goto fail_character_obj_sep;
@@ -306,10 +333,21 @@ obj_val_begin:
         }
         goto fail_literal_null;
     }
-    if (char_is_space(*cur)) {
-        FAST_SKIP_SPACES(&cur, end);
-        if (char_is_space(*cur)) cur++;
-        // while (char_is_space(*++cur));
+    if (*cur <= U8MAX && char_is_space(*cur)) {
+        // read pretty:
+        //   the ": " is read out, this character is likely to be "\n", then we should skip spaces before new line
+        // read minify:
+        //   the ": " or ":" is read out, this is an unlikely case
+        cur++;
+#if DECODE_READ_PRETTY
+        if (*cur == ' ') FAST_SKIP_SPACES(&cur, end);
+#endif
+        if (*cur <= U8MAX && char_is_space(*cur)) {
+            // handle unlikely cases
+            do {
+                cur++;
+            } while (*cur <= U8MAX && char_is_space(*cur));
+        }
         goto obj_val_begin;
     }
     if ((*cur == 'i' || *cur == 'I' || *cur == 'N')) {
@@ -325,11 +363,15 @@ obj_val_begin:
 
 obj_val_end:;
 #if DECODE_READ_PRETTY
-    if (CMP_2_CHARS_EQ(cur, _dotReturn, end)) {
+    // ",\n"
+    if (CMP_2_CHARS_EQ(cur, _DotReturn, end)) {
+#else
+    // ", "
+    if (CMP_2_CHARS_EQ(cur, _DotSpace, end)) {
+#endif
         cur += 2;
         goto obj_key_begin;
     }
-#endif
     if (likely(*cur == ',')) {
         cur++;
         goto obj_key_begin;
@@ -338,10 +380,16 @@ obj_val_end:;
         cur++;
         goto obj_end;
     }
-    if (char_is_space(*cur)) {
-        FAST_SKIP_SPACES(&cur, end);
-        if (char_is_space(*cur)) cur++;
-        // while (char_is_space(*++cur));
+    if (*cur <= U8MAX && char_is_space(*cur)) {
+        // unlikely case
+        cur++;
+        if (*cur == ' ') FAST_SKIP_SPACES(&cur, end);
+        if (*cur <= U8MAX && char_is_space(*cur)) {
+            do {
+                cur++;
+            } while (*cur <= U8MAX && char_is_space(*cur));
+        }
+        //
         goto obj_val_end;
     }
 
@@ -366,9 +414,12 @@ obj_end:
 doc_end:
     /* check invalid contents after json document */
     if (unlikely(cur < end)) {
-        FAST_SKIP_SPACES(&cur, end);
-        if (char_is_space(*cur)) cur++;
-        // while (char_is_space(*cur)) cur++;
+        if (*cur == ' ') FAST_SKIP_SPACES(&cur, end);
+        if (*cur <= U8MAX && char_is_space(*cur)) {
+            do {
+                cur++;
+            } while (*cur <= U8MAX && char_is_space(*cur));
+        }
         if (unlikely(cur < end)) goto fail_garbage;
     }
 

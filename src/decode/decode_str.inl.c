@@ -16,6 +16,7 @@
 // #include "simd/check_mask.inl.h"
 
 #define PYYJSON_DECODE_STR PYYJSON_CONCAT2(pyyjson_decode_str, COMPILE_UCS_LEVEL)
+#define SHOULD_READ_PRETTY PYYJSON_CONCAT2(should_read_pretty, COMPILE_UCS_LEVEL)
 #define READ_STR PYYJSON_CONCAT2(read_str, COMPILE_UCS_LEVEL)
 #define CMP_2_CHARS_EQ PYYJSON_CONCAT2(cmp_2_chars_eq, COMPILE_UCS_LEVEL)
 #define FAST_SKIP_SPACES PYYJSON_CONCAT2(fast_skip_spaces, COMPILE_UCS_LEVEL)
@@ -1281,6 +1282,7 @@ force_inline void FAST_SKIP_SPACES(const _FROM_TYPE **cur_addr, const _FROM_TYPE
     const SIMD_TYPE template = SET1(' ');
 #undef SET1
     const _FROM_TYPE *cur = *cur_addr;
+    assert(*cur == ' ');
 loop:;
     if (likely(cur + CHECK_COUNT_MAX < end)) {
         SIMD_TYPE SIMD_VAR = load_simd((const void *)cur);
@@ -1469,6 +1471,23 @@ fail_cleanup:
 #undef return_err
 }
 
+force_inline bool SHOULD_READ_PRETTY(const _FROM_TYPE *buffer, const _FROM_TYPE *end) {
+    if (end - buffer > 3) {
+        // check if can use pretty read
+        _FROM_TYPE second, third;
+        second = buffer[1];
+        third = buffer[2];
+        if (second == '\n' || third == '\n') {
+            // likely to hit
+            return true;
+        }
+        if (second <= U8MAX && third <= U8MAX && char_is_space(second) && char_is_space(third)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static force_noinline PyObject *PYYJSON_DECODE_STR(PyUnicodeObject *in_unicode) {
     // some checks
     assert(in_unicode);
@@ -1503,16 +1522,25 @@ static force_noinline PyObject *PYYJSON_DECODE_STR(PyUnicodeObject *in_unicode) 
 
     /* read json document */
     if (likely(*buffer <= U8MAX && char_is_container(*buffer))) {
-        if (end - buffer > 3) {
-            // check if can use pretty read
-            _FROM_TYPE second, third;
-            second = buffer[1];
-            third = buffer[2];
-            if (second <= U8MAX && third <= U8MAX && char_is_space(second) && char_is_space(third)) {
-                ret = READ_ROOT_PRETTY(buffer, end - buffer);
-            } else {
-                ret = READ_ROOT_MINIFY(buffer, end - buffer);
-            }
+        //     bool should_read_pretty = false;
+        //     if (end - buffer > 3) {
+        //         // check if can use pretty read
+        //         _FROM_TYPE second, third;
+        //         second = buffer[1];
+        //         third = buffer[2];
+        //         if (second == '\n' || third == '\n') {
+        //             should_read_pretty = true;
+        //             goto start_doc_read;
+        //         }
+        //         if (second <= U8MAX && third <= U8MAX && char_is_space(second) && char_is_space(third)) {
+        //             should_read_pretty = true;
+        //             goto start_doc_read;
+        //         }
+        //     }
+        // //
+        // start_doc_read:;
+        if (SHOULD_READ_PRETTY(buffer, end)) {
+            ret = READ_ROOT_PRETTY(buffer, end - buffer);
         } else {
             ret = READ_ROOT_MINIFY(buffer, end - buffer);
         }
@@ -1565,6 +1593,7 @@ static force_noinline PyObject *PYYJSON_DECODE_STR(PyUnicodeObject *in_unicode) 
 #undef FAST_SKIP_SPACES
 #undef CMP_2_CHARS_EQ
 #undef READ_STR
+#undef SHOULD_READ_PRETTY
 #undef PYYJSON_DECODE_STR
 //
 #undef COMPILE_READ_UCS_LEVEL
