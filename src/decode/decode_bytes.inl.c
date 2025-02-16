@@ -379,7 +379,7 @@ copy_ascii_ucs1:
     REPEAT_INCR_16(expr_jump)
 #undef expr_jump
 
-    byte_move_16(dst, src);
+    memcpy(dst, src, 16);
     src += 16;
     dst += 16;
     /* modified BEGIN */
@@ -503,7 +503,7 @@ copy_ascii_ucs1_stop_14:
     goto copy_utf8_ucs1;
 copy_ascii_ucs1_stop_15:
     /* modified END */
-    byte_move_16(dst, src);
+    memcpy(dst, src, 16);
     src += 15;
     dst += 15;
     /* modified BEGIN */

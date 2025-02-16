@@ -243,15 +243,15 @@ force_inline void byte_move_8(void *dst, const void *src) {
     memcpy(dst, &tmp, 8);
 }
 
-force_inline void byte_move_16(void *dst, const void *src) {
-    char *pdst = (char *)dst;
-    const char *psrc = (const char *)src;
-    u64 tmp1, tmp2;
-    memcpy(&tmp1, psrc, 8);
-    memcpy(&tmp2, psrc + 8, 8);
-    memcpy(pdst, &tmp1, 8);
-    memcpy(pdst + 8, &tmp2, 8);
-}
+// force_inline void byte_move_16(void *dst, const void *src) {
+    // char *pdst = (char *)dst;
+    // const char *psrc = (const char *)src;
+    // u64 tmp1, tmp2;
+    // memcpy(&tmp1, psrc, 8);
+    // memcpy(&tmp2, psrc + 8, 8);
+    // memcpy(pdst, &tmp1, 8);
+    // memcpy(pdst + 8, &tmp2, 8);
+// }
 
 force_inline u32 byte_load_4(const void *src) {
     v32_uni uni;
