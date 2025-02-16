@@ -17,6 +17,7 @@
 
 #define PYYJSON_DECODE_STR PYYJSON_CONCAT2(pyyjson_decode_str, COMPILE_UCS_LEVEL)
 #define READ_STR PYYJSON_CONCAT2(read_str, COMPILE_UCS_LEVEL)
+#define CMP_2_CHARS_EQ PYYJSON_CONCAT2(cmp_2_chars_eq, COMPILE_UCS_LEVEL)
 #define FAST_SKIP_SPACES PYYJSON_CONCAT2(fast_skip_spaces, COMPILE_UCS_LEVEL)
 #define READ_ROOT PYYJSON_CONCAT2(read_root, COMPILE_UCS_LEVEL)
 #define READ_ROOT_SINGLE PYYJSON_CONCAT2(read_root_single, COMPILE_UCS_LEVEL)
@@ -1270,6 +1271,10 @@ fail:;
     return NULL;
 }
 
+force_inline bool CMP_2_CHARS_EQ(const _FROM_TYPE *cur, const _FROM_TYPE *_template, const _FROM_TYPE *end) {
+    return cur + 2 <= end && 0 == memcmp((const void *)cur, (const void *)_template, 2 * sizeof(_FROM_TYPE));
+}
+
 force_inline void FAST_SKIP_SPACES(const _FROM_TYPE **cur_addr, const _FROM_TYPE *end) {
 #define SET1 PYYJSON_CONCAT3(broadcast, READ_BIT_SIZE, SIMD_BIT_SIZE)
     const SIMD_TYPE template = SET1(' ');
@@ -1291,7 +1296,7 @@ loop:;
     } else {
         static _FROM_TYPE _t[2] = {' ', ' '};
         while (true) REPEAT_CALL_16({
-            if (likely(cur + 2 <= end && 0 == memcmp((const void *)cur, (const void *)_t, sizeof(_t)))) cur += 2;
+            if (CMP_2_CHARS_EQ(cur, _t, end)) cur += 2;
             else
                 break;
         })
@@ -1327,20 +1332,6 @@ force_inline bool CHECK_AND_RESERVE_STR_BUFFER(Py_ssize_t len, _FROM_TYPE **buff
 
 /** Read JSON document (accept all style, but optimized for pretty). */
 static force_noinline PyObject *READ_ROOT(const _FROM_TYPE *dat, Py_ssize_t len) {
-    // check unicode is valid
-    // assert(PyUnicode_Check(unicode_root));
-    // assert(((PyASCIIObject *)unicode_root)->state.kind == COMPILE_READ_UCS_LEVEL);
-    // assert((((PyASCIIObject *)unicode_root)->state.ascii != false) == (COMPILE_UCS_LEVEL == 0));
-    // Py_ssize_t len = ((PyASCIIObject *)unicode_root)->length;
-    // assert(len > 0);
-    // init `dat` ptr
-    //     const _FROM_TYPE *const dat =
-    // #if COMPILE_UCS_LEVEL == 0
-    //             (u8 *)(((PyASCIIObject *)unicode_root) + 1);
-    // #else
-    //             (_FROM_TYPE *)(((PyCompactUnicodeObject *)unicode_root) + 1);
-    // #endif
-    //
     const _FROM_TYPE *cur = dat;
     const _FROM_TYPE *const end = cur + len;
     // container stack info
@@ -1474,7 +1465,7 @@ arr_val_begin:
 arr_val_end:;
     {
         static _FROM_TYPE _t[2] = {',', '\n'};
-        if (cur < end && 0 == memcmp((void *)cur, _t, sizeof(_t))) {
+        if (CMP_2_CHARS_EQ(cur, _t, end)) {
             cur += 2;
             goto arr_val_begin;
         }
@@ -1563,7 +1554,7 @@ obj_key_begin:
 obj_key_end:;
     {
         static _FROM_TYPE _t[2] = {':', ' '};
-        if (cur < end && 0 == memcmp((const void *)cur, (const void *)_t, sizeof(_t))) {
+        if (CMP_2_CHARS_EQ(cur, _t, end)) {
             cur += 2;
             goto obj_val_begin;
         }
@@ -1652,7 +1643,7 @@ obj_val_begin:
 obj_val_end:;
     {
         static _FROM_TYPE _t[2] = {',', '\n'};
-        if (cur < end && 0 == memcmp((const void *)cur, (const void *)_t, sizeof(_t))) {
+        if (CMP_2_CHARS_EQ(cur, _t, end)) {
             cur += 2;
             goto obj_key_begin;
         }
@@ -1994,6 +1985,7 @@ static force_noinline PyObject *PYYJSON_DECODE_STR(PyUnicodeObject *in_unicode) 
 #undef READ_ROOT_SINGLE
 #undef READ_ROOT
 #undef FAST_SKIP_SPACES
+#undef CMP_2_CHARS_EQ
 #undef READ_STR
 #undef PYYJSON_DECODE_STR
 //
