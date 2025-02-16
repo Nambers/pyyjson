@@ -1433,9 +1433,12 @@ static force_noinline PyObject *READ_ROOT_SINGLE(const _FROM_TYPE *dat, Py_ssize
 single_end:
     assert(ret);
     if (unlikely(cur < end)) {
-        if (cur == ' ') FAST_SKIP_SPACES(&cur, end);
-        if (char_is_space(*cur)) cur++;
-        // while (char_is_space(*cur)) cur++;
+        if (*cur == ' ') FAST_SKIP_SPACES(&cur, end);
+        if (*cur <= U8MAX && char_is_space(*cur)) {
+            do {
+                cur++;
+            } while (*cur <= U8MAX && char_is_space(*cur));
+        }
         if (unlikely(cur < end)) goto fail_garbage;
     }
     return ret;

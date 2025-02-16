@@ -4,6 +4,14 @@
  *   DECODE_READ_PRETTY, true/false
  */
 
+#define WRAPPED_CHAR_IS_SPACE(_u8ptr) *_u8ptr <= U8MAX &&char_is_space(*_u8ptr)
+// use SKIP_CONSECUTIVE_SPACES after a `WRAPPED_CHAR_IS_SPACE` check
+#define SKIP_CONSECUTIVE_SPACES(_u8ptr)          \
+    do {                                         \
+        do {                                     \
+            _u8ptr++;                            \
+        } while (WRAPPED_CHAR_IS_SPACE(_u8ptr)); \
+    } while (0)
 
 /** Read JSON document (accept all style, but optimized for pretty). */
 static force_noinline PyObject *READ_ROOT_IMPL(const _FROM_TYPE *dat, Py_ssize_t len) {
@@ -127,7 +135,7 @@ arr_val_begin:
         while (*cur != ',') cur--;
         goto fail_trailing_comma;
     }
-    if (*cur <= U8MAX && char_is_space(*cur)) {
+    if (WRAPPED_CHAR_IS_SPACE(cur)) {
         // read pretty:
         //   the ",\n" and white spaces after them are all read out,
         //   this case is unlikely.
@@ -135,9 +143,7 @@ arr_val_begin:
         //   the ", " or "," is read out, this case is unlikely
         // guess it occurs when the document is using some `CHAR_TYPE_SPACE` characters
         // other than space itself as indent, like, tabs.
-        do {
-            cur++;
-        } while (*cur <= U8MAX && char_is_space(*cur));
+        SKIP_CONSECUTIVE_SPACES(cur);
         goto arr_val_begin;
     }
     if ((*cur == 'i' || *cur == 'I' || *cur == 'N')) {
@@ -170,14 +176,12 @@ arr_val_end:;
         cur++;
         goto arr_end;
     }
-    if (*cur <= U8MAX && char_is_space(*cur)) {
+    if (WRAPPED_CHAR_IS_SPACE(cur)) {
         // unlikely case, we expect a "," or "]" but not found right after the value
         cur++;
         if (*cur == ' ') FAST_SKIP_SPACES(&cur, end);
-        if (*cur <= U8MAX && char_is_space(*cur)) {
-            do {
-                cur++;
-            } while (*cur <= U8MAX && char_is_space(*cur));
+        if (WRAPPED_CHAR_IS_SPACE(cur)) {
+            SKIP_CONSECUTIVE_SPACES(cur);
         }
         //
         goto arr_val_end;
@@ -243,14 +247,12 @@ obj_key_begin:
         if (likely(get_decode_ctn_len(decode_ctn_info->ctn) == 0)) goto obj_end;
         goto fail_trailing_comma;
     }
-    if (*cur <= U8MAX && char_is_space(*cur)) {
+    if (WRAPPED_CHAR_IS_SPACE(cur)) {
         // for both read pretty and minify:
         //   likely occurs when the document is using some `CHAR_TYPE_SPACE` characters
         //   other than space as indent.
         //   see the comment in `arr_val_begin` for more details.
-        do {
-            cur++;
-        } while (*cur <= U8MAX && char_is_space(*cur));
+        SKIP_CONSECUTIVE_SPACES(cur);
         goto obj_key_begin;
     }
     goto fail_character_obj_key;
@@ -267,14 +269,12 @@ obj_key_end:;
         cur++;
         goto obj_val_begin;
     }
-    if (*cur <= U8MAX && char_is_space(*cur)) {
+    if (WRAPPED_CHAR_IS_SPACE(cur)) {
         // unlikely case, we expect a colon here
         cur++;
         if (*cur == ' ') FAST_SKIP_SPACES(&cur, end);
-        if (*cur <= U8MAX && char_is_space(*cur)) {
-            do {
-                cur++;
-            } while (*cur <= U8MAX && char_is_space(*cur));
+        if (WRAPPED_CHAR_IS_SPACE(cur)) {
+            SKIP_CONSECUTIVE_SPACES(cur);
         }
         //
         goto obj_key_end;
@@ -333,7 +333,7 @@ obj_val_begin:
         }
         goto fail_literal_null;
     }
-    if (*cur <= U8MAX && char_is_space(*cur)) {
+    if (WRAPPED_CHAR_IS_SPACE(cur)) {
         // read pretty:
         //   the ": " is read out, this character is likely to be "\n", then we should skip spaces before new line
         // read minify:
@@ -342,11 +342,9 @@ obj_val_begin:
 #if DECODE_READ_PRETTY
         if (*cur == ' ') FAST_SKIP_SPACES(&cur, end);
 #endif
-        if (*cur <= U8MAX && char_is_space(*cur)) {
+        if (WRAPPED_CHAR_IS_SPACE(cur)) {
             // handle unlikely cases
-            do {
-                cur++;
-            } while (*cur <= U8MAX && char_is_space(*cur));
+            SKIP_CONSECUTIVE_SPACES(cur);
         }
         goto obj_val_begin;
     }
@@ -380,14 +378,12 @@ obj_val_end:;
         cur++;
         goto obj_end;
     }
-    if (*cur <= U8MAX && char_is_space(*cur)) {
+    if (WRAPPED_CHAR_IS_SPACE(cur)) {
         // unlikely case
         cur++;
         if (*cur == ' ') FAST_SKIP_SPACES(&cur, end);
-        if (*cur <= U8MAX && char_is_space(*cur)) {
-            do {
-                cur++;
-            } while (*cur <= U8MAX && char_is_space(*cur));
+        if (WRAPPED_CHAR_IS_SPACE(cur)) {
+            SKIP_CONSECUTIVE_SPACES(cur);
         }
         //
         goto obj_val_end;
@@ -415,10 +411,8 @@ doc_end:
     /* check invalid contents after json document */
     if (unlikely(cur < end)) {
         if (*cur == ' ') FAST_SKIP_SPACES(&cur, end);
-        if (*cur <= U8MAX && char_is_space(*cur)) {
-            do {
-                cur++;
-            } while (*cur <= U8MAX && char_is_space(*cur));
+        if (WRAPPED_CHAR_IS_SPACE(cur)) {
+            SKIP_CONSECUTIVE_SPACES(cur);
         }
         if (unlikely(cur < end)) goto fail_garbage;
     }
@@ -509,3 +503,6 @@ failed_cleanup:
     return NULL;
 #undef return_err
 }
+
+#undef SKIP_CONSECUTIVE_SPACES
+#undef WRAPPED_CHAR_IS_SPACE
