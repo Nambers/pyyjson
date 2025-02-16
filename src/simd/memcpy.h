@@ -35,16 +35,16 @@
 #define PYYJSON_MEMCPY_MAX_ALIGN 64
 #if __AVX512F__
 #    define pyyjson_memcpy pyyjson_memcpy_avx512
-#    define MEMCPY_SIMD_SIZE 64
+#    define PYYJSON_MEMCPY_SIMD_SIZE 64
 #elif __AVX__
 #    define pyyjson_memcpy pyyjson_memcpy_avx
-#    define MEMCPY_SIMD_SIZE 32
+#    define PYYJSON_MEMCPY_SIMD_SIZE 32
 #elif __SSE4_1__
 #    define pyyjson_memcpy pyyjson_memcpy_sse4_1
-#    define MEMCPY_SIMD_SIZE 16
+#    define PYYJSON_MEMCPY_SIMD_SIZE 16
 #else
 #    define pyyjson_memcpy pyyjson_memcpy_sse
-#    define MEMCPY_SIMD_SIZE 16
+#    define PYYJSON_MEMCPY_SIMD_SIZE 16
 #endif
 
 force_inline void __pyyjson_memcpy(char **dest_addr, const char **src_addr, size_t n_bytes) {
@@ -54,25 +54,25 @@ force_inline void __pyyjson_memcpy(char **dest_addr, const char **src_addr, size
 }
 
 force_inline void __pyyjson_short_memcpy_small_first(char **dest_addr, const char **src_addr, size_t n_bytes) {
-    assert(n_bytes < MEMCPY_SIMD_SIZE);
+    assert(n_bytes < PYYJSON_MEMCPY_SIMD_SIZE);
     if (n_bytes & 1) __pyyjson_memcpy(dest_addr, src_addr, 1);
     if (n_bytes & 2) __pyyjson_memcpy(dest_addr, src_addr, 2);
     if (n_bytes & 4) __pyyjson_memcpy(dest_addr, src_addr, 4);
     if (n_bytes & 8) __pyyjson_memcpy(dest_addr, src_addr, 8);
-#if MEMCPY_SIMD_SIZE >= 32
+#if PYYJSON_MEMCPY_SIMD_SIZE >= 32
     if (n_bytes & 16) __pyyjson_memcpy(dest_addr, src_addr, 16);
 #endif
-#if MEMCPY_SIMD_SIZE >= 64
+#if PYYJSON_MEMCPY_SIMD_SIZE >= 64
     if (n_bytes & 32) __pyyjson_memcpy(dest_addr, src_addr, 32);
 #endif
 }
 
 force_inline void __pyyjson_short_memcpy_large_first(char **dest_addr, const char **src_addr, size_t n_bytes) {
-    assert(n_bytes < MEMCPY_SIMD_SIZE);
-#if MEMCPY_SIMD_SIZE >= 64
+    assert(n_bytes < PYYJSON_MEMCPY_SIMD_SIZE);
+#if PYYJSON_MEMCPY_SIMD_SIZE >= 64
     if (n_bytes & 32) __pyyjson_memcpy(dest_addr, src_addr, 32);
 #endif
-#if MEMCPY_SIMD_SIZE >= 32
+#if PYYJSON_MEMCPY_SIMD_SIZE >= 32
     if (n_bytes & 16) __pyyjson_memcpy(dest_addr, src_addr, 16);
 #endif
     if (n_bytes & 8) __pyyjson_memcpy(dest_addr, src_addr, 8);
@@ -83,7 +83,7 @@ force_inline void __pyyjson_short_memcpy_large_first(char **dest_addr, const cha
 
 /* Copy memory size smaller than sizeof(SUPPORTED_SIMD_SIZE). */
 force_inline void pyyjson_short_memcpy_small_first(void *dst, const void *src, size_t n_bytes) {
-    assert(n_bytes < MEMCPY_SIMD_SIZE);
+    assert(n_bytes < PYYJSON_MEMCPY_SIMD_SIZE);
     char *d = (char *)dst;
     const char *s = (const char *)src;
     __pyyjson_short_memcpy_small_first(&d, &s, n_bytes);
@@ -91,7 +91,7 @@ force_inline void pyyjson_short_memcpy_small_first(void *dst, const void *src, s
 
 /* Copy memory size smaller than sizeof(SUPPORTED_SIMD_SIZE). */
 force_inline void pyyjson_short_memcpy_large_first(void *dst, const void *src, size_t n_bytes) {
-    assert(n_bytes < MEMCPY_SIMD_SIZE);
+    assert(n_bytes < PYYJSON_MEMCPY_SIMD_SIZE);
     char *d = (char *)dst;
     const char *s = (const char *)src;
     __pyyjson_short_memcpy_large_first(&d, &s, n_bytes);
