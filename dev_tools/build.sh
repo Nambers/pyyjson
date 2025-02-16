@@ -4,7 +4,7 @@ set -e
 source dev_tools/get_env.sh
 
 if [ $# -eq 0 ]; then
-    cmake --build $BUILD_DIR
+    cmake --build $BUILD_DIR -- -j $(nproc)
     exit 0
 fi
 
@@ -37,4 +37,4 @@ mkdir -p $BUILD_DIR
 echo $CUR_PYVER > $BUILD_DIR/pyver
 
 cmake . -B $BUILD_DIR -DCMAKE_BUILD_TYPE=$TARGET_BUILD_TYPE -DPython3_INCLUDE_DIR=$Python3_INCLUDE_DIR -DPython3_LIBRARY=$Python3_LIBRARY
-cmake --build $BUILD_DIR
+cmake --build $BUILD_DIR -- -j $(nproc)
