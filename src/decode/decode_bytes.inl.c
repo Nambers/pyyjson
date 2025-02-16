@@ -1615,7 +1615,7 @@ force_inline bool _skip_starting_space(char **buffer_addr, Py_ssize_t *len_addr)
     return true;
 }
 
-force_inline void _alloc_bytes_buffer(Py_ssize_t len, bool *dynamic, u8 **buffer) {
+force_inline void _alloc_aligned_bytes_buffer(Py_ssize_t len, bool *dynamic, u8 **buffer) {
     if (unlikely(len > (Py_ssize_t)PY_SSIZE_T_MAX - PYYJSON_MEMCPY_MAX_ALIGN - 4)) {
         PyErr_NoMemory();
         *buffer = NULL;
@@ -1623,7 +1623,7 @@ force_inline void _alloc_bytes_buffer(Py_ssize_t len, bool *dynamic, u8 **buffer
     }
     Py_ssize_t required_size = len + PYYJSON_MEMCPY_MAX_ALIGN + 4;
     if (unlikely(required_size > PYYJSON_STRING_BUFFER_SIZE)) {
-        *buffer = aligned_alloc(64, required_size);
+        *buffer = PYYJSON_ALIGNED_ALLOC(64, required_size);
         if (unlikely(!*buffer)) {
             PyErr_NoMemory();
             return;
@@ -1651,7 +1651,7 @@ static force_noinline PyObject *pyyjson_decode_bytes(char *_buffer, Py_ssize_t l
 
     u8 *_new_buffer;
     bool is_dynamic;
-    _alloc_bytes_buffer(len, &is_dynamic, &_new_buffer);
+    _alloc_aligned_bytes_buffer(len, &is_dynamic, &_new_buffer);
     if (!_new_buffer) {
         PyErr_NoMemory();
         return NULL;
@@ -1676,6 +1676,6 @@ static force_noinline PyObject *pyyjson_decode_bytes(char *_buffer, Py_ssize_t l
         ret = read_root_single_bytes(buffer, len);
     }
 
-    if (is_dynamic) free(_new_buffer);
+    if (is_dynamic) PYYJSON_ALIGNED_FREE(_new_buffer);
     return ret;
 }

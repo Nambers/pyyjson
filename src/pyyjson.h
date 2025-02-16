@@ -249,6 +249,14 @@
 #define PYYJSON_MAX(x, y) ((x) > (y) ? (x) : (y))
 #define PYYJSON_MIN(x, y) ((x) < (y) ? (x) : (y))
 
+#ifdef _MSC_VER
+#    define PYYJSON_ALIGNED_ALLOC(_align, _size) _aligned_malloc(_size, _align)
+#    define PYYJSON_ALIGNED_FREE(_ptr) _aligned_free(_ptr)
+#else
+#    define PYYJSON_ALIGNED_ALLOC(_align, _size) aligned_alloc(_align, _size)
+#    define PYYJSON_ALIGNED_FREE(_ptr) free(_ptr)
+#endif
+
 /* String type macros */
 #define PYYJSON_STRING_TYPE_ASCII 0
 #define PYYJSON_STRING_TYPE_LATIN1 1
