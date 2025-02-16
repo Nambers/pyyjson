@@ -31,6 +31,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+#define PYYJSON_MEMCPY_MAX_ALIGN 64
 #if __AVX512F__
 #    define pyyjson_memcpy pyyjson_memcpy_avx512
 #    define MEMCPY_SIMD_SIZE 64

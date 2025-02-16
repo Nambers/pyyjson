@@ -1596,38 +1596,86 @@ fail_cleanup:
 #undef return_err
 }
 
+extern pyyjson_align(64) u8 pyyjson_bytes_temp_buffer[PYYJSON_STRING_BUFFER_SIZE];
+
+force_inline bool _skip_starting_space(char **buffer_addr, Py_ssize_t *len_addr) {
+    /* skip empty contents before json document */
+    if (unlikely(char_is_space_or_comment(**buffer_addr))) {
+        if (likely(char_is_space(**buffer_addr))) {
+            do {
+                *buffer_addr = *buffer_addr + 1;
+                *len_addr = (*len_addr) - 1;
+            } while (char_is_space(**buffer_addr));
+        }
+        if (unlikely(*len_addr <= 0)) {
+            PyErr_Format(JSONDecodeError, "input data is empty");
+            return false;
+        }
+    }
+    return true;
+}
+
+force_inline void _alloc_bytes_buffer(Py_ssize_t len, bool *dynamic, u8 **buffer) {
+    if (unlikely(len > (Py_ssize_t)PY_SSIZE_T_MAX - PYYJSON_MEMCPY_MAX_ALIGN - 4)) {
+        PyErr_NoMemory();
+        *buffer = NULL;
+        return;
+    }
+    Py_ssize_t required_size = len + PYYJSON_MEMCPY_MAX_ALIGN + 4;
+    if (unlikely(required_size > PYYJSON_STRING_BUFFER_SIZE)) {
+        *buffer = aligned_alloc(64, required_size);
+        if (unlikely(!*buffer)) {
+            PyErr_NoMemory();
+            return;
+        }
+        *dynamic = true;
+    } else {
+        *buffer = pyyjson_bytes_temp_buffer;
+        *dynamic = false;
+    }
+}
+
 static force_noinline PyObject *pyyjson_decode_bytes(char *_buffer, Py_ssize_t len) {
     // some checks
     if (unlikely(!len)) {
         PyErr_Format(JSONDecodeError, "input data is empty");
         return NULL;
     }
+
     assert(_buffer);
     assert(len > 0);
 
-    // use u8 from now
-    const u8 *buffer = (const u8 *)_buffer;
-    const u8 *const end = buffer + len;
-    PyObject *ret;
-    assert(*end == 0);
-
-    /* skip empty contents before json document */
-    if (unlikely(char_is_space_or_comment(*buffer))) {
-        if (likely(char_is_space(*buffer))) {
-            while (char_is_space(*++buffer));
-        }
-        if (unlikely(buffer >= end)) {
-            PyErr_Format(JSONDecodeError, "input data is empty");
-            return NULL;
-        }
+    if (!_skip_starting_space(&_buffer, &len)) {
+        return NULL;
     }
+
+    u8 *_new_buffer;
+    bool is_dynamic;
+    _alloc_bytes_buffer(len, &is_dynamic, &_new_buffer);
+    if (!_new_buffer) {
+        PyErr_NoMemory();
+        return NULL;
+    }
+    u8 *buffer;
+    {
+        uintptr_t _buffer_int = (uintptr_t)_buffer;
+        usize align_offset = (_buffer_int & (MEMCPY_SIMD_SIZE - 1));
+        buffer = _new_buffer + align_offset;
+        pyyjson_memcpy((void *)buffer, (const void *)_buffer, (usize)len);
+    }
+
+    // use u8 from now
+    u8 *const end = buffer + len;
+    *end = 0;
+    PyObject *ret;
 
     /* read json document */
     if (likely(char_is_container(*buffer))) {
-        ret = read_bytes_root_pretty(buffer, end - buffer);
+        ret = read_bytes_root_pretty(buffer, len);
     } else {
-        ret = read_root_single_bytes(buffer, end - buffer);
+        ret = read_root_single_bytes(buffer, len);
     }
 
+    if (is_dynamic) free(_new_buffer);
     return ret;
 }
