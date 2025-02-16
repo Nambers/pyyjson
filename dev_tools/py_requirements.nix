@@ -3,21 +3,24 @@ let
   pkgs = pypkgs.pkgs;
   lib = pkgs.lib;
   minorVer = lib.strings.toInt pypkgs.python.sourceVersion.minor;
+  pythonVerConfig = import ./pyver.nix;
 in
 with pypkgs;
 [
   psutil
   pytz
+  objgraph
+  pytest
 ]
 ++ (
-  with pypkgs; # needed by tests
+  with pypkgs; # needed by tests, but cannot be built in python3.14
   (lib.optionals (minorVer < 14) [
-    pytest
     arrow
     pytest-random-order
     pytest-xdist
   ])
 )
+# some dependecies of orjson cannot be built in python3.14
 ++ (lib.optionals (minorVer < 14) [
   (
     (pypkgs.buildPythonPackage rec {
@@ -93,4 +96,5 @@ with pypkgs;
     })
   )
 ])
-++ (with pypkgs; (lib.optionals (minorVer < 13) [ objgraph ]))
+# benchmark is only needed for python3.13
+++ (with pypkgs; (lib.optionals (minorVer == pythonVerConfig.curVer) [ pytest-benchmark ]))

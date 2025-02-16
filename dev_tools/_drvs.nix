@@ -13,6 +13,14 @@ let
       x = (
         (pkgs.enableDebugging py).override {
           self = x;
+          packageOverrides = (
+            self: super:
+            #lib.optionalAttrs (py.isPy313 or false) 
+            {
+              orjson = pkgs.callPackage ./orjson_fixed.nix { inherit super; };
+              pytest-benchmark = pkgs.callPackage ./pytest-benchmark-fixed.nix {inherit super;};
+            }
+          );
         }
       );
     in
