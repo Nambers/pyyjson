@@ -1616,14 +1616,14 @@ force_inline bool _skip_starting_space(char **buffer_addr, Py_ssize_t *len_addr)
 }
 
 force_inline void _alloc_aligned_bytes_buffer(Py_ssize_t len, bool *dynamic, u8 **buffer) {
-    if (unlikely(len > (Py_ssize_t)PY_SSIZE_T_MAX - PYYJSON_MEMCPY_SIMD_SIZE - 4)) {
+    if (unlikely(len > (Py_ssize_t)PY_SSIZE_T_MAX - 2 * PYYJSON_MEMCPY_SIMD_SIZE - 4)) {
         PyErr_NoMemory();
         *buffer = NULL;
         return;
     }
-    Py_ssize_t required_size = len + PYYJSON_MEMCPY_SIMD_SIZE + 4;
+    Py_ssize_t required_size = size_align_up(len + PYYJSON_MEMCPY_SIMD_SIZE + 4, PYYJSON_MEMCPY_SIMD_SIZE);
     if (unlikely(required_size > PYYJSON_STRING_BUFFER_SIZE)) {
-        *buffer = PYYJSON_ALIGNED_ALLOC(64, required_size);
+        *buffer = PYYJSON_ALIGNED_ALLOC(PYYJSON_MEMCPY_SIMD_SIZE, required_size);
         if (unlikely(!*buffer)) {
             PyErr_NoMemory();
             return;
