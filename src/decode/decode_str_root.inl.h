@@ -4,7 +4,7 @@
  *   DECODE_READ_PRETTY, true/false
  */
 
-#define WRAPPED_CHAR_IS_SPACE(_u8ptr) *_u8ptr <= U8MAX &&char_is_space(*_u8ptr)
+#define WRAPPED_CHAR_IS_SPACE(_u8ptr) (*_u8ptr <= U8MAX &&char_is_space(*_u8ptr))
 // use SKIP_CONSECUTIVE_SPACES after a `WRAPPED_CHAR_IS_SPACE` check
 #define SKIP_CONSECUTIVE_SPACES(_u8ptr)          \
     do {                                         \
