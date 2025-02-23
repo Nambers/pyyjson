@@ -520,10 +520,36 @@ copy_utf8_ucs1:
         pos = src;
         uni = byte_load_4(src);
         // TODO remove the repeat4 later
-        while (true) REPEAT_CALL_4({
-            if ((uni & b3_mask) == b3_patt) {
-                /* modified BEGIN */
-                // code point: [U+0800, U+FFFF]
+        /* modified BEGIN */
+        if (is_valid_seq_3(uni)) {
+            // if ((uni & b3_mask) == b3_patt) {
+            // code point: [U+0800, U+FFFF]
+            // BEGIN ucs1 -> ucs2
+            assert(cur_max_ucs_size == 1);
+            len_ucs1 = dst - (u8 *)temp_string_buf;
+            dst_ucs2 = ((u16 *)temp_string_buf) + len_ucs1;
+            cur_max_ucs_size = 2;
+            // END ucs1 -> ucs2
+            // write
+            *dst_ucs2++ = read_b3_unicode(uni);
+            // byte_copy_4(dst, &uni);
+            // dst += 3;
+            // move src and load
+            src += 3;
+            goto copy_utf8_inner_ucs2;
+            // uni = byte_load_4(src);
+            // } else
+            //     break;
+        }
+        if (is_valid_seq_1(uni)) goto copy_ascii_ucs1;
+        /* modified END */
+        while (is_valid_seq_2(uni)) {
+            // if ((uni & b2_mask) == b2_patt) {
+            /* modified BEGIN */
+            assert(cur_max_ucs_size == 1);
+            u16 to_write = read_b2_unicode(uni);
+            if (likely(to_write >= 0x100)) {
+                // UCS2
                 // BEGIN ucs1 -> ucs2
                 assert(cur_max_ucs_size == 1);
                 len_ucs1 = dst - (u8 *)temp_string_buf;
@@ -531,74 +557,48 @@ copy_utf8_ucs1:
                 cur_max_ucs_size = 2;
                 // END ucs1 -> ucs2
                 // write
-                *dst_ucs2++ = read_b3_unicode(uni);
-                // byte_copy_4(dst, &uni);
-                // dst += 3;
+                *dst_ucs2++ = to_write;
                 // move src and load
-                src += 3;
+                src += 2;
                 goto copy_utf8_inner_ucs2;
                 // uni = byte_load_4(src);
-                /* modified END */
-            } else
-                break;
-        })
-        if ((uni & b1_mask) == b1_patt) goto copy_ascii_ucs1;
-        while (true) REPEAT_CALL_4({
-            if ((uni & b2_mask) == b2_patt) {
-                /* modified BEGIN */
-                assert(cur_max_ucs_size == 1);
-                u16 to_write = read_b2_unicode(uni);
-                if (likely(to_write >= 0x100)) {
-                    // UCS2
-                    // BEGIN ucs1 -> ucs2
-                    assert(cur_max_ucs_size == 1);
-                    len_ucs1 = dst - (u8 *)temp_string_buf;
-                    dst_ucs2 = ((u16 *)temp_string_buf) + len_ucs1;
-                    cur_max_ucs_size = 2;
-                    // END ucs1 -> ucs2
-                    // write
-                    *dst_ucs2++ = to_write;
-                    // move src and load
-                    src += 2;
-                    goto copy_utf8_inner_ucs2;
-                    // uni = byte_load_4(src);
-                } else {
-                    is_ascii = false;
-                    // write
-                    *dst++ = (u8)to_write;
-                    // move src and load
-                    src += 2;
-                    // still ascii, no need goto
-                    uni = byte_load_4(src);
-                }
-                // code point: [U+0080, U+07FF], latin1 or ucs2
-                // byte_copy_2(dst, &uni);
-                // dst += 2;
-                /* modified END */
-            } else
-                break;
-        })
-        while (true) REPEAT_CALL_4({
-            if ((uni & b4_mask) == b4_patt) {
-                /* modified BEGIN */
-                // code point: [U+10000, U+10FFFF]
-                // must be ucs4
-                // BEGIN ucs1 -> ucs4
-                assert(cur_max_ucs_size == 1);
-                len_ucs1 = dst - (u8 *)temp_string_buf;
-                dst_ucs4 = ((u32 *)temp_string_buf) + len_ucs1;
-                cur_max_ucs_size = 4;
-                // END ucs1 -> ucs4
-                *dst_ucs4++ = read_b4_unicode(uni);
-                // byte_copy_4(dst, &uni);
-                // dst += 4;
-                src += 4;
-                goto copy_utf8_inner_ucs4;
-                // uni = byte_load_4(src);
-                /* modified END */
-            } else
-                break;
-        })
+            } else {
+                is_ascii = false;
+                // write
+                *dst++ = (u8)to_write;
+                // move src and load
+                src += 2;
+                // still ascii, no need goto
+                uni = byte_load_4(src);
+            }
+            // code point: [U+0080, U+07FF], latin1 or ucs2
+            // byte_copy_2(dst, &uni);
+            // dst += 2;
+            /* modified END */
+            // } else
+            //     break;
+        }
+        if (is_valid_seq_4(uni)) {
+            // if ((uni & b4_mask) == b4_patt) {
+            /* modified BEGIN */
+            // code point: [U+10000, U+10FFFF]
+            // must be ucs4
+            // BEGIN ucs1 -> ucs4
+            assert(cur_max_ucs_size == 1);
+            len_ucs1 = dst - (u8 *)temp_string_buf;
+            dst_ucs4 = ((u32 *)temp_string_buf) + len_ucs1;
+            cur_max_ucs_size = 4;
+            // END ucs1 -> ucs4
+            *dst_ucs4++ = read_b4_unicode(uni);
+            // byte_copy_4(dst, &uni);
+            // dst += 4;
+            src += 4;
+            goto copy_utf8_inner_ucs4;
+            // uni = byte_load_4(src);
+            /* modified END */
+            // } else
+            //     break;
+        }
 
         /* modified BEGIN */
         if (unlikely(pos == src)) {
@@ -747,76 +747,76 @@ copy_utf8_ucs2:
         pos = src;
         uni = byte_load_4(src);
         // TODO remove the repeat4 later
-        while (true) REPEAT_CALL_4({
-            if ((uni & b3_mask) == b3_patt) {
-                /* modified BEGIN */
-                // code point: [U+0800, U+FFFF]
-                assert(cur_max_ucs_size == 2);
-                // write
-                *dst_ucs2++ = read_b3_unicode(uni);
-                // byte_copy_4(dst, &uni);
-                // dst += 3;
-                // move src and load
-                src += 3;
-                // goto copy_utf8_ucs2;
-                uni = byte_load_4(src);
-                /* modified END */
-            } else
-                break;
-        })
-        if ((uni & b1_mask) == b1_patt) goto copy_ascii_ucs2;
-        while (true) REPEAT_CALL_4({
-            if ((uni & b2_mask) == b2_patt) {
-                /* modified BEGIN */
-                assert(cur_max_ucs_size == 2);
-                u16 to_write = read_b2_unicode(uni);
-                *dst_ucs2++ = to_write;
-                src += 2;
-                uni = byte_load_4(src);
-                // if (likely(to_write >= 0x100)) {
-                //     // UCS2
-                //     // write
-                //     *dst_ucs2++ = to_write;
-                //     // move src and load
-                //     src += 2;
-                //     goto copy_utf8_ucs2;
-                //     // uni = byte_load_4(src);
-                // } else {
-                //     // write
-                //     *dst_ucs2++ = (u8)to_write;
-                //     // move src and load
-                //     src += 2;
-                //     // still ascii, no need goto
-                //     uni = byte_load_4(src);
-                // }
-                // code point: [U+0080, U+07FF], latin1 or ucs2
-                // byte_copy_2(dst, &uni);
-                // dst += 2;
-                /* modified END */
-            } else
-                break;
-        })
-        while (true) REPEAT_CALL_4({
-            if ((uni & b4_mask) == b4_patt) {
-                /* modified BEGIN */
-                // code point: [U+10000, U+10FFFF]
-                // must be ucs4
-                // BEGIN ucs2 -> ucs4
-                assert(cur_max_ucs_size == 2);
-                len_ucs2 = dst_ucs2 - (u16 *)temp_string_buf - len_ucs1;
-                dst_ucs4 = ((u32 *)temp_string_buf) + len_ucs1 + len_ucs2;
-                cur_max_ucs_size = 4;
-                // END ucs2 -> ucs4
-                *dst_ucs4++ = read_b4_unicode(uni);
-                // byte_copy_4(dst, &uni);
-                // dst += 4;
-                src += 4;
-                goto copy_utf8_inner_ucs4;
-                // uni = byte_load_4(src);
-                /* modified END */
-            } else
-                break;
-        })
+        while (is_valid_seq_3(uni)) {
+            // if ((uni & b3_mask) == b3_patt) {
+            /* modified BEGIN */
+            // code point: [U+0800, U+FFFF]
+            assert(cur_max_ucs_size == 2);
+            // write
+            *dst_ucs2++ = read_b3_unicode(uni);
+            // byte_copy_4(dst, &uni);
+            // dst += 3;
+            // move src and load
+            src += 3;
+            // goto copy_utf8_ucs2;
+            uni = byte_load_4(src);
+            /* modified END */
+            // } else
+            //     break;
+        }
+        if (is_valid_seq_1(uni)) goto copy_ascii_ucs2;
+        while (is_valid_seq_2(uni)) {
+            // if ((uni & b2_mask) == b2_patt) {
+            /* modified BEGIN */
+            assert(cur_max_ucs_size == 2);
+            u16 to_write = read_b2_unicode(uni);
+            *dst_ucs2++ = to_write;
+            src += 2;
+            uni = byte_load_4(src);
+            // if (likely(to_write >= 0x100)) {
+            //     // UCS2
+            //     // write
+            //     *dst_ucs2++ = to_write;
+            //     // move src and load
+            //     src += 2;
+            //     goto copy_utf8_ucs2;
+            //     // uni = byte_load_4(src);
+            // } else {
+            //     // write
+            //     *dst_ucs2++ = (u8)to_write;
+            //     // move src and load
+            //     src += 2;
+            //     // still ascii, no need goto
+            //     uni = byte_load_4(src);
+            // }
+            // code point: [U+0080, U+07FF], latin1 or ucs2
+            // byte_copy_2(dst, &uni);
+            // dst += 2;
+            /* modified END */
+            // } else
+            //     break;
+        }
+        if (is_valid_seq_4(uni)) {
+            // if ((uni & b4_mask) == b4_patt) {
+            /* modified BEGIN */
+            // code point: [U+10000, U+10FFFF]
+            // must be ucs4
+            // BEGIN ucs2 -> ucs4
+            assert(cur_max_ucs_size == 2);
+            len_ucs2 = dst_ucs2 - (u16 *)temp_string_buf - len_ucs1;
+            dst_ucs4 = ((u32 *)temp_string_buf) + len_ucs1 + len_ucs2;
+            cur_max_ucs_size = 4;
+            // END ucs2 -> ucs4
+            *dst_ucs4++ = read_b4_unicode(uni);
+            // byte_copy_4(dst, &uni);
+            // dst += 4;
+            src += 4;
+            goto copy_utf8_inner_ucs4;
+            // uni = byte_load_4(src);
+            /* modified END */
+            // } else
+            //     break;
+        }
 
         /* modified BEGIN */
         if (unlikely(pos == src)) {
@@ -961,69 +961,69 @@ copy_utf8_ucs4:
         pos = src;
         uni = byte_load_4(src);
         // TODO remove the repeat4 later
-        while (true) REPEAT_CALL_4({
-            if ((uni & b3_mask) == b3_patt) {
-                /* modified BEGIN */
-                // code point: [U+0800, U+FFFF]
-                assert(cur_max_ucs_size == 4);
-                // write
-                *dst_ucs4++ = read_b3_unicode(uni);
-                // byte_copy_4(dst, &uni);
-                // dst += 3;
-                // move src and load
-                src += 3;
-                // goto copy_utf8_ucs2;
-                uni = byte_load_4(src);
-                /* modified END */
-            } else
-                break;
-        })
-        if ((uni & b1_mask) == b1_patt) goto copy_ascii_ucs4;
-        while (true) REPEAT_CALL_4({
-            if ((uni & b2_mask) == b2_patt) {
-                /* modified BEGIN */
-                assert(cur_max_ucs_size == 4);
-                *dst_ucs4++ = read_b2_unicode(uni);
-                src += 2;
-                uni = byte_load_4(src);
-                // if (likely(to_write >= 0x100)) {
-                //     // UCS2
-                //     // write
-                //     *dst_ucs2++ = to_write;
-                //     // move src and load
-                //     src += 2;
-                //     goto copy_utf8_ucs2;
-                //     // uni = byte_load_4(src);
-                // } else {
-                //     // write
-                //     *dst_ucs2++ = (u8)to_write;
-                //     // move src and load
-                //     src += 2;
-                //     // still ascii, no need goto
-                //     uni = byte_load_4(src);
-                // }
-                // code point: [U+0080, U+07FF], latin1 or ucs2
-                // byte_copy_2(dst, &uni);
-                // dst += 2;
-                /* modified END */
-            } else
-                break;
-        })
-        while (true) REPEAT_CALL_4({
-            if ((uni & b4_mask) == b4_patt) {
-                /* modified BEGIN */
-                // code point: [U+10000, U+10FFFF]
-                // must be ucs4
-                *dst_ucs4++ = read_b4_unicode(uni);
-                // byte_copy_4(dst, &uni);
-                // dst += 4;
-                src += 4;
-                // goto copy_utf8_ucs4;
-                uni = byte_load_4(src);
-                /* modified END */
-            } else
-                break;
-        })
+        while (is_valid_seq_3(uni)) {
+            // if ((uni & b3_mask) == b3_patt) {
+            /* modified BEGIN */
+            // code point: [U+0800, U+FFFF]
+            assert(cur_max_ucs_size == 4);
+            // write
+            *dst_ucs4++ = read_b3_unicode(uni);
+            // byte_copy_4(dst, &uni);
+            // dst += 3;
+            // move src and load
+            src += 3;
+            // goto copy_utf8_ucs2;
+            uni = byte_load_4(src);
+            /* modified END */
+            // } else
+            //     break;
+        }
+        if (is_valid_seq_1(uni)) goto copy_ascii_ucs4;
+        while (is_valid_seq_2(uni)) {
+            // if ((uni & b2_mask) == b2_patt) {
+            /* modified BEGIN */
+            assert(cur_max_ucs_size == 4);
+            *dst_ucs4++ = read_b2_unicode(uni);
+            src += 2;
+            uni = byte_load_4(src);
+            // if (likely(to_write >= 0x100)) {
+            //     // UCS2
+            //     // write
+            //     *dst_ucs2++ = to_write;
+            //     // move src and load
+            //     src += 2;
+            //     goto copy_utf8_ucs2;
+            //     // uni = byte_load_4(src);
+            // } else {
+            //     // write
+            //     *dst_ucs2++ = (u8)to_write;
+            //     // move src and load
+            //     src += 2;
+            //     // still ascii, no need goto
+            //     uni = byte_load_4(src);
+            // }
+            // code point: [U+0080, U+07FF], latin1 or ucs2
+            // byte_copy_2(dst, &uni);
+            // dst += 2;
+            /* modified END */
+            // } else
+            //     break;
+        }
+        while (is_valid_seq_4(uni)) {
+            // if ((uni & b4_mask) == b4_patt) {
+            /* modified BEGIN */
+            // code point: [U+10000, U+10FFFF]
+            // must be ucs4
+            *dst_ucs4++ = read_b4_unicode(uni);
+            // byte_copy_4(dst, &uni);
+            // dst += 4;
+            src += 4;
+            // goto copy_utf8_ucs4;
+            uni = byte_load_4(src);
+            /* modified END */
+            // } else
+            //     break;
+        }
 
         /* modified BEGIN */
         if (unlikely(pos == src)) {
