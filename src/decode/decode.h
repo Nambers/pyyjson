@@ -211,14 +211,14 @@ force_inline bool read_8_to_hex_u16(const u8 *cur, u16 *val);
 //     return ((t0 | t1) & (u16)0xF0F0) == 0;
 // }
 
-force_inline bool byte_match_2(const void *buf, const char *pat) {
+force_inline bool byte_match_2(const void *buf, const void *pat) {
     v16_uni u1, u2;
     memcpy(&u1, buf, 2);
     memcpy(&u2, pat, 2);
     return u1.u == u2.u;
 }
 
-force_inline bool byte_match_4(const void *buf, const char *pat) {
+force_inline bool byte_match_4(const void *buf, const void *pat) {
     v32_uni u1, u2;
     memcpy(&u1, buf, 4);
     memcpy(&u2, pat, 4);

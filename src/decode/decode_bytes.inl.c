@@ -8,7 +8,7 @@
  @param msg The error message pointer.
  @return Whether success.
  */
-force_inline PyObject *read_bytes(const u8 **ptr, u8 *write_buffer, bool is_key) {
+static force_noinline PyObject *read_bytes(const u8 **ptr, u8 *write_buffer, bool is_key) {
     /*
      Each unicode code point is encoded as 1 to 4 bytes in UTF-8 encoding,
      we use 4-byte mask and pattern value to validate UTF-8 byte sequence,
@@ -1071,420 +1071,17 @@ read_finalize:
 #undef is_valid_seq_4
 }
 
-/** Read JSON document (accept all style, but optimized for pretty). */
-force_inline PyObject *read_bytes_root_pretty(const u8 *dat, usize len) {
+#define READ_ROOT_IMPL read_bytes_root_pretty
+#define DECODE_READ_PRETTY 1
+#include "decode_bytes_root.inl.h"
+#undef DECODE_READ_PRETTY
+#undef READ_ROOT_IMPL
 
-    // container stack info
-    DecodeCtnStackInfo _decode_ctn_info;
-    DecodeCtnStackInfo *decode_ctn_info = &_decode_ctn_info;
-    // object stack info
-    DecodeObjStackInfo _decode_obj_stack_info;
-    DecodeObjStackInfo *const decode_obj_stack_info = &_decode_obj_stack_info;
-    memset(decode_ctn_info, 0, sizeof(DecodeCtnStackInfo));
-    memset(decode_obj_stack_info, 0, sizeof(DecodeObjStackInfo));
-    // init
-    if (!init_decode_ctn_stack_info(decode_ctn_info) || !init_decode_obj_stack_info(decode_obj_stack_info)) goto failed_cleanup;
-    u8 *string_buffer_head = (u8 *)pyyjson_string_buffer;
-
-    //
-    if (unlikely(len > ((size_t)(-1)) / 4)) {
-        goto fail_alloc;
-    }
-    if (unlikely(4 * len > PYYJSON_STRING_BUFFER_SIZE)) {
-        string_buffer_head = malloc(4 * len);
-        if (!string_buffer_head) goto fail_alloc;
-    }
-    //
-    const u8 *cur = (const u8 *)dat;
-    const u8 *const end = (const u8 *)dat + len;
-
-    if (*cur++ == '{') {
-        set_decode_ctn(decode_ctn_info->ctn, 0, false);
-        if (*cur == '\n') cur++;
-        goto obj_key_begin;
-    } else {
-        set_decode_ctn(decode_ctn_info->ctn, 0, true);
-        if (*cur == '\n') cur++;
-        goto arr_val_begin;
-    }
-
-arr_begin:
-    /* save current container */
-    /* create a new array value, save parent container offset */
-    if (unlikely(!ctn_grow_check(decode_ctn_info))) goto fail_ctn_grow;
-    set_decode_ctn(decode_ctn_info->ctn, 0, true);
-
-    /* push the new array value as current container */
-    if (*cur == '\n') cur++;
-
-arr_val_begin:
-#if PYYJSON_IS_REAL_GCC
-    while (true) REPEAT_CALL_16({
-        if (byte_match_2((void *)cur, "  ")) cur += 2;
-        else
-            break;
-    })
-#else
-    while (true) REPEAT_CALL_16({
-        if (likely(byte_match_2(cur, "  "))) cur += 2;
-        else
-            break;
-    })
-#endif
-
-    if (*cur == '{') {
-        cur++;
-        goto obj_begin;
-    }
-    if (*cur == '[') {
-        cur++;
-        goto arr_begin;
-    }
-    if (char_is_number(*cur)) {
-        PyObject *number_obj = read_number_1(&cur, end);
-        if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
-            incr_decode_ctn_size(decode_ctn_info->ctn);
-            goto arr_val_end;
-        }
-        goto fail_number;
-    }
-    if (*cur == '"') {
-        PyObject *str_obj = read_bytes(&cur, string_buffer_head, false);
-        if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
-            incr_decode_ctn_size(decode_ctn_info->ctn);
-            goto arr_val_end;
-        }
-        goto fail_string;
-    }
-    if (*cur == 't') {
-        if (likely(_read_true_1(&cur, end) && pyyjson_decode_true(decode_obj_stack_info))) {
-            incr_decode_ctn_size(decode_ctn_info->ctn);
-            goto arr_val_end;
-        }
-        goto fail_literal_true;
-    }
-    if (*cur == 'f') {
-        if (likely(_read_false_1(&cur, end) && pyyjson_decode_false(decode_obj_stack_info))) {
-            incr_decode_ctn_size(decode_ctn_info->ctn);
-            goto arr_val_end;
-        }
-        goto fail_literal_false;
-    }
-    if (*cur == 'n') {
-        if (likely(_read_null_1(&cur, end) && pyyjson_decode_null(decode_obj_stack_info))) {
-            incr_decode_ctn_size(decode_ctn_info->ctn);
-            goto arr_val_end;
-        }
-        if (likely(_read_nan_1(&cur, end) && pyyjson_decode_nan(decode_obj_stack_info, false))) {
-            incr_decode_ctn_size(decode_ctn_info->ctn);
-            goto arr_val_end;
-        }
-        goto fail_literal_null;
-    }
-    if (*cur == ']') {
-        cur++;
-        if (likely(get_decode_ctn_len(decode_ctn_info->ctn) == 0)) goto arr_end;
-        while (*cur != ',') cur--;
-        goto fail_trailing_comma;
-    }
-    if (char_is_space(*cur)) {
-        while (char_is_space(*++cur));
-        goto arr_val_begin;
-    }
-    if ((*cur == 'i' || *cur == 'I' || *cur == 'N')) {
-        PyObject *number_obj = read_inf_or_nan_1(false, &cur, end);
-        if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
-            incr_decode_ctn_size(decode_ctn_info->ctn);
-            goto arr_val_end;
-        }
-        goto fail_character_val;
-    }
-
-    goto fail_character_val;
-
-arr_val_end:
-    if (byte_match_2((void *)cur, ",\n")) {
-        cur += 2;
-        goto arr_val_begin;
-    }
-    if (*cur == ',') {
-        cur++;
-        goto arr_val_begin;
-    }
-    if (*cur == ']') {
-        cur++;
-        goto arr_end;
-    }
-    if (char_is_space(*cur)) {
-        while (char_is_space(*++cur));
-        goto arr_val_end;
-    }
-
-    goto fail_character_arr_end;
-
-arr_end:
-    assert(decode_ctn_is_arr(decode_ctn_info->ctn));
-    if (!pyyjson_decode_arr(decode_obj_stack_info, get_decode_ctn_len(decode_ctn_info->ctn))) goto failed_cleanup;
-    /* pop parent as current container */
-    if (unlikely(decode_ctn_info->ctn-- == decode_ctn_info->ctn_start)) {
-        goto doc_end;
-    }
-
-    incr_decode_ctn_size(decode_ctn_info->ctn);
-    if (*cur == '\n') cur++;
-    if (!decode_ctn_is_arr(decode_ctn_info->ctn)) {
-        goto obj_val_end;
-    } else {
-        goto arr_val_end;
-    }
-
-obj_begin:
-    /* push container */
-    if (unlikely(!ctn_grow_check(decode_ctn_info))) goto fail_ctn_grow;
-    set_decode_ctn(decode_ctn_info->ctn, 0, false);
-    if (*cur == '\n') cur++;
-
-obj_key_begin:
-#if PYYJSON_IS_REAL_GCC
-    while (true) REPEAT_CALL_16({
-        if (byte_match_2((void *)cur, "  ")) cur += 2;
-        else
-            break;
-    })
-#else
-    while (true) REPEAT_CALL_16({
-        if (likely(byte_match_2(cur, "  "))) cur += 2;
-        else
-            break;
-    })
-#endif
-    if (likely(*cur == '"')) {
-        PyObject *str_obj = read_bytes(&cur, string_buffer_head, true);
-        if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
-            goto obj_key_end;
-        }
-        goto fail_string;
-    }
-    if (likely(*cur == '}')) {
-        cur++;
-        if (likely(get_decode_ctn_len(decode_ctn_info->ctn) == 0)) goto obj_end;
-        goto fail_trailing_comma;
-    }
-    if (char_is_space(*cur)) {
-        while (char_is_space(*++cur));
-        goto obj_key_begin;
-    }
-    goto fail_character_obj_key;
-
-obj_key_end:
-    if (byte_match_2((void *)cur, ": ")) {
-        cur += 2;
-        goto obj_val_begin;
-    }
-    if (*cur == ':') {
-        cur++;
-        goto obj_val_begin;
-    }
-    if (char_is_space(*cur)) {
-        while (char_is_space(*++cur));
-        goto obj_key_end;
-    }
-    goto fail_character_obj_sep;
-
-obj_val_begin:
-    if (*cur == '"') {
-        PyObject *str_obj = read_bytes(&cur, string_buffer_head, false);
-        if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
-            incr_decode_ctn_size(decode_ctn_info->ctn);
-            goto obj_val_end;
-        }
-        goto fail_string;
-    }
-    if (char_is_number(*cur)) {
-        PyObject *number_obj = read_number_1(&cur, end);
-        if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
-            incr_decode_ctn_size(decode_ctn_info->ctn);
-            goto obj_val_end;
-        }
-        goto fail_number;
-    }
-    if (*cur == '{') {
-        cur++;
-        goto obj_begin;
-    }
-    if (*cur == '[') {
-        cur++;
-        goto arr_begin;
-    }
-    if (*cur == 't') {
-        if (likely(_read_true_1(&cur, end) && pyyjson_decode_true(decode_obj_stack_info))) {
-            incr_decode_ctn_size(decode_ctn_info->ctn);
-            goto obj_val_end;
-        }
-        goto fail_literal_true;
-    }
-    if (*cur == 'f') {
-        if (likely(_read_false_1(&cur, end) && pyyjson_decode_false(decode_obj_stack_info))) {
-            incr_decode_ctn_size(decode_ctn_info->ctn);
-            goto obj_val_end;
-        }
-        goto fail_literal_false;
-    }
-    if (*cur == 'n') {
-        if (likely(_read_null_1(&cur, end) && pyyjson_decode_null(decode_obj_stack_info))) {
-            incr_decode_ctn_size(decode_ctn_info->ctn);
-            goto obj_val_end;
-        }
-        if (likely(_read_nan_1(&cur, end) && pyyjson_decode_nan(decode_obj_stack_info, false))) {
-            incr_decode_ctn_size(decode_ctn_info->ctn);
-            goto obj_val_end;
-        }
-        goto fail_literal_null;
-    }
-    if (char_is_space(*cur)) {
-        while (char_is_space(*++cur));
-        goto obj_val_begin;
-    }
-    if ((*cur == 'i' || *cur == 'I' || *cur == 'N')) {
-        PyObject *number_obj = read_inf_or_nan_1(false, &cur, end);
-        if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
-            incr_decode_ctn_size(decode_ctn_info->ctn);
-            goto obj_val_end;
-        }
-        goto fail_character_val;
-    }
-
-    goto fail_character_val;
-
-obj_val_end:
-    if (byte_match_2((void *)cur, ",\n")) {
-        cur += 2;
-        goto obj_key_begin;
-    }
-    if (likely(*cur == ',')) {
-        cur++;
-        goto obj_key_begin;
-    }
-    if (likely(*cur == '}')) {
-        cur++;
-        goto obj_end;
-    }
-    if (char_is_space(*cur)) {
-        while (char_is_space(*++cur));
-        goto obj_val_end;
-    }
-
-    goto fail_character_obj_end;
-
-obj_end:
-    assert(!decode_ctn_is_arr(decode_ctn_info->ctn));
-    if (unlikely(!pyyjson_decode_obj(decode_obj_stack_info, get_decode_ctn_len(decode_ctn_info->ctn)))) goto failed_cleanup;
-    /* pop container */
-    /* point to the next value */
-    if (unlikely(decode_ctn_info->ctn-- == decode_ctn_info->ctn_start)) {
-        goto doc_end;
-    }
-    incr_decode_ctn_size(decode_ctn_info->ctn);
-    if (*cur == '\n') cur++;
-    if (decode_ctn_is_arr(decode_ctn_info->ctn)) {
-        goto arr_val_end;
-    } else {
-        goto obj_val_end;
-    }
-
-doc_end:
-    /* check invalid contents after json document */
-    if (unlikely(cur < end)) {
-        while (char_is_space(*cur)) cur++;
-        if (unlikely(cur < end)) goto fail_garbage;
-    }
-
-success:;
-    PyObject *obj = *decode_obj_stack_info->result_stack;
-    assert(decode_ctn_info->ctn == decode_ctn_info->ctn_start - 1);
-    assert(decode_obj_stack_info->cur_write_result_addr == decode_obj_stack_info->result_stack + 1);
-    assert(obj && !PyErr_Occurred());
-    assert(obj->ob_refcnt == 1);
-    // free string buffer
-    if (unlikely(string_buffer_head != pyyjson_string_buffer)) {
-        free(string_buffer_head);
-    }
-    // free obj stack buffer if allocated dynamically
-    if (unlikely(decode_obj_stack_info->result_stack_end - decode_obj_stack_info->result_stack > PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE)) {
-        free(decode_obj_stack_info->result_stack);
-    }
-
-    return obj;
-
-#define return_err(_pos, _type, _msg)                                                             \
-    do {                                                                                          \
-        if (_type == JSONDecodeError) {                                                           \
-            PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, ((u8 *)_pos) - (u8 *)dat); \
-        } else {                                                                                  \
-            PyErr_SetString(_type, _msg);                                                         \
-        }                                                                                         \
-        goto failed_cleanup;                                                                      \
-    } while (0)
-
-fail_string:
-    return_err(cur, JSONDecodeError, "invalid string");
-fail_number:
-    return_err(cur, JSONDecodeError, "invalid number");
-fail_alloc:
-    return_err(cur, PyExc_MemoryError,
-               "memory allocation failed");
-fail_trailing_comma:
-    return_err(cur, JSONDecodeError,
-               "trailing comma is not allowed");
-fail_literal_true:
-    return_err(cur, JSONDecodeError,
-               "invalid literal, expected a valid literal such as 'true'");
-fail_literal_false:
-    return_err(cur, JSONDecodeError,
-               "invalid literal, expected a valid literal such as 'false'");
-fail_literal_null:
-    return_err(cur, JSONDecodeError,
-               "invalid literal, expected a valid literal such as 'null'");
-fail_character_val:
-    return_err(cur, JSONDecodeError,
-               "unexpected character, expected a valid JSON value");
-fail_character_arr_end:
-    return_err(cur, JSONDecodeError,
-               "unexpected character, expected a comma or a closing bracket");
-fail_character_obj_key:
-    return_err(cur, JSONDecodeError,
-               "unexpected character, expected a string for object key");
-fail_character_obj_sep:
-    return_err(cur, JSONDecodeError,
-               "unexpected character, expected a colon after object key");
-fail_character_obj_end:
-    return_err(cur, JSONDecodeError,
-               "unexpected character, expected a comma or a closing brace");
-fail_comment:
-    return_err(cur, JSONDecodeError,
-               "unclosed multiline comment");
-fail_garbage:
-    return_err(cur, JSONDecodeError,
-               "unexpected content after document");
-fail_ctn_grow:
-    return_err(cur, JSONDecodeError,
-               "max recursion exceeded");
-
-failed_cleanup:
-    for (PyObject **obj_ptr = decode_obj_stack_info->result_stack; obj_ptr < decode_obj_stack_info->cur_write_result_addr; obj_ptr++) {
-        Py_XDECREF(*obj_ptr);
-    }
-    // free string buffer
-    if (unlikely(string_buffer_head != pyyjson_string_buffer)) {
-        free(string_buffer_head);
-    }
-    // free obj stack buffer if allocated dynamically
-    if (unlikely(decode_obj_stack_info->result_stack_end - decode_obj_stack_info->result_stack > PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE)) {
-        free(decode_obj_stack_info->result_stack);
-    }
-    return NULL;
-#undef return_err
-}
+#define READ_ROOT_IMPL read_bytes_root_minify
+#define DECODE_READ_PRETTY 0
+#include "decode_bytes_root.inl.h"
+#undef DECODE_READ_PRETTY
+#undef READ_ROOT_IMPL
 
 /** Read single value JSON document. */
 static force_noinline PyObject *read_root_single_bytes(const u8 *dat, usize len) {
@@ -1635,6 +1232,23 @@ force_inline void _alloc_aligned_bytes_buffer(Py_ssize_t len, bool *dynamic, u8 
     }
 }
 
+force_inline bool should_read_bytes_pretty(const u8 *buffer, Py_ssize_t len) {
+    if (len > 3) {
+        // check if can use pretty read
+        u8 second, third;
+        second = buffer[1];
+        third = buffer[2];
+        if (second == '\n' || third == '\n') {
+            // likely to hit
+            return true;
+        }
+        if (char_is_space(second) && char_is_space(third)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static force_noinline PyObject *pyyjson_decode_bytes(char *_buffer, Py_ssize_t len) {
     // some checks
     if (unlikely(!len)) {
@@ -1670,7 +1284,11 @@ static force_noinline PyObject *pyyjson_decode_bytes(char *_buffer, Py_ssize_t l
 
     /* read json document */
     if (likely(char_is_container(*buffer))) {
-        ret = read_bytes_root_pretty(buffer, len);
+        if (should_read_bytes_pretty(buffer, len)) {
+            ret = read_bytes_root_pretty(buffer, len);
+        } else {
+            ret = read_bytes_root_minify(buffer, len);
+        }
     } else {
         ret = read_root_single_bytes(buffer, len);
     }
