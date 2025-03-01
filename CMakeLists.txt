@@ -4,33 +4,12 @@ set(CMAKE_C_STANDARD 17)
 set(PYYJSON_SOVERSION 0)
 
 # ------------------------------------------------------------------------------
-# Search Python Package
-find_package(Python3 COMPONENTS Development)
-
-# check for python3
-if((NOT Python3_INCLUDE_DIRS) OR(NOT Python3_LIBRARIES))
-    message(FATAL_ERROR "Python3 not found")
-endif()
-
-message("Python3_INCLUDE_DIRS = ${Python3_INCLUDE_DIRS}")
-message("Python3_LIBRARIES = ${Python3_LIBRARIES}")
-
-# ------------------------------------------------------------------------------
-# Build Type
-if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-    if(NOT CMAKE_BUILD_TYPE)
-        message(STATUS "No build type selected, default to: Release")
-        set(CMAKE_BUILD_TYPE Release)
-    endif()
-endif()
-
-# ------------------------------------------------------------------------------
 # Build Options for tests and docs
 option(ASAN_ENABLED "Build with asan" OFF)
 
 # TODO
 option(BUILD_BENCHMARK "Build benchmarks" ON)
-option(BUILD_TEST "Build tests" OFF)
+option(BUILD_TEST "Build tests" ON)
 option(BUILD_SHIPPING_SIMD "Build all simd for shipping" ON)
 option(BUILD_AVX512 "Force build avx512, non-shipping" OFF)
 option(BUILD_AVX2 "Force build avx2, non-shipping" OFF)
@@ -44,9 +23,31 @@ else()
     set(BUILD_MULTI_LIB 0)
 endif()
 
-add_definitions(-DYYJSON_DISABLE_NON_STANDARD=1)
-add_definitions(-DYYJSON_DISABLE_UTF8_VALIDATION=1)
-add_definitions(-DYYJSON_DISABLE_UTILS=1)
+# ------------------------------------------------------------------------------
+# Search Python Package
+if(BUILD_TEST)
+    find_package(Python3 COMPONENTS Development REQUIRED)
+else()
+    find_package(Python3 COMPONENTS Development)
+endif()
+
+# check for python3
+if((NOT Python3_INCLUDE_DIRS) OR(NOT Python3_LIBRARIES))
+    message(FATAL_ERROR "Python3 not found")
+endif()
+
+message("Python3_INCLUDE_DIRS = ${Python3_INCLUDE_DIRS}")
+message("Python3_LIBRARIES = ${Python3_LIBRARIES}")
+message("Python3_LIBRARY_DIRS = ${Python3_LIBRARY_DIRS}")
+
+# ------------------------------------------------------------------------------
+# Build Type
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    if(NOT CMAKE_BUILD_TYPE)
+        message(STATUS "No build type selected, default to: Release")
+        set(CMAKE_BUILD_TYPE Release)
+    endif()
+endif()
 
 # ------------------------------------------------------------------------------
 # Global settings
@@ -128,6 +129,7 @@ set(SRC_WITH_SIMD
 
 set(SRC_TEST
     src/ctests/test.c
+    src/ctests/main.c
 )
 
 if(BUILD_BENCHMARK)
@@ -239,7 +241,6 @@ if(WIN32)
         $<INSTALL_INTERFACE:YYJSON_IMPORTS>)
 endif()
 
-
 if(MSVC)
     # TODO remove this
     # target_compile_options(commonBuild INTERFACE /arch:AVX512F /arch:AVX512BW)
@@ -262,3 +263,10 @@ if(APPLE)
 endif(APPLE)
 
 install(TARGETS pyyjson LIBRARY DESTINATION .)
+
+if(BUILD_TEST)
+    add_executable(pyyjson_test ${SRC_TEST})
+    target_link_libraries(pyyjson_test PUBLIC commonBuild)
+    target_link_libraries(pyyjson_test PUBLIC Python3::Python)
+    install(TARGETS pyyjson_test RUNTIME DESTINATION .)
+endif()

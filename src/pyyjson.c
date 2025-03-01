@@ -18,8 +18,6 @@ force_inline void cpuid(int *info, int x) {
 }
 #endif
 
-#define MODULE_STATE(o) ((modulestate *)PyModule_GetState(o))
-
 typedef PyObject *pyyjson_cache_type;
 
 extern pyyjson_cache_type AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
@@ -54,40 +52,21 @@ static PyMethodDef pyyjson_Methods[] = {
         {NULL, NULL, 0, NULL} /* Sentinel */
 };
 
-static int module_traverse(PyObject *m, visitproc visit, void *arg);
-static int module_clear(PyObject *m);
 static void module_free(void *m);
-
-typedef struct
-{
-    PyObject *type_decimal;
-} modulestate;
 
 static struct PyModuleDef moduledef = {
         PyModuleDef_HEAD_INIT,
         "pyyjson",
-        0,                   /* m_doc */
-        sizeof(modulestate), /* m_size */
-        pyyjson_Methods,     /* m_methods */
-        NULL,                /* m_slots */
-        module_traverse,     /* m_traverse */
-        module_clear,        /* m_clear */
-        module_free          /* m_free */
+        0,               /* m_doc */
+        0,               /* m_size */
+        pyyjson_Methods, /* m_methods */
+        NULL,            /* m_slots */
+        NULL,            /* m_traverse */
+        NULL,            /* m_clear */
+        module_free      /* m_free */
 };
 
-static int module_traverse(PyObject *m, visitproc visit, void *arg) {
-    Py_VISIT(MODULE_STATE(m)->type_decimal);
-    return 0;
-}
-
-static int module_clear(PyObject *m) {
-    Py_CLEAR(MODULE_STATE(m)->type_decimal);
-    return 0;
-}
-
 static void module_free(void *m) {
-    module_clear((PyObject *)m);
-
     for (size_t i = 0; i < PYYJSON_KEY_CACHE_SIZE; i++) {
         Py_XDECREF(AssociativeKeyCache[i]);
     }
