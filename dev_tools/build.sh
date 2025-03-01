@@ -36,5 +36,5 @@ get_cmake_build_type
 mkdir -p $BUILD_DIR
 echo $CUR_PYVER > $BUILD_DIR/pyver
 
-cmake . -B $BUILD_DIR -DCMAKE_BUILD_TYPE=$TARGET_BUILD_TYPE -DPython3_INCLUDE_DIR=$Python3_INCLUDE_DIR -DPython3_LIBRARY=$Python3_LIBRARY
+cmake . -B $BUILD_DIR -DCMAKE_BUILD_TYPE=$TARGET_BUILD_TYPE -DPython3_INCLUDE_DIR=$Python3_INCLUDE_DIR
 cmake --build $BUILD_DIR -- -j $(nproc)
