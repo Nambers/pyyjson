@@ -521,6 +521,7 @@ copy_utf8_ucs1:
         uni = byte_load_4(src);
         // TODO remove the repeat4 later
         /* modified BEGIN */
+        if (is_valid_seq_1(uni)) goto copy_ascii_ucs1;
         if (is_valid_seq_3(uni)) {
             // if ((uni & b3_mask) == b3_patt) {
             // code point: [U+0800, U+FFFF]
@@ -541,7 +542,6 @@ copy_utf8_ucs1:
             // } else
             //     break;
         }
-        if (is_valid_seq_1(uni)) goto copy_ascii_ucs1;
         /* modified END */
         while (is_valid_seq_2(uni)) {
             // if ((uni & b2_mask) == b2_patt) {
