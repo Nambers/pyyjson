@@ -12,7 +12,7 @@ set +e
 
 TARGET_BUILD_TYPE=$1
 
-y=$(cat $BUILD_DIR/pyver 2> /dev/null)
+y=$(cat $BUILD_DIR/pyver 2>/dev/null)
 if [[ $CUR_PYVER != $y ]]; then
     echo "py ver mismatch, removing build dir"
     rm -rf $BUILD_DIR
@@ -34,7 +34,7 @@ get_cmake_build_type() {
 get_cmake_build_type
 
 mkdir -p $BUILD_DIR
-echo $CUR_PYVER > $BUILD_DIR/pyver
+echo $CUR_PYVER >$BUILD_DIR/pyver
 
-cmake . -B $BUILD_DIR -DCMAKE_BUILD_TYPE=$TARGET_BUILD_TYPE -DPython3_INCLUDE_DIR=$Python3_INCLUDE_DIR
+cmake . -B $BUILD_DIR -DCMAKE_BUILD_TYPE=$TARGET_BUILD_TYPE -DPython3_ROOT_DIR=$Python3_ROOT_DIR
 cmake --build $BUILD_DIR -- -j $(nproc)

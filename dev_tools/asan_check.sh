@@ -3,7 +3,7 @@ set -e
 source ./dev_tools/get_env.sh
 mkdir -p ./$BUILD_DIR
 rm -rf ./$BUILD_DIR/*
-./.nix-pyenv/bin/cmake . -B $BUILD_DIR -DCMAKE_BUILD_TYPE=Debug -DASAN_ENABLED=on -DPython3_INCLUDE_DIR=$Python3_INCLUDE_DIR -DPython3_LIBRARY=$Python3_LIBRARY
+./.nix-pyenv/bin/cmake . -B $BUILD_DIR -DCMAKE_BUILD_TYPE=Debug -DASAN_ENABLED=on -DPython3_ROOT_DIR=$Python3_ROOT_DIR
 cmake --build $BUILD_DIR --config Debug -- -j $(nproc)
 export LD_PRELOAD=$(pwd)/.nix-pyenv/lib/libasan.so
 set +e
