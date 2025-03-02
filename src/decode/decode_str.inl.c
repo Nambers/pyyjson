@@ -411,11 +411,13 @@ force_inline SpecialCharReadResult DO_SPECIAL(DECODE_SRC_INFO *restrict decode_s
         result.value = DECODE_ESCAPE_UNICODE(decode_src_info);
         result.flag = StrContinue;
         if (unlikely(result.value == (u32)0xffffffff)) {
+            assert(PyErr_Occurred());
             result.flag = StrInvalid;
         }
         return result;
     } else if (u < ControlMax) {
         // invalid
+        PyErr_SetString(JSONDecodeError, "Invalid control character in string");
         result.flag = StrInvalid;
         return result;
     } else {

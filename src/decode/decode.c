@@ -145,6 +145,14 @@ force_inline PyObject *get_key_cache(const u8 *unicode_str, pyyjson_hash_t hash,
     return NULL;
 }
 
+force_inline void make_hash(PyASCIIObject *ascii, const u8 *unicode_str, size_t real_len) {
+#if PY_MINOR_VERSION >= 14
+    ascii->hash = PyUnicode_Type.tp_hash(PYYJSON_STATIC_CAST(PyObject *, ascii));
+#else
+    ascii->hash = _Py_HashBytes(unicode_str, real_len);
+#endif
+}
+
 force_inline PyObject *make_string(const u8 *unicode_str, Py_ssize_t len, int type_flag, bool is_key) {
     PYYJSON_TRACE_STR_LEN(len);
     PyObject *obj;
@@ -197,12 +205,13 @@ force_inline PyObject *make_string(const u8 *unicode_str, Py_ssize_t len, int ty
     }
 success:
     if (is_key) {
-        assert(((PyASCIIObject *)obj)->hash == -1);
-#if PY_MINOR_VERSION >= 14
-        ((PyASCIIObject *)obj)->hash = PyUnicode_Type.tp_hash(obj);
-#else
-        ((PyASCIIObject *)obj)->hash = _Py_HashBytes(unicode_str, real_len);
+#if PY_MINOR_VERSION >= 12
+        if (0 == ((PyASCIIObject *)obj)->state.statically_allocated)
 #endif
+        {
+            assert(((PyASCIIObject *)obj)->hash == -1);
+            make_hash((PyASCIIObject *)obj, unicode_str, real_len);
+        }
     }
     return obj;
 }
@@ -250,6 +259,7 @@ force_inline bool init_decode_ctn_stack_info(DecodeCtnStackInfo *restrict decode
 
 
 bool _pyyjson_decode_obj_stack_resize(DecodeObjStackInfo *restrict decode_obj_stack_info);
+
 //  {
 //     // resize
 //     if (likely(PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE == decode_obj_stack_info->result_stack_end - decode_obj_stack_info->result_stack)) {
