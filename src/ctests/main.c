@@ -1,15 +1,15 @@
 
-#include "pyyjson.h"
-
-force_inline PyObject *import_pyyjson(void) {
-    PyObject *pModule = PyImport_ImportModule("pyyjson");
-    return pModule;
-}
+#include "test_common.h"
 
 int main(int argc, char **argv) {
-    Py_Initialize();
-
     PyObject *pyyjson_module;
+
+    if (!initialize_cpython()) {
+        PyErr_Print();
+        Py_Finalize();
+        return 1;
+    }
+
 
     pyyjson_module = import_pyyjson();
 
@@ -21,6 +21,9 @@ int main(int argc, char **argv) {
 
     // extract pyyjson module info
     // TODO
+    Py_DECREF(pyyjson_module);
+
+    Py_Finalize();
 
     return 0;
 }

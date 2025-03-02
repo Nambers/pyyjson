@@ -128,8 +128,11 @@ set(SRC_WITH_SIMD
 )
 
 set(SRC_TEST
-    src/ctests/test.c
     src/ctests/main.c
+)
+
+set(SRC_FUZZER
+    src/ctests/fuzzer.c
 )
 
 if(BUILD_BENCHMARK)
@@ -265,8 +268,21 @@ endif(APPLE)
 install(TARGETS pyyjson LIBRARY DESTINATION .)
 
 if(BUILD_TEST)
+    include(CTest)
     add_executable(pyyjson_test ${SRC_TEST})
     target_link_libraries(pyyjson_test PUBLIC commonBuild)
     target_link_libraries(pyyjson_test PUBLIC Python3::Python)
     install(TARGETS pyyjson_test RUNTIME DESTINATION .)
+
+    if(CMAKE_C_COMPILER_ID MATCHES Clang)
+        file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/test_data/fuzzer.dict" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
+        file(GLOB TEST_DATA_FILES "${CMAKE_CURRENT_SOURCE_DIR}/test_data/json/**/*.json")
+        file(COPY ${TEST_DATA_FILES} DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/corpus")
+        add_executable(pyyjson_fuzzer ${SRC_FUZZER})
+        target_link_libraries(pyyjson_fuzzer PUBLIC commonBuild)
+        target_link_libraries(pyyjson_fuzzer PUBLIC Python3::Python)
+        target_compile_options(pyyjson_fuzzer PRIVATE -fsanitize=fuzzer -g -O1)
+        target_link_options(pyyjson_fuzzer PRIVATE -fsanitize=fuzzer)
+        add_test(pyyjson_fuzzer ${CMAKE_CURRENT_BINARY_DIR}/pyyjson_fuzzer -dict=fuzzer.dict -max_total_time=300 ${CMAKE_CURRENT_BINARY_DIR}/corpus)
+    endif()
 endif()
