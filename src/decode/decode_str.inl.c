@@ -968,7 +968,7 @@ loop_1_t_t:;
         // need_copy == true
         // need_check_max_char == true
         // this implies max_char_type == 0 && COMPILE_UCS_LEVEL == 1
-        assert(_read_state.max_char_type == COMPILE_UCS_LEVEL && _read_state.max_char_type <= 1);
+        assert(_read_state.max_char_type == 0);
         // BEGIN
         assert(_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX);
         while (_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX) {
