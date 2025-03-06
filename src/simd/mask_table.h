@@ -6,6 +6,7 @@
 
 extern pyyjson_align(64) const u8 _TailmaskTable_8[64][64];
 extern pyyjson_align(64) const u8 _HeadmaskTable_8[64][64];
+extern pyyjson_align(64) const u8 _TailmaskReversedTable_8[64][64];
 #if __SSSE3__
 // TODO
 extern pyyjson_align(64) const u8 _RShiftMaskTable[16][16];
@@ -44,6 +45,21 @@ force_inline const void *read_head_mask_table_16(Py_ssize_t row) {
 /* Read head mask of u32. */
 force_inline const void *read_head_mask_table_32(Py_ssize_t row) {
     return (const void *)&_HeadmaskTable_8[4 * row][0];
+}
+
+/* Read tail mask of u8. */
+force_inline const void *read_tail_mask_reversed_table_8(Py_ssize_t row) {
+    return (const void *)&_TailmaskReversedTable_8[row][0];
+}
+
+/* Read tail mask of u16. */
+force_inline const void *read_tail_mask_reversed_table_16(Py_ssize_t row) {
+    return (const void *)&_TailmaskReversedTable_8[2 * row][0];
+}
+
+/* Read tail mask of u32. */
+force_inline const void *read_tail_mask_reversed_table_32(Py_ssize_t row) {
+    return (const void *)&_TailmaskReversedTable_8[4 * row][0];
 }
 
 #if __SSSE3__

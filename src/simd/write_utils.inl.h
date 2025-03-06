@@ -25,7 +25,7 @@ force_inline void WRITE_PARTIAL_HEAD(void *restrict dst, SIMD_TYPE SIMD_VAR, Py_
 force_inline void WRITE_PARTIAL_TAIL(void *restrict dst, SIMD_TYPE SIMD_VAR, Py_ssize_t tail_cnt) {
 #    if WRITE_SUPPORT_MASK_WRITE
     static_assert(SIMD_BIT_SIZE == 256 && COMPILE_WRITE_UCS_LEVEL == 4, "");
-    _mm256_maskstore_epi32((i32 *)dst, load_simd_aligned(read_tail_mask_table_32(tail_cnt)), SIMD_VAR);
+    _mm256_maskstore_epi32((i32 *)dst, load_simd_aligned(read_tail_mask_reversed_table_32(tail_cnt)), SIMD_VAR);
 #    else
     static_assert(PYYJSON_HAS_BLENDV, "PYYJSON_HAS_BLENDV");
 #        define BLENDV_WRITER PYYJSON_CONCAT2(blendv_writetail, SIMD_BIT_SIZE)
