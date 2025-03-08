@@ -608,25 +608,27 @@ force_inline u32 read_b4_unicode(u32 uni) {
 
 #include "decode_bytes.inl.c"
 
-// force_noinline PyObject *read_root_0(PyUnicodeObject *unicode_root);
-// force_noinline PyObject *read_root_1(PyUnicodeObject *unicode_root);
-// force_noinline PyObject *read_root_2(PyUnicodeObject *unicode_root);
-// force_noinline PyObject *read_root_4(PyUnicodeObject *unicode_root);
+static int invalid_arg_checked = 0;
 
 PyObject *SIMD_NAME_MODIFIER(pyyjson_Decode)(PyObject *self, PyObject *args, PyObject *kwargs) {
-    // const char *string = NULL;
-    // Py_ssize_t len = 0;
-    static const char *kwlist[] = {"s", NULL};
-    PyObject *in_obj;
+    PyObject *obj;
     PyObject *ret;
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", (char **)kwlist, &in_obj)) {
-        PyErr_SetString(PyExc_TypeError, "Invalid argument");
+    //
+    PyObject *cls = NULL, *object_hook = NULL, *parse_float = NULL, *parse_int = NULL, *parse_constant = NULL, *object_pairs_hook = NULL;
+    static const char *kwlist[] = {"s", "cls", "object_hook", "parse_float", "parse_int", "parse_constant", "object_pairs_hook", NULL};
+    //
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|OOOOOO", (char **)kwlist, &obj, &cls, &object_hook, &parse_float, &parse_int, &parse_constant, &object_pairs_hook)) {
         return NULL;
     }
 
-    if (PyUnicode_Check(in_obj)) {
-        PyASCIIObject *ascii_head = PYYJSON_STATIC_CAST(PyASCIIObject *, in_obj);
-        PyUnicodeObject *in_unicode = PYYJSON_STATIC_CAST(PyUnicodeObject *, in_obj);
+    if (!invalid_arg_checked && (cls || object_hook || parse_float || parse_int || parse_constant || object_pairs_hook)) {
+        printf("Warning: some options are not supported in this version of pyyjson\n");
+        invalid_arg_checked = 1;
+    }
+
+    if (PyUnicode_Check(obj)) {
+        PyASCIIObject *ascii_head = PYYJSON_STATIC_CAST(PyASCIIObject *, obj);
+        PyUnicodeObject *in_unicode = PYYJSON_STATIC_CAST(PyUnicodeObject *, obj);
         int kind = ascii_head->state.ascii ? 0 : ascii_head->state.kind;
         switch (kind) {
             case PYYJSON_STRING_TYPE_ASCII: {
@@ -654,10 +656,10 @@ PyObject *SIMD_NAME_MODIFIER(pyyjson_Decode)(PyObject *self, PyObject *args, PyO
         goto done;
     }
 
-    if (PyBytes_Check(in_obj)) {
+    if (PyBytes_Check(obj)) {
         char *buffer;
         Py_ssize_t length;
-        if (unlikely(0 != PyBytes_AsStringAndSize(in_obj, &buffer, &length))) {
+        if (unlikely(0 != PyBytes_AsStringAndSize(obj, &buffer, &length))) {
             ret = NULL;
             goto done;
         }
@@ -665,9 +667,9 @@ PyObject *SIMD_NAME_MODIFIER(pyyjson_Decode)(PyObject *self, PyObject *args, PyO
         goto done;
     }
 
-    if (PyByteArray_Check(in_obj)) {
-        char *buffer = PyByteArray_AS_STRING(in_obj);
-        Py_ssize_t length = PyByteArray_GET_SIZE(in_obj);
+    if (PyByteArray_Check(obj)) {
+        char *buffer = PyByteArray_AS_STRING(obj);
+        Py_ssize_t length = PyByteArray_GET_SIZE(obj);
         ret = pyyjson_decode_bytes(buffer, length);
         goto done;
     }
@@ -681,12 +683,4 @@ done:;
         PyErr_SetString(JSONDecodeError, "Failed to decode JSON: unknown error");
     }
     return ret;
-    // PyObject *root = yyjson_read_opts(string, len);
-    // if (unlikely(!root)) {
-    //     if (!PyErr_Occurred()) {
-    //         PyErr_SetString(JSONDecodeError, "Failed to decode JSON: unknown error");
-    //     }
-    // }
-
-    // return root;
 }

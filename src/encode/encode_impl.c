@@ -387,16 +387,40 @@ force_inline PyObject *pyyjson_dumps_single_constant(PyFastTypes py_type) {
     return ret;
 }
 
+static int invalid_arg_checked = 0;
+
 /* Entrance for python code. */
 PyObject *SIMD_NAME_MODIFIER(pyyjson_Encode)(PyObject *self, PyObject *args, PyObject *kwargs) {
     PyObject *obj;
-    int option_digit = 0;
-    usize indent = 0;
     PyObject *ret;
-    static const char *kwlist[] = {"obj", "options", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|i", (char **)kwlist, &obj, &option_digit)) {
-        PyErr_SetString(PyExc_TypeError, "Invalid argument");
+    //
+    PyObject *indent = NULL, *skipkeys = NULL, *ensure_ascii = NULL, *check_circular = NULL, *allow_nan = NULL, *cls = NULL, *separators = NULL, *default_ = NULL, *sort_keys = NULL;
+    static const char *kwlist[] = {"obj", "indent", "skipkeys", "ensure_ascii", "check_circular", "allow_nan", "cls", "separators", "default", "sort_keys", NULL};
+    //
+    int indent_int = 0;
+    //
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|OOOOOOOO", (char **)kwlist, &obj, &indent, &skipkeys, &ensure_ascii, &check_circular, &allow_nan, &cls, &separators, &default_, &sort_keys)) {
         goto fail;
+    }
+
+    if (!invalid_arg_checked && (skipkeys || ensure_ascii || check_circular || allow_nan || cls || separators || default_ || sort_keys)) {
+        printf("Warning: some options are not supported in this version of pyyjson\n");
+        invalid_arg_checked = 1;
+    }
+
+    if (indent) {
+        if (indent != Py_None && !PyLong_Check(indent)) {
+            PyErr_SetString(PyExc_TypeError, "indent must be an integer");
+            goto fail;
+        }
+        if (indent != Py_None) {
+            int _indent = PyLong_AsLong(indent);
+            if (_indent < 0 || _indent > 4 || (_indent / 2) * 2 != _indent) {
+                PyErr_SetString(PyExc_ValueError, "indent must be 0, 2, or 4");
+                goto fail;
+            }
+            indent_int = _indent;
+        }
     }
 
     assert(obj);
@@ -430,17 +454,8 @@ PyObject *SIMD_NAME_MODIFIER(pyyjson_Encode)(PyObject *self, PyObject *args, PyO
     }
 
 dumps_container:;
-    if (option_digit & 1) {
-        if (option_digit & 2) {
-            PyErr_SetString(PyExc_ValueError, "Cannot mix indent options");
-            goto fail;
-        }
-        indent = 2;
-    } else if (option_digit & 2) {
-        indent = 4;
-    }
 
-    switch (indent) {
+    switch (indent_int) {
         case 0: {
             ret = pyyjson_dumps_obj_0_0(obj);
             break;
