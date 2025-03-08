@@ -441,7 +441,13 @@ static inline int to_chars(const floating_decimal_64 v, const bool sign, char *c
 
     // --- write exponent ---
     int32_t exp = v.exponent + (int32_t)olength - 1;
-    if (!exp) return index;
+    if (!exp) {
+        if (olength <= 1) {
+            result[index++] = '.';
+            result[index++] = '0';
+        }
+        return index;
+    }
     // Print the exponent.
     result[index++] = 'E';
     if (exp < 0) {
