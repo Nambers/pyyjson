@@ -1,7 +1,6 @@
 .nix-pyenv/
 /.vscode
 /.envrc
-/python-test
 /test.py
 /test_decode.py
 /debug_source
