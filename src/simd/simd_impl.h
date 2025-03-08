@@ -166,9 +166,8 @@ force_inline SIMD_128 broadcast_64_128(i64 v) {
 #endif
 }
 
-#if __SSSE3__
 force_inline const void *read_rshift_mask_table(int row);
-#endif
+
 /*
  * Right shift 128 bits for the case imm8 cannot be determined at compile time.
  Shifted bits should be multiple of 8; imm8 is the number of "bytes" to shift.

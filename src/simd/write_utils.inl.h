@@ -29,7 +29,7 @@ force_inline void WRITE_PARTIAL_TAIL(void *restrict dst, SIMD_TYPE SIMD_VAR, Py_
 #    else
     static_assert(PYYJSON_HAS_BLENDV, "PYYJSON_HAS_BLENDV");
 #        define BLENDV_WRITER PYYJSON_CONCAT2(blendv_writetail, SIMD_BIT_SIZE)
-#        define MASK_TABLE_READER PYYJSON_CONCAT2(read_tail_mask_table, WRITE_BIT_SIZE)
+#        define MASK_TABLE_READER PYYJSON_CONCAT2(read_tail_mask_reversed_table, WRITE_BIT_SIZE)
     if (tail_cnt) {
         BLENDV_WRITER(SIMD_VAR, dst, load_simd_aligned(MASK_TABLE_READER(tail_cnt)));
     }
