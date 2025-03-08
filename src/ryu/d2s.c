@@ -449,7 +449,7 @@ static inline int to_chars(const floating_decimal_64 v, const bool sign, char *c
         return index;
     }
     // Print the exponent.
-    result[index++] = 'E';
+    result[index++] = 'e';
     if (exp < 0) {
         result[index++] = '-';
         exp = -exp;
