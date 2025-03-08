@@ -314,21 +314,21 @@ force_inline void UPDATE_WRITE_TYPE(DECODE_UNICODE_INFO *restrict decode_unicode
     Py_UNREACHABLE();
 }
 
-force_inline bool VERIFY_ESCAPE_HEX(DECODE_SRC_INFO *decode_src_info) {
-    if (unlikely(decode_src_info->src + 4 > decode_src_info->src_end)) {
+force_inline bool VERIFY_ESCAPE_HEX(DECODE_SRC_INFO *decode_src_info, int offset) {
+    if (unlikely(decode_src_info->src + 4 + offset > decode_src_info->src_end)) {
         PyErr_SetString(JSONDecodeError, "Unexpected ending when reading escaped sequence in string");
         return false;
     }
     // need to verify the next 4 unicode for u16 and u32, since the size of hex conv table is 256
 #if COMPILE_READ_UCS_LEVEL == 2
-    u64 to_verify = *(u64 *)decode_src_info->src;
+    u64 to_verify = *(u64 *)(decode_src_info->src + offset);
     const u64 verify_mask = 0xff00ff00ff00ff00ULL;
     if (unlikely((to_verify & verify_mask) != 0)) {
         PyErr_SetString(JSONDecodeError, "Invalid escape sequence in string");
         return false;
     }
 #elif COMPILE_READ_UCS_LEVEL == 4
-    SIMD_128 to_verify = load_128((void *)decode_src_info->src);
+    SIMD_128 to_verify = load_128((void *)(decode_src_info->src + offset));
     const SIMD_128 verify_mask = broadcast_64_128((i64)0xffffff00ffffff00ULL);
     if (unlikely(!testz_128(to_verify, verify_mask))) {
         PyErr_SetString(JSONDecodeError, "Invalid escape sequence in string");
@@ -355,7 +355,7 @@ static force_noinline u32 DECODE_ESCAPE_UNICODE(DECODE_SRC_INFO *restrict decode
             u16 hi;
 
             decode_src_info->src++;
-            if (unlikely(!VERIFY_ESCAPE_HEX(decode_src_info) || !READ_TO_HEX_U16(decode_src_info->src, &hi))) {
+            if (unlikely(!VERIFY_ESCAPE_HEX(decode_src_info, 0) || !READ_TO_HEX_U16(decode_src_info->src, &hi))) {
                 if (unlikely(!PyErr_Occurred())) {
                     PyErr_SetString(JSONDecodeError, "Invalid escape sequence in string");
                 }
@@ -375,7 +375,7 @@ static force_noinline u32 DECODE_ESCAPE_UNICODE(DECODE_SRC_INFO *restrict decode
                     PyErr_SetString(JSONDecodeError, "No low surrogate in string");
                     return (u32)0xffffffff;
                 }
-                if (unlikely(!READ_TO_HEX_U16(decode_src_info->src + 2, &lo))) {
+                if (unlikely(!VERIFY_ESCAPE_HEX(decode_src_info, 2) || !READ_TO_HEX_U16(decode_src_info->src + 2, &lo))) {
                     PyErr_SetString(JSONDecodeError, "Invalid escaped sequence in string");
                     return (u32)0xffffffff;
                 }
@@ -463,9 +463,20 @@ static force_noinline void PROCESS_ESCAPE(
             DECODE_UNICODE_WRITE_ONE_CHAR(decode_unicode_info, 4, value);
             return;
         }
-        assert(read_state->max_char_type == PYYJSON_STRING_TYPE_UCS4);
-        assert(read_state->dont_check_max_char);
-        // leave `state_dirty` as is
+        if (COMPILE_READ_UCS_LEVEL < 4) { // compile time
+            // write as is 4
+            assert(read_state->max_char_type == PYYJSON_STRING_TYPE_UCS4);
+            assert(read_state->dont_check_max_char);
+            // leave `state_dirty` as is
+            DECODE_UNICODE_WRITE_ONE_CHAR(decode_unicode_info, 4, value);
+            return;
+        }
+        // COMPILE_READ_UCS_LEVEL == 4, write_as == 4
+        bool updated = 4 > read_state->max_char_type;
+        read_state->max_char_type = 4;
+        read_state->dont_check_max_char = true;
+        read_state->state_dirty = read_state->state_dirty || updated;
+        // write_as not updated
         DECODE_UNICODE_WRITE_ONE_CHAR(decode_unicode_info, 4, value);
         return;
     } else if (value > 0xff) {
