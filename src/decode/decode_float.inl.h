@@ -122,6 +122,12 @@ force_inline PyObject *READ_NUMBER(const _FROM_TYPE **ptr, const _FROM_TYPE *buf
             return PyLong_FromLongLong((i64)(sign ? (u64)(~(_v) + 1) : (u64)(_v))); \
         } while (false)
 
+#    define return_u64(_v)                                                                  \
+        do {                                                                                \
+            *end = cur;                                                                     \
+            return PyLong_FromUnsignedLongLong((u64)(sign ? (u64)(~(_v) + 1) : (u64)(_v))); \
+        } while (false)
+
 #    define return_f64(_v)                                            \
         do {                                                          \
             *end = cur;                                               \
@@ -289,7 +295,7 @@ digi_intg_more:
                     // if (has_read_flag(BIGNUM_AS_RAW)) return_raw();
                     return_f64(normalized_u64_to_f64(sig));
                 }
-                return_i64(sig);
+                return_u64(sig);
             }
         }
     }
@@ -693,6 +699,7 @@ digi_finish:
 #    undef return_inf
 #    undef return_0
 #    undef return_i64
+#    undef return_u64
 #    undef return_f64
 #    undef return_f64_bin
 #    undef return_raw
@@ -726,6 +733,12 @@ force_inline PyObject *READ_NUMBER(const _FROM_TYPE **ptr, const _FROM_TYPE *buf
         do {                                                                        \
             *end = cur;                                                             \
             return PyLong_FromLongLong((i64)(sign ? (u64)(~(_v) + 1) : (u64)(_v))); \
+        } while (false)
+
+#    define return_u64(_v)                                                                  \
+        do {                                                                                \
+            *end = cur;                                                                     \
+            return PyLong_FromUnsignedLongLong((u64)(sign ? (u64)(~(_v) + 1) : (u64)(_v))); \
         } while (false)
 
 #    define return_f64(_v)                                            \
@@ -803,7 +816,7 @@ force_inline PyObject *READ_NUMBER(const _FROM_TYPE **ptr, const _FROM_TYPE *buf
                 // if (has_read_flag(BIGNUM_AS_RAW)) return_raw();
                 return_f64(normalized_u64_to_f64(sig));
             }
-            return_i64(sig);
+            return_u64(sig);
         }
     }
 
@@ -919,6 +932,7 @@ read_double:
 #    undef return_err
 #    undef return_0
 #    undef return_i64
+#    undef return_u64
 #    undef return_f64
 #    undef return_f64_bin
 #    undef return_inf

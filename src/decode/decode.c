@@ -582,13 +582,13 @@ force_inline u32 read_b4_unicode(u32 uni) {
 
 #include "simd/check_mask_wrap.inl.c"
 
+#include "simd/downgrade_wrap.inl.c"
+
 #include "decode_float_wrap.inl.c"
 
 #include "simd/write_utils_wrap.inl.c"
 
 #include "simd/readwrite_utils_wrap.inl.c"
-
-#include "simd/downgrade_wrap.inl.c"
 
 #define COMPILE_UCS_LEVEL 0
 #include "decode_str.inl.c"
