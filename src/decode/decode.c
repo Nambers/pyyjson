@@ -622,7 +622,7 @@ PyObject *SIMD_NAME_MODIFIER(pyyjson_Decode)(PyObject *self, PyObject *args, PyO
     }
 
     if (!invalid_arg_checked && (cls || object_hook || parse_float || parse_int || parse_constant || object_pairs_hook)) {
-        printf("Warning: some options are not supported in this version of pyyjson\n");
+        fprintf(stderr, "Warning: some options are not supported in this version of pyyjson\n");
         invalid_arg_checked = 1;
     }
 

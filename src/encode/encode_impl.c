@@ -404,7 +404,7 @@ PyObject *SIMD_NAME_MODIFIER(pyyjson_Encode)(PyObject *self, PyObject *args, PyO
     }
 
     if (!invalid_arg_checked && (skipkeys || ensure_ascii || check_circular || allow_nan || cls || separators || default_ || sort_keys)) {
-        printf("Warning: some options are not supported in this version of pyyjson\n");
+        fprintf(stderr, "Warning: some options are not supported in this version of pyyjson\n");
         invalid_arg_checked = 1;
     }
 
