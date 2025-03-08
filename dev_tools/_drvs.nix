@@ -3,7 +3,7 @@
 }:
 let
   lib = pkgs.lib;
-  pythonVerConfig = import ./pyver.nix;
+  pythonVerConfig = lib.importJSON ./pyver.json;
   maxSupportVer = pythonVerConfig.maxSupportVer;
   minSupportVer = pythonVerConfig.minSupportVer;
   supportedVers = builtins.genList (x: minSupportVer + x) (maxSupportVer - minSupportVer + 1);

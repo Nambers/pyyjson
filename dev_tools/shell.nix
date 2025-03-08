@@ -4,7 +4,7 @@
 let
   nix_pyenv_directory = ".nix-pyenv";
   # define version
-  pythonVerConfig = import ./pyver.nix;
+  pythonVerConfig = pkgs.lib.importJSON ./pyver.json;
   curVer = pythonVerConfig.curVer;
   leastVer = pythonVerConfig.minSupportVer;
   drvs = pkgs.callPackage ./_drvs.nix { };

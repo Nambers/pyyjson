@@ -3,7 +3,7 @@ let
   pkgs = pypkgs.pkgs;
   lib = pkgs.lib;
   minorVer = lib.strings.toInt pypkgs.python.sourceVersion.minor;
-  pythonVerConfig = import ./pyver.nix;
+  pythonVerConfig = lib.importJSON ./pyver.json;
 in
 with pypkgs;
 [

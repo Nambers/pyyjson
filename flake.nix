@@ -31,7 +31,7 @@
           let
             defaultShell = pkgs.callPackage ./dev_tools/shell.nix { };
             _drvs = pkgs.callPackage ./dev_tools/_drvs.nix { };
-            pythonVerConfig = import ./dev_tools/pyver.nix;
+            pythonVerConfig = lib.importJSON ./dev_tools/pyver.json;
             curVer = pythonVerConfig.curVer;
             leastVer = pythonVerConfig.minSupportVer;
             inputDerivation = defaultShell.inputDerivation;

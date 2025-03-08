@@ -1,5 +1,0 @@
-{
-    curVer = 13;
-    minSupportVer = 9;
-    maxSupportVer = 14;
-}
