@@ -211,3 +211,43 @@ PyObject *run_object_benchmark(PyObject *self, PyObject *args, PyObject *kwargs)
 fail:;
     return NULL;
 }
+
+PyObject *inspect_pyunicode(PyObject *self, PyObject *args, PyObject *kwargs) {
+    PyObject *unicode;
+    PyObject *t1 = NULL, *t2 = NULL, *t3 = NULL, *t4 = NULL;
+    static const char *kwlist[] = {"unicode", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", (char **)kwlist, &unicode)) {
+        goto fail;
+    }
+    if (!PyUnicode_Check(unicode)) {
+        PyErr_SetString(PyExc_TypeError, "First argument must be unicode");
+        goto fail;
+    }
+    PyASCIIObject *u = (PyASCIIObject *)unicode;
+    int length = u->length;
+    int kind = u->state.kind;
+    int ascii = u->state.ascii;
+    int interned = u->state.interned;
+    t1 = PyLong_FromLong(kind);
+    if (!t1) goto fail;
+    t2 = PyLong_FromLong(kind * length);
+    if (!t2) goto fail;
+    t3 = PyBool_FromLong(ascii);
+    if (!t3) goto fail;
+    t4 = PyBool_FromLong(interned);
+    if (!t4) goto fail;
+    PyObject *ret = PyTuple_New(4);
+    if (!ret) goto fail;
+    PyTuple_SET_ITEM(ret, 0, t1);
+    PyTuple_SET_ITEM(ret, 1, t2);
+    PyTuple_SET_ITEM(ret, 2, t3);
+    PyTuple_SET_ITEM(ret, 3, t3);
+    return ret;
+
+fail:;
+    Py_XDECREF(t1);
+    Py_XDECREF(t2);
+    Py_XDECREF(t3);
+    Py_XDECREF(t4);
+    return NULL;
+}

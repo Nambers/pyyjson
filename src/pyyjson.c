@@ -30,6 +30,7 @@ PyObject *pyyjson_DecodeFile(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *run_unicode_accumulate_benchmark(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *run_object_accumulate_benchmark(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *run_object_benchmark(PyObject *self, PyObject *args, PyObject *kwargs);
+PyObject *inspect_pyunicode(PyObject *self, PyObject *args, PyObject*kwargs);
 #endif
 PyObject *pyyjson_print_current_features(PyObject *self, PyObject *);
 
@@ -45,6 +46,7 @@ static PyMethodDef pyyjson_Methods[] = {
         {"run_unicode_accumulate_benchmark", (PyCFunction)run_unicode_accumulate_benchmark, METH_VARARGS | METH_KEYWORDS, "Benchmark."},
         {"run_object_accumulate_benchmark", (PyCFunction)run_object_accumulate_benchmark, METH_VARARGS | METH_KEYWORDS, "Benchmark."},
         {"run_object_benchmark", (PyCFunction)run_object_benchmark, METH_VARARGS | METH_KEYWORDS, "Benchmark."},
+        {"inspect_pyunicode", (PyCFunction)inspect_pyunicode, METH_VARARGS | METH_KEYWORDS, "Inspect PyUnicode."},
 #endif
         {"print_current_features", pyyjson_print_current_features, METH_NOARGS, "Prints current features."},
         // {"dump", (PyCFunction)pyyjson_FileEncode, METH_VARARGS | METH_KEYWORDS, "Converts arbitrary object recursively into JSON file. "},
