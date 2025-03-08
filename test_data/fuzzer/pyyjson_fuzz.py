@@ -17,10 +17,10 @@ def fuzz_bytes_input(input_bytes: bytes):
     should_success, _ = success_test(json.loads, input_bytes)
 
     success, decoded = success_test(pyyjson.loads, input_bytes)
-    if should_success and not success:
-        print(f"pyyjson.loads failed on input_bytes: {input_bytes}")
-    if not should_success and success:
-        print(f"pyyjson.loads should have failed on input_bytes: {input_bytes}")
+    # if should_success and not success:
+    #     print(f"pyyjson.loads failed on input_bytes: {input_bytes}")
+    # if not should_success and success:
+    #     print(f"pyyjson.loads should have failed on input_bytes: {input_bytes}")
     if success:
         pyyjson.dumps(decoded)
     _, input_str = success_test(input_bytes.decode, "utf-8")
@@ -31,9 +31,9 @@ def fuzz_bytes_input(input_bytes: bytes):
 def fuzz_str_input(input_str: str):
     should_success, _ = success_test(json.loads, input_str)
     success, decoded = success_test(pyyjson.loads, input_str)
-    if should_success and not success:
-        print(f"pyyjson.loads failed on input_str: {input_str}")
-    if not should_success and success:
-        print(f"pyyjson.loads should have failed on input_str: {input_str}")
+    # if should_success and not success:
+    #     print(f"pyyjson.loads failed on input_str: {input_str}")
+    # if not should_success and success:
+    #     print(f"pyyjson.loads should have failed on input_str: {input_str}")
     if success:
         pyyjson.dumps(decoded)
