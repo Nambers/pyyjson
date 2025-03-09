@@ -205,12 +205,12 @@ force_inline PyObject *make_string(const u8 *unicode_str, Py_ssize_t len, int ty
     }
 success:
     if (is_key) {
-#if PY_MINOR_VERSION >= 12
-        if (0 == ((PyASCIIObject *)obj)->state.statically_allocated)
-#endif
-        {
-            assert(((PyASCIIObject *)obj)->hash == -1);
-            make_hash((PyASCIIObject *)obj, unicode_str, real_len);
+        PyASCIIObject *ascii_obj = PYYJSON_STATIC_CAST(PyASCIIObject *, obj);
+        if (0 == ascii_obj->state.interned) {
+            assert(ascii_obj->hash == -1);
+            make_hash(ascii_obj, unicode_str, real_len);
+        } else {
+            assert(ascii_obj->hash != -1);
         }
     }
     return obj;
