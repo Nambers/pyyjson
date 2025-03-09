@@ -333,11 +333,11 @@ extern "C" {
    /* make all functions private */
 #  undef XXH_PUBLIC_API
 #  if defined(__GNUC__)
-#    define XXH_PUBLIC_API static __inline __attribute__((__unused__))
+#    define XXH_PUBLIC_API static __inline__ __attribute__((always_inline))
+#  elif defined(_MSC_VER)
+#    define XXH_PUBLIC_API static __forceinline
 #  elif defined (__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
 #    define XXH_PUBLIC_API static inline
-#  elif defined(_MSC_VER)
-#    define XXH_PUBLIC_API static __inline
 #  else
      /* note: this version may generate warnings for unused static functions */
 #    define XXH_PUBLIC_API static
