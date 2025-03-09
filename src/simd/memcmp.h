@@ -13,9 +13,9 @@ force_inline bool __memcmp_neq_short(u8 **x_addr, u8 **y_addr, usize *size_addr,
     return false;
 }
 
-/* Compare memory blocks smaller (or equal to) 64 bytes.
- * Return true if not equal (be compatible with memcmp().) */
-force_inline bool pyyjson_memcmp_neq_le64(u8 *x, u8 *y, usize size) {
+/* Compare memory blocks smaller than (or equal to) 64 bytes.
+ * Return non-zero if not equal (be compatible with memcmp().) */
+force_inline int pyyjson_memcmp_neq_le64(u8 *x, u8 *y, usize size) {
     assert(size <= 64);
 #if SIMD_BIT_SIZE == 512
     if (size == 64) {
@@ -23,7 +23,9 @@ force_inline bool pyyjson_memcmp_neq_le64(u8 *x, u8 *y, usize size) {
     }
 #endif
     if (__memcmp_neq_short(&x, &y, &size, 32)) return 1;
+#if SIMD_BIT_SIZE < 512
     if (__memcmp_neq_short(&x, &y, &size, 32)) return 1;
+#endif
     if (__memcmp_neq_short(&x, &y, &size, 16)) return 1;
     if (__memcmp_neq_short(&x, &y, &size, 8)) return 1;
     if (__memcmp_neq_short(&x, &y, &size, 4)) return 1;
