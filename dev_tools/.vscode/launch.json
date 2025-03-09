@@ -155,7 +155,7 @@
                 "pytest",
                 "-s",
                 "-rxX",
-                "./python-test/test_type.py"
+                "./python-test"
             ],
             "environment": [
                 {
@@ -181,7 +181,8 @@
                     "text": "-gdb-set disassembly-flavor intel",
                     "ignoreFailures": true
                 }
-            ]
+            ],
+            "preLaunchTask": "CMake: build with last config"
         },
         {
             "name": "(gdb) Launch fuzzer",

@@ -10,6 +10,7 @@
                     "executable": "nix",
                     "args": [
                         "develop",
+                        "--no-net",
                         "-c",
                         "zsh"
                     ]
@@ -33,6 +34,7 @@
                     "executable": "nix",
                     "args": [
                         "develop",
+                        "--no-net",
                         "-c",
                         "zsh"
                     ]
@@ -56,6 +58,7 @@
                     "executable": "nix",
                     "args": [
                         "develop",
+                        "--no-net",
                         "-c",
                         "zsh"
                     ]
@@ -79,6 +82,7 @@
                     "executable": "nix",
                     "args": [
                         "develop",
+                        "--no-net",
                         "-c",
                         "zsh"
                     ]
@@ -92,29 +96,6 @@
                 "isDefault": true
             },
             "detail": "Call build.sh with nix develop"
-        },
-        {
-            "label": "pre-pytest",
-            "type": "shell",
-            "command": "${workspaceFolder}/dev_tools/pre-pytest.sh",
-            "options": {
-                "shell": {
-                    "executable": "nix",
-                    "args": [
-                        "develop",
-                        "-c",
-                        "zsh"
-                    ]
-                }
-            },
-            "problemMatcher": [
-                "$gcc"
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-            "detail": "Call pre-pytest.sh with nix develop"
         },
         {
             "label": "CMake: build test.cpp",
@@ -132,10 +113,10 @@
                     "executable": "nix",
                     "args": [
                         "develop",
-                        "--command",
-                        "zsh",
-                        "-c"
-                    ],
+                        "--no-net",
+                        "-c",
+                        "zsh"
+                    ]
                 }
             },
             "problemMatcher": [
