@@ -852,7 +852,9 @@ force_inline PyObject *READ_STR(
             .src_end = _reader_end,
     };
 
-    if (unlikely(_decode_src_info.src > _decode_src_info.src_end - CHECK_COUNT_MAX)) goto read_tail;
+    const _FROM_TYPE *const last_src_batch = _decode_src_info.src_end - CHECK_COUNT_MAX;
+
+    if (unlikely(_decode_src_info.src > last_src_batch)) goto read_tail;
 #if COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_ASCII
     goto loop_1_f_f;
 #elif COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_LATIN1
@@ -882,8 +884,8 @@ loop_1_f_f:;
         // this implies max_char_type == COMPILE_UCS_LEVEL && max_char_type <= 1
         assert(_read_state.max_char_type == COMPILE_UCS_LEVEL && _read_state.max_char_type <= 1);
         // BEGIN
-        assert(_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX);
-        while (_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX) {
+        assert(_decode_src_info.src <= last_src_batch);
+        while (_decode_src_info.src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
                              &_decode_src_info,
@@ -893,7 +895,7 @@ loop_1_f_f:;
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > _decode_src_info.src_end - CHECK_COUNT_MAX)) break;
+                if (unlikely(_decode_src_info.src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
@@ -915,8 +917,8 @@ loop_1_f_t:;
         // this implies max_char_type == 0 && COMPILE_UCS_LEVEL == 1
         assert(_read_state.max_char_type == 0 && COMPILE_UCS_LEVEL == 1);
         // BEGIN
-        assert(_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX);
-        while (_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX) {
+        assert(_decode_src_info.src <= last_src_batch);
+        while (_decode_src_info.src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
                              &_decode_src_info,
@@ -926,7 +928,7 @@ loop_1_f_t:;
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > _decode_src_info.src_end - CHECK_COUNT_MAX)) break;
+                if (unlikely(_decode_src_info.src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
@@ -948,8 +950,8 @@ loop_1_t_f:;
         // this implies 1 >= max_char_type >= COMPILE_UCS_LEVEL
         assert(_read_state.max_char_type >= COMPILE_UCS_LEVEL && _read_state.max_char_type <= 1);
         // BEGIN
-        assert(_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX);
-        while (_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX) {
+        assert(_decode_src_info.src <= last_src_batch);
+        while (_decode_src_info.src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
                              &_decode_src_info,
@@ -959,7 +961,7 @@ loop_1_t_f:;
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > _decode_src_info.src_end - CHECK_COUNT_MAX)) break;
+                if (unlikely(_decode_src_info.src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
@@ -981,8 +983,8 @@ loop_1_t_t:;
         // this implies max_char_type == 0 && COMPILE_UCS_LEVEL == 1
         assert(_read_state.max_char_type == 0);
         // BEGIN
-        assert(_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX);
-        while (_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX) {
+        assert(_decode_src_info.src <= last_src_batch);
+        while (_decode_src_info.src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
                              &_decode_src_info,
@@ -992,7 +994,7 @@ loop_1_t_t:;
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > _decode_src_info.src_end - CHECK_COUNT_MAX)) break;
+                if (unlikely(_decode_src_info.src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
@@ -1014,8 +1016,8 @@ loop_2_f_f:;
         // this implies 2 == max_char_type == COMPILE_UCS_LEVEL
         assert(_read_state.max_char_type == 2 && _read_state.max_char_type <= 2);
         // BEGIN
-        assert(_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX);
-        while (_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX) {
+        assert(_decode_src_info.src <= last_src_batch);
+        while (_decode_src_info.src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
                              &_decode_src_info,
@@ -1025,7 +1027,7 @@ loop_2_f_f:;
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > _decode_src_info.src_end - CHECK_COUNT_MAX)) break;
+                if (unlikely(_decode_src_info.src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
@@ -1047,8 +1049,8 @@ loop_2_f_t:;
         // this implies max_char_type < COMPILE_UCS_LEVEL == 2
         assert(_read_state.max_char_type < COMPILE_UCS_LEVEL && COMPILE_UCS_LEVEL <= 2);
         // BEGIN
-        assert(_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX);
-        while (_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX) {
+        assert(_decode_src_info.src <= last_src_batch);
+        while (_decode_src_info.src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
                              &_decode_src_info,
@@ -1058,7 +1060,7 @@ loop_2_f_t:;
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > _decode_src_info.src_end - CHECK_COUNT_MAX)) break;
+                if (unlikely(_decode_src_info.src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
@@ -1080,8 +1082,8 @@ loop_2_t_f:;
         // this implies max_char_type == 2 >= COMPILE_UCS_LEVEL
         assert(_read_state.max_char_type >= COMPILE_UCS_LEVEL && _read_state.max_char_type == 2);
         // BEGIN
-        assert(_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX);
-        while (_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX) {
+        assert(_decode_src_info.src <= last_src_batch);
+        while (_decode_src_info.src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
                              &_decode_src_info,
@@ -1091,7 +1093,7 @@ loop_2_t_f:;
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > _decode_src_info.src_end - CHECK_COUNT_MAX)) break;
+                if (unlikely(_decode_src_info.src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
@@ -1113,8 +1115,8 @@ loop_2_t_t:;
         // this implies max_char_type < COMPILE_UCS_LEVEL == 2
         assert(_read_state.max_char_type < COMPILE_UCS_LEVEL && COMPILE_UCS_LEVEL == 2);
         // BEGIN
-        assert(_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX);
-        while (_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX) {
+        assert(_decode_src_info.src <= last_src_batch);
+        while (_decode_src_info.src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
                              &_decode_src_info,
@@ -1124,7 +1126,7 @@ loop_2_t_t:;
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > _decode_src_info.src_end - CHECK_COUNT_MAX)) break;
+                if (unlikely(_decode_src_info.src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
@@ -1146,8 +1148,8 @@ loop_4_f_f:;
         // this implies 4 == max_char_type
         assert(_read_state.max_char_type == 4);
         // BEGIN
-        assert(_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX);
-        while (_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX) {
+        assert(_decode_src_info.src <= last_src_batch);
+        while (_decode_src_info.src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
                              &_decode_src_info,
@@ -1157,7 +1159,7 @@ loop_4_f_f:;
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > _decode_src_info.src_end - CHECK_COUNT_MAX)) break;
+                if (unlikely(_decode_src_info.src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
@@ -1179,8 +1181,8 @@ loop_4_f_t:;
         // this implies max_char_type < COMPILE_UCS_LEVEL == 4
         assert(_read_state.max_char_type < 4);
         // BEGIN
-        assert(_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX);
-        while (_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX) {
+        assert(_decode_src_info.src <= last_src_batch);
+        while (_decode_src_info.src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
                              &_decode_src_info,
@@ -1190,7 +1192,7 @@ loop_4_f_t:;
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > _decode_src_info.src_end - CHECK_COUNT_MAX)) break;
+                if (unlikely(_decode_src_info.src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
@@ -1212,8 +1214,8 @@ loop_4_t_f:;
         // also, **won't goto other labels from here**
         assert(_read_state.max_char_type >= COMPILE_UCS_LEVEL && _read_state.max_char_type == 4);
         // BEGIN
-        assert(_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX);
-        while (_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX) {
+        assert(_decode_src_info.src <= last_src_batch);
+        while (_decode_src_info.src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
                              &_decode_src_info,
@@ -1221,7 +1223,7 @@ loop_4_t_f:;
                              4, true, false);
             if (_read_state.scan_flag == StrEnd) goto done;
             if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-            if (unlikely(_decode_src_info.src > _decode_src_info.src_end - CHECK_COUNT_MAX)) break;
+            if (unlikely(_decode_src_info.src > last_src_batch)) break;
         }
         goto read_tail;
         // END
@@ -1236,8 +1238,8 @@ loop_4_t_t:;
         // this implies max_char_type < COMPILE_UCS_LEVEL == 4
         assert(_read_state.max_char_type < 4);
         // BEGIN
-        assert(_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX);
-        while (_decode_src_info.src <= _decode_src_info.src_end - CHECK_COUNT_MAX) {
+        assert(_decode_src_info.src <= last_src_batch);
+        while (_decode_src_info.src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
                              &_decode_src_info,
@@ -1247,7 +1249,7 @@ loop_4_t_t:;
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > _decode_src_info.src_end - CHECK_COUNT_MAX)) break;
+                if (unlikely(_decode_src_info.src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
