@@ -2,6 +2,7 @@
 #include "decode.h"
 
 #include "pyyjson.h"
+#include "simd/memcmp.h"
 #include "simd/memcpy.h"
 #include "tls.h"
 #include "xxhash.h"
@@ -138,7 +139,12 @@ force_inline PyObject *get_key_cache(const u8 *unicode_str, pyyjson_hash_t hash,
     assert(real_len <= 64);
     pyyjson_cache_type cache = AssociativeKeyCache[REHASHER(hash)];
     if (!cache) return NULL;
-    if (likely(((real_len == PyUnicode_GET_LENGTH(cache) * PyUnicode_KIND(cache))) && (memcmp(PyUnicode_DATA(cache), unicode_str, real_len) == 0))) {
+    PyASCIIObject *cache_ascii = PYYJSON_CAST(PyASCIIObject *, cache);
+    Py_ssize_t cache_length = cache_ascii->length;
+    Py_ssize_t kind = cache_ascii->state.kind;
+    bool is_ascii = cache_ascii->state.ascii;
+    Py_ssize_t offset = is_ascii ? sizeof(PyASCIIObject) : sizeof(PyCompactUnicodeObject);
+    if (likely(((real_len == cache_length * kind)) && (pyyjson_memcmp_neq_le64(PYYJSON_CAST(u8 *, unicode_str), PYYJSON_CAST(u8 *, cache) + offset, real_len) == 0))) {
         PYYJSON_TRACE_CACHE_HIT();
         return cache;
     }
@@ -159,26 +165,31 @@ force_inline PyObject *make_string(const u8 *unicode_str, Py_ssize_t len, int ty
     Py_UCS4 max_char;
     size_t real_len;
     XXH64_hash_t hash;
+    Py_ssize_t offset;
 
     switch (type_flag) {
         case PYYJSON_STRING_TYPE_ASCII: {
             max_char = 0x7f;
             real_len = len;
+            offset = sizeof(PyASCIIObject);
             break;
         }
         case PYYJSON_STRING_TYPE_LATIN1: {
             max_char = 0xff;
             real_len = len;
+            offset = sizeof(PyCompactUnicodeObject);
             break;
         }
         case PYYJSON_STRING_TYPE_UCS2: {
             max_char = 0xffff;
             real_len = len * 2;
+            offset = sizeof(PyCompactUnicodeObject);
             break;
         }
         case PYYJSON_STRING_TYPE_UCS4: {
             max_char = 0x10ffff;
             real_len = len * 4;
+            offset = sizeof(PyCompactUnicodeObject);
             break;
         }
         default:
@@ -199,7 +210,7 @@ force_inline PyObject *make_string(const u8 *unicode_str, Py_ssize_t len, int ty
 
     obj = PyUnicode_New(len, max_char);
     if (obj == NULL) return NULL;
-    pyyjson_memcpy(PyUnicode_DATA(obj), unicode_str, real_len);
+    pyyjson_memcpy(PYYJSON_CAST(u8 *, obj) + offset, unicode_str, real_len);
     if (should_cache) {
         add_key_cache(hash, obj);
     }
