@@ -37,4 +37,5 @@ jobs:
       - name: Run Tests
         id: tests
         run: |
-          python dev_tools\automated_test.py --ignore bench
+          python -m pip install pytest
+          python dev_tools\automated_test.py

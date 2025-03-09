@@ -35,4 +35,4 @@ jobs:
         nix develop -c python ./dev_tools/automated_test.py --build-only --pyver ${{ matrix.pyver }} --build-type Release
     - name: Build and Run Tests
       run: |
-        nix develop -c python ./dev_tools/automated_test.py --pyver ${{ matrix.pyver }} --ignore bench
+        nix develop -c python ./dev_tools/automated_test.py  --build-type Debug --pyver ${{ matrix.pyver }}
