@@ -13,5 +13,5 @@ cmake --build $BUILD_DIR -- -j $(nproc)
 
 export PYTHONPATH=$(pwd)/$BUILD_DIR
 if [ -z ${SKIP_TEST+x} ]; then
-    exec $Python3_EXECUTABLE -m pytest python-test
+    exec $Python3_EXECUTABLE -m pytest --random-order python-test
 fi

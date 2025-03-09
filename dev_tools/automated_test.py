@@ -73,7 +73,7 @@ def run_test(args):
 
     if sys.platform in ["linux", "darwin"]:
         # use nix
-        test_entrance = os.path.join(CUR_DIR, "asan_check.sh" if args.asan else "autobuild.sh")
+        test_entrance = os.path.join(CUR_DIR, "asan_check.sh" if args.asan else "autotest.sh")
         envs = os.environ.copy()
         envs.update({
             "BUILD_PY_VER": str(args.pyver),
