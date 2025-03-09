@@ -13,7 +13,11 @@ let
   pyenvs = drvs.pyenvs;
   pyenv = builtins.elemAt pyenvs (curVer - leastVer);
 in
-pkgs.mkShell {
+(pkgs.mkShell {
   packages = pkgs.callPackage ./packages.nix { };
   hardeningDisable = [ "fortify" ];
+
+})
+// {
+  __drvs = drvs;
 }

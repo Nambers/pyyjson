@@ -15,11 +15,19 @@ let
           self = x;
           packageOverrides = (
             self: super:
-            #lib.optionalAttrs (py.isPy313 or false) 
             {
               orjson = pkgs.callPackage ./orjson_fixed.nix { inherit super; };
-              pytest-benchmark = pkgs.callPackage ./pytest-benchmark-fixed.nix {inherit super;};
+              pytest-benchmark = pkgs.callPackage ./pytest-benchmark-fixed.nix { inherit super; };
             }
+            // (lib.optionalAttrs (py.pythonVersion == "3.14") {
+              pytest-random-order =
+                (super.pytest-random-order.override {
+                  pytest-xdist = null;
+                }).overrideAttrs
+                  {
+                    pytestCheckPhase = ":";
+                  };
+            })
           );
         }
       );
