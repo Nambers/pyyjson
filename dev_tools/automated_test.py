@@ -17,8 +17,9 @@ class MockArgs(dict):
 
 
 def run_all_versions_test(args) -> int:
-    with open("./dev_tools/supported_versions.json", "rb") as f:
-        vers: list[int] = json.loads(f.read())
+    with open("./dev_tools/pyver.json", "rb") as f:
+        _o = json.load(f)
+        vers = list(range(_o["minSupportVer"], _o["maxSupportVer"] + 1))
     exec_command_str = f"""
 import importlib.util
 spec = importlib.util.spec_from_file_location("autotest", "{CUR_FILE}")
@@ -26,7 +27,6 @@ mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 args = mod.MockArgs()
 args.build_type = "{args.build_type}"
-args.ignore = {args.ignore or []}
 args.build_only = {bool(args.build_only)}
 args.asan = {bool(args.asan)}
 args.pyver = $TO_INSERT
@@ -65,14 +65,8 @@ mod.run_test(args)
 
 
 def run_test(args):
-    if args.ignore and args.build_only:
-        print("Ignore test names only works when not building only.")
-        return 1
-    # if args.asan and args.build_only:
-    #     print("ASAN check only works when not building only.")
-    #     return 1
     if args.asan:
-        print("NOTE: use asan check will suppress `ignore` and `build-type` options.")
+        print("NOTE: use asan check will suppress `build-type` option.")
 
     if args.all_ver:
         return run_all_versions_test(args)
@@ -88,8 +82,6 @@ def run_test(args):
         if not args.asan:
             build_type = args.build_type
             envs["TARGET_BUILD_TYPE"] = build_type
-            if args.ignore:
-                envs["IGNORES"] = " ".join(args.ignore)
         if args.build_only:
             envs["SKIP_TEST"] = "1"
         if "IN_NIX_SHELL" in os.environ:
@@ -114,10 +106,9 @@ def run_test(args):
         subprocess.run(["cmake", "--build", "build", "--config", args.build_type], check=True, env=new_env)
         if args.build_only:
             return 0
+        # run test
         exe_base_name = os.path.basename(sys.executable)
-        cmd = [exe_base_name, "test/all_test.py"]
-        if args.ignore:
-            cmd += ["--ignore"] + args.ignore
+        cmd = [exe_base_name, "-m", "pytest", "python-test"]
         target_file = f"build/{args.build_type}/pyyjson.dll"
         os.rename(target_file, "build/pyyjson.pyd")
         new_env["PYTHONPATH"] = os.path.join(os.curdir, "build")
@@ -131,7 +122,6 @@ def main():
     parser.add_argument("--build-type", help="CMake Build type", default="Debug")
     parser.add_argument("--pyver", help="Specify Python version, default to 13", default="13")
     parser.add_argument("--all-ver", help="Test with all versions", action="store_true")
-    parser.add_argument("--ignore", help="Ignore test names", nargs="+", default=[])
     parser.add_argument("--build-only", help="Build without running tests", action="store_true")
     parser.add_argument("--asan", help="Run asan check", action="store_true")
 

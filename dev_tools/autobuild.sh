@@ -13,9 +13,5 @@ cmake --build $BUILD_DIR -- -j $(nproc)
 
 export PYTHONPATH=$(pwd)/$BUILD_DIR
 if [ -z ${SKIP_TEST+x} ]; then
-    if [ -z ${IGNORES+x} ]; then
-        exec $Python3_EXECUTABLE test/all_test.py
-    else
-        exec $Python3_EXECUTABLE test/all_test.py --ignore $IGNORES
-    fi
+    exec $Python3_EXECUTABLE -m pytest python-test
 fi
