@@ -147,7 +147,7 @@ force_inline PyObject *get_key_cache(const u8 *unicode_str, pyyjson_hash_t hash,
 
 force_inline void make_hash(PyASCIIObject *ascii, const u8 *unicode_str, size_t real_len) {
 #if PY_MINOR_VERSION >= 14
-    ascii->hash = PyUnicode_Type.tp_hash(PYYJSON_STATIC_CAST(PyObject *, ascii));
+    ascii->hash = PyUnicode_Type.tp_hash(PYYJSON_CAST(PyObject *, ascii));
 #else
     ascii->hash = _Py_HashBytes(unicode_str, real_len);
 #endif
@@ -205,7 +205,7 @@ force_inline PyObject *make_string(const u8 *unicode_str, Py_ssize_t len, int ty
     }
 success:
     if (is_key) {
-        PyASCIIObject *ascii_obj = PYYJSON_STATIC_CAST(PyASCIIObject *, obj);
+        PyASCIIObject *ascii_obj = PYYJSON_CAST(PyASCIIObject *, obj);
         if (0 == ascii_obj->state.interned) {
             assert(ascii_obj->hash == -1);
             make_hash(ascii_obj, unicode_str, real_len);
@@ -627,8 +627,8 @@ PyObject *SIMD_NAME_MODIFIER(pyyjson_Decode)(PyObject *self, PyObject *args, PyO
     }
 
     if (PyUnicode_Check(obj)) {
-        PyASCIIObject *ascii_head = PYYJSON_STATIC_CAST(PyASCIIObject *, obj);
-        PyUnicodeObject *in_unicode = PYYJSON_STATIC_CAST(PyUnicodeObject *, obj);
+        PyASCIIObject *ascii_head = PYYJSON_CAST(PyASCIIObject *, obj);
+        PyUnicodeObject *in_unicode = PYYJSON_CAST(PyUnicodeObject *, obj);
         int kind = ascii_head->state.ascii ? 0 : ascii_head->state.kind;
         switch (kind) {
             case PYYJSON_STRING_TYPE_ASCII: {

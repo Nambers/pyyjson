@@ -1507,16 +1507,16 @@ force_inline bool SHOULD_READ_PRETTY(const _FROM_TYPE *buffer, const _FROM_TYPE 
 static force_noinline PyObject *PYYJSON_DECODE_STR(PyUnicodeObject *in_unicode) {
     // some checks
     assert(in_unicode);
-    PyASCIIObject *ascii_head = PYYJSON_STATIC_CAST(PyASCIIObject *, in_unicode);
+    PyASCIIObject *ascii_head = PYYJSON_CAST(PyASCIIObject *, in_unicode);
     assert((ascii_head->state.ascii ? 0 : ascii_head->state.kind) == COMPILE_UCS_LEVEL);
     if (unlikely(!ascii_head->length)) {
         PyErr_Format(JSONDecodeError, "input data is empty");
         return NULL;
     }
 #if COMPILE_UCS_LEVEL > 0
-    const _FROM_TYPE *buffer = PYYJSON_STATIC_CAST(_FROM_TYPE *, PYYJSON_STATIC_CAST(PyCompactUnicodeObject *, in_unicode) + 1);
+    const _FROM_TYPE *buffer = PYYJSON_CAST(_FROM_TYPE *, PYYJSON_CAST(PyCompactUnicodeObject *, in_unicode) + 1);
 #else
-    const _FROM_TYPE *buffer = PYYJSON_STATIC_CAST(_FROM_TYPE *, ascii_head + 1);
+    const _FROM_TYPE *buffer = PYYJSON_CAST(_FROM_TYPE *, ascii_head + 1);
 #endif
     assert(buffer);
     assert(ascii_head->length > 0);

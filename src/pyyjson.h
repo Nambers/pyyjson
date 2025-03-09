@@ -189,7 +189,7 @@
 #define REPEAT_32(x) REPEAT_16(x) REPEAT_16(x)
 #define REPEAT_64(x) REPEAT_32(x) REPEAT_32(x)
 
-#define PYYJSON_STATIC_CAST(type, expr) ((type)(expr))
+#define PYYJSON_CAST(type, expr) ((type)(expr))
 
 /*==============================================================================
  * Macros
