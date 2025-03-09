@@ -236,7 +236,6 @@ obj_key_begin:
     if (likely(*cur == '"')) {
         cur++;
         PyObject *str_obj = READ_STR(&cur, end, string_buffer_head, true);
-        ;
         if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
             goto obj_key_end;
         }
@@ -285,7 +284,6 @@ obj_val_begin:
     if (*cur == '"') {
         cur++;
         PyObject *str_obj = READ_STR(&cur, end, string_buffer_head, false);
-        ;
         if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
