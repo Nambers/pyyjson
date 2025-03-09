@@ -32,6 +32,6 @@ bool _pyyjson_decode_obj_stack_resize(DecodeObjStackInfo *restrict decode_obj_st
     return true;
 }
 
-thread_local u8 pyyjson_string_buffer[PYYJSON_STRING_BUFFER_SIZE];
+thread_local pyyjson_align(64) u8 pyyjson_string_buffer[PYYJSON_STRING_BUFFER_SIZE];
 pyyjson_cache_type AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
 pyyjson_align(64) u8 pyyjson_bytes_temp_buffer[PYYJSON_STRING_BUFFER_SIZE];
