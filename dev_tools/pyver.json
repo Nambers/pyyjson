@@ -1,5 +1,6 @@
 {
-    "curVer": 13,
+    "curVer": 9,
     "minSupportVer": 9,
-    "maxSupportVer": 14
+    "maxSupportVer": 14,
+    "latestStableVer": 13
 }

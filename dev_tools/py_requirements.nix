@@ -97,4 +97,4 @@ with pypkgs;
   )
 ])
 # benchmark is only needed for python3.13
-++ (with pypkgs; (lib.optionals (minorVer == pythonVerConfig.curVer) [ pytest-benchmark ]))
+++ (with pypkgs; (lib.optionals (minorVer == pythonVerConfig.latestStableVer) [ pytest-benchmark ]))
