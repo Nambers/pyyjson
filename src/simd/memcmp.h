@@ -22,10 +22,15 @@ force_inline int pyyjson_memcmp_neq_le64(u8 *x, u8 *y, usize size) {
         return memcmp(x, y, 64) ? 1 : 0;
     }
 #endif
-    if (__memcmp_neq_short(&x, &y, &size, 32)) return 1;
+    if (size >= 32) {
+        if (memcmp(x, y, 32)) return 1;
+        x -= 32;
+        y -= 32;
 #if SIMD_BIT_SIZE < 512
-    if (__memcmp_neq_short(&x, &y, &size, 32)) return 1;
+        if (size == 64) return memcmp(x, y, 32) ? 1 : 0;
 #endif
+        size -= 32;
+    }
     if (__memcmp_neq_short(&x, &y, &size, 16)) return 1;
     if (__memcmp_neq_short(&x, &y, &size, 8)) return 1;
     if (__memcmp_neq_short(&x, &y, &size, 4)) return 1;
