@@ -48,6 +48,6 @@ force_inline void fill_random_buffer(void *_buffer, usize length) {
 
 /* Tests. */
 
-DECLARE_TEST(test_elevate_1_2_to_128);
-DECLARE_TEST(test_elevate_1_4_to_128);
-DECLARE_TEST(test_elevate_2_4_to_128);
+DECLARE_TEST(test_elevate_1_2_to_128)
+DECLARE_TEST(test_elevate_1_4_to_128)
+DECLARE_TEST(test_elevate_2_4_to_128)
