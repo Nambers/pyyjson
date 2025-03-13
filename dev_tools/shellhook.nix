@@ -77,7 +77,7 @@ in
 
   if [ "$_SHOULD_CREATE_PYENV" = "false" ]; then
     echo "Not creating pyenv because not in the root directory"
-    return
+    exit 0
   fi
 
   # ensure the nix-pyenv directory exists
