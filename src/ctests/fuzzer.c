@@ -1,8 +1,6 @@
 
 #include "test_common.h"
 
-#define COUNT_OF(x) ((sizeof(x) / sizeof(0 [x])) / ((size_t)(!(sizeof(x) % sizeof(0 [x])))))
-
 typedef struct TestArgSettings {
     int valid;
     PyObject *args[16];

@@ -131,6 +131,10 @@ set(SRC_TEST
     src/ctests/main.c
 )
 
+set(SRC_TEST_WITH_SIMD
+    src/ctests/test.c
+)
+
 set(SRC_FUZZER
     src/ctests/fuzzer.c
 )
@@ -269,7 +273,29 @@ install(TARGETS pyyjson LIBRARY DESTINATION .)
 
 if(BUILD_TEST)
     include(CTest)
-    add_executable(pyyjson_test ${SRC_TEST})
+
+    if(BUILD_SHIPPING_SIMD)
+        add_library(pyyjson_test_sse2 OBJECT ${SRC_TEST_WITH_SIMD})
+        target_link_libraries(pyyjson_test_sse2 PUBLIC commonBuild)
+        add_library(pyyjson_test_avx2 OBJECT ${SRC_TEST_WITH_SIMD})
+        target_link_libraries(pyyjson_test_avx2 PUBLIC commonBuild)
+        add_library(pyyjson_test_avx512 OBJECT ${SRC_TEST_WITH_SIMD})
+        target_link_libraries(pyyjson_test_avx512 PUBLIC commonBuild)
+
+        if(MSVC)
+            # MSVC does not support precise SIMD feature settings like /arch:SSE4.2, /arch:AVX512F
+            target_compile_options(pyyjson_test_avx512 PRIVATE /arch:AVX512)
+            target_compile_options(pyyjson_test_avx2 PRIVATE /arch:AVX2)
+        else()
+            target_compile_options(pyyjson_test_avx512 PRIVATE -mavx512f -mavx512bw)
+            target_compile_options(pyyjson_test_avx2 PRIVATE -mavx2)
+        endif()
+
+        add_executable(pyyjson_test ${SRC_TEST} $<TARGET_OBJECTS:pyyjson_test_avx512> $<TARGET_OBJECTS:pyyjson_test_avx2> $<TARGET_OBJECTS:pyyjson_test_sse2>)
+    else()
+        add_executable(pyyjson_test ${SRC_TEST} ${SRC_TEST_WITH_SIMD})
+    endif()
+
     target_link_libraries(pyyjson_test PUBLIC commonBuild)
     target_link_libraries(pyyjson_test PUBLIC Python3::Python)
     install(TARGETS pyyjson_test RUNTIME DESTINATION .)

@@ -27,7 +27,6 @@ fail:;
 
 // returns a new reference
 force_inline PyObject *import_pyyjson(void) {
-
     PyObject *pModule = PyImport_ImportModule("pyyjson");
     return pModule;
 }

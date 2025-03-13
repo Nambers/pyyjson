@@ -202,6 +202,8 @@
 // #define repeat8(x)  { x x x x x x x x }
 #define REPEAT_CALL_16(x) {x x x x x x x x x x x x x x x x}
 
+#define COUNT_OF(x) ((sizeof(x) / sizeof(0 [x])) / ((size_t)(!(sizeof(x) % sizeof(0 [x])))))
+
 // #define repeat2_incr(x)   { x(0)  x(1) }
 // #define repeat4_incr(x)   { x(0)  x(1)  x(2)  x(3) }
 // #define repeat8_incr(x)   { x(0)  x(1)  x(2)  x(3)  x(4)  x(5)  x(6)  x(7)  }
