@@ -115,6 +115,10 @@ in
       chmod -R 700 ${debugSourceDir}/orjson
   fi
 
+  # sde wrapper script
+  echo "PYTHONPATH=\$(pwd)/build sde64 -clx -- \"\$@\";" > ${nix_pyenv_directory}/bin/run-sde
+  chmod +x ${nix_pyenv_directory}/bin/run-sde
+
   # save env for external use
   echo "PATH=$PATH" > ${nix_pyenv_directory}/.shell-env
   echo "CC=$CC" >> ${nix_pyenv_directory}/.shell-env
