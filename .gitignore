@@ -7,6 +7,8 @@
 /.direnv
 /dev_tools/.vscode/settings.json
 /build-*
+/test.c
+/*.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
