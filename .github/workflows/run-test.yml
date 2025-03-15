@@ -43,15 +43,15 @@ jobs:
         echo $result
         echo "result=$result" >> $GITHUB_OUTPUT
     - name: Run Python Tests (SDE, AVX512)
-      if: steps.print_features.outputs.result != "AVX512"
+      if: steps.print_features.outputs.result != 'AVX512'
       run: |
         PYTHONPATH=$(pwd)/build-py3.${{ matrix.pyver }} .nix-pyenv/bin/run-sde-clx .nix-pyenv/bin/python3.${{ matrix.pyver }} -m pytest --random-order python-test
     - name: Run Python Tests (SDE, AVX2)
-      if: steps.print_features.outputs.result != "AVX2"
+      if: steps.print_features.outputs.result != 'AVX2'
       run: |
         PYTHONPATH=$(pwd)/build-py3.${{ matrix.pyver }} .nix-pyenv/bin/run-sde-rpl .nix-pyenv/bin/python3.${{ matrix.pyver }} -m pytest --random-order python-test
     - name: Run Python Tests (SDE, SSE2)
-      if: steps.print_features.outputs.result != "SSE2"
+      if: steps.print_features.outputs.result != 'SSE2'
       run: |
         PYTHONPATH=$(pwd)/build-py3.${{ matrix.pyver }} .nix-pyenv/bin/run-sde-ivb .nix-pyenv/bin/python3.${{ matrix.pyver }} -m pytest --random-order python-test
     - name: Run C Tests (SDE, ALL)
