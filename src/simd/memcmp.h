@@ -24,8 +24,8 @@ force_inline int pyyjson_memcmp_neq_le64(u8 *x, u8 *y, usize size) {
 #endif
     if (size >= 32) {
         if (memcmp(x, y, 32)) return 1;
-        x -= 32;
-        y -= 32;
+        x += 32;
+        y += 32;
 #if SIMD_BIT_SIZE < 512
         if (size == 64) return memcmp(x, y, 32) ? 1 : 0;
 #endif
