@@ -173,7 +173,6 @@ PyCFunctionWithKeywords _pyyjson_encode_interface = NULL;
 PyCFunctionWithKeywords _pyyjson_decode_interface = NULL;
 
 X86SIMDFeatureLevel get_simd_feature(void) {
-    // return X86SIMDFeatureLevelSSE2;
     int info[4];
     cpuid_count(info, 7);
     int ebx = info[1];

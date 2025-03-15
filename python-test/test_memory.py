@@ -4,7 +4,11 @@ import dataclasses
 import datetime
 import gc
 import random
+import sys
 from typing import List
+
+import pytest
+import pyyjson
 
 try:
     import pytz
@@ -15,9 +19,6 @@ try:
     import psutil
 except ImportError:
     psutil = None  # type: ignore
-import pytest
-
-import pyyjson
 
 try:
     import numpy
@@ -28,6 +29,22 @@ try:
     import pandas
 except ImportError:
     pandas = None  # type: ignore
+
+
+def is_libasan_loaded():
+    if sys.platform != "linux":
+        return False
+    try:
+        with open("/proc/self/maps", "r") as maps_file:
+            for line in maps_file:
+                if "libasan.so" in line:
+                    return True
+    except Exception:
+        pass
+    return False
+
+
+asan_loaded = is_libasan_loaded()
 
 FIXTURE = '{"a":[81891289, 8919812.190129012], "b": false, "c": null, "d": "東京"}'
 
@@ -61,7 +78,10 @@ DATACLASS_FIXTURE = [
     for i in range(100000, 101000)
 ]
 
-MAX_INCREASE = 4194304  # 4MiB
+# For the case `sde64 -ivb` checks, the memory allocation strategy is different, which uses more memory.
+# For asan check, the memory will not be released and rss increases over time.
+# For other cases, 4MiB is enough.
+MAX_INCREASE = 1024 * 1024 * 6  # 6MiB.
 
 
 class Unsupported:
@@ -70,6 +90,7 @@ class Unsupported:
 
 class TestMemory:
     @pytest.mark.skipif(psutil is None, reason="psutil not installed")
+    @pytest.mark.skipif(asan_loaded, reason="libasan loaded")
     def test_memory_loads(self):
         """
         loads() memory leak
@@ -83,7 +104,8 @@ class TestMemory:
             val = pyyjson.loads(FIXTURE)
             assert val
         gc.collect()
-        assert proc.memory_info().rss <= mem + MAX_INCREASE
+        leak = proc.memory_info().rss - mem
+        assert leak <= MAX_INCREASE
 
     # @pytest.mark.skipif(psutil is None, reason="psutil not installed")
     # def test_memory_loads_memoryview(self):
@@ -100,9 +122,10 @@ class TestMemory:
     #         val = pyyjson.loads(memoryview(fixture))
     #         assert val
     #     gc.collect()
-    #     assert proc.memory_info().rss <= mem + MAX_INCREASE
+    #     assert proc.memory_info().rss - mem <= + MAX_INCREASE
 
     @pytest.mark.skipif(psutil is None, reason="psutil not installed")
+    @pytest.mark.skipif(asan_loaded, reason="libasan loaded")
     def test_memory_dumps(self):
         """
         dumps() memory leak
@@ -117,10 +140,10 @@ class TestMemory:
             val = pyyjson.dumps(fixture)
             assert val
         gc.collect()
-        assert proc.memory_info().rss <= mem + MAX_INCREASE
-        assert proc.memory_info().rss <= mem + MAX_INCREASE
+        assert proc.memory_info().rss - mem <= MAX_INCREASE
 
     @pytest.mark.skipif(psutil is None, reason="psutil not installed")
+    @pytest.mark.skipif(asan_loaded, reason="libasan loaded")
     def test_memory_loads_exc(self):
         """
         loads() memory leak exception without a GC pause
@@ -136,10 +159,11 @@ class TestMemory:
             except pyyjson.JSONDecodeError:
                 i += 1
         assert n == i
-        assert proc.memory_info().rss <= mem + MAX_INCREASE
+        assert proc.memory_info().rss - mem <= MAX_INCREASE
         gc.enable()
 
     @pytest.mark.skipif(psutil is None, reason="psutil not installed")
+    @pytest.mark.skipif(asan_loaded, reason="libasan loaded")
     def test_memory_dumps_exc(self):
         """
         dumps() memory leak exception without a GC pause
@@ -156,7 +180,7 @@ class TestMemory:
             except pyyjson.JSONEncodeError:
                 i += 1
         assert n == i
-        assert proc.memory_info().rss <= mem + MAX_INCREASE
+        assert proc.memory_info().rss - mem <= MAX_INCREASE
         gc.enable()
 
     # @pytest.mark.skipif(psutil is None, reason="psutil not installed")
@@ -182,54 +206,17 @@ class TestMemory:
     #         val = pyyjson.dumps(fixture, default=default)
     #         assert val
     #     gc.collect()
-    #     assert proc.memory_info().rss <= mem + MAX_INCREASE
-
-    # @pytest.mark.skipif(psutil is None, reason="psutil not installed")
-    # def test_memory_dumps_dataclass(self):
-    #     """
-    #     dumps() dataclass memory leak
-    #     """
-    #     proc = psutil.Process()
-    #     gc.collect()
-    #     val = pyyjson.dumps(DATACLASS_FIXTURE)
-    #     assert val
-    #     mem = proc.memory_info().rss
-    #     for _ in range(100):
-    #         val = pyyjson.dumps(DATACLASS_FIXTURE)
-    #         assert val
-    #     assert val
-    #     gc.collect()
-    #     assert proc.memory_info().rss <= mem + MAX_INCREASE
-
-    # @pytest.mark.skipif(
-    #     psutil is None or pytz is None,
-    #     reason="psutil not installed",
-    # )
-    # def test_memory_dumps_pytz_tzinfo(self):
-    #     """
-    #     dumps() pytz tzinfo memory leak
-    #     """
-    #     proc = psutil.Process()
-    #     gc.collect()
-    #     dt = datetime.datetime.now()
-    #     val = pyyjson.dumps(pytz.UTC.localize(dt))
-    #     assert val
-    #     mem = proc.memory_info().rss
-    #     for _ in range(50000):
-    #         val = pyyjson.dumps(pytz.UTC.localize(dt))
-    #         assert val
-    #     assert val
-    #     gc.collect()
-    #     assert proc.memory_info().rss <= mem + MAX_INCREASE
+    #     assert proc.memory_info().rss - mem <= MAX_INCREASE
 
     @pytest.mark.skipif(psutil is None, reason="psutil not installed")
+    @pytest.mark.skipif(asan_loaded, reason="libasan loaded")
     def test_memory_loads_keys(self):
         """
         loads() memory leak with number of keys causing cache eviction
         """
         proc = psutil.Process()
         gc.collect()
-        fixture = {"key_%s" % idx: "value" for idx in range(1024)}
+        fixture = {f"key_{idx}": "value" for idx in range(1024)}
         assert len(fixture) == 1024
         val = pyyjson.dumps(fixture)
         loaded = pyyjson.loads(val)
@@ -239,56 +226,4 @@ class TestMemory:
             loaded = pyyjson.loads(val)
             assert loaded
         gc.collect()
-        assert proc.memory_info().rss <= mem + MAX_INCREASE
-
-    # @pytest.mark.skipif(psutil is None, reason="psutil not installed")
-    # @pytest.mark.skipif(numpy is None, reason="numpy is not installed")
-    # def test_memory_dumps_numpy(self):
-    #     """
-    #     dumps() numpy memory leak
-    #     """
-    #     proc = psutil.Process()
-    #     gc.collect()
-    #     fixture = numpy.random.rand(4, 4, 4)
-    #     val = pyyjson.dumps(fixture, option=pyyjson.OPT_SERIALIZE_NUMPY)
-    #     assert val
-    #     mem = proc.memory_info().rss
-    #     for _ in range(100):
-    #         val = pyyjson.dumps(fixture, option=pyyjson.OPT_SERIALIZE_NUMPY)
-    #         assert val
-    #     assert val
-    #     gc.collect()
-    #     assert proc.memory_info().rss <= mem + MAX_INCREASE
-
-    # @pytest.mark.skipif(psutil is None, reason="psutil not installed")
-    # @pytest.mark.skipif(pandas is None, reason="pandas is not installed")
-    # def test_memory_dumps_pandas(self):
-    #     """
-    #     dumps() pandas memory leak
-    #     """
-    #     proc = psutil.Process()
-    #     gc.collect()
-    #     numpy.random.rand(4, 4, 4)
-    #     df = pandas.Series(numpy.random.rand(4, 4, 4).tolist())
-    #     val = df.map(pyyjson.dumps)
-    #     assert not val.empty
-    #     mem = proc.memory_info().rss
-    #     for _ in range(100):
-    #         val = df.map(pyyjson.dumps)
-    #         assert not val.empty
-    #     gc.collect()
-    #     assert proc.memory_info().rss <= mem + MAX_INCREASE
-
-    # @pytest.mark.skipif(psutil is None, reason="psutil not installed")
-    # def test_memory_dumps_fragment(self):
-    #     """
-    #     dumps() Fragment memory leak
-    #     """
-    #     proc = psutil.Process()
-    #     gc.collect()
-    #     pyyjson.dumps(pyyjson.Fragment(str(0)))
-    #     mem = proc.memory_info().rss
-    #     for i in range(10000):
-    #         pyyjson.dumps(pyyjson.Fragment(str(i)))
-    #     gc.collect()
-    #     assert proc.memory_info().rss <= mem + MAX_INCREASE
+        assert proc.memory_info().rss - mem <= MAX_INCREASE
