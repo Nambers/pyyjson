@@ -30,16 +30,71 @@ try:
 except ImportError:
     pandas = None  # type: ignore
 
-
 def is_libasan_loaded():
-    if sys.platform != "linux":
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            from ctypes import wintypes
+            # load needed DLL
+            psapi = ctypes.WinDLL("Psapi.dll")
+            kernel32 = ctypes.WinDLL("kernel32.dll")
+
+            # get handle of current process
+            GetCurrentProcess = kernel32.GetCurrentProcess
+            GetCurrentProcess.restype = wintypes.HANDLE
+            hProcess = GetCurrentProcess()
+
+            # setup param and return type for EnumProcessModules
+            EnumProcessModules = psapi.EnumProcessModules
+            EnumProcessModules.restype = wintypes.BOOL
+            EnumProcessModules.argtypes = [
+                wintypes.HANDLE,                  # hProcess
+                ctypes.POINTER(wintypes.HMODULE), # lphModule
+                wintypes.DWORD,                   # cb
+                ctypes.POINTER(wintypes.DWORD)    # lpcbNeeded
+            ]
+
+            # setup param and return type for GetModuleFileNameExA
+            GetModuleFileNameExA = psapi.GetModuleFileNameExA
+            GetModuleFileNameExA.restype = wintypes.DWORD
+            GetModuleFileNameExA.argtypes = [
+                wintypes.HANDLE,  # hProcess
+                wintypes.HMODULE, # hModule
+                wintypes.LPSTR,   # lpFilename
+                wintypes.DWORD    # nSize
+            ]
+
+            # Allocate array for module handles
+            MAX_MODULES = 1024
+            module_array = (wintypes.HMODULE * MAX_MODULES)()
+            cb = ctypes.sizeof(module_array)
+            needed = wintypes.DWORD()
+
+            if not EnumProcessModules(hProcess, module_array, cb, ctypes.byref(needed)):
+                print("Fail to call EnumProcessModules.")
+                return False
+
+            module_count = needed.value // ctypes.sizeof(wintypes.HMODULE)
+
+            # Iterate all loaded modules
+            for i in range(module_count):
+                hModule = module_array[i]
+                buffer_len = 260
+                module_filename = ctypes.create_string_buffer(buffer_len)
+                if GetModuleFileNameExA(hProcess, hModule, module_filename, buffer_len):
+                    # Convert to Python string (ignore encoding error)
+                    path_str = module_filename.value.decode('utf-8', errors='ignore').lower()
+                    if "asan" in path_str:
+                        return True
+        except Exception:  # pylint: disable=broad-except
+            pass
         return False
     try:
         with open("/proc/self/maps", "r") as maps_file:
             for line in maps_file:
                 if "libasan.so" in line:
                     return True
-    except Exception:
+    except Exception:  # pylint: disable=broad-except
         pass
     return False
 

@@ -102,16 +102,25 @@ def run_test(args):
         if os.path.exists("build"):
             shutil.rmtree("build")
         os.makedirs("build")
-        subprocess.run(["cmake", "-S", ".", "-B", "build", "-DCMAKE_BUILD_TYPE=" + args.build_type], check=True, env=new_env)
-        subprocess.run(["cmake", "--build", "build", "--config", args.build_type], check=True, env=new_env)
+        if args.asan:
+            build_type = "Debug"
+        else:
+            build_type = args.build_type
+        configure_cmd = ["cmake", "-S", ".", "-B", "build", "-DCMAKE_BUILD_TYPE=" + build_type]
+        if args.asan:
+            configure_cmd += ["-DASAN_ENABLED=ON"]
+        subprocess.run(configure_cmd, check=True, env=new_env)
+        subprocess.run(["cmake", "--build", "build", "--config", build_type], check=True, env=new_env)
+        target_file = f"build/{build_type}/pyyjson.dll"
+        os.rename(target_file, "build/pyyjson.pyd")
+        if args.asan:
+            os.rename(f"build/{build_type}/clang_rt.asan_dynamic-x86_64.dll", "build/clang_rt.asan_dynamic-x86_64.dll")
         if args.build_only:
             return 0
         # run test
+        new_env["PYTHONPATH"] = os.path.join(os.curdir, "build")
         exe_base_name = os.path.basename(sys.executable)
         cmd = [exe_base_name, "-m", "pytest", "python-test"]
-        target_file = f"build/{args.build_type}/pyyjson.dll"
-        os.rename(target_file, "build/pyyjson.pyd")
-        new_env["PYTHONPATH"] = os.path.join(os.curdir, "build")
         subprocess.run(cmd, check=True, env=new_env)
     return 0
 

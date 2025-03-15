@@ -100,7 +100,6 @@ if(ASAN_ENABLED)
 
     if(MSVC)
         target_compile_options(commonBuild INTERFACE /fsanitize=address)
-        target_link_options(commonBuild INTERFACE /fsanitize=address)
     else()
         target_compile_options(commonBuild INTERFACE -fsanitize=address)
         target_link_options(commonBuild INTERFACE -fsanitize=address)
@@ -182,6 +181,24 @@ else()
 endif()
 
 set_target_properties(pyyjson PROPERTIES PREFIX "")
+
+if(ASAN_ENABLED AND MSVC)
+    get_filename_component(MSVC_COMPILER_DIR "${CMAKE_C_COMPILER}" PATH)
+    set(ASAN_DLL_PATH "${MSVC_COMPILER_DIR}/clang_rt.asan_dynamic-x86_64.dll")
+    if(EXISTS "${ASAN_DLL_PATH}")
+        message(STATUS "Found AddressSanitizer runtime DLL at: ${ASAN_DLL_PATH}")
+        # 在 my_target 构建完成后，将 DLL 复制到目标所在目录
+        add_custom_command(
+        TARGET pyyjson POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${ASAN_DLL_PATH}"
+                $<TARGET_FILE_DIR:pyyjson>
+        COMMENT "Copying AddressSanitizer runtime DLL to output directory"
+        )
+    else()
+        message(WARNING "AddressSanitizer runtime DLL not found at: ${ASAN_DLL_PATH}")
+    endif()
+endif()
 
 # set_target_properties(pyyjson PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PYYJSON_SOVERSION})
 
