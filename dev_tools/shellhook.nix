@@ -50,6 +50,18 @@ let
       (builtins.elemAt (builtins.filter (x: x.pname == "orjson") (
         import ./py_requirements.nix using_python.pkgs
       )) 0).src;
+  pythonpathEnvLiteral = "\${" + "PYTHONPATH+x}";
+  runSdeClxPath = "${nix_pyenv_directory}/bin/run-sde-clx";
+  runSdeRplPath = "${nix_pyenv_directory}/bin/run-sde-rpl";
+  sdeScript = ''
+    if [ -z ${pythonpathEnvLiteral} ]; then
+        PYTHONPATH=$(pwd)/build sde64 @cpuid@ -- "$@"
+    else
+        sde64 @cpuid@ -- "$@"
+    fi
+  '';
+  sdeClxScript = builtins.replaceStrings [ "@cpuid@" ] [ "-clx" ] sdeScript;
+  sdeRplScript = builtins.replaceStrings [ "@cpuid@" ] [ "-rpl" ] sdeScript;
 in
 ''
   _SOURCE_ROOT=$(readlink -f ${builtins.toString ./.}/..)
@@ -116,8 +128,15 @@ in
   fi
 
   # sde wrapper script
-  echo "PYTHONPATH=\$(pwd)/build sde64 -clx -- \"\$@\";" > ${nix_pyenv_directory}/bin/run-sde
-  chmod +x ${nix_pyenv_directory}/bin/run-sde
+  cat > ${runSdeClxPath} << 'EOF'
+  ${sdeClxScript}
+  EOF
+  chmod +x ${runSdeClxPath}
+  #
+  cat > ${runSdeRplPath} << 'EOF'
+  ${sdeRplScript}
+  EOF
+  chmod +x ${runSdeRplPath}
 
   # save env for external use
   echo "PATH=$PATH" > ${nix_pyenv_directory}/.shell-env
