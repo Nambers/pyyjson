@@ -33,6 +33,7 @@ PyObject *run_object_benchmark(PyObject *self, PyObject *args, PyObject *kwargs)
 PyObject *inspect_pyunicode(PyObject *self, PyObject *args, PyObject *kwargs);
 #endif
 PyObject *pyyjson_print_current_features(PyObject *self, PyObject *);
+PyObject *pyyjson_get_current_features(PyObject *self, PyObject *);
 
 PyObject *JSONDecodeError = NULL;
 PyObject *JSONEncodeError = NULL;
@@ -42,15 +43,14 @@ static PyMethodDef pyyjson_Methods[] = {
         {"decode", (PyCFunction)pyyjson_Decode, METH_VARARGS | METH_KEYWORDS, "decode(s)\n--\n\nConverts JSON as string to dict object structure."},
         {"dumps", (PyCFunction)pyyjson_Encode, METH_VARARGS | METH_KEYWORDS, "dumps(obj, indent=None)\n--\n\nConverts arbitrary object recursively into JSON."},
         {"loads", (PyCFunction)pyyjson_Decode, METH_VARARGS | METH_KEYWORDS, "loads(s)\n--\n\nConverts JSON as string to dict object structure."},
+        {"print_current_features", pyyjson_print_current_features, METH_NOARGS, "print_current_features()\n--\n\nPrints current features."},
+        {"get_current_features", pyyjson_get_current_features, METH_NOARGS, "get_current_features()\n--\n\nGet current features."},
 #if PYYJSON_BUILD_BENCHMARK
         {"run_unicode_accumulate_benchmark", (PyCFunction)run_unicode_accumulate_benchmark, METH_VARARGS | METH_KEYWORDS, "Benchmark."},
         {"run_object_accumulate_benchmark", (PyCFunction)run_object_accumulate_benchmark, METH_VARARGS | METH_KEYWORDS, "Benchmark."},
         {"run_object_benchmark", (PyCFunction)run_object_benchmark, METH_VARARGS | METH_KEYWORDS, "Benchmark."},
         {"inspect_pyunicode", (PyCFunction)inspect_pyunicode, METH_VARARGS | METH_KEYWORDS, "Inspect PyUnicode."},
 #endif
-        {"print_current_features", pyyjson_print_current_features, METH_NOARGS, "Prints current features."},
-        // {"dump", (PyCFunction)pyyjson_FileEncode, METH_VARARGS | METH_KEYWORDS, "Converts arbitrary object recursively into JSON file. "},
-        // {"load", (PyCFunction)pyyjson_DecodeFile, METH_VARARGS | METH_KEYWORDS, "Converts JSON as file to dict object structure."},
         {NULL, NULL, 0, NULL} /* Sentinel */
 };
 
@@ -173,6 +173,7 @@ PyCFunctionWithKeywords _pyyjson_encode_interface = NULL;
 PyCFunctionWithKeywords _pyyjson_decode_interface = NULL;
 
 X86SIMDFeatureLevel get_simd_feature(void) {
+    // return X86SIMDFeatureLevelSSE2;
     int info[4];
     cpuid_count(info, 7);
     int ebx = info[1];
@@ -270,14 +271,57 @@ PyObject *pyyjson_print_current_features(PyObject *self, PyObject *args) {
     }
 #else
 #    if SIMD_BIT_SIZE == 512
-    printf("SIMD: AVX512\n");
+    printf("SIMD: AVX512; MultiLib: False\n");
 #    elif SIMD_BIT_SIZE == 256
-    printf("SIMD: AVX2\n");
-// #elif __SSE4_2__
-// printf("SIMD: SSE4.2\n");
+    printf("SIMD: AVX2; MultiLib: False\n");
+// #    elif __SSE4_2__
+//     printf("SIMD: SSE4.2; MultiLib: False\n");
 #    else
-    printf("SIMD: SSE2\n");
+    printf("SIMD: SSE2; MultiLib: False\n");
 #    endif
 #endif
     Py_RETURN_NONE;
+}
+
+PyObject *pyyjson_get_current_features(PyObject *self, PyObject *args) {
+    PyObject *ret = PyDict_New();
+#if BUILD_MULTI_LIB
+    _update_simd_features();
+    PyDict_SetItemString(ret, "MultiLib", PyBool_FromLong(true));
+    switch (CurrentSIMDFeatureLevel) {
+        case X86SIMDFeatureLevelSSE2: {
+            PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("SSE2"));
+            break;
+        }
+        // case X86SIMDFeatureLevelSSE4_2: {
+        //     PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("SSE4.2"));
+        //     break;
+        // }
+        case X86SIMDFeatureLevelAVX2: {
+            PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("AVX2"));
+            break;
+        }
+        case X86SIMDFeatureLevelAVX512: {
+            PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("AVX512"));
+            break;
+        }
+        default: {
+            PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("Unknown"));
+            break;
+        }
+    }
+#else
+    PyDict_SetItemString(ret, "MultiLib", PyBool_FromLong(false));
+
+#    if SIMD_BIT_SIZE == 512
+    PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("AVX512"));
+#    elif SIMD_BIT_SIZE == 256
+    PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("AVX2"));
+// #    elif __SSE4_2__
+//     PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("SSE4.2"));
+#    else
+    PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("SSE2"));
+#    endif
+#endif
+    return ret;
 }
