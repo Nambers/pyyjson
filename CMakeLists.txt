@@ -5,7 +5,7 @@ set(PYYJSON_SOVERSION 0)
 
 # ------------------------------------------------------------------------------
 # Build Options for tests and docs
-option(ASAN_ENABLED "Build with asan" ON)
+option(ASAN_ENABLED "Build with asan" OFF)
 
 # TODO
 option(BUILD_BENCHMARK "Build benchmarks" ON)
