@@ -5,7 +5,7 @@ set(PYYJSON_SOVERSION 0)
 
 # ------------------------------------------------------------------------------
 # Build Options for tests and docs
-option(ASAN_ENABLED "Build with asan" OFF)
+option(ASAN_ENABLED "Build with asan" ON)
 
 # TODO
 option(BUILD_BENCHMARK "Build benchmarks" ON)
@@ -308,8 +308,15 @@ if(BUILD_TEST)
         add_executable(pyyjson_fuzzer ${SRC_FUZZER})
         target_link_libraries(pyyjson_fuzzer PUBLIC commonBuild)
         target_link_libraries(pyyjson_fuzzer PUBLIC Python3::Python)
-        target_compile_options(pyyjson_fuzzer PRIVATE -fsanitize=fuzzer -g -O1)
-        target_link_options(pyyjson_fuzzer PRIVATE -fsanitize=fuzzer)
+
+        if(ASAN_ENABLED)
+            target_compile_options(pyyjson_fuzzer PRIVATE -fsanitize=fuzzer,address -g -O1)
+            target_link_options(pyyjson_fuzzer PRIVATE -fsanitize=fuzzer,address)
+        else()
+            target_compile_options(pyyjson_fuzzer PRIVATE -fsanitize=fuzzer -g -O1)
+            target_link_options(pyyjson_fuzzer PRIVATE -fsanitize=fuzzer)
+        endif()
+
         add_test(pyyjson_fuzzer ${CMAKE_CURRENT_BINARY_DIR}/pyyjson_fuzzer -dict=fuzzer.dict -max_total_time=300 ${CMAKE_CURRENT_BINARY_DIR}/corpus)
     endif()
 endif()
