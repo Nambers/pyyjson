@@ -51,17 +51,18 @@ let
         import ./py_requirements.nix using_python.pkgs
       )) 0).src;
   pythonpathEnvLiteral = "\${" + "PYTHONPATH+x}";
+  sde = pkgs.callPackage ./sde.nix { };
   runSdeClxPath = "${nix_pyenv_directory}/bin/run-sde-clx";
   runSdeRplPath = "${nix_pyenv_directory}/bin/run-sde-rpl";
   sdeScript = ''
     if [ -z ${pythonpathEnvLiteral} ]; then
-        PYTHONPATH=$(pwd)/build sde64 @cpuid@ -- "$@"
+        PYTHONPATH=$(pwd)/build @sde64@ @cpuid@ -- "$@"
     else
-        sde64 @cpuid@ -- "$@"
+        @sde64@ @cpuid@ -- "$@"
     fi
   '';
-  sdeClxScript = builtins.replaceStrings [ "@cpuid@" ] [ "-clx" ] sdeScript;
-  sdeRplScript = builtins.replaceStrings [ "@cpuid@" ] [ "-rpl" ] sdeScript;
+  sdeClxScript = builtins.replaceStrings [ "@cpuid@" "@sde64@" ] [ "-clx" "${sde}/bin/sde64" ] sdeScript;
+  sdeRplScript = builtins.replaceStrings [ "@cpuid@" "@sde64@" ] [ "-rpl" "${sde}/bin/sde64" ] sdeScript;
 in
 ''
   _SOURCE_ROOT=$(readlink -f ${builtins.toString ./.}/..)
