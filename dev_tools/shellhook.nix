@@ -54,6 +54,7 @@ let
   sde = pkgs.callPackage ./sde.nix { };
   runSdeClxPath = "${nix_pyenv_directory}/bin/run-sde-clx";
   runSdeRplPath = "${nix_pyenv_directory}/bin/run-sde-rpl";
+  runSdeIvbPath = "${nix_pyenv_directory}/bin/run-sde-ivb";
   sdeScript = ''
     if [ -z ${pythonpathEnvLiteral} ]; then
         PYTHONPATH=$(pwd)/build @sde64@ @cpuid@ -- "$@"
@@ -61,8 +62,15 @@ let
         @sde64@ @cpuid@ -- "$@"
     fi
   '';
-  sdeClxScript = builtins.replaceStrings [ "@cpuid@" "@sde64@" ] [ "-clx" "${sde}/bin/sde64" ] sdeScript;
-  sdeRplScript = builtins.replaceStrings [ "@cpuid@" "@sde64@" ] [ "-rpl" "${sde}/bin/sde64" ] sdeScript;
+  sdeClxScript =
+    builtins.replaceStrings [ "@cpuid@" "@sde64@" ] [ "-clx" "${sde}/bin/sde64" ]
+      sdeScript;
+  sdeRplScript =
+    builtins.replaceStrings [ "@cpuid@" "@sde64@" ] [ "-rpl" "${sde}/bin/sde64" ]
+      sdeScript;
+  sdeIvbScript =
+    builtins.replaceStrings [ "@cpuid@" "@sde64@" ] [ "-ivb" "${sde}/bin/sde64" ]
+      sdeScript;
 in
 ''
   _SOURCE_ROOT=$(readlink -f ${builtins.toString ./.}/..)
@@ -138,6 +146,11 @@ in
   ${sdeRplScript}
   EOF
   chmod +x ${runSdeRplPath}
+  #
+  cat > ${runSdeIvbPath} << 'EOF'
+  ${sdeIvbScript}
+  EOF
+  chmod +x ${runSdeIvbPath}
 
   # save env for external use
   echo "PATH=$PATH" > ${nix_pyenv_directory}/.shell-env
