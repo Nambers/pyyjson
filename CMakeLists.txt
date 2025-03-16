@@ -299,6 +299,7 @@ if(BUILD_TEST)
     target_link_libraries(pyyjson_test PUBLIC commonBuild)
     target_link_libraries(pyyjson_test PUBLIC Python3::Python)
     install(TARGETS pyyjson_test RUNTIME DESTINATION .)
+    add_test(pyyjson_test ${CMAKE_CURRENT_BINARY_DIR}/pyyjson_test)
 
     if(CMAKE_C_COMPILER_ID MATCHES Clang)
         file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/test_data/fuzzer/fuzzer.dict" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
