@@ -3,10 +3,7 @@
 
 #include "pyyjson.h"
 #include "simd/simd_detect.h"
-#include <immintrin.h>
-#if defined(_MSC_VER)
-#    include <intrin.h>
-#endif
+
 
 
 #if SIMD_BIT_SIZE == 512
