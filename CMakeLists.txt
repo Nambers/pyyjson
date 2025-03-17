@@ -18,10 +18,24 @@ option(BUILD_NATIVE "Force build with -march=native, non-shipping" OFF)
 option(RYU_HUMAN_READABLE "Not use scientific notation output in ryu" OFF)
 
 if(BUILD_SHIPPING_SIMD)
+    if(BUILD_AVX512 OR BUILD_AVX2 OR BUILD_SSE4 OR BUILD_NATIVE)
+        message(FATAL_ERROR "BUILD_SHIPPING_SIMD cannot be enabled with BUILD_AVX512, BUILD_AVX2, BUILD_SSE4 or BUILD_NATIVE")
+    endif()
+
     set(BUILD_MULTI_LIB 1)
 else()
+    if((BUILD_AVX512 OR BUILD_AVX2 OR BUILD_SSE4) AND BUILD_NATIVE)
+        message(FATAL_ERROR "BUILD_AVX512, BUILD_AVX2, BUILD_SSE4 cannot be enabled with BUILD_NATIVE")
+    endif()
+
     set(BUILD_MULTI_LIB 0)
 endif()
+
+# ------------------------------------------------------------------------------
+# Project Config
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(CompilerFeatures)
+include(XcodeProperty)
 
 # ------------------------------------------------------------------------------
 # Search Python Package
@@ -52,6 +66,7 @@ endif()
 # ------------------------------------------------------------------------------
 # Global settings
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # ------------------------------------------------------------------------------
 # Libraries
@@ -61,6 +76,22 @@ add_library(commonBuild INTERFACE)
 target_link_libraries(commonBuild INTERFACE ${Python3_LIBRARIES})
 target_include_directories(commonBuild INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src> ${Python3_INCLUDE_DIRS})
 target_compile_definitions(commonBuild INTERFACE BUILD_MULTI_LIB=${BUILD_MULTI_LIB})
+
+if(BUILD_AVX512)
+    add_avx512_compile_option(commonBuild INTERFACE)
+endif()
+
+if(BUILD_AVX2)
+    add_avx2_compile_option(commonBuild INTERFACE)
+endif()
+
+if(BUILD_SSE4)
+    add_sse4_compile_option(commonBuild INTERFACE)
+endif()
+
+if(BUILD_NATIVE)
+    add_native_compile_option(commonBuild INTERFACE)
+endif()
 
 message("CMAKE_C_COMPILER_ID = ${CMAKE_C_COMPILER_ID}")
 message("CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
@@ -98,12 +129,14 @@ if(ASAN_ENABLED)
     message("ENABLE ASAN")
     target_compile_definitions(commonBuild INTERFACE PYYJSON_ASAN_CHECK=1)
 
-    if(MSVC)
-        target_compile_options(commonBuild INTERFACE /fsanitize=address)
-    else()
-        target_compile_options(commonBuild INTERFACE -fsanitize=address)
-        target_link_options(commonBuild INTERFACE -fsanitize=address)
-    endif()
+    add_asan_compile_option(commonBuild INTERFACE)
+
+    # if(MSVC)
+    # target_compile_options(commonBuild INTERFACE /fsanitize=address)
+    # else()
+    # target_compile_options(commonBuild INTERFACE -fsanitize=address)
+    # target_link_options(commonBuild INTERFACE -fsanitize=address)
+    # endif()
 endif()
 
 # ------------------------------------------------------------------------------
@@ -143,7 +176,7 @@ if(BUILD_BENCHMARK)
 endif()
 
 # add library pyyjson
-if(BUILD_SHIPPING_SIMD)
+if(BUILD_MULTI_LIB)
     if("${TARGET_SIMD_ARCH}" STREQUAL "x86")
         add_library(pyyjson_common OBJECT ${SRC_FILES})
         target_link_libraries(pyyjson_common PUBLIC commonBuild)
@@ -159,17 +192,17 @@ if(BUILD_SHIPPING_SIMD)
         add_library(pyyjson SHARED $<TARGET_OBJECTS:pyyjson_avx512> $<TARGET_OBJECTS:pyyjson_avx2> $<TARGET_OBJECTS:pyyjson_sse2> $<TARGET_OBJECTS:pyyjson_common>)
         target_link_libraries(pyyjson PUBLIC ${Python3_LIBRARIES})
 
-        if(MSVC)
-            # MSVC does not support precise SIMD feature settings like /arch:SSE4.2, /arch:AVX512F
-            target_compile_options(pyyjson_avx512 PRIVATE /arch:AVX512)
-            target_compile_options(pyyjson_avx2 PRIVATE /arch:AVX2)
+        add_avx512_compile_option(pyyjson_avx512)
+        add_avx2_compile_option(pyyjson_avx2)
 
-        else()
-            target_compile_options(pyyjson_avx512 PRIVATE -mavx512f -mavx512bw)
-            target_compile_options(pyyjson_avx2 PRIVATE -mavx2)
+    elseif("${TARGET_SIMD_ARCH}" STREQUAL "aarch")
+        add_library(pyyjson_common OBJECT ${SRC_FILES})
+        target_link_libraries(pyyjson_common PUBLIC commonBuild)
+        add_library(pyyjson_neon OBJECT ${SRC_WITH_SIMD})
+        target_link_libraries(pyyjson_neon PUBLIC pyyjson_common)
+        add_library(pyyjson SHARED $<TARGET_OBJECTS:pyyjson_neon> $<TARGET_OBJECTS:pyyjson_common>)
+        target_link_libraries(pyyjson PUBLIC ${Python3_LIBRARIES})
 
-            # target_compile_options(pyyjson_sse4 PRIVATE -msse4.1 -msse4.2)
-        endif()
     else()
         message(FATAL_ERROR "TARGET_SIMD_ARCH=${TARGET_SIMD_ARCH} not supported")
 
@@ -185,15 +218,17 @@ set_target_properties(pyyjson PROPERTIES PREFIX "")
 if(ASAN_ENABLED AND MSVC)
     get_filename_component(MSVC_COMPILER_DIR "${CMAKE_C_COMPILER}" PATH)
     set(ASAN_DLL_PATH "${MSVC_COMPILER_DIR}/clang_rt.asan_dynamic-x86_64.dll")
+
     if(EXISTS "${ASAN_DLL_PATH}")
         message(STATUS "Found AddressSanitizer runtime DLL at: ${ASAN_DLL_PATH}")
+
         # 在 my_target 构建完成后，将 DLL 复制到目标所在目录
         add_custom_command(
-        TARGET pyyjson POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${ASAN_DLL_PATH}"
-                $<TARGET_FILE_DIR:pyyjson>
-        COMMENT "Copying AddressSanitizer runtime DLL to output directory"
+            TARGET pyyjson POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${ASAN_DLL_PATH}"
+            $<TARGET_FILE_DIR:pyyjson>
+            COMMENT "Copying AddressSanitizer runtime DLL to output directory"
         )
     else()
         message(WARNING "AddressSanitizer runtime DLL not found at: ${ASAN_DLL_PATH}")
@@ -203,10 +238,6 @@ endif()
 # set_target_properties(pyyjson PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PYYJSON_SOVERSION})
 
 # ------------------------------------------------------------------------------
-# Project Config
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-include(XcodeProperty)
-
 if(XCODE)
     set(PYYJSON_FLAGS)
     list(APPEND PYYJSON_FLAGS "-Wall" "-Wextra" "-Werror" "-pedantic" "-pedantic-errors")
@@ -227,8 +258,7 @@ elseif(MSVC)
     set(PYYJSON_FLAGS)
     list(APPEND PYYJSON_FLAGS "/utf-8")
 
-    target_compile_options(commonBuild INTERFACE $<$<C_COMPILER_ID:MSVC>:${PYYJSON_FLAGS}>)
-    target_compile_options(commonBuild INTERFACE $<$<CXX_COMPILER_ID:MSVC>:${PYYJSON_FLAGS}>)
+    target_compile_options(commonBuild INTERFACE ${PYYJSON_FLAGS})
 
 elseif(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|Intel")
     set(PYYJSON_FLAGS)
@@ -250,9 +280,7 @@ elseif(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|Intel")
         message("Debug mode, enabling debug symbols")
     endif()
 
-    target_compile_options(commonBuild INTERFACE $<$<COMPILE_LANGUAGE:C>:${PYYJSON_FLAGS}>)
-
-    # target_compile_options(commonBuild INTERFACE $<$<COMPILE_LANGUAGE:CXX>:${PYYJSON_FLAGS}>)
+    target_compile_options(commonBuild INTERFACE ${PYYJSON_FLAGS})
 endif()
 
 include(CheckIncludeFile)
@@ -291,7 +319,7 @@ install(TARGETS pyyjson LIBRARY DESTINATION .)
 if(BUILD_TEST)
     include(CTest)
 
-    if(BUILD_SHIPPING_SIMD)
+    if(BUILD_MULTI_LIB)
         add_library(pyyjson_test_sse2 OBJECT ${SRC_TEST_WITH_SIMD})
         target_link_libraries(pyyjson_test_sse2 PUBLIC commonBuild)
         add_library(pyyjson_test_avx2 OBJECT ${SRC_TEST_WITH_SIMD})
@@ -299,14 +327,8 @@ if(BUILD_TEST)
         add_library(pyyjson_test_avx512 OBJECT ${SRC_TEST_WITH_SIMD})
         target_link_libraries(pyyjson_test_avx512 PUBLIC commonBuild)
 
-        if(MSVC)
-            # MSVC does not support precise SIMD feature settings like /arch:SSE4.2, /arch:AVX512F
-            target_compile_options(pyyjson_test_avx512 PRIVATE /arch:AVX512)
-            target_compile_options(pyyjson_test_avx2 PRIVATE /arch:AVX2)
-        else()
-            target_compile_options(pyyjson_test_avx512 PRIVATE -mavx512f -mavx512bw)
-            target_compile_options(pyyjson_test_avx2 PRIVATE -mavx2)
-        endif()
+        add_avx512_compile_option(pyyjson_test_avx512)
+        add_avx2_compile_option(pyyjson_test_avx2)
 
         add_executable(pyyjson_test ${SRC_TEST} $<TARGET_OBJECTS:pyyjson_test_avx512> $<TARGET_OBJECTS:pyyjson_test_avx2> $<TARGET_OBJECTS:pyyjson_test_sse2>)
     else()
@@ -327,12 +349,12 @@ if(BUILD_TEST)
         target_link_libraries(pyyjson_fuzzer PUBLIC commonBuild)
         target_link_libraries(pyyjson_fuzzer PUBLIC Python3::Python)
 
+        add_asan_compile_option(pyyjson_fuzzer)
+        target_compile_options(pyyjson_fuzzer PRIVATE -fsanitize=fuzzer -g -O1)
+        target_link_options(pyyjson_fuzzer PRIVATE -fsanitize=fuzzer)
+
         if(ASAN_ENABLED)
-            target_compile_options(pyyjson_fuzzer PRIVATE -fsanitize=fuzzer,address -g -O1)
-            target_link_options(pyyjson_fuzzer PRIVATE -fsanitize=fuzzer,address)
-        else()
-            target_compile_options(pyyjson_fuzzer PRIVATE -fsanitize=fuzzer -g -O1)
-            target_link_options(pyyjson_fuzzer PRIVATE -fsanitize=fuzzer)
+            add_asan_compile_option(pyyjson_fuzzer)
         endif()
 
         add_test(pyyjson_fuzzer ${CMAKE_CURRENT_BINARY_DIR}/pyyjson_fuzzer -dict=fuzzer.dict -max_total_time=300 ${CMAKE_CURRENT_BINARY_DIR}/corpus)
