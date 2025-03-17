@@ -2,6 +2,7 @@
   pkgs ? import <nixpkgs> { },
 }:
 let
+  lib = pkgs.lib;
   pythonVerConfig = pkgs.lib.importJSON ./pyver.json;
   curVer = pythonVerConfig.curVer;
   leastVer = pythonVerConfig.minSupportVer;
@@ -17,7 +18,10 @@ in
   gcc
   gdb
   python-launcher
-  sde
+
   valgrind
 ])
 ++ drvs.pyenvs
+++ lib.optionals (pkgs.system == "x86_64-linux") [
+  drvs.sde
+]

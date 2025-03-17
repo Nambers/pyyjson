@@ -62,15 +62,10 @@ let
         @sde64@ @cpuid@ -- "$@"
     fi
   '';
-  sdeClxScript =
-    builtins.replaceStrings [ "@cpuid@" "@sde64@" ] [ "-clx" "${sde}/bin/sde64" ]
-      sdeScript;
-  sdeRplScript =
-    builtins.replaceStrings [ "@cpuid@" "@sde64@" ] [ "-rpl" "${sde}/bin/sde64" ]
-      sdeScript;
-  sdeIvbScript =
-    builtins.replaceStrings [ "@cpuid@" "@sde64@" ] [ "-ivb" "${sde}/bin/sde64" ]
-      sdeScript;
+  sde64Path = lib.optionalString (pkgs.system == "x86_64-linux") "${sde}/bin/sde64";
+  sdeClxScript = builtins.replaceStrings [ "@cpuid@" "@sde64@" ] [ "-clx" sde64Path ] sdeScript;
+  sdeRplScript = builtins.replaceStrings [ "@cpuid@" "@sde64@" ] [ "-rpl" sde64Path ] sdeScript;
+  sdeIvbScript = builtins.replaceStrings [ "@cpuid@" "@sde64@" ] [ "-ivb" sde64Path ] sdeScript;
 in
 ''
   _SOURCE_ROOT=$(readlink -f ${builtins.toString ./.}/..)
@@ -136,6 +131,12 @@ in
       chmod -R 700 ${debugSourceDir}/orjson
   fi
 
+  # save env for external use
+  echo "PATH=$PATH" > ${nix_pyenv_directory}/.shell-env
+  echo "CC=$CC" >> ${nix_pyenv_directory}/.shell-env
+  echo "CXX=$CXX" >> ${nix_pyenv_directory}/.shell-env
+''
++ lib.optionalString (pkgs.system == "x86_64-linux") ''
   # sde wrapper script
   cat > ${runSdeClxPath} << 'EOF'
   ${sdeClxScript}
@@ -151,9 +152,4 @@ in
   ${sdeIvbScript}
   EOF
   chmod +x ${runSdeIvbPath}
-
-  # save env for external use
-  echo "PATH=$PATH" > ${nix_pyenv_directory}/.shell-env
-  echo "CC=$CC" >> ${nix_pyenv_directory}/.shell-env
-  echo "CXX=$CXX" >> ${nix_pyenv_directory}/.shell-env
 ''
