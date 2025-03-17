@@ -206,12 +206,13 @@ PLATFORM_SIMD_LEVEL get_simd_feature(void) {
     return X86SIMDFeatureLevelSSE2;
 #    elif PYYJSON_AARCH
     return AArchSIMDFeatureLevelNEON;
+#    endif
 }
 
 force_inline void _update_simd_features(void) {
     if (unlikely(CurrentSIMDFeatureLevel == -1)) {
         PLATFORM_SIMD_LEVEL simd_feature = get_simd_feature();
-#        if PYYJSON_X86
+#    if PYYJSON_X86
         switch (simd_feature) {
             case X86SIMDFeatureLevelSSE2: {
                 _pyyjson_encode_interface = pyyjson_Encode_sse2;
@@ -237,9 +238,9 @@ force_inline void _update_simd_features(void) {
                 assert(false);
             }
         }
-#        elif PYYJSON_AARCH
+#    elif PYYJSON_AARCH
 
-#        endif
+#    endif
         // mark as ready
         CurrentSIMDFeatureLevel = (int)simd_feature;
     }
@@ -257,105 +258,104 @@ PyObject *pyyjson_Decode(PyObject *self, PyObject *args, PyObject *kwargs) {
     return _pyyjson_decode_interface(self, args, kwargs);
 }
 
-#    endif
+#endif
 
 
-    PyObject *pyyjson_print_current_features(PyObject * self, PyObject * args) {
-        // TODO change to returning a dict with all build info
-#    if BUILD_MULTI_LIB
-        _update_simd_features();
-#        if PYYJSON_X86
-        switch (CurrentSIMDFeatureLevel) {
-            case X86SIMDFeatureLevelSSE2: {
-                printf("SIMD: SSE2\n");
-                break;
-            }
-            // case X86SIMDFeatureLevelSSE4_2: {
-            //     printf("SIMD: SSE4.2\n");
-            //     break;
-            // }
-            case X86SIMDFeatureLevelAVX2: {
-                printf("SIMD: AVX2\n");
-                break;
-            }
-            case X86SIMDFeatureLevelAVX512: {
-                printf("SIMD: AVX512\n");
-                break;
-            }
-            default: {
-                printf("SIMD: Unknown\n");
-                break;
-            }
+PyObject *pyyjson_print_current_features(PyObject *self, PyObject *args) {
+    // TODO change to returning a dict with all build info
+#if BUILD_MULTI_LIB
+    _update_simd_features();
+#    if PYYJSON_X86
+    switch (CurrentSIMDFeatureLevel) {
+        case X86SIMDFeatureLevelSSE2: {
+            printf("SIMD: SSE2\n");
+            break;
         }
-#        elif PYYJSON_AARCH
-        printf("SIMD: NEON\n");
-#        endif
-#    else
-#        if PYYJSON_X86
-#            if SIMD_BIT_SIZE == 512
+        // case X86SIMDFeatureLevelSSE4_2: {
+        //     printf("SIMD: SSE4.2\n");
+        //     break;
+        // }
+        case X86SIMDFeatureLevelAVX2: {
+            printf("SIMD: AVX2\n");
+            break;
+        }
+        case X86SIMDFeatureLevelAVX512: {
+            printf("SIMD: AVX512\n");
+            break;
+        }
+        default: {
+            printf("SIMD: Unknown\n");
+            break;
+        }
+    }
+#    elif PYYJSON_AARCH
+    printf("SIMD: NEON\n");
+#    endif
+#else
+#    if PYYJSON_X86
+#        if SIMD_BIT_SIZE == 512
     printf("SIMD: AVX512; MultiLib: False\n");
-#            elif SIMD_BIT_SIZE == 256
+#        elif SIMD_BIT_SIZE == 256
     printf("SIMD: AVX2; MultiLib: False\n");
 // #    elif __SSE4_2__
 //     printf("SIMD: SSE4.2; MultiLib: False\n");
-#            else
+#        else
     printf("SIMD: SSE2; MultiLib: False\n");
-#            endif
-#        elif PYYJSON_AARCH
+#        endif
+#    elif PYYJSON_AARCH
     printf("SIMD: NEON; MultiLib: False\n");
-#        endif
 #    endif
-        Py_RETURN_NONE;
-    }
+#endif
+    Py_RETURN_NONE;
+}
 
-    PyObject *pyyjson_get_current_features(PyObject * self, PyObject * args) {
-        PyObject *ret = PyDict_New();
-#    if BUILD_MULTI_LIB
-        _update_simd_features();
-        PyDict_SetItemString(ret, "MultiLib", PyBool_FromLong(true));
-#        if PYYJSON_X86
-        switch (CurrentSIMDFeatureLevel) {
-            case X86SIMDFeatureLevelSSE2: {
-                PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("SSE2"));
-                break;
-            }
-            // case X86SIMDFeatureLevelSSE4_2: {
-            //     PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("SSE4.2"));
-            //     break;
-            // }
-            case X86SIMDFeatureLevelAVX2: {
-                PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("AVX2"));
-                break;
-            }
-            case X86SIMDFeatureLevelAVX512: {
-                PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("AVX512"));
-                break;
-            }
-            default: {
-                PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("Unknown"));
-                break;
-            }
+PyObject *pyyjson_get_current_features(PyObject *self, PyObject *args) {
+    PyObject *ret = PyDict_New();
+#if BUILD_MULTI_LIB
+    _update_simd_features();
+    PyDict_SetItemString(ret, "MultiLib", PyBool_FromLong(true));
+#    if PYYJSON_X86
+    switch (CurrentSIMDFeatureLevel) {
+        case X86SIMDFeatureLevelSSE2: {
+            PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("SSE2"));
+            break;
         }
-#        elif PYYJSON_AARCH
-        PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("NEON"));
-#        endif
-#    else
-#        if PYYJSON_X86
+        // case X86SIMDFeatureLevelSSE4_2: {
+        //     PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("SSE4.2"));
+        //     break;
+        // }
+        case X86SIMDFeatureLevelAVX2: {
+            PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("AVX2"));
+            break;
+        }
+        case X86SIMDFeatureLevelAVX512: {
+            PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("AVX512"));
+            break;
+        }
+        default: {
+            PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("Unknown"));
+            break;
+        }
+    }
+#    elif PYYJSON_AARCH
+    PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("NEON"));
+#    endif
+#else
+#    if PYYJSON_X86
     PyDict_SetItemString(ret, "MultiLib", PyBool_FromLong(false));
 
-#            if SIMD_BIT_SIZE == 512
+#        if SIMD_BIT_SIZE == 512
     PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("AVX512"));
-#            elif SIMD_BIT_SIZE == 256
+#        elif SIMD_BIT_SIZE == 256
     PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("AVX2"));
 // #    elif __SSE4_2__
 //     PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("SSE4.2"));
-#            else
+#        else
     PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("SSE2"));
-#            endif
-#        elif PYYJSON_AARCH
-    PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("NEON"));
 #        endif
+#    elif PYYJSON_AARCH
+    PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("NEON"));
 #    endif
-        return ret;
-    }
 #endif
+    return ret;
+}

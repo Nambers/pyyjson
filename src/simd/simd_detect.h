@@ -61,7 +61,6 @@
 #endif
 
 #if PYYJSON_X86
-static_assert(false, "");
 #    include <immintrin.h>
 #    if defined(_MSC_VER)
 #        include <intrin.h>
