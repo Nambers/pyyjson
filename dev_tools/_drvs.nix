@@ -57,5 +57,7 @@ in
     python-launcher
     valgrind
     ; # packages
+}
+// lib.optionalAttrs (pkgs.system == "x86_64-linux") {
   inherit sde;
 }
