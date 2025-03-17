@@ -5,7 +5,6 @@
 #include "simd/simd_impl.h"
 #include "unicode/include/indent.h"
 #include "unicode/include/reserve.h"
-#include <immintrin.h>
 
 // encode_simd_utils.inl
 #define CHECK_ESCAPE_IMPL_GET_MASK PYYJSON_CONCAT2(check_escape_impl_get_mask, COMPILE_READ_UCS_LEVEL)

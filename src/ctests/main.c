@@ -6,13 +6,12 @@
 #include <stdlib.h>
 #include <time.h>
 
-
-#if defined(_MSC_VER)
-#    include <intrin.h>
-#    define cpuid_count(info, x) __cpuidex(info, x, 0)
-#    define cpuid(info, x) __cpuid(info, x)
-#else
-#    include <cpuid.h>
+#if PYYJSON_X86
+#    if defined(_MSC_VER)
+#        define cpuid_count(info, x) __cpuidex(info, x, 0)
+#        define cpuid(info, x) __cpuid(info, x)
+#    else
+#        include <cpuid.h>
 
 force_inline void cpuid_count(int *info, int x) {
     __cpuid_count(x, 0, info[0], info[1], info[2], info[3]);
@@ -21,6 +20,7 @@ force_inline void cpuid_count(int *info, int x) {
 force_inline void cpuid(int *info, int x) {
     __cpuid(x, info[0], info[1], info[2], info[3]);
 }
+#    endif
 #endif
 
 bool _SupportAVX512 = false;

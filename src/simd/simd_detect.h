@@ -1,9 +1,10 @@
 #ifndef PYYJSON_SIMD_DETECT_H
 #define PYYJSON_SIMD_DETECT_H
 
+#include <Python.h>
 #if PYYJSON_DETECT_SIMD
 
-#    if TARGET_SIMD_ARCH == x86
+#    if PYYJSON_X86
 #        if __AVX512F__ && __AVX512BW__
 #            define SIMD_BIT_SIZE 512
 #            define SIMD_FEATURE_NAME avx512
@@ -39,7 +40,8 @@
 #        else
 #            define PYYJSON_HAS_BLENDV 0
 #        endif
-#    elif TARGET_SIMD_ARCH == aarch
+#    elif PYYJSON_AARCH
+#        define SIMD_FEATURE_NAME neon
 #        define PYYJSON_HAS_BLENDV 0
 // aarch64 TODO
 #    else
@@ -56,6 +58,16 @@
 #    define SIMD_NAME_MODIFIER(x) PYYJSON_CONCAT2(x, SIMD_FEATURE_NAME)
 #else
 #    define SIMD_NAME_MODIFIER(x) x
+#endif
+
+#if PYYJSON_X86
+static_assert(false, "");
+#    include <immintrin.h>
+#    if defined(_MSC_VER)
+#        include <intrin.h>
+#    endif
+#elif PYYJSON_AARCH
+#    include <arm_neon.h>
 #endif
 
 #endif // PYYJSON_SIMD_DETECT_H
