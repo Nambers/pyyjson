@@ -110,11 +110,6 @@ force_inline void pyyjson_memcpy_avx512(void *dest, const void *src, size_t n_by
     if (d_int & 0x3f) {
         size_t tmp = 0x40 - (d_int & 0x3f);
         size_t nh = PYYJSON_MIN(tmp, n);
-        //
-        // memcpy(d, s, nh);
-        // d += nh;
-        // s += nh;
-        //
         __pyyjson_short_memcpy_small_first(&d, &s, nh);
         s_int += nh;
         n -= nh;
@@ -167,9 +162,7 @@ force_inline void pyyjson_memcpy_avx512(void *dest, const void *src, size_t n_by
             n -= sizeof(__m512d);
         }
     }
-    if (n)
-        // memcpy(d, s, n);
-        __pyyjson_short_memcpy_large_first(&d, &s, n);
+    if (n) __pyyjson_short_memcpy_large_first(&d, &s, n);
 }
 #endif
 
@@ -186,11 +179,6 @@ force_inline void pyyjson_memcpy_avx(void *dest, const void *src, size_t n_bytes
     if (d_int & 0x1f) {
         size_t tmp = 0x20 - (d_int & 0x1f);
         size_t nh = PYYJSON_MIN(tmp, n);
-        //
-        // memcpy(d, s, nh);
-        // d += nh;
-        // s += nh;
-        //
         __pyyjson_short_memcpy_small_first(&d, &s, nh);
         s_int += nh;
         n -= nh;
@@ -243,9 +231,7 @@ force_inline void pyyjson_memcpy_avx(void *dest, const void *src, size_t n_bytes
             n -= sizeof(__m256d);
         }
     }
-    if (n)
-        // memcpy(d, s, n);
-        __pyyjson_short_memcpy_large_first(&d, &s, n);
+    if (n) __pyyjson_short_memcpy_large_first(&d, &s, n);
 }
 #endif
 
@@ -260,9 +246,6 @@ force_inline void pyyjson_memcpy_sse(void *dest, const void *src, size_t n_bytes
     if (d_int & 0xf) {
         size_t tmp = 0x10 - (d_int & 0x0f);
         size_t nh = PYYJSON_MIN(tmp, n);
-        // memcpy(d, s, nh);
-        // d += nh;
-        // s += nh;
         __pyyjson_short_memcpy_small_first(&d, &s, nh);
         s_int += nh;
         n -= nh;
@@ -316,9 +299,7 @@ force_inline void pyyjson_memcpy_sse(void *dest, const void *src, size_t n_bytes
         }
     }
 
-    if (n)
-        // memcpy(d, s, n);
-        __pyyjson_short_memcpy_large_first(&d, &s, n);
+    if (n) __pyyjson_short_memcpy_large_first(&d, &s, n);
 }
 
 #endif // PYYJSON_MEMCPY_H
