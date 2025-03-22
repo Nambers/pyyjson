@@ -25,7 +25,7 @@ with pypkgs;
   (
     (pypkgs.buildPythonPackage rec {
       pname = "orjson";
-      version = "3.10.11";
+      version = "3.10.15";
       pyproject = true;
       useFetchCargoVendor = true;
 
@@ -35,13 +35,13 @@ with pypkgs;
         owner = "ijl";
         repo = "orjson";
         rev = "refs/tags/${version}";
-        hash = "sha256-RJcTyLf2pLb1kHd7+5K9dGMWja4KFdKIwdRAp6Ud+Ps=";
+        hash = "sha256-FlcWf6BhUP2Y5ivRQx1W0G8sgfvbuAQN7qpBJbd3N2I=";
       };
 
       cargoDeps = pkgs.rustPlatform.fetchCargoVendor {
         inherit src;
         name = "${pname}-${version}";
-        hash = "sha256-sxUp3q9S1PmwUmbmXWj235MB+qAFzTCu8x1OXOzVUpY=";
+        hash = "sha256-fHp5Rh2Mzn62ZUoVHETl/6kZ6Iztxkd5mjxira7NVBU=";
       };
 
       maturinBuildFlags = [ "--interpreter ${python.executable}" ];
