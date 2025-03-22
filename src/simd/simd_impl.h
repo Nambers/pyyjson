@@ -4,42 +4,43 @@
 #include "pyyjson.h"
 #include "simd/simd_detect.h"
 
+#if PYYJSON_X86
 
 
-#if SIMD_BIT_SIZE == 512
-#    define SIMD_VAR z
-#    define SIMD_TYPE __m512i
-#    define SIMD_MASK_TYPE u64
-#    define SIMD_SMALL_MASK_TYPE u16
-#    define SIMD_BIT_MASK_TYPE u64
-#    define SIMD_HALF_TYPE __m256i
-#    define SIMD_EXTRACT_QUARTER _mm512_extracti32x4_epi32
-#    define SIMD_EXTRACT_HALF _mm512_extracti64x4_epi64
-#    define SIMD_REAL_HALF_TYPE __m256i
-#    define SIMD_REAL_QUARTER_TYPE __m128i
-#elif SIMD_BIT_SIZE == 256
-#    define SIMD_VAR y
-#    define SIMD_TYPE __m256i
-#    define SIMD_MASK_TYPE SIMD_TYPE
-#    define SIMD_SMALL_MASK_TYPE __m128i
-#    define SIMD_BIT_MASK_TYPE u32
-#    define SIMD_HALF_TYPE __m128i
-#    define SIMD_EXTRACT_HALF _mm256_extracti128_si256
-#    define SIMD_REAL_HALF_TYPE __m128i
-#    define SIMD_REAL_QUARTER_TYPE u64
-#else
-#    define SIMD_VAR x
-#    define SIMD_TYPE __m128i
-#    define SIMD_MASK_TYPE SIMD_TYPE
-#    define SIMD_SMALL_MASK_TYPE SIMD_TYPE
-#    define SIMD_BIT_MASK_TYPE u16
-#    define SIMD_HALF_TYPE SIMD_TYPE
-#    define SIMD_REAL_HALF_TYPE u64
-#    define SIMD_REAL_QUARTER_TYPE u32
-#endif
+#    if SIMD_BIT_SIZE == 512
+#        define SIMD_VAR z
+#        define SIMD_TYPE __m512i
+#        define SIMD_MASK_TYPE u64
+#        define SIMD_SMALL_MASK_TYPE u16
+#        define SIMD_BIT_MASK_TYPE u64
+#        define SIMD_HALF_TYPE __m256i
+#        define SIMD_EXTRACT_QUARTER _mm512_extracti32x4_epi32
+#        define SIMD_EXTRACT_HALF _mm512_extracti64x4_epi64
+#        define SIMD_REAL_HALF_TYPE __m256i
+#        define SIMD_REAL_QUARTER_TYPE __m128i
+#    elif SIMD_BIT_SIZE == 256
+#        define SIMD_VAR y
+#        define SIMD_TYPE __m256i
+#        define SIMD_MASK_TYPE SIMD_TYPE
+#        define SIMD_SMALL_MASK_TYPE __m128i
+#        define SIMD_BIT_MASK_TYPE u32
+#        define SIMD_HALF_TYPE __m128i
+#        define SIMD_EXTRACT_HALF _mm256_extracti128_si256
+#        define SIMD_REAL_HALF_TYPE __m128i
+#        define SIMD_REAL_QUARTER_TYPE u64
+#    else
+#        define SIMD_VAR x
+#        define SIMD_TYPE __m128i
+#        define SIMD_MASK_TYPE SIMD_TYPE
+#        define SIMD_SMALL_MASK_TYPE SIMD_TYPE
+#        define SIMD_BIT_MASK_TYPE u16
+#        define SIMD_HALF_TYPE SIMD_TYPE
+#        define SIMD_REAL_HALF_TYPE u64
+#        define SIMD_REAL_QUARTER_TYPE u32
+#    endif
 
-#define SIMD_STORER PYYJSON_CONCAT2(write, SIMD_BIT_SIZE)
-#define SIMD_AND PYYJSON_CONCAT2(simd_and, SIMD_BIT_SIZE)
+#    define SIMD_STORER PYYJSON_CONCAT2(write, SIMD_BIT_SIZE)
+#    define SIMD_AND PYYJSON_CONCAT2(simd_and, SIMD_BIT_SIZE)
 
 /*==============================================================================
  * common SIMD code
@@ -48,26 +49,26 @@
 /*
  * Right shift 128 bits. Shifted bits should be multiple of 8.
  */
-#define RIGHT_SHIFT_128BITS(x, bits, out_ptr)                  \
-    do {                                                       \
-        static_assert(((bits) % 8) == 0, "((bits) % 8) == 0"); \
-        *(out_ptr) = _mm_bsrli_si128((x), (bits) / 8);         \
-    } while (0)
+#    define RIGHT_SHIFT_128BITS(x, bits, out_ptr)                  \
+        do {                                                       \
+            static_assert(((bits) % 8) == 0, "((bits) % 8) == 0"); \
+            *(out_ptr) = _mm_bsrli_si128((x), (bits) / 8);         \
+        } while (0)
 
 /*
  * Load memory to a simd variable.
  * This is unaligned.
  */
 force_inline SIMD_TYPE load_simd(const void *src) {
-#if SIMD_BIT_SIZE == 512
+#    if SIMD_BIT_SIZE == 512
     return _mm512_loadu_si512(src);
-#elif SIMD_BIT_SIZE == 256
+#    elif SIMD_BIT_SIZE == 256
     return _mm256_lddqu_si256((const SIMD_256_IU *)src);
-#elif __SSE3__
+#    elif __SSE3__
     return _mm_lddqu_si128((const SIMD_128_IU *)src);
-#else
+#    else
     return _mm_loadu_si128((const SIMD_128_IU *)src);
-#endif
+#    endif
 }
 
 /*
@@ -75,13 +76,13 @@ force_inline SIMD_TYPE load_simd(const void *src) {
  * This is aligned.
  */
 force_inline SIMD_TYPE load_simd_aligned(const void *src) {
-#if SIMD_BIT_SIZE == 512
+#    if SIMD_BIT_SIZE == 512
     return _mm512_load_si512(src);
-#elif SIMD_BIT_SIZE == 256
+#    elif SIMD_BIT_SIZE == 256
     return _mm256_load_si256((const __m256i *)src);
-#else
+#    else
     return _mm_load_si128((const __m128i *)src);
-#endif
+#    endif
 }
 
 /*
@@ -89,13 +90,13 @@ force_inline SIMD_TYPE load_simd_aligned(const void *src) {
  * This is unaligned.
  */
 force_inline void write_simd(void *dst, SIMD_TYPE SIMD_VAR) {
-#if SIMD_BIT_SIZE == 512
+#    if SIMD_BIT_SIZE == 512
     _mm512_storeu_si512(dst, SIMD_VAR);
-#elif SIMD_BIT_SIZE == 256
+#    elif SIMD_BIT_SIZE == 256
     _mm256_storeu_si256((SIMD_256_IU *)dst, SIMD_VAR);
-#else
+#    else
     _mm_storeu_si128((SIMD_128_IU *)dst, SIMD_VAR);
-#endif
+#    endif
 }
 
 /*
@@ -103,13 +104,13 @@ force_inline void write_simd(void *dst, SIMD_TYPE SIMD_VAR) {
  * The `dst` must be aligned.
  */
 force_inline void write_aligned(void *dst, SIMD_TYPE SIMD_VAR) {
-#if SIMD_BIT_SIZE == 128
+#    if SIMD_BIT_SIZE == 128
     _mm_store_si128((__m128i *)dst, SIMD_VAR);
-#elif SIMD_BIT_SIZE == 256
+#    elif SIMD_BIT_SIZE == 256
     _mm256_store_si256((__m256i *)dst, SIMD_VAR);
-#else
+#    else
     _mm512_store_si512(dst, SIMD_VAR);
-#endif
+#    endif
 }
 
 /*
@@ -120,11 +121,11 @@ force_inline void write_128(void *dst, SIMD_128 x) {
 }
 
 force_inline SIMD_128 load_128(const void *src) {
-#if __SSE3__
+#    if __SSE3__
     return _mm_lddqu_si128((const SIMD_128_IU *)src);
-#else
+#    else
     return _mm_loadu_si128((const SIMD_128_IU *)src);
-#endif
+#    endif
 }
 
 force_inline SIMD_128 load_128_aligned(const void *src) {
@@ -156,11 +157,11 @@ force_inline SIMD_128 broadcast_32_128(i32 v) {
 }
 
 force_inline SIMD_128 broadcast_64_128(i64 v) {
-#if defined(_MSC_VER) && !defined(_M_IX86)
+#    if defined(_MSC_VER) && !defined(_M_IX86)
     return _mm_set1_epi64x(v);
-#else
+#    else
     return _mm_set1_epi64((__m64)v);
-#endif
+#    endif
 }
 
 force_inline const void *read_rshift_mask_table(int row);
@@ -170,9 +171,9 @@ force_inline const void *read_rshift_mask_table(int row);
  Shifted bits should be multiple of 8; imm8 is the number of "bytes" to shift.
  */
 force_inline SIMD_128 runtime_right_shift_128bits(SIMD_128 x, int imm8) {
-#if __SSSE3__
+#    if __SSSE3__
     return _mm_shuffle_epi8(x, load_128_aligned(read_rshift_mask_table(imm8)));
-#else
+#    else
     switch (imm8) {
         case 1: {
             return _mm_bsrli_si128(x, 1);
@@ -241,7 +242,7 @@ force_inline SIMD_128 runtime_right_shift_128bits(SIMD_128 x, int imm8) {
     }
     Py_UNREACHABLE();
     return x;
-#endif
+#    endif
 }
 
 force_inline SIMD_128 set_32_128(i32 d, i32 c, i32 b, i32 a) {
@@ -292,19 +293,19 @@ force_inline SIMD_128 satureate_minus_128(SIMD_128 a, SIMD_128 b) {
  * See https://github.com/samyvilar/dyn_perf/blob/master/sse2.h
  */
 force_inline SIMD_128 elevate_1_2_to_128(SIMD_128 a) {
-#if __SSE4_1__
+#    if __SSE4_1__
     return _mm_cvtepu8_epi16(a);
-#elif __SSSE3__
+#    elif __SSSE3__
     return _mm_shuffle_epi8(a, _mm_set_epi8(0x80, 7, 0x80, 6, 0x80, 5, 0x80, 4, 0x80, 3, 0x80, 2, 0x80, 1, 0x80, 0));
-#else
+#    else
     return _mm_unpacklo_epi8(a, _mm_setzero_si128()); // ~2 cycles ..
-#endif
+#    endif
 }
 
 force_inline SIMD_128 elevate_1_4_to_128(SIMD_128 a) {
-#if __SSE4_1__
+#    if __SSE4_1__
     return _mm_cvtepu8_epi32(a);
-#elif __SSSE3__
+#    elif __SSSE3__
     return _mm_shuffle_epi8(
             a,
             _mm_set_epi8(
@@ -312,17 +313,17 @@ force_inline SIMD_128 elevate_1_4_to_128(SIMD_128 a) {
                     0x80, 0x80, 0x80, 2,
                     0x80, 0x80, 0x80, 1,
                     0x80, 0x80, 0x80, 0));
-#else
+#    else
     a = _mm_unpacklo_epi8(a, a);                         // a0, a0, a1, a1, a2, a2, a3, a3, ....
     return _mm_srli_epi32(_mm_unpacklo_epi16(a, a), 24); // ~ 3 cycles ...
-#endif
+#    endif
 }
 
 force_inline SIMD_128 elevate_2_4_to_128(SIMD_128 a) {
 
-#if defined(__SSE4_1__)
+#    if defined(__SSE4_1__)
     return _mm_cvtepu16_epi32(a);
-#elif defined(__SSSE3__)
+#    elif defined(__SSSE3__)
     return _mm_shuffle_epi8(
             a,
             _mm_set_epi8(
@@ -330,9 +331,9 @@ force_inline SIMD_128 elevate_2_4_to_128(SIMD_128 a) {
                     0x80, 0x80, 5, 4,
                     0x80, 0x80, 3, 2,
                     0x80, 0x80, 1, 0));
-#else
+#    else
     return _mm_unpacklo_epi16(a, _mm_setzero_si128());
-#endif
+#    endif
 }
 
 force_inline void extract_128_two_parts(SIMD_128 x, SIMD_128 *restrict x1, SIMD_128 *restrict x2) {
@@ -341,24 +342,24 @@ force_inline void extract_128_two_parts(SIMD_128 x, SIMD_128 *restrict x1, SIMD_
 }
 
 force_inline void extract_128_four_parts(SIMD_128 x, SIMD_128 *restrict x1, SIMD_128 *restrict x2, SIMD_128 *restrict x3, SIMD_128 *restrict x4) {
-#if __SSE3__
-#    define MOVEHDUP(_x) (SIMD_128) _mm_movehdup_ps((__m128)(_x))
-#else
-#    define MOVEHDUP(_x) _mm_bsrli_si128((_x), 4)
-#endif
+#    if __SSE3__
+#        define MOVEHDUP(_x) (SIMD_128) _mm_movehdup_ps((__m128)(_x))
+#    else
+#        define MOVEHDUP(_x) _mm_bsrli_si128((_x), 4)
+#    endif
     *x1 = x;
     *x2 = MOVEHDUP(x);
     *x3 = unpack_hi_64_128(x, x);
     *x4 = MOVEHDUP(*x3);
-#undef MOVEHDUP
+#    undef MOVEHDUP
 }
 
 force_inline u64 real_extract_first_64_from_128(SIMD_128 x) {
-#if defined(_MSC_VER) && !defined(_M_IX86)
+#    if defined(_MSC_VER) && !defined(_M_IX86)
     return (u64)_mm_cvtsi128_si64x(x);
-#else
+#    else
     return (u64)_mm_cvtsi128_si64(x);
-#endif
+#    endif
 }
 
 force_inline u32 real_extract_first_32_from_128(SIMD_128 x) {
@@ -367,34 +368,34 @@ force_inline u32 real_extract_first_32_from_128(SIMD_128 x) {
 
 /* (a & b) == 0 */
 force_inline bool testz_128(SIMD_128 a, SIMD_128 b) {
-#if defined(__SSE4_1__)
+#    if defined(__SSE4_1__)
     return (bool)_mm_testz_si128(a, b);
-#else
+#    else
     return _mm_movemask_epi8(_mm_cmpeq_epi8(simd_and_128(a, b), _mm_setzero_si128())) == 0xFFFF;
-#endif
+#    endif
 }
 
 /*
  * Mask utilities.
  */
 force_inline bool check_mask_zero(SIMD_MASK_TYPE mask) {
-#if SIMD_BIT_SIZE == 512
+#    if SIMD_BIT_SIZE == 512
     return mask == 0;
-#elif SIMD_BIT_SIZE == 256
+#    elif SIMD_BIT_SIZE == 256
     return (bool)_mm256_testz_si256(mask, mask);
-#else
-#    if defined(__SSE4_1__)
-    return (bool)_mm_testz_si128(mask, mask);
 #    else
+#        if defined(__SSE4_1__)
+    return (bool)_mm_testz_si128(mask, mask);
+#        else
     return _mm_movemask_epi8(_mm_cmpeq_epi8(mask, _mm_setzero_si128())) == 0xFFFF;
+#        endif
 #    endif
-#endif
 }
 
 /*==============================================================================
  * SSE4.1 only SIMD code
  *============================================================================*/
-#if __SSE4_1__
+#    if __SSE4_1__
 force_inline SIMD_128 blendv_128(SIMD_128 blend, SIMD_128 x, SIMD_128 mask) {
     return _mm_blendv_epi8(blend, x, mask);
 }
@@ -410,18 +411,18 @@ force_inline void blendv_writetail_128(SIMD_128 to_write, void *addr, SIMD_128 t
     SIMD_128 blended = blendv_128(blend_A, to_write, tailmask);
     write_128(addr, blended);
 }
-#endif
+#    endif
 
 /*==============================================================================
  * SSE4.2 only SIMD code
  *============================================================================*/
-#if __SSE4_2__
-#endif
+#    if __SSE4_2__
+#    endif
 
 /*==============================================================================
  * AVX only SIMD code
  *============================================================================*/
-#if __AVX__
+#    if __AVX__
 force_inline SIMD_256 load_256(const void *src) {
     return _mm256_lddqu_si256((const SIMD_256_IU *)src);
 }
@@ -453,12 +454,12 @@ force_inline SIMD_256 broadcast_32_256(i32 v) {
 force_inline bool testz_256(SIMD_256 y) {
     return (bool)_mm256_testz_si256(y, y);
 }
-#endif
+#    endif
 
 /*==============================================================================
  * AVX2 only SIMD code
  *============================================================================*/
-#if __AVX2__
+#    if __AVX2__
 force_inline SIMD_256 cmpneq_8_256(SIMD_256 a, SIMD_256 b) {
     return _mm256_cmpeq_epi8(_mm256_cmpeq_epi8(a, b), _mm256_setzero_si256());
 }
@@ -568,12 +569,12 @@ force_inline SIMD_128 zip_256_32_to_16(SIMD_256 y) {
     return _mm_packus_epi32(x_low, x_high);
 }
 
-#endif
+#    endif
 
 /*==============================================================================
  * AVX512F only SIMD code
  *============================================================================*/
-#if __AVX512F__
+#    if __AVX512F__
 force_inline SIMD_512 load_512(const void *src) {
     return _mm512_loadu_si512(src);
 }
@@ -629,12 +630,12 @@ force_inline void extract_512_four_parts(SIMD_512 z, SIMD_128 *restrict x1, SIMD
     *x3 = _mm512_extracti32x4_epi32(z, 2);
     *x4 = _mm512_extracti32x4_epi32(z, 3);
 }
-#endif
+#    endif
 
 /*==============================================================================
  * AVX512BW only SIMD code
  *============================================================================*/
-#if __AVX512BW__
+#    if __AVX512BW__
 force_inline SIMD_512 elevate_1_2_to_512(SIMD_256 y) {
     return _mm512_cvtepu8_epi16(y);
 }
@@ -646,30 +647,30 @@ force_inline u64 cmpneq_8_512(SIMD_512 a, SIMD_512 b) {
 force_inline u32 cmpneq_16_512(SIMD_512 a, SIMD_512 b) {
     return (u32)_mm512_cmpneq_epi16_mask(a, b);
 }
-#endif
+#    endif
 
 /*==============================================================================
  * SIMD half related.
  * This does not have 128-bits version.
  *============================================================================*/
-#if SIMD_BIT_SIZE > 128
+#    if SIMD_BIT_SIZE > 128
 force_inline SIMD_HALF_TYPE load_aligned_half(const void *src) {
-#    if SIMD_BIT_SIZE == 256
+#        if SIMD_BIT_SIZE == 256
     return load_128_aligned(src);
-#    else // SIMD_BIT_SIZE == 512
+#        else // SIMD_BIT_SIZE == 512
     return load_256_aligned(src);
-#    endif
+#        endif
 }
 
 force_inline SIMD_HALF_TYPE load_half(const void *src) {
-#    if SIMD_BIT_SIZE == 256
+#        if SIMD_BIT_SIZE == 256
     return load_128(src);
-#    else
+#        else
     return load_256(src);
-#    endif
+#        endif
 }
 
-#endif // SIMD_BIT_SIZE > 128
+#    endif // SIMD_BIT_SIZE > 128
 
 /*==============================================================================
  * Zip unsigned integer related.
@@ -677,7 +678,7 @@ force_inline SIMD_HALF_TYPE load_half(const void *src) {
  *============================================================================*/
 
 force_inline SIMD_REAL_HALF_TYPE zip_simd_32_to_16(SIMD_TYPE SIMD_VAR) {
-#if SIMD_BIT_SIZE == 512
+#    if SIMD_BIT_SIZE == 512
     /* z = A|B|C|D */
     SIMD_128 x1, x2, x3, x4;
     extract_512_four_parts(z, &x1, &x2, &x3, &x4);
@@ -686,11 +687,11 @@ force_inline SIMD_REAL_HALF_TYPE zip_simd_32_to_16(SIMD_TYPE SIMD_VAR) {
     /* y2 = B|D */
     SIMD_256 y2 = _mm256_set_m128i(x4, x2);
     return _mm256_packus_epi32(y1, y2);
-#elif SIMD_BIT_SIZE == 256
+#    elif SIMD_BIT_SIZE == 256
     return zip_256_32_to_16(y);
-#elif __SSE4_1__
+#    elif __SSE4_1__
     return (SIMD_REAL_HALF_TYPE)real_extract_first_64_from_128(_mm_packus_epi32(x, x));
-#else
+#    else
     // in this case we don't have the convenient `_mm_packus_epi32`
     // TODO: is this really faster than *dst++ = *src++ ???
     /* x =  aa00bb00|cc00dd00 */
@@ -705,11 +706,11 @@ force_inline SIMD_REAL_HALF_TYPE zip_simd_32_to_16(SIMD_TYPE SIMD_VAR) {
     /* x5 = bbddcc00|dd000000 */
     SIMD_128 x5 = simd_or_128(x2, x3);
     return (SIMD_REAL_HALF_TYPE)real_extract_first_64_from_128(_mm_unpacklo_epi16(x4, x5));
-#endif
+#    endif
 }
 
 force_inline SIMD_REAL_HALF_TYPE zip_simd_16_to_8(SIMD_TYPE SIMD_VAR) {
-#if SIMD_BIT_SIZE == 512
+#    if SIMD_BIT_SIZE == 512
     /* z = A|B|C|D */
     SIMD_128 x1, x2, x3, x4;
     extract_512_four_parts(z, &x1, &x2, &x3, &x4);
@@ -718,16 +719,16 @@ force_inline SIMD_REAL_HALF_TYPE zip_simd_16_to_8(SIMD_TYPE SIMD_VAR) {
     /* y2 = B|D */
     SIMD_256 y2 = _mm256_set_m128i(x4, x2);
     return _mm256_packus_epi16(y1, y2);
-#elif SIMD_BIT_SIZE == 256
+#    elif SIMD_BIT_SIZE == 256
     return zip_256_16_to_8(y);
-#else
+#    else
     /* x = aaxxbbxxccxxddxx */
     return (SIMD_REAL_HALF_TYPE)real_extract_first_64_from_128(_mm_packus_epi16(x, x));
-#endif
+#    endif
 }
 
 force_inline SIMD_REAL_QUARTER_TYPE zip_simd_32_to_8(SIMD_TYPE SIMD_VAR) {
-#if SIMD_BIT_SIZE == 512
+#    if SIMD_BIT_SIZE == 512
     pyyjson_align(64) static const u8 t1[64] = {
             0, 4, 8, 12,
             0x80, 0x80,
@@ -764,9 +765,9 @@ force_inline SIMD_REAL_QUARTER_TYPE zip_simd_32_to_8(SIMD_TYPE SIMD_VAR) {
     SIMD_128 x1, x2, x3, x4;
     extract_512_four_parts(z1, &x1, &x2, &x3, &x4);
     return simd_or_128(simd_or_128(x1, x2), simd_or_128(x3, x4));
-#elif SIMD_BIT_SIZE == 256
+#    elif SIMD_BIT_SIZE == 256
     return zip_256_32_to_8(y);
-#elif __SSSE3__
+#    elif __SSSE3__
     pyyjson_align(64) static const u8 t1[16] = {0, 4, 8, 12,
                                                 0x80, 0x80,
                                                 0x80, 0x80,
@@ -775,35 +776,37 @@ force_inline SIMD_REAL_QUARTER_TYPE zip_simd_32_to_8(SIMD_TYPE SIMD_VAR) {
                                                 0x80, 0x80,
                                                 0x80, 0x80};
     return (SIMD_REAL_QUARTER_TYPE)real_extract_first_32_from_128(_mm_shuffle_epi8(x, load_128_aligned(t1)));
-#else
+#    else
     // first using signed pack to u16. The values in `x` are below 256, so signed pack is equivalent to unsigned pack.
     SIMD_128 x1 = _mm_packs_epi32(x, x);
     // then use unsigned pack to u8
     return real_extract_first_32_from_128(_mm_packus_epi16(x1, x1));
-#endif
+#    endif
 }
 
 /*==============================================================================
  * Half/quarter write.
  *============================================================================*/
 force_inline void write_real_quarter(void *dst, SIMD_REAL_QUARTER_TYPE quat) {
-#if SIMD_BIT_SIZE == 512
+#    if SIMD_BIT_SIZE == 512
     write_128(dst, quat);
-#elif SIMD_BIT_SIZE == 256
+#    elif SIMD_BIT_SIZE == 256
     *(u64 *)dst = quat;
-#else
+#    else
     *(u32 *)dst = quat;
-#endif
+#    endif
 }
 
 force_inline void write_real_half(void *dst, SIMD_REAL_HALF_TYPE half) {
-#if SIMD_BIT_SIZE == 512
+#    if SIMD_BIT_SIZE == 512
     write_256(dst, half);
-#elif SIMD_BIT_SIZE == 256
+#    elif SIMD_BIT_SIZE == 256
     write_128(dst, half);
-#else
+#    else
     *(u64 *)dst = half;
-#endif
+#    endif
 }
+#elif PYYJSON_AARCH
 
+#endif
 #endif // ENCODE_SIMD_IMPL_H
