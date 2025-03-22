@@ -33,7 +33,6 @@
 #            define SIMD_256_IU __m256i_u
 #        endif
 #        define SIMD_512 __m512i
-#        define HAS_SIMD 1
 
 #        if (SIMD_BIT_SIZE > 128) || __SSE4_1__
 #            define PYYJSON_HAS_BLENDV 1
@@ -67,6 +66,7 @@
 #    endif
 #elif PYYJSON_AARCH
 #    include <arm_neon.h>
+static_assert(__LITTLE_ENDIAN__, "currently only little endian is supported");
 #endif
 
 #endif // PYYJSON_SIMD_DETECT_H
