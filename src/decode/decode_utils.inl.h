@@ -76,7 +76,11 @@ force_inline bool _READ_NULL(const _FROM_TYPE **restrict ptr, const _FROM_TYPE *
 
 /** Read 'Infinity' literal (ignoring case). */
 force_inline bool _READ_INF(const _FROM_TYPE **ptr, const _FROM_TYPE *end) {
-#define COMP_TWICE (COMPILE_READ_UCS_LEVEL == 4 && SIMD_BIT_SIZE < 256)
+#if COMPILE_READ_UCS_LEVEL == 4 && (PYYJSON_AARCH || SIMD_BIT_SIZE < 256)
+#    define COMP_TWICE 1
+#else
+#    define COMP_TWICE 0
+#endif
     if (end < *ptr + 8) {
         return false;
     }
