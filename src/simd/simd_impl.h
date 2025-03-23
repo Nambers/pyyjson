@@ -1,8 +1,105 @@
 #ifndef ENCODE_SIMD_IMPL_H
 #define ENCODE_SIMD_IMPL_H
 
+#include "Python.h"
 #include "pyyjson.h"
 #include "simd/simd_detect.h"
+
+/* Common SIMD vector types. */
+#ifdef _MSC_VER
+typedef __declspec(align(16)) struct {
+    u8 v[16];
+} VECTOR_U8_128_A;
+
+typedef __declspec(align(1)) struct {
+    u8 v[16];
+} VECTOR_U8_128_U;
+
+typedef __declspec(align(16)) struct {
+    u16 v[8];
+} VECTOR_U16_128_A;
+
+typedef __declspec(align(2)) struct {
+    u16 v[8];
+} VECTOR_U16_128_U;
+
+typedef __declspec(align(16)) struct {
+    u32 v[4];
+} VECTOR_U32_128_A;
+
+typedef __declspec(align(4)) struct {
+    u32 v[4];
+} VECTOR_U32_128_U;
+
+typedef __declspec(align(32)) struct {
+    u8 v[32];
+} VECTOR_U8_256_A;
+
+typedef __declspec(align(1)) struct {
+    u8 v[32];
+} VECTOR_U8_256_U;
+
+typedef __declspec(align(32)) struct {
+    u16 v[16];
+} VECTOR_U16_256_A;
+
+typedef __declspec(align(2)) struct {
+    u16 v[16];
+} VECTOR_U16_256_U;
+
+typedef __declspec(align(32)) struct {
+    u32 v[8];
+} VECTOR_U32_256_A;
+
+typedef __declspec(align(4)) struct {
+    u32 v[8];
+} VECTOR_U32_256_U;
+
+typedef __declspec(align(64)) struct {
+    u8 v[64];
+} VECTOR_U8_512_A;
+
+typedef __declspec(align(1)) struct {
+    u8 v[64];
+} VECTOR_U8_512_U;
+
+typedef __declspec(align(64)) struct {
+    u16 v[32];
+} VECTOR_U16_512_A;
+
+typedef __declspec(align(2)) struct {
+    u16 v[32];
+} VECTOR_U16_512_U;
+
+typedef __declspec(align(64)) struct {
+    u32 v[16];
+} VECTOR_U32_512_A;
+
+typedef __declspec(align(4)) struct {
+    u32 v[16];
+} VECTOR_U32_512_U;
+
+#else
+typedef u8 VECTOR_U8_128_A __attribute__((__vector_size__(16), __aligned__(16)));
+typedef u8 VECTOR_U8_128_U __attribute__((__vector_size__(16), __aligned__(1)));
+typedef u16 VECTOR_U16_128_A __attribute__((__vector_size__(16), __aligned__(16)));
+typedef u16 VECTOR_U16_128_U __attribute__((__vector_size__(16), __aligned__(2)));
+typedef u32 VECTOR_U32_128_A __attribute__((__vector_size__(16), __aligned__(16)));
+typedef u32 VECTOR_U32_128_U __attribute__((__vector_size__(16), __aligned__(4)));
+typedef u8 VECTOR_U8_256_A __attribute__((__vector_size__(32), __aligned__(32)));
+typedef u8 VECTOR_U8_256_U __attribute__((__vector_size__(32), __aligned__(1)));
+typedef u16 VECTOR_U16_256_A __attribute__((__vector_size__(32), __aligned__(32)));
+typedef u16 VECTOR_U16_256_U __attribute__((__vector_size__(32), __aligned__(2)));
+typedef u32 VECTOR_U32_256_A __attribute__((__vector_size__(32), __aligned__(32)));
+typedef u32 VECTOR_U32_256_U __attribute__((__vector_size__(32), __aligned__(4)));
+typedef u8 VECTOR_U8_512_A __attribute__((__vector_size__(64), __aligned__(64)));
+typedef u8 VECTOR_U8_512_U __attribute__((__vector_size__(64), __aligned__(1)));
+typedef u16 VECTOR_U16_512_A __attribute__((__vector_size__(64), __aligned__(64)));
+typedef u16 VECTOR_U16_512_U __attribute__((__vector_size__(64), __aligned__(2)));
+typedef u32 VECTOR_U32_512_A __attribute__((__vector_size__(64), __aligned__(64)));
+typedef u32 VECTOR_U32_512_U __attribute__((__vector_size__(64), __aligned__(4)));
+#endif
+
 
 #if PYYJSON_X86
 
@@ -292,7 +389,7 @@ force_inline SIMD_128 satureate_minus_128(SIMD_128 a, SIMD_128 b) {
 /* Elevate utilities.
  * See https://github.com/samyvilar/dyn_perf/blob/master/sse2.h
  */
-force_inline SIMD_128 elevate_1_2_to_128(SIMD_128 a) {
+force_inline VECTOR_U16_128_A elevate_1_2_to_128(VECTOR_U8_128_A a) {
 #    if __SSE4_1__
     return _mm_cvtepu8_epi16(a);
 #    elif __SSSE3__
