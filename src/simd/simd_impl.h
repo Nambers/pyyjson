@@ -7,73 +7,56 @@
 
 /* Common SIMD vector types. */
 #ifdef _MSC_VER
-typedef __declspec(align(16)) struct {
-    u8 v[16];
-} VECTOR_U8_128_A;
+typedef __m128i VECTOR_U8_128_A;
+
 
 typedef __declspec(align(1)) struct {
     u8 v[16];
 } VECTOR_U8_128_U;
 
-typedef __declspec(align(16)) struct {
-    u16 v[8];
-} VECTOR_U16_128_A;
+typedef __m128i VECTOR_U16_128_A;
 
 typedef __declspec(align(2)) struct {
     u16 v[8];
 } VECTOR_U16_128_U;
 
-typedef __declspec(align(16)) struct {
-    u32 v[4];
-} VECTOR_U32_128_A;
+typedef __m128i VECTOR_U32_128_A;
 
 typedef __declspec(align(4)) struct {
     u32 v[4];
 } VECTOR_U32_128_U;
 
-typedef __declspec(align(32)) struct {
-    u8 v[32];
-} VECTOR_U8_256_A;
+typedef __m256i VECTOR_U8_256_A;
 
 typedef __declspec(align(1)) struct {
     u8 v[32];
 } VECTOR_U8_256_U;
 
-typedef __declspec(align(32)) struct {
-    u16 v[16];
-} VECTOR_U16_256_A;
+typedef __m256i VECTOR_U16_256_A;
 
 typedef __declspec(align(2)) struct {
     u16 v[16];
 } VECTOR_U16_256_U;
 
-typedef __declspec(align(32)) struct {
-    u32 v[8];
-} VECTOR_U32_256_A;
+typedef __m256i VECTOR_U32_256_A;
 
 typedef __declspec(align(4)) struct {
     u32 v[8];
 } VECTOR_U32_256_U;
 
-typedef __declspec(align(64)) struct {
-    u8 v[64];
-} VECTOR_U8_512_A;
+typedef __m512i VECTOR_U8_512_A;
 
 typedef __declspec(align(1)) struct {
     u8 v[64];
 } VECTOR_U8_512_U;
 
-typedef __declspec(align(64)) struct {
-    u16 v[32];
-} VECTOR_U16_512_A;
+typedef __m512i VECTOR_U16_512_A;
 
 typedef __declspec(align(2)) struct {
     u16 v[32];
 } VECTOR_U16_512_U;
 
-typedef __declspec(align(64)) struct {
-    u32 v[16];
-} VECTOR_U32_512_A;
+typedef __m512i VECTOR_U32_512_A;
 
 typedef __declspec(align(4)) struct {
     u32 v[16];
@@ -399,7 +382,7 @@ force_inline VECTOR_U16_128_A elevate_1_2_to_128(VECTOR_U8_128_A a) {
 #    endif
 }
 
-force_inline SIMD_128 elevate_1_4_to_128(SIMD_128 a) {
+force_inline VECTOR_U32_128_A elevate_1_4_to_128(VECTOR_U8_128_A a) {
 #    if __SSE4_1__
     return _mm_cvtepu8_epi32(a);
 #    elif __SSSE3__
@@ -416,7 +399,7 @@ force_inline SIMD_128 elevate_1_4_to_128(SIMD_128 a) {
 #    endif
 }
 
-force_inline SIMD_128 elevate_2_4_to_128(SIMD_128 a) {
+force_inline VECTOR_U32_128_A elevate_2_4_to_128(VECTOR_U16_128_A a) {
 
 #    if defined(__SSE4_1__)
     return _mm_cvtepu16_epi32(a);
@@ -536,15 +519,15 @@ force_inline void write_256_aligned(void *dst, SIMD_256 y) {
     _mm256_store_si256((__m256i *)dst, y);
 }
 
-force_inline SIMD_256 broadcast_8_256(i8 v) {
+force_inline VECTOR_U8_256_A broadcast_8_256(i8 v) {
     return _mm256_set1_epi8(v);
 }
 
-force_inline SIMD_256 broadcast_16_256(i16 v) {
+force_inline VECTOR_U16_256_A broadcast_16_256(i16 v) {
     return _mm256_set1_epi16(v);
 }
 
-force_inline SIMD_256 broadcast_32_256(i32 v) {
+force_inline VECTOR_U32_256_A broadcast_32_256(i32 v) {
     return _mm256_set1_epi32(v);
 }
 
@@ -557,27 +540,27 @@ force_inline bool testz_256(SIMD_256 y) {
  * AVX2 only SIMD code
  *============================================================================*/
 #    if __AVX2__
-force_inline SIMD_256 cmpneq_8_256(SIMD_256 a, SIMD_256 b) {
+force_inline VECTOR_U8_256_A cmpneq_8_256(VECTOR_U8_256_A a, VECTOR_U8_256_A b) {
     return _mm256_cmpeq_epi8(_mm256_cmpeq_epi8(a, b), _mm256_setzero_si256());
 }
 
-force_inline SIMD_256 cmpneq_16_256(SIMD_256 a, SIMD_256 b) {
+force_inline VECTOR_U16_256_A cmpneq_16_256(VECTOR_U16_256_A a, VECTOR_U16_256_A b) {
     return _mm256_cmpeq_epi16(_mm256_cmpeq_epi16(a, b), _mm256_setzero_si256());
 }
 
-force_inline SIMD_256 cmpneq_32_256(SIMD_256 a, SIMD_256 b) {
+force_inline VECTOR_U32_256_A cmpneq_32_256(VECTOR_U32_256_A a, VECTOR_U32_256_A b) {
     return _mm256_cmpeq_epi32(_mm256_cmpeq_epi32(a, b), _mm256_setzero_si256());
 }
 
-force_inline SIMD_256 elevate_1_2_to_256(SIMD_128 x) {
+force_inline VECTOR_U16_256_A elevate_1_2_to_256(VECTOR_U8_128_A x) {
     return _mm256_cvtepu8_epi16(x);
 }
 
-force_inline SIMD_256 elevate_1_4_to_256(SIMD_128 x) {
+force_inline VECTOR_U32_256_A elevate_1_4_to_256(VECTOR_U8_128_A x) {
     return _mm256_cvtepu8_epi32(x);
 }
 
-force_inline SIMD_256 elevate_2_4_to_256(SIMD_128 x) {
+force_inline VECTOR_U32_256_A elevate_2_4_to_256(VECTOR_U16_128_A x) {
     return _mm256_cvtepu16_epi32(x);
 }
 
@@ -594,7 +577,7 @@ force_inline u32 to_bitmask_256(SIMD_256 a) {
     return (u32)t;
 }
 
-force_inline SIMD_256 cmpeq0_8_256(SIMD_256 a) {
+force_inline VECTOR_U8_256_A cmpeq0_8_256(VECTOR_U8_256_A a) {
     return _mm256_cmpeq_epi8(a, _mm256_setzero_si256());
 }
 
@@ -625,17 +608,17 @@ force_inline void extract_256_four_parts(SIMD_256 y, SIMD_128 *restrict x1, SIMD
     *x4 = unpack_hi_64_128(*x3, *x3);
 }
 
-force_inline SIMD_256 cmpgt_i32_256(SIMD_256 a, SIMD_256 b) {
+force_inline VECTOR_U32_256_A cmpgt_i32_256(VECTOR_U32_256_A a, VECTOR_U32_256_A b) {
     return _mm256_cmpgt_epi32(a, b);
 }
 
-force_inline SIMD_128 zip_256_16_to_8(SIMD_256 y) {
+force_inline VECTOR_U8_128_A zip_256_16_to_8(VECTOR_U16_256_A y) {
     __m128i x_low = _mm256_extracti128_si256(y, 0);
     __m128i x_high = _mm256_extracti128_si256(y, 1);
     return _mm_packus_epi16(x_low, x_high);
 }
 
-force_inline u64 zip_256_32_to_8(SIMD_256 y) {
+force_inline u64 zip_256_32_to_8(VECTOR_U32_256_A y) {
     /*y = axxxbxxxcxxxdxxx|exxxfxxxgxxxhxxx */
     pyyjson_align(64) static const u8 t1[32] = {0, 4, 8, 12,
                                                 0x80, 0x80,
@@ -660,7 +643,7 @@ force_inline u64 zip_256_32_to_8(SIMD_256 y) {
     return (u64)(i1 | i2);
 }
 
-force_inline SIMD_128 zip_256_32_to_16(SIMD_256 y) {
+force_inline VECTOR_U16_128_A zip_256_32_to_16(VECTOR_U32_256_A y) {
     __m128i x_low = _mm256_extracti128_si256(y, 0);
     __m128i x_high = _mm256_extracti128_si256(y, 1);
     return _mm_packus_epi32(x_low, x_high);
@@ -692,27 +675,27 @@ force_inline SIMD_512 simd_and_512(SIMD_512 a, SIMD_512 b) {
     return _mm512_and_si512(a, b);
 }
 
-force_inline u16 cmpneq_32_512(SIMD_512 a, SIMD_512 b) {
+force_inline u16 cmpneq_32_512(VECTOR_U32_512_A a, VECTOR_U32_512_A b) {
     return (u16)_mm512_cmpneq_epi32_mask(a, b);
 }
 
-force_inline SIMD_512 broadcast_8_512(i8 v) {
+force_inline VECTOR_U8_512_A broadcast_8_512(i8 v) {
     return _mm512_set1_epi8(v);
 }
 
-force_inline SIMD_512 broadcast_16_512(i16 v) {
+force_inline VECTOR_U16_512_A broadcast_16_512(i16 v) {
     return _mm512_set1_epi16(v);
 }
 
-force_inline SIMD_512 broadcast_32_512(i32 v) {
+force_inline VECTOR_U32_512_A broadcast_32_512(i32 v) {
     return _mm512_set1_epi32(v);
 }
 
-force_inline SIMD_512 elevate_2_4_to_512(SIMD_256 y) {
+force_inline VECTOR_U32_512_A elevate_2_4_to_512(VECTOR_U16_256_A y) {
     return _mm512_cvtepu16_epi32(y);
 }
 
-force_inline SIMD_512 elevate_1_4_to_512(SIMD_128 x) {
+force_inline VECTOR_U32_512_A elevate_1_4_to_512(VECTOR_U8_128_A x) {
     return _mm512_cvtepu8_epi32(x);
 }
 
@@ -733,15 +716,15 @@ force_inline void extract_512_four_parts(SIMD_512 z, SIMD_128 *restrict x1, SIMD
  * AVX512BW only SIMD code
  *============================================================================*/
 #    if __AVX512BW__
-force_inline SIMD_512 elevate_1_2_to_512(SIMD_256 y) {
+force_inline VECTOR_U16_512_A elevate_1_2_to_512(VECTOR_U8_256_A y) {
     return _mm512_cvtepu8_epi16(y);
 }
 
-force_inline u64 cmpneq_8_512(SIMD_512 a, SIMD_512 b) {
+force_inline u64 cmpneq_8_512(VECTOR_U8_512_A a, VECTOR_U8_512_A b) {
     return (u64)_mm512_cmpneq_epi8_mask(a, b);
 }
 
-force_inline u32 cmpneq_16_512(SIMD_512 a, SIMD_512 b) {
+force_inline u32 cmpneq_16_512(VECTOR_U16_512_A a, VECTOR_U16_512_A b) {
     return (u32)_mm512_cmpneq_epi16_mask(a, b);
 }
 #    endif
