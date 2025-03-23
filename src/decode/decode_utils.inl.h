@@ -1,6 +1,7 @@
 // requires: READ
 
 #include "decode.h"
+#include "pyyjson.h"
 #include "simd/simd_impl.h"
 
 #define DECODE_SRC_INFO PYYJSON_CONCAT2(DecodeSrcInfo, COMPILE_READ_UCS_LEVEL)
@@ -43,7 +44,7 @@ force_inline bool READ_TO_HEX_U16(const _FROM_TYPE *cur, u16 *val) {
 /** Read 'true' literal, '*cur' should be 't'. */
 force_inline bool _READ_TRUE(const _FROM_TYPE **restrict ptr, const _FROM_TYPE *restrict end) {
     _FROM_TYPE *cur = (_FROM_TYPE *)*ptr;
-    _FROM_TYPE t[4] = {'t', 'r', 'u', 'e'};
+    pyyjson_align(sizeof(_FROM_TYPE) * 4) static const _FROM_TYPE t[4] = {'t', 'r', 'u', 'e'};
     if (likely(end >= cur + 4 && memcmp(cur, t, 4 * sizeof(_FROM_TYPE)) == 0)) {
         *ptr = cur + 4;
         return true;
@@ -55,7 +56,7 @@ force_inline bool _READ_TRUE(const _FROM_TYPE **restrict ptr, const _FROM_TYPE *
 force_inline bool _READ_FALSE(const _FROM_TYPE **restrict ptr, const _FROM_TYPE *restrict end) {
     // the first 'f' is already checked
     _FROM_TYPE *cur = (_FROM_TYPE *)*ptr;
-    _FROM_TYPE t[4] = {'a', 'l', 's', 'e'};
+    pyyjson_align(sizeof(_FROM_TYPE) * 4) static const _FROM_TYPE t[4] = {'a', 'l', 's', 'e'};
     if (likely(end >= cur + 4 && memcmp(cur + 1, t, 4 * sizeof(_FROM_TYPE)) == 0)) {
         *ptr = cur + 5;
         return true;
@@ -66,7 +67,7 @@ force_inline bool _READ_FALSE(const _FROM_TYPE **restrict ptr, const _FROM_TYPE 
 /** Read 'null' literal, '*cur' should be 'n'. */
 force_inline bool _READ_NULL(const _FROM_TYPE **restrict ptr, const _FROM_TYPE *restrict end) {
     _FROM_TYPE *cur = (_FROM_TYPE *)*ptr;
-    _FROM_TYPE t[4] = {'n', 'u', 'l', 'l'};
+    pyyjson_align(sizeof(_FROM_TYPE) * 4) static const _FROM_TYPE t[4] = {'n', 'u', 'l', 'l'};
     if (likely(end >= cur + 4 && memcmp(cur, t, 4 * sizeof(_FROM_TYPE)) == 0)) {
         *ptr = cur + 4;
         return true;
@@ -76,78 +77,44 @@ force_inline bool _READ_NULL(const _FROM_TYPE **restrict ptr, const _FROM_TYPE *
 
 /** Read 'Infinity' literal (ignoring case). */
 force_inline bool _READ_INF(const _FROM_TYPE **ptr, const _FROM_TYPE *end) {
-#define COMP_TWICE (COMPILE_READ_UCS_LEVEL == 4 && SIMD_BIT_SIZE < 256)
-    if (end < *ptr + 8) {
+#define _READ_INF_SIMD_TYPE PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, READ_BIT_SIZEx8, A)
+    if (unlikely(end < *ptr + 8)) {
         return false;
     }
-    static const _FROM_TYPE _mask[16] = {
+    pyyjson_align(sizeof(_FROM_TYPE) * 8) static const _FROM_TYPE _mask[8] = {
             ~(_FROM_TYPE)0x20, ~(_FROM_TYPE)0x20, ~(_FROM_TYPE)0x20, ~(_FROM_TYPE)0x20,
-            ~(_FROM_TYPE)0x20, ~(_FROM_TYPE)0x20, ~(_FROM_TYPE)0x20, ~(_FROM_TYPE)0x20, 0};
-    static const _FROM_TYPE template[16] = {'I', 'N', 'F', 'I', 'N', 'I', 'T', 'Y', 0};
-#if COMP_TWICE
-    SIMD_128 slide1 = load_128((void *)*ptr);
-    SIMD_128 slide2 = load_128((void *)((*ptr) + 4));
-    SIMD_128 mask1 = load_128_aligned(_mask);
-    SIMD_128 mask2 = load_128_aligned(_mask + 4);
-    slide1 = simd_and_128(slide1, mask1);
-    slide2 = simd_and_128(slide2, mask2);
-    if (likely(0 == memcmp(&slide1, &template, 4 * sizeof(u32)) && 0 == memcmp(&slide2, &template[4], 4 * sizeof(u32)))) {
-        ptr += 8;
-        return true;
-    }
-    return false;
-#else // !COMP_TWICE
-#    if COMPILE_READ_UCS_LEVEL == 4
-    SIMD_256 slide = load_256((void *)*ptr);
-    SIMD_256 mask = load_256_aligned(_mask);
-    slide = simd_and_256(slide, mask);
-#    elif COMPILE_READ_UCS_LEVEL == 2
-    SIMD_128 slide = load_128((void *)*ptr);
-    SIMD_128 mask = load_128_aligned(_mask);
-    slide = simd_and_128(slide, mask);
-#    else
-    u64 slide = *(u64 *)*ptr;
-    u64 mask = *(u64 *)_mask;
-    slide = slide & mask;
-#    endif
-    // use memcmp and compiler optimization to avoid repeating the same code
-    if (likely(0 == memcmp(&slide, &template, sizeof(slide)))) {
+            ~(_FROM_TYPE)0x20, ~(_FROM_TYPE)0x20, ~(_FROM_TYPE)0x20, ~(_FROM_TYPE)0x20};
+    pyyjson_align(sizeof(_FROM_TYPE) * 8) static const _FROM_TYPE _template[8] = {
+            'I', 'N', 'F', 'I', 'N', 'I', 'T', 'Y'};
+    _READ_INF_SIMD_TYPE data;
+    memcpy(&data, *ptr, sizeof(data));
+    data = data & *(_READ_INF_SIMD_TYPE *)&_mask;
+    if (likely(0 == memcmp(&data, &_template, sizeof(data)))) {
         *ptr += 8;
         return true;
     }
     return false;
-#endif // !COMP_TWICE
-#undef COMP_TWICE
+#undef _READ_INF_SIMD_TYPE
 }
 
 /** Read 'NaN' literal (ignoring case). */
 force_inline bool _READ_NAN(const _FROM_TYPE **restrict ptr, const _FROM_TYPE *restrict end) {
+#define _READ_NAN_SIMD_TYPE PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, READ_BIT_SIZEx4, A)
     if (end < *ptr + 3) {
         return false;
     }
     // it is safe to load *end, so here we load `4 * sizeof(_FROM_TYPE)` bytes
-    static const _FROM_TYPE _mask[4] = {~(_FROM_TYPE)0x20, ~(_FROM_TYPE)0x20, ~(_FROM_TYPE)0x20, 0};
-    static const _FROM_TYPE template[4] = {'N', 'A', 'N', 0};
-#if COMPILE_READ_UCS_LEVEL == 4
-    SIMD_128 slide = load_128((void *)*ptr);
-    SIMD_128 mask = load_128_aligned(_mask);
-    slide = simd_and_128(slide, mask);
-#elif COMPILE_READ_UCS_LEVEL == 2
-    u64 slide = *(u64 *)*ptr;
-    u64 mask = *(u64 *)_mask;
-    slide = slide & mask;
-#else
-    u32 slide = *(u32 *)*ptr;
-    u32 mask = *(u32 *)_mask;
-    slide = slide & mask;
-#endif
-    // use memcmp and compiler optimization to avoid repeating the same code
-    if (likely(0 == memcmp(&slide, &template, sizeof(slide)))) {
+    pyyjson_align(sizeof(_FROM_TYPE) * 4) static const _FROM_TYPE _mask[4] = {~(_FROM_TYPE)0x20, ~(_FROM_TYPE)0x20, ~(_FROM_TYPE)0x20, 0};
+    pyyjson_align(sizeof(_FROM_TYPE) * 4) static const _FROM_TYPE _template[4] = {'N', 'A', 'N', 0};
+    _READ_NAN_SIMD_TYPE data;
+    memcpy(&data, *ptr, sizeof(data));
+    data = data & *(_READ_NAN_SIMD_TYPE *)&_mask;
+    if (likely(0 == memcmp(&data, &_template, sizeof(data)))) {
         *ptr += 3;
         return true;
     }
-
     return false;
+#undef _READ_NAN_SIMD_TYPE
 }
 
 /** Read 'Infinity' or 'NaN' literal (ignoring case). */
