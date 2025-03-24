@@ -21,7 +21,7 @@ force_inline void VECTOR_WRITE_INDENT(UnicodeVector *restrict vec, Py_ssize_t _c
 
 force_inline UnicodeVector *INDENT_WRITER(UnicodeVector **vec_addr, Py_ssize_t cur_nested_depth, bool is_in_obj, Py_ssize_t additional_reserve_count) {
     UnicodeVector *vec;
-    if (!is_in_obj && COMPILE_INDENT_LEVEL) {
+    if (!is_in_obj && COMPILE_INDENT_LEVEL != 0) {
         vec = VEC_RESERVE(vec_addr, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + additional_reserve_count);
         RETURN_ON_UNLIKELY_ERR(!vec);
         VECTOR_WRITE_INDENT(vec, cur_nested_depth);

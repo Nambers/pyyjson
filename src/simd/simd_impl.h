@@ -7,8 +7,43 @@
 
 /* Common SIMD vector types. */
 #ifdef _MSC_VER
-typedef __m128i VECTOR_U8_128_A;
+typedef u32 VECTOR_U8_32_A;
 
+typedef __declspec(align(1)) struct {
+    u8 v[4];
+} VECTOR_U8_32_U;
+
+typedef u32 VECTOR_U16_32_A;
+
+typedef __declspec(align(2)) struct {
+    u16 v[2];
+} VECTOR_U16_32_U;
+
+typedef u32 VECTOR_U32_32_A;
+
+typedef __declspec(align(4)) struct {
+    u32 v[1];
+} VECTOR_U32_32_U;
+
+typedef u64 VECTOR_U8_64_A;
+
+typedef __declspec(align(1)) struct {
+    u8 v[8];
+} VECTOR_U8_64_U;
+
+typedef u64 VECTOR_U16_64_A;
+
+typedef __declspec(align(2)) struct {
+    u16 v[4];
+} VECTOR_U16_64_U;
+
+typedef u64 VECTOR_U32_64_A;
+
+typedef __declspec(align(4)) struct {
+    u32 v[2];
+} VECTOR_U32_64_U;
+
+typedef __m128i VECTOR_U8_128_A;
 
 typedef __declspec(align(1)) struct {
     u8 v[16];
@@ -63,6 +98,18 @@ typedef __declspec(align(4)) struct {
 } VECTOR_U32_512_U;
 
 #else
+typedef u8 VECTOR_U8_32_A __attribute__((__vector_size__(4), __aligned__(4)));
+typedef u8 VECTOR_U8_32_U __attribute__((__vector_size__(4), __aligned__(1)));
+typedef u16 VECTOR_U16_32_A __attribute__((__vector_size__(4), __aligned__(4)));
+typedef u16 VECTOR_U16_32_U __attribute__((__vector_size__(4), __aligned__(2)));
+typedef u32 VECTOR_U32_32_A __attribute__((__vector_size__(4), __aligned__(4)));
+typedef u32 VECTOR_U32_32_U __attribute__((__vector_size__(4), __aligned__(4)));
+typedef u8 VECTOR_U8_64_A __attribute__((__vector_size__(8), __aligned__(8)));
+typedef u8 VECTOR_U8_64_U __attribute__((__vector_size__(8), __aligned__(1)));
+typedef u16 VECTOR_U16_64_A __attribute__((__vector_size__(8), __aligned__(8)));
+typedef u16 VECTOR_U16_64_U __attribute__((__vector_size__(8), __aligned__(2)));
+typedef u32 VECTOR_U32_64_A __attribute__((__vector_size__(8), __aligned__(8)));
+typedef u32 VECTOR_U32_64_U __attribute__((__vector_size__(8), __aligned__(4)));
 typedef u8 VECTOR_U8_128_A __attribute__((__vector_size__(16), __aligned__(16)));
 typedef u8 VECTOR_U8_128_U __attribute__((__vector_size__(16), __aligned__(1)));
 typedef u16 VECTOR_U16_128_A __attribute__((__vector_size__(16), __aligned__(16)));
@@ -435,7 +482,7 @@ force_inline void extract_128_four_parts(SIMD_128 x, SIMD_128 *restrict x1, SIMD
 }
 
 force_inline u64 real_extract_first_64_from_128(SIMD_128 x) {
-#    if defined(_MSC_VER) && !defined(_M_IX86)
+#    if defined(_MSC_VER) && !defined(_M_IX86) && !defined(__clang__)
     return (u64)_mm_cvtsi128_si64x(x);
 #    else
     return (u64)_mm_cvtsi128_si64(x);

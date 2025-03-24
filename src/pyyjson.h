@@ -248,6 +248,12 @@
 #define PYYJSON_SIMPLE_CONCAT3_EX(a, b, c) a##b##c
 #define PYYJSON_SIMPLE_CONCAT3(a, b, c) PYYJSON_SIMPLE_CONCAT3_EX(a, b, c)
 
+#define PYYJSON_SIMPLE_CONCAT4_EX(a, b, c, d) a##b##c##d
+#define PYYJSON_SIMPLE_CONCAT4(a, b, c, d) PYYJSON_SIMPLE_CONCAT4_EX(a, b, c, d)
+
+#define PYYJSON_SIMPLE_CONCAT5_EX(a, b, c, d, e) a##b##c##d##e
+#define PYYJSON_SIMPLE_CONCAT5(a, b, c, d, e) PYYJSON_SIMPLE_CONCAT3_EX(a, b, c, d, e)
+
 #define PYYJSON_MAX(x, y) ((x) > (y) ? (x) : (y))
 #define PYYJSON_MIN(x, y) ((x) < (y) ? (x) : (y))
 

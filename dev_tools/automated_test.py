@@ -106,7 +106,7 @@ def run_test(args):
             build_type = "Debug"
         else:
             build_type = args.build_type
-        configure_cmd = ["cmake", "-S", ".", "-B", "build", "-DCMAKE_BUILD_TYPE=" + build_type]
+        configure_cmd = ["cmake", "-T", "ClangCL", "-S", ".", "-B", "build", "-DCMAKE_BUILD_TYPE=" + build_type]
         if args.asan:
             configure_cmd += ["-DASAN_ENABLED=ON"]
         subprocess.run(configure_cmd, check=True, env=new_env)
