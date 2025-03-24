@@ -482,7 +482,7 @@ force_inline void extract_128_four_parts(SIMD_128 x, SIMD_128 *restrict x1, SIMD
 }
 
 force_inline u64 real_extract_first_64_from_128(SIMD_128 x) {
-#    if defined(_MSC_VER) && !defined(_M_IX86)
+#    if defined(_MSC_VER) && !defined(_M_IX86) && !defined(__clang__)
     return (u64)_mm_cvtsi128_si64x(x);
 #    else
     return (u64)_mm_cvtsi128_si64(x);
