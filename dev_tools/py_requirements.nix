@@ -48,7 +48,11 @@ with pypkgs;
           {
             inherit src;
             name = "${pname}-${version}";
-            hash = "sha256-fHp5Rh2Mzn62ZUoVHETl/6kZ6Iztxkd5mjxira7NVBU=";
+            hash =
+              if (minorVer >= pythonVerConfig.latestStableVer) then
+                "sha256-fHp5Rh2Mzn62ZUoVHETl/6kZ6Iztxkd5mjxira7NVBU="
+              else
+                "sha256-YvZl0zYuUBTIBAdIh6IDR3vIWlk5ye5e3cLB0j/41pk=";
           };
 
       maturinBuildFlags = [ "--interpreter ${python.executable}" ];
