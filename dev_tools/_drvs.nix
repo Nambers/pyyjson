@@ -31,7 +31,7 @@ let
             // (lib.optionalAttrs (py.pythonOlder "3.11") {
               setuptools-scm = (
                 super.setuptools-scm.overrideAttrs {
-                  dependencies = super.setuptools-scm.dependencies ++ [ super.tomli ];
+                  nativeBuildInputs = super.setuptools-scm.nativeBuildInputs ++ [ super.tomli ];
                 }
               );
             })
