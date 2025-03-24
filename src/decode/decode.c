@@ -282,37 +282,6 @@ force_inline bool init_decode_ctn_stack_info(DecodeCtnStackInfo *restrict decode
 
 bool _pyyjson_decode_obj_stack_resize(DecodeObjStackInfo *restrict decode_obj_stack_info);
 
-//  {
-//     // resize
-//     if (likely(PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE == decode_obj_stack_info->result_stack_end - decode_obj_stack_info->result_stack)) {
-//         void *new_buffer = malloc(sizeof(PyObject *) * (PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE << 1));
-//         if (unlikely(!new_buffer)) {
-//             PyErr_NoMemory();
-//             return false;
-//         }
-//         memcpy(new_buffer, decode_obj_stack_info->result_stack, sizeof(PyObject *) * PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE);
-//         decode_obj_stack_info->result_stack = (PyObject **)new_buffer;
-//         decode_obj_stack_info->cur_write_result_addr = decode_obj_stack_info->result_stack + PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE;
-//         decode_obj_stack_info->result_stack_end = decode_obj_stack_info->result_stack + (PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE << 1);
-//     } else {
-//         Py_ssize_t old_capacity = decode_obj_stack_info->result_stack_end - decode_obj_stack_info->result_stack;
-//         if (unlikely((PY_SSIZE_T_MAX >> 1) < old_capacity)) {
-//             PyErr_NoMemory();
-//             return false;
-//         }
-//         Py_ssize_t new_capacity = old_capacity << 1;
-//         void *new_buffer = realloc(decode_obj_stack_info->result_stack, sizeof(PyObject *) * new_capacity);
-//         if (unlikely(!new_buffer)) {
-//             PyErr_NoMemory();
-//             return false;
-//         }
-//         decode_obj_stack_info->result_stack = (PyObject **)new_buffer;
-//         decode_obj_stack_info->cur_write_result_addr = decode_obj_stack_info->result_stack + old_capacity;
-//         decode_obj_stack_info->result_stack_end = decode_obj_stack_info->result_stack + new_capacity;
-//     }
-//     return true;
-// }
-
 force_inline bool pyyjson_push_obj(DecodeObjStackInfo *restrict decode_obj_stack_info, PyObject *obj) {
     static_assert(((Py_ssize_t)PYYJSON_DECODE_OBJ_BUFFER_INIT_SIZE << 1) > 0, "(PYYJSON_DECODE_OBJSTACK_BUFFER_SIZE << 1) > 0");
     if (unlikely(decode_obj_stack_info->cur_write_result_addr >= decode_obj_stack_info->result_stack_end)) {
@@ -321,27 +290,6 @@ force_inline bool pyyjson_push_obj(DecodeObjStackInfo *restrict decode_obj_stack
     }
     *decode_obj_stack_info->cur_write_result_addr++ = obj;
     return true;
-}
-
-force_inline bool pyyjson_decode_double(DecodeObjStackInfo *restrict decode_obj_stack_info, double val) {
-    PYYJSON_TRACE_OP(PYYJSON_OP_NUMBER);
-    PyObject *obj = PyFloat_FromDouble(val);
-    RETURN_ON_UNLIKELY_ERR(!obj);
-    return pyyjson_push_obj(decode_obj_stack_info, obj);
-}
-
-force_inline bool pyyjson_decode_longlong(DecodeObjStackInfo *restrict decode_obj_stack_info, i64 val) {
-    PYYJSON_TRACE_OP(PYYJSON_OP_NUMBER);
-    PyObject *obj = PyLong_FromLongLong(val);
-    RETURN_ON_UNLIKELY_ERR(!obj);
-    return pyyjson_push_obj(decode_obj_stack_info, obj);
-}
-
-force_inline bool pyyjson_decode_unsignedlonglong(DecodeObjStackInfo *restrict decode_obj_stack_info, u64 val) {
-    PYYJSON_TRACE_OP(PYYJSON_OP_NUMBER);
-    PyObject *obj = PyLong_FromUnsignedLongLong(val);
-    RETURN_ON_UNLIKELY_ERR(!obj);
-    return pyyjson_push_obj(decode_obj_stack_info, obj);
 }
 
 force_inline bool pyyjson_decode_arr(DecodeObjStackInfo *restrict decode_obj_stack_info, Py_ssize_t arr_len) {
@@ -410,13 +358,6 @@ force_inline bool pyyjson_decode_true(DecodeObjStackInfo *restrict decode_obj_st
 force_inline bool pyyjson_decode_nan(DecodeObjStackInfo *restrict decode_obj_stack_info, bool is_signed) {
     PYYJSON_TRACE_OP(PYYJSON_OP_NAN_INF);
     PyObject *o = PyFloat_FromDouble(is_signed ? -fabs(Py_NAN) : fabs(Py_NAN));
-    RETURN_ON_UNLIKELY_ERR(!o);
-    return pyyjson_push_obj(decode_obj_stack_info, o);
-}
-
-force_inline bool pyyjson_decode_inf(DecodeObjStackInfo *restrict decode_obj_stack_info, bool is_signed) {
-    PYYJSON_TRACE_OP(PYYJSON_OP_NAN_INF);
-    PyObject *o = PyFloat_FromDouble(is_signed ? -fabs(Py_HUGE_VAL) : fabs(Py_HUGE_VAL));
     RETURN_ON_UNLIKELY_ERR(!o);
     return pyyjson_push_obj(decode_obj_stack_info, o);
 }
@@ -521,86 +462,6 @@ force_inline u32 read_b4_unicode(u32 uni) {
     return ((uni & 0x07) << 18) | ((uni & 0x3f00) << 4) | ((uni & 0x3f0000) >> 10) | ((uni & 0x3f000000) >> 24);
 #endif
 }
-
-// force_noinline PyObject *read_root_single_bytes(const u8 *dat, usize len);
-
-// PyObject *yyjson_read_opts(const char *dat,
-//                            Py_ssize_t len) {
-
-// #define return_err(_pos, _type, _msg)                               \
-//     do {                                                            \
-//         if (_type == JSONDecodeError) {                             \
-//             PyErr_Format(JSONDecodeError, "%s at %zu", _msg, _pos); \
-//         } else {                                                    \
-//             PyErr_SetString(_type, _msg);                           \
-//         }                                                           \
-//         return NULL;                                                \
-//     } while (0)
-
-//     PyObject *obj;
-//     const char *end = dat + len;
-
-//     if (unlikely(!dat)) {
-//         return_err(0, JSONDecodeError, "input data is NULL");
-//     }
-//     if (unlikely(!len)) {
-//         return_err(0, JSONDecodeError, "input length is 0");
-//     }
-
-//     if (unlikely(len >= USIZE_MAX)) {
-//         return_err(0, PyExc_MemoryError, "memory allocation failed");
-//     }
-
-//     /* skip empty contents before json document */
-//     if (unlikely(char_is_space_or_comment(*dat))) {
-//         if (likely(char_is_space(*dat))) {
-//             while (char_is_space(*++dat));
-//         }
-//         if (unlikely(dat >= end)) {
-//             return_err(0, JSONDecodeError, "input data is empty");
-//         }
-//     }
-
-//     /* read json document */
-//     // obj = read_bytes_root_pretty(dat, len);
-//     // TODO
-//     if (likely(char_is_container(*dat))) {
-//         if (char_is_space(dat[1]) && char_is_space(dat[2])) {
-//             obj = read_bytes_root_pretty(dat, len);
-//         } else {
-//             obj = read_bytes_root_pretty(dat, len);
-//             // obj = read_root_minify(dat, len);
-//         }
-//     } else {
-//         obj = read_root_single_bytes(dat, len);
-//     }
-
-//     /* check result */
-//     // if (likely(obj)) {
-//     //     memset(err, 0, sizeof(yyjson_read_err));
-//     // } else {
-//     //     /* RFC 8259: JSON text MUST be encoded using UTF-8 */
-//     //     if (err->pos == 0 && err->code != YYJSON_READ_ERROR_MEMORY_ALLOCATION) {
-//     //         if ((hdr[0] == 0xEF && hdr[1] == 0xBB && hdr[2] == 0xBF)) {
-//     //             err->msg = "byte order mark (BOM) is not supported";
-//     //         } else if (len >= 4 &&
-//     //                    ((hdr[0] == 0x00 && hdr[1] == 0x00 &&
-//     //                      hdr[2] == 0xFE && hdr[3] == 0xFF) ||
-//     //                     (hdr[0] == 0xFF && hdr[1] == 0xFE &&
-//     //                      hdr[2] == 0x00 && hdr[3] == 0x00))) {
-//     //             err->msg = "UTF-32 encoding is not supported";
-//     //         } else if (len >= 2 &&
-//     //                    ((hdr[0] == 0xFE && hdr[1] == 0xFF) ||
-//     //                     (hdr[0] == 0xFF && hdr[1] == 0xFE))) {
-//     //             err->msg = "UTF-16 encoding is not supported";
-//     //         }
-//     //     }
-//     //     if (!has_read_flag(INSITU)) alc.free(alc.ctx, (void *)hdr);
-//     // }
-//     return obj;
-
-// #undef return_err
-// }
 
 #include "simd/check_mask_wrap.inl.c"
 

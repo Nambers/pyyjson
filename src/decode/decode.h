@@ -264,8 +264,6 @@ force_inline u32 byte_load_4(const void *src) {
  * These functions are used by JSON reader to read literals and comments.
  *============================================================================*/
 
-force_inline bool pyyjson_decode_inf(DecodeObjStackInfo *restrict decode_obj_stack_info, bool is_signed);
-
 force_inline bool pyyjson_decode_nan(DecodeObjStackInfo *restrict decode_obj_stack_info, bool is_signed);
 
 
