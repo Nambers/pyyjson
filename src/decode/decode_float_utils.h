@@ -3,10 +3,6 @@
 #include "decode.h"
 
 
-force_inline bool pyyjson_decode_double(DecodeObjStackInfo *restrict decode_obj_stack_info, double val);
-
-force_inline bool pyyjson_decode_longlong(DecodeObjStackInfo *restrict decode_obj_stack_info, i64 val);
-
 #if PYYJSON_HAS_IEEE_754
 /** Maximum exponent of exact pow10 */
 #    define U64_POW10_MAX_EXP 19
