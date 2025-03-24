@@ -38,11 +38,18 @@ with pypkgs;
         hash = "sha256-FlcWf6BhUP2Y5ivRQx1W0G8sgfvbuAQN7qpBJbd3N2I=";
       };
 
-      cargoDeps = pkgs.rustPlatform.fetchCargoVendor {
-        inherit src;
-        name = "${pname}-${version}";
-        hash = "sha256-fHp5Rh2Mzn62ZUoVHETl/6kZ6Iztxkd5mjxira7NVBU=";
-      };
+      cargoDeps =
+        (
+          if (minorVer >= pythonVerConfig.latestStableVer) then
+            (pkgs.rustPlatform.fetchCargoVendor)
+          else
+            (pkgs.rustPlatform.fetchCargoTarball)
+        )
+          {
+            inherit src;
+            name = "${pname}-${version}";
+            hash = "sha256-fHp5Rh2Mzn62ZUoVHETl/6kZ6Iztxkd5mjxira7NVBU=";
+          };
 
       maturinBuildFlags = [ "--interpreter ${python.executable}" ];
 
