@@ -47,6 +47,7 @@
                 using_python = builtins.elemAt _drvs.using_pythons (curVer - leastVer);
               };
             };
+            packages.setuptools-scm = pkgs.python310.withPackages (p: [ p.setuptools_scm ]); 
           };
       }
     );
