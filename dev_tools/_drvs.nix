@@ -1,5 +1,7 @@
 {
   pkgs ? import <nixpkgs> { },
+  fetchFromGitHub,
+  ...
 }:
 let
   lib = pkgs.lib;
@@ -29,11 +31,16 @@ let
                   };
             })
             // (lib.optionalAttrs (py.pythonOlder "3.11") {
-              setuptools-scm = (
-                super.setuptools-scm.overrideAttrs {
-                  nativeBuildInputs = super.setuptools-scm.nativeBuildInputs ++ [ super.tomli ];
-                }
-              );
+              tomli =
+                assert (lib.versionAtLeast super.tomli.version "2.0.3");
+                (super.tomli.overrideAttrs {
+                  src = fetchFromGitHub {
+                    owner = "hukkin";
+                    repo = super.tomli.pname;
+                    rev = "2.0.2";
+                    hash = "sha256-YduGLNprrW1yFQ2gUNuueHTtQ+bXH43hVFzDR6rKtFI=";
+                  };
+                });
             })
           );
         }
