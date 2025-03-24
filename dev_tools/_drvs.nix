@@ -12,18 +12,18 @@ let
   latestStableVer = pythonVerConfig.latestStableVer;
   supportedVers = builtins.genList (x: minSupportVer + x) (maxSupportVer - minSupportVer + 1);
   using_pythons_map =
-    py:
+    { py, curPkgs, ... }:
     let
       x = (
-        (pkgs.enableDebugging py).override {
+        (curPkgs.enableDebugging py).override {
           self = x;
           packageOverrides = (
             self: super:
             {
-              orjson = pkgs.callPackage ./orjson_fixed.nix { inherit super; };
-              pytest-benchmark = pkgs.callPackage ./pytest-benchmark-fixed.nix { inherit super; };
+              orjson = curPkgs.callPackage ./orjson_fixed.nix { inherit super; };
+              pytest-benchmark = curPkgs.callPackage ./pytest-benchmark-fixed.nix { inherit super; };
             }
-            // (lib.optionalAttrs (py.pythonVersion == "3.14") {
+            // (curPkgs.lib.optionalAttrs (py.pythonVersion == "3.14") {
               pytest-random-order =
                 (super.pytest-random-order.override {
                   pytest-xdist = null;
@@ -32,18 +32,18 @@ let
                     pytestCheckPhase = ":";
                   };
             })
-            // (lib.optionalAttrs (py.pythonOlder "3.11") {
-              # tomli =
-              #   assert (lib.versionAtLeast super.tomli.version "2.0.3");
-              #   (super.tomli.overrideAttrs {
-              #     src = fetchFromGitHub {
-              #       owner = "hukkin";
-              #       repo = super.tomli.pname;
-              #       rev = "2.0.2";
-              #       hash = "sha256-YduGLNprrW1yFQ2gUNuueHTtQ+bXH43hVFzDR6rKtFI=";
-              #     };
-              #   });
-            })
+            # // (curPkgs.lib.optionalAttrs (py.pythonOlder "3.11") {
+            #   # tomli =
+            #   #   assert (lib.versionAtLeast super.tomli.version "2.0.3");
+            #   #   (super.tomli.overrideAttrs {
+            #   #     src = fetchFromGitHub {
+            #   #       owner = "hukkin";
+            #   #       repo = super.tomli.pname;
+            #   #       rev = "2.0.2";
+            #   #       hash = "sha256-YduGLNprrW1yFQ2gUNuueHTtQ+bXH43hVFzDR6rKtFI=";
+            #   #     };
+            #   #   });
+            # })
           );
         }
       );
@@ -51,12 +51,10 @@ let
     x;
   using_pythons = (
     builtins.map using_pythons_map (
-      builtins.map (
-        supportedVer:
-        builtins.getAttr ("python3" + (builtins.toString supportedVer)) (
-          if (supportedVer >= latestStableVer) then pkgs else pkgs-24-05
-        )
-      ) supportedVers
+      builtins.map (supportedVer: rec {
+        curPkgs = if (supportedVer >= latestStableVer) then pkgs else pkgs-24-05;
+        py = builtins.getAttr ("python3" + (builtins.toString supportedVer)) (curPkgs);
+      }) supportedVers
     )
   );
   # import required python packages
