@@ -353,7 +353,7 @@ if(BUILD_TEST)
     install(TARGETS pyyjson_test RUNTIME DESTINATION .)
     add_test(pyyjson_test ${CMAKE_CURRENT_BINARY_DIR}/pyyjson_test)
 
-    if(CMAKE_C_COMPILER_ID MATCHES Clang)
+    if((CMAKE_C_COMPILER_ID MATCHES Clang) AND NOT WIN32)
         file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/test_data/fuzzer/fuzzer.dict" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
         file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/test_data/fuzzer/pyyjson_fuzz.py" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
         file(GLOB TEST_DATA_FILES "${CMAKE_CURRENT_SOURCE_DIR}/test_data/json/**/*.json")
