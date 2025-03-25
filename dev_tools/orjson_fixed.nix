@@ -39,7 +39,7 @@ super.buildPythonPackage rec {
           if useNixpkgsUnstable then
             "sha256-fHp5Rh2Mzn62ZUoVHETl/6kZ6Iztxkd5mjxira7NVBU="
           else
-            "sha256-N++F0d0l58eyp9tDqXSjJsiEd6GNFRPY9mBoPLl6Wiw=";
+            "sha256-yQkpjedHwgsZiiZEzYV66aa9RepCFW0PBqtD29tfoMI=";
       };
 
   nativeBuildInputs =
