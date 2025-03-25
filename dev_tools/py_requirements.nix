@@ -74,7 +74,7 @@ with pypkgs;
               substitutions = {
                 inherit (pkgs.rust.envVars) rustTargetPlatformSpec setEnv;
               };
-            } ./maturin-build-hook.sh
+            } "${pkgs.path}/pkgs/build-support/rust/hooks/maturin-build-hook.sh"
           ) { })
         ]);
 
