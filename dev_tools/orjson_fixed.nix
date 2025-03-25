@@ -7,26 +7,11 @@
   rustPlatform,
   ...
 }:
-# super.orjson.overridePythonAttrs (
-#   superAttr:
-#   let
-#     filterFunc = x: (!(builtins.isAttrs (x)) || ((x.pname or "") != "xxhash"));
-#     _nativeBuildInputs = (builtins.filter filterFunc super.orjson.nativeBuildInputs);
-#     # _nativeCheckInputs = (builtins.filter filterFunc (builtins.trace super.orjson super.orjson).nativeCheckInputs);
-#     _buildInputs = (builtins.filter filterFunc super.orjson.buildInputs);
-#   in
-#   rec {
-#     nativeBuildInputs =
-#       assert (builtins.length _nativeBuildInputs) < (builtins.length super.orjson.nativeBuildInputs);
-#       _nativeBuildInputs;
-#       buildInputs =
-#       assert (builtins.length _buildInputs) < (builtins.length super.orjson.buildInputs);
-#       _buildInputs;
-#     # nativeCheckInputs =
-#     #   assert (builtins.length _nativeCheckInputs) < (builtins.length super.orjson.nativeCheckInputs);
-#     #   _nativeCheckInputs;
-#   }
-# )
+let
+  minorVer = lib.strings.toInt super.python.sourceVersion.minor;
+  pythonVerConfig = lib.importJSON ./pyver.json;
+  useNixpkgsUnstable = (minorVer >= pythonVerConfig.latestStableVer);
+in
 super.buildPythonPackage rec {
   pname = "orjson";
   version = super.orjson.version;
@@ -37,11 +22,11 @@ super.buildPythonPackage rec {
   src = fetchFromGitHub {
     owner = "ijl";
     repo = "orjson";
-    tag = version;
+    rev = version;
     hash = "sha256-FlcWf6BhUP2Y5ivRQx1W0G8sgfvbuAQN7qpBJbd3N2I=";
   };
 
-  cargoDeps = rustPlatform.fetchCargoVendor {
+  cargoDeps = (if useNixpkgsUnstable then rustPlatform.fetchCargoVendor else pkgs.rustPlatform.fetchCargoTarball) {
     inherit src;
     name = "${pname}-${version}";
     hash = "sha256-fHp5Rh2Mzn62ZUoVHETl/6kZ6Iztxkd5mjxira7NVBU=";

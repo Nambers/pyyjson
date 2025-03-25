@@ -74,6 +74,11 @@ in
     python-launcher
     valgrind
     ; # packages
+    py39env = builtins.elemAt pyenvs 0;
+    py310env = builtins.elemAt pyenvs 1;
+    py311env = builtins.elemAt pyenvs 2;
+    py312env = builtins.elemAt pyenvs 3;
+    py313env = builtins.elemAt pyenvs 4;
 }
 // lib.optionalAttrs (pkgs.system == "x86_64-linux") {
   inherit sde;
