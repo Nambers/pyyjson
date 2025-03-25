@@ -1,5 +1,7 @@
 {
   pkgs ? import <nixpkgs> { },
+  pkgs-24-05,
+  ...
 }:
 let
   nix_pyenv_directory = ".nix-pyenv";
@@ -7,14 +9,14 @@ let
   pythonVerConfig = pkgs.lib.importJSON ./pyver.json;
   curVer = pythonVerConfig.curVer;
   leastVer = pythonVerConfig.minSupportVer;
-  drvs = pkgs.callPackage ./_drvs.nix { };
+  drvs = pkgs.callPackage ./_drvs.nix {inherit pkgs-24-05; };
   using_pythons = drvs.using_pythons;
   using_python = builtins.elemAt using_pythons (curVer - leastVer);
   pyenvs = drvs.pyenvs;
   pyenv = builtins.elemAt pyenvs (curVer - leastVer);
 in
 (pkgs.mkShell {
-  packages = pkgs.callPackage ./packages.nix { };
+  packages = pkgs.callPackage ./packages.nix { inherit pkgs-24-05;};
   hardeningDisable = [ "fortify" ];
 
 })

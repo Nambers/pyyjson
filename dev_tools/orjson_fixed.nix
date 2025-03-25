@@ -7,29 +7,14 @@
   rustPlatform,
   ...
 }:
-# super.orjson.overridePythonAttrs (
-#   superAttr:
-#   let
-#     filterFunc = x: (!(builtins.isAttrs (x)) || ((x.pname or "") != "xxhash"));
-#     _nativeBuildInputs = (builtins.filter filterFunc super.orjson.nativeBuildInputs);
-#     # _nativeCheckInputs = (builtins.filter filterFunc (builtins.trace super.orjson super.orjson).nativeCheckInputs);
-#     _buildInputs = (builtins.filter filterFunc super.orjson.buildInputs);
-#   in
-#   rec {
-#     nativeBuildInputs =
-#       assert (builtins.length _nativeBuildInputs) < (builtins.length super.orjson.nativeBuildInputs);
-#       _nativeBuildInputs;
-#       buildInputs =
-#       assert (builtins.length _buildInputs) < (builtins.length super.orjson.buildInputs);
-#       _buildInputs;
-#     # nativeCheckInputs =
-#     #   assert (builtins.length _nativeCheckInputs) < (builtins.length super.orjson.nativeCheckInputs);
-#     #   _nativeCheckInputs;
-#   }
-# )
+let
+  minorVer = lib.strings.toInt super.python.sourceVersion.minor;
+  pythonVerConfig = lib.importJSON ./pyver.json;
+  useNixpkgsUnstable = (minorVer >= pythonVerConfig.latestStableVer);
+in
 super.buildPythonPackage rec {
   pname = "orjson";
-  version = super.orjson.version;
+  version = if useNixpkgsUnstable then "3.10.15" else "3.10.1";
   pyproject = true;
 
   disabled = super.pythonOlder "3.8";
@@ -37,15 +22,25 @@ super.buildPythonPackage rec {
   src = fetchFromGitHub {
     owner = "ijl";
     repo = "orjson";
-    tag = version;
-    hash = "sha256-FlcWf6BhUP2Y5ivRQx1W0G8sgfvbuAQN7qpBJbd3N2I=";
+    rev = version;
+    hash =
+      if useNixpkgsUnstable then
+        "sha256-FlcWf6BhUP2Y5ivRQx1W0G8sgfvbuAQN7qpBJbd3N2I="
+      else
+        "sha256-vEJriLd7f+zlYcMIyhDTkq2kmNc5MaNLHo0qMLS5hro=";
   };
 
-  cargoDeps = rustPlatform.fetchCargoVendor {
-    inherit src;
-    name = "${pname}-${version}";
-    hash = "sha256-fHp5Rh2Mzn62ZUoVHETl/6kZ6Iztxkd5mjxira7NVBU=";
-  };
+  cargoDeps =
+    (if useNixpkgsUnstable then rustPlatform.fetchCargoVendor else pkgs.rustPlatform.fetchCargoTarball)
+      {
+        inherit src;
+        name = "${pname}-${version}";
+        hash =
+          if useNixpkgsUnstable then
+            "sha256-fHp5Rh2Mzn62ZUoVHETl/6kZ6Iztxkd5mjxira7NVBU="
+          else
+            "sha256-yQkpjedHwgsZiiZEzYV66aa9RepCFW0PBqtD29tfoMI=";
+      };
 
   nativeBuildInputs =
     [ super.cffi ]
