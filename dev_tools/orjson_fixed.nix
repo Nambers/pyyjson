@@ -26,11 +26,17 @@ super.buildPythonPackage rec {
     hash = "sha256-FlcWf6BhUP2Y5ivRQx1W0G8sgfvbuAQN7qpBJbd3N2I=";
   };
 
-  cargoDeps = (if useNixpkgsUnstable then rustPlatform.fetchCargoVendor else pkgs.rustPlatform.fetchCargoTarball) {
-    inherit src;
-    name = "${pname}-${version}";
-    hash = "sha256-fHp5Rh2Mzn62ZUoVHETl/6kZ6Iztxkd5mjxira7NVBU=";
-  };
+  cargoDeps =
+    (if useNixpkgsUnstable then rustPlatform.fetchCargoVendor else pkgs.rustPlatform.fetchCargoTarball)
+      {
+        inherit src;
+        name = "${pname}-${version}";
+        hash =
+          if useNixpkgsUnstable then
+            "sha256-fHp5Rh2Mzn62ZUoVHETl/6kZ6Iztxkd5mjxira7NVBU="
+          else
+            "sha256-YvZl0zYuUBTIBAdIh6IDR3vIWlk5ye5e3cLB0j/41pk=";
+      };
 
   nativeBuildInputs =
     [ super.cffi ]
