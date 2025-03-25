@@ -14,7 +14,7 @@ let
 in
 super.buildPythonPackage rec {
   pname = "orjson";
-  version = super.orjson.version;
+  version = if useNixpkgsUnstable then "3.10.15" else "3.10.1";
   pyproject = true;
 
   disabled = super.pythonOlder "3.8";
@@ -23,7 +23,11 @@ super.buildPythonPackage rec {
     owner = "ijl";
     repo = "orjson";
     rev = version;
-    hash = "sha256-FlcWf6BhUP2Y5ivRQx1W0G8sgfvbuAQN7qpBJbd3N2I=";
+    hash =
+      if useNixpkgsUnstable then
+        "sha256-FlcWf6BhUP2Y5ivRQx1W0G8sgfvbuAQN7qpBJbd3N2I="
+      else
+        "sha256-vEJriLd7f+zlYcMIyhDTkq2kmNc5MaNLHo0qMLS5hro=";
   };
 
   cargoDeps =
@@ -35,7 +39,7 @@ super.buildPythonPackage rec {
           if useNixpkgsUnstable then
             "sha256-fHp5Rh2Mzn62ZUoVHETl/6kZ6Iztxkd5mjxira7NVBU="
           else
-            "sha256-YvZl0zYuUBTIBAdIh6IDR3vIWlk5ye5e3cLB0j/41pk=";
+            "sha256-N++F0d0l58eyp9tDqXSjJsiEd6GNFRPY9mBoPLl6Wiw=";
       };
 
   nativeBuildInputs =
