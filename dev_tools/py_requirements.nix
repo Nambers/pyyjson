@@ -9,7 +9,6 @@ in
 with pypkgs;
 [
   objgraph
-  orjson
   psutil
   pytz
   pytest
@@ -19,6 +18,7 @@ with pypkgs;
   with pypkgs; # needed by tests, but cannot be built in python3.14
   (lib.optionals (minorVer < 14) [
     arrow
+    orjson
     pytest-xdist
   ])
 )
