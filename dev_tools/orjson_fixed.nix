@@ -14,7 +14,7 @@ let
 in
 super.buildPythonPackage rec {
   pname = "orjson";
-  version = if useNixpkgsUnstable then "3.10.15" else "3.10.1";
+  version = if useNixpkgsUnstable then "3.10.16" else "3.10.13";
   pyproject = true;
 
   disabled = super.pythonOlder "3.8";
@@ -25,9 +25,9 @@ super.buildPythonPackage rec {
     rev = version;
     hash =
       if useNixpkgsUnstable then
-        "sha256-FlcWf6BhUP2Y5ivRQx1W0G8sgfvbuAQN7qpBJbd3N2I="
+        "sha256-hgyW3bff70yByxPFqw8pwPMPMAh9FxL1U+LQoJI6INo="
       else
-        "sha256-vEJriLd7f+zlYcMIyhDTkq2kmNc5MaNLHo0qMLS5hro=";
+        "sha256-7i4vrVSXJvwqmOsH9OWdeg/VoJeXnzacqhVAcf2Dex8=";
   };
 
   cargoDeps =
@@ -37,9 +37,9 @@ super.buildPythonPackage rec {
         name = "${pname}-${version}";
         hash =
           if useNixpkgsUnstable then
-            "sha256-fHp5Rh2Mzn62ZUoVHETl/6kZ6Iztxkd5mjxira7NVBU="
+            "sha256-mOHOIKmcXjPwZ8uPth+yvreHG4IpiS6SFhWY+IZS69E="
           else
-            "sha256-yQkpjedHwgsZiiZEzYV66aa9RepCFW0PBqtD29tfoMI=";
+            "sha256-2YCXJLJ101OaW74okRYtmFazoS4o0n7psXBWJXRaFh4=";
       };
 
   nativeBuildInputs =
