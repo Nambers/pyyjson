@@ -6,6 +6,7 @@
 /debug_source
 /.direnv
 /dev_tools/.vscode/settings.json
+/dev_tools/.vscode-aarch64/settings.json
 /build-*
 /test.c
 /*.json
