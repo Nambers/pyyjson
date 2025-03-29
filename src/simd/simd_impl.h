@@ -4,6 +4,7 @@
 #include "Python.h"
 #include "pyyjson.h"
 #include "simd/simd_detect.h"
+#include <string.h>
 
 /* Common SIMD vector types. */
 #ifdef _MSC_VER
@@ -697,7 +698,8 @@ force_inline VECTOR_U16_128_A zip_256_32_to_16(VECTOR_U32_256_A y) {
 /* Read: 32 bytes (16 u16). Write: 56 bytes. Valid in result: 48 bytes. */
 force_inline void ucs2_encode_3bytes_utf8_avx2(u16 *read_in, u8 *writer) {
     /* abcdefgh|12345678 */
-    VECTOR_U16_256_A _y = *(VECTOR_U16_256_U *)read_in;
+    VECTOR_U16_256_A _y;
+    memcpy(&_y, read_in, sizeof(_y));
     VECTOR_U16_256_A y[2];
     VECTOR_U16_128_A x_low = _mm256_extracti128_si256(_y, 0);
     VECTOR_U16_128_A x_high = _mm256_extracti128_si256(_y, 1);
