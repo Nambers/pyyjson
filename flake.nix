@@ -45,8 +45,7 @@
           leastVer = pythonVerConfig.minSupportVer;
           verLength = curVer - leastVer;
         in
-        # inputDerivation = defaultShell.inputDerivation;
-        rec {
+        {
           internal = defaultShell;
           default = defaultShell.overrideAttrs {
             shellHook = pkgs.callPackage ./dev_tools/shellhook.nix {
@@ -59,25 +58,5 @@
           };
         }
       );
-      # devShells.internal = defaultShell;
-      # devShells.default = defaultShell.overrideAttrs {
-      #   shellHook = pkgs.callPackage ./dev_tools/shellhook.nix {
-      #     inherit inputDerivation;
-      #     inherit (_drvs) pyenvs;
-      #     nix_pyenv_directory = ".nix-pyenv";
-      #     pyenv = builtins.elemAt _drvs.pyenvs (curVer - leastVer);
-      #     using_python = builtins.elemAt _drvs.using_pythons (curVer - leastVer);
-      #   };
-      # };
-      # packages.gevent = pkgs.python39.withPackages (p: [
-      #   (p.gevent.overrideAttrs {
-      #     # src = pkgs.fetchFromGitHub {
-      #     #     owner = "hukkin";
-      #     #     repo = p.tomli.pname;
-      #     #     rev = "2.0.2";
-      #     #     hash = "";
-      #     #   };
-      #   })
-      # ]);
     };
 }
