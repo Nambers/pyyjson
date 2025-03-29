@@ -182,7 +182,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
         RETURN_ON_UNLIKELY_ERR(!vec);
     }
 #elif PYYJSON_AARCH
-#    define VECTOR_TYPE PYYJSON_SIMPLE_CONCAT(VECTOR_U, READ_BIT_SIZE, _128_A)
+// #    define VECTOR_TYPE PYYJSON_SIMPLE_CONCAT(VECTOR_U, READ_BIT_SIZE, _128_A)
     assert(len < CHECK_COUNT_MAX);
     VECTOR_TYPE x, mask, check_mask;
     const _FROM_TYPE *load_start = src + len - CHECK_COUNT_MAX;
@@ -211,7 +211,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
         vec = VECTOR_WRITE_ESCAPE_IMPL(vec_addr, src, len, 0);
         RETURN_ON_UNLIKELY_ERR(!vec);
     }
-#    undef VECTOR_TYPE
+// #    undef VECTOR_TYPE
 #else // SIMD_BIT_SIZE == 128
     // TODO
     assert(len < CHECK_COUNT_MAX);

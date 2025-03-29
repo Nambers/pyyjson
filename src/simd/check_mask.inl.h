@@ -69,27 +69,38 @@ force_inline SIMD_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restric
 #    endif // SIMD_BIT_SIZE
 }
 #elif PYYJSON_AARCH
-#    define VECTOR_TYPE PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 128, A)
-#    define VECTOR_TYPE_U PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 128, U)
+// #    define VECTOR_TYPE PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 128, A)
+// #    define VECTOR_TYPE_U PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 128, U)
+#    define SET1 PYYJSON_SIMPLE_CONCAT2(vdupq_n_u, READ_BIT_SIZE)
+#    define CMPEQ PYYJSON_SIMPLE_CONCAT2(vceqq_u, READ_BIT_SIZE)
+#    define CMPLT PYYJSON_SIMPLE_CONCAT2(vcltq_u, READ_BIT_SIZE)
 
 force_inline VECTOR_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restrict src, VECTOR_TYPE *restrict x) {
     *x = *(const VECTOR_TYPE_U *)src; //load_simd((const void *)src);
-    VECTOR_TYPE t1 = PYYJSON_SIMPLE_CONCAT2(vdupq_n_u, READ_BIT_SIZE)(_Quote);
-    VECTOR_TYPE t2 = PYYJSON_SIMPLE_CONCAT2(vdupq_n_u, READ_BIT_SIZE)(_Slash);
-    VECTOR_TYPE t4 = PYYJSON_SIMPLE_CONCAT2(vdupq_n_u, READ_BIT_SIZE)(ControlMax);
+    VECTOR_TYPE t1 = SET1(_Quote);
+    VECTOR_TYPE t2 = SET1(_Slash);
+    VECTOR_TYPE t3 = SET1(ControlMax);
+    VECTOR_TYPE m1 = CMPEQ(*x, t1);
+    VECTOR_TYPE m2 = CMPEQ(*x, t2);
+    VECTOR_TYPE m3 = CMPLT(*x, t3);
+    return m1 | m2 | m3;
 }
 
-#    undef VECTOR_TYPE
-#    undef VECTOR_TYPE_U
+#    undef CMPLT
+#    undef CMPEQ
+#    undef SET1
+// #    undef VECTOR_TYPE
+// #    undef VECTOR_TYPE_U
 #endif
 
+#if PYYJSON_X86
 force_inline u32 GET_DONE_COUNT_FROM_MASK(SIMD_MASK_TYPE mask) {
     SIMD_BIT_MASK_TYPE bit_mask;
-#if SIMD_BIT_SIZE == 512
+#    if SIMD_BIT_SIZE == 512
     bit_mask = mask;
     assert(bit_mask);
     u32 done_count = u64_tz_bits(bit_mask); // / sizeof(_FROM_TYPE);
-#elif SIMD_BIT_SIZE == 256
+#    elif SIMD_BIT_SIZE == 256
     // for bit size < 512, we don't have cmp_epu8, the mask is calculated by subs_epu8
     // so we have to cmpeq with zero to get the real bit mask.
     mask = cmpeq0_8_256(mask);
@@ -97,26 +108,30 @@ force_inline u32 GET_DONE_COUNT_FROM_MASK(SIMD_MASK_TYPE mask) {
     bit_mask = ~bit_mask;
     assert(bit_mask);
     u32 done_count = u32_tz_bits(bit_mask) / sizeof(_FROM_TYPE);
-#else // SIMD_BIT_SIZE
-#    if COMPILE_READ_UCS_LEVEL != 4
+#    else // SIMD_BIT_SIZE
+#        if COMPILE_READ_UCS_LEVEL != 4
     // for bit size < 512, we don't have cmp_epu8,
     // the mask is calculated by subs_epu for ucs < 4
     // so we have to cmpeq with zero to get the real bit mask.
     mask = cmpeq0_8_128(mask);
     bit_mask = to_bitmask_128(mask);
     bit_mask = ~bit_mask;
-#    else
+#        else
     // ucs4 does not have subs_epu, so we don't need cmpeq0.
     // The mask itself is ready for use
     bit_mask = to_bitmask_128(mask);
-#    endif // COMPILE_READ_UCS_LEVEL
+#        endif // COMPILE_READ_UCS_LEVEL
     assert(bit_mask);
     u32 done_count = u32_tz_bits((u32)bit_mask) / sizeof(_FROM_TYPE);
-#endif
+#    endif
     return done_count;
 }
+#elif PYYJSON_AARCH
+// force_inline u32 GET_DONE_COUNT_FROM_MASK(VECTOR_TYPE mask) {
+// }
+#endif
 
-#if SIMD_BIT_SIZE == 512
+#if PYYJSON_X86 && SIMD_BIT_SIZE == 512
 force_inline SIMD_MASK_TYPE CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(SIMD_512 z, u64 rw_mask) {
 #    define CUR_QUOTE PYYJSON_SIMPLE_CONCAT2(_Quote_i, READ_BIT_SIZE)
 #    define CUR_SLASH PYYJSON_SIMPLE_CONCAT2(_Slash_i, READ_BIT_SIZE)
