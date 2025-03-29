@@ -118,7 +118,7 @@ static force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(UnicodeVector **re
 force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t len, UnicodeVector **vec_addr) {
     assert(vec_addr);
     UnicodeVector *vec = *vec_addr;
-#if SIMD_BIT_SIZE == 512
+#if SIMD_BIT_SIZE == 512 && PYYJSON_X86
     SIMD_512 z;
 #    if COMPILE_READ_UCS_LEVEL == 1
 #        define _MASKZ_LOADU _mm512_maskz_loadu_epi8
@@ -159,7 +159,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
     }
 #    undef _MASKZ_LOADU
 #    undef _MASK_STOREU
-#elif SIMD_BIT_SIZE == 256
+#elif SIMD_BIT_SIZE == 256 && PYYJSON_X86
     __m256i y;
     const _FROM_TYPE *load_start = src + len - CHECK_COUNT_MAX;
     _TARGET_TYPE *store_start = _WRITER(vec) + len - CHECK_COUNT_MAX;
@@ -181,6 +181,37 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
         vec = VECTOR_WRITE_ESCAPE_IMPL(vec_addr, src, len, 0);
         RETURN_ON_UNLIKELY_ERR(!vec);
     }
+#elif PYYJSON_AARCH
+#    define VECTOR_TYPE PYYJSON_SIMPLE_CONCAT(VECTOR_U, READ_BIT_SIZE, _128_A)
+    assert(len < CHECK_COUNT_MAX);
+    VECTOR_TYPE x, mask, check_mask;
+    const _FROM_TYPE *load_start = src + len - CHECK_COUNT_MAX;
+    _TARGET_TYPE *store_start = _WRITER(vec) + len - CHECK_COUNT_MAX;
+#    define MASK_TABLE_READER PYYJSON_CONCAT2(read_tail_mask_table, READ_BIT_SIZE)
+    // mask = load_128_aligned(MASK_TABLE_READER(CHECK_COUNT_MAX - len));
+    mask = *(VECTOR_TYPE *)MASK_TABLE_READER(CHECK_COUNT_MAX - len);
+#    undef MASK_TABLE_READER
+    check_mask = CHECK_ESCAPE_IMPL_GET_MASK(load_start, &x);
+    check_mask = simd_and_128(check_mask, mask);
+    if (likely(check_mask_zero(check_mask))) {
+#    if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
+#        if __SSE4_1__
+        x = blendv_128(load_128((const void *)store_start), x, mask);
+        write_128((void *)store_start, x);
+#        else  // < __SSE4_1__
+        x = runtime_right_shift_128bits(x, COMPILE_READ_UCS_LEVEL * (int)(CHECK_COUNT_MAX - len));
+        write_128(_WRITER(vec), x);
+#        endif // __SSE4_1__
+#    else      // COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
+        x = runtime_right_shift_128bits(x, COMPILE_READ_UCS_LEVEL * (int)(CHECK_COUNT_MAX - len));
+        WRITE_SIMD_IMPL(_WRITER(vec), x);
+#    endif     // COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
+        _WRITER(vec) += len;
+    } else {
+        vec = VECTOR_WRITE_ESCAPE_IMPL(vec_addr, src, len, 0);
+        RETURN_ON_UNLIKELY_ERR(!vec);
+    }
+#    undef VECTOR_TYPE
 #else // SIMD_BIT_SIZE == 128
     // TODO
     assert(len < CHECK_COUNT_MAX);
