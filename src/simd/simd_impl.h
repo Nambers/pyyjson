@@ -694,7 +694,7 @@ force_inline VECTOR_U16_128_A zip_256_32_to_16(VECTOR_U32_256_A y) {
     return _mm_packus_epi32(x_low, x_high);
 }
 
-/* Read: 32 bytes (16 u16). Write: 48 bytes. */
+/* Read: 32 bytes (16 u16). Write: 56 bytes. Valid in result: 48 bytes. */
 force_inline void ucs2_encode_3bytes_utf8_avx2(u16 *read_in, u8 *writer) {
     /* abcdefgh|12345678 */
     VECTOR_U16_256_A _y = *(VECTOR_U16_256_U *)read_in;
@@ -785,7 +785,7 @@ force_inline void ucs2_encode_3bytes_utf8_avx2(u16 *read_in, u8 *writer) {
     }
 }
 
-/* Read: 10 bytes (20 u16). Write: 32 bytes. */
+/* Read: 20 bytes (10 u16). Write: 32 bytes. Valid in result: 30 bytes. */
 // force_inline void ucs2_encode_3bytes_utf8_avx2_v2(u16 *read_in, u8 *writer) {
 //     /* abcdefgh|12345678 */
 //     VECTOR_U16_256_A y;
@@ -954,7 +954,7 @@ force_inline u32 cmpneq_16_512(VECTOR_U16_512_A a, VECTOR_U16_512_A b) {
  * AVX512F && AVX512BW only SIMD code
  *============================================================================*/
 #    if __AVX512F__ && __AVX512BW__
-/* Read: 42 bytes (21 u16). Write: 64 bytes. */
+/* Read: 42 bytes (21 u16). Write: 64 bytes. Valid in result: 63 bytes. */
 force_inline void ucs2_encode_3bytes_utf8_avx512(u16 *read_in, u8 *writer) {
     VECTOR_U16_512_A z;
     memcpy(((VECTOR_U16_128_A *)&z) + 3, read_in + 16, 10); // max read 42 bytes!

@@ -51,44 +51,36 @@ typedef struct TestCounter {
     int passed_count;
 } TestCounter;
 
-bool wrap_run_test(bool (*func)(void), const char *name, TestCounter *counter) {
-    printf("RUNNING TEST: %s", name);
-    bool ret = func();
+bool wrap_run_test(int (*func)(void), const char *name, TestCounter *counter) {
+    int ret = func();
+    if (ret == INVALID) return true;
+    printf("RUNNING TEST: %-50s", name);
     counter->total_count++;
-    if (ret) {
-        printf("\t\t\t" _GREEN "PASSED" _CLEAR "\n");
+    if (ret == PASSED) {
+        printf(" " _GREEN "PASSED" _CLEAR "\n");
         counter->passed_count++;
+    } else if (ret == SKIPPED) {
+        printf(" " _YELLOW "SKIPPED" _CLEAR "\n");
+        counter->skipped_count++;
     } else {
-        printf("\t\t\t" _RED "!!!!!FAILED" _CLEAR "\n");
+        printf(" " _RED "!!!!!FAILED" _CLEAR "\n");
     }
     return ret;
 }
 
 #define RUN_ONE_TEST(_name) wrap_run_test(_name, #_name, &counter)
-#define SKIP_ONE_TEST(_name) \
-    counter.total_count++;   \
-    counter.skipped_count++; \
-    printf("RUNNING TEST: %s\t\t\t" _YELLOW "SKIPPED" _CLEAR "\n", #_name);
 #if BUILD_MULTI_LIB
-#    define RUN_TESTS(_name)                                \
-        do {                                                \
-            if (support_avx512) {                           \
-                check_pass &= RUN_ONE_TEST(_name##_avx512); \
-            } else {                                        \
-                SKIP_ONE_TEST(_name##_avx512)               \
-            }                                               \
-            if (support_avx2) {                             \
-                check_pass &= RUN_ONE_TEST(_name##_avx2);   \
-            } else {                                        \
-                SKIP_ONE_TEST(_name##_avx2)                 \
-            }                                               \
-            check_pass &= RUN_ONE_TEST(_name##_sse2);       \
+#    define RUN_TESTS(_name)              \
+        do {                              \
+            RUN_ONE_TEST(_name##_avx512); \
+            RUN_ONE_TEST(_name##_avx2);   \
+            RUN_ONE_TEST(_name##_sse2);   \
         } while (0)
 #else
-#    define RUN_TESTS(_name) check_pass &= RUN_ONE_TEST(_name);
+#    define RUN_TESTS(_name) RUN_ONE_TEST(_name);
 #endif
 
-void show_test_counter(TestCounter *counter) {
+bool show_test_counter(TestCounter *counter) {
     int failed = counter->total_count - (counter->passed_count + counter->skipped_count);
     printf("==================================================================================\n");
     if (!failed) {
@@ -96,13 +88,13 @@ void show_test_counter(TestCounter *counter) {
     } else {
         printf(_RED "Summary: %d tests in total, %d passed, %d skipped, %d failed." _CLEAR "\n", counter->total_count, counter->passed_count, counter->skipped_count, failed);
     }
+    return !failed;
 }
 
 bool run_c_tests(void) {
     bool support_avx512 = _SupportAVX512;
     bool support_avx2 = _SupportAVX2;
 
-    bool check_pass = true;
     TestCounter counter;
     ZERO_FILL(counter);
 
@@ -111,8 +103,7 @@ bool run_c_tests(void) {
     RUN_TESTS(test_elevate_2_4_to_128);
     RUN_TESTS(test_ucs2_encode_3bytes_utf8);
 
-    show_test_counter(&counter);
-    return check_pass;
+    return show_test_counter(&counter);
 }
 
 int main(int argc, char **argv) {

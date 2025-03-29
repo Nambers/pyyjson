@@ -8,7 +8,7 @@
     do {                            \
         bool _check_result_ = (_x); \
         if (!_check_result_) {      \
-            return false;           \
+            return FAILED;          \
         }                           \
     } while (0)
 
@@ -27,6 +27,14 @@
         memset(&(_x), 0, sizeof(_x)); \
     } while (0)
 
+static const int INVALID = -1;
+static const int FAILED = 0;
+static const int PASSED = 1;
+static const int SKIPPED = 2;
+
+extern bool _SupportAVX512;
+extern bool _SupportAVX2;
+
 /* Helper functions. */
 
 force_inline void fill_random_buffer(void *_buffer, usize length) {
@@ -38,12 +46,12 @@ force_inline void fill_random_buffer(void *_buffer, usize length) {
 
 /* DECLARE_TEST macro. */
 #if BUILD_MULTI_LIB
-#    define DECLARE_TEST(_name)  \
-        bool _name##_sse2(void); \
-        bool _name##_avx2(void); \
-        bool _name##_avx512(void);
+#    define DECLARE_TEST(_name) \
+        int _name##_sse2(void); \
+        int _name##_avx2(void); \
+        int _name##_avx512(void);
 #else
-#    define DECLARE_TEST(_name) bool _name(void);
+#    define DECLARE_TEST(_name) int _name(void);
 #endif
 
 /* Tests. */
