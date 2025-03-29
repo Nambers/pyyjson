@@ -42,6 +42,7 @@
 #    elif PYYJSON_AARCH
 #        define SIMD_FEATURE_NAME neon
 #        define PYYJSON_HAS_BLENDV 0
+#        define SIMD_BIT_SIZE 128
 // aarch64 TODO
 #    else
 #        error "unsupported architecture"
