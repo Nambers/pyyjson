@@ -98,6 +98,40 @@ typedef __declspec(align(4)) struct {
     u32 v[16];
 } VECTOR_U32_512_U;
 
+#elif PYYJSON_AARCH
+// smaller than 128
+typedef u8 VECTOR_U8_32_A __attribute__((__vector_size__(4), __aligned__(4)));
+typedef u8 VECTOR_U8_32_U __attribute__((__vector_size__(4), __aligned__(1)));
+typedef u16 VECTOR_U16_32_A __attribute__((__vector_size__(4), __aligned__(4)));
+typedef u16 VECTOR_U16_32_U __attribute__((__vector_size__(4), __aligned__(2)));
+typedef u32 VECTOR_U32_32_A __attribute__((__vector_size__(4), __aligned__(4)));
+typedef u32 VECTOR_U32_32_U __attribute__((__vector_size__(4), __aligned__(4)));
+// 64~128
+typedef uint8x8_t VECTOR_U8_64_A;
+typedef u8 VECTOR_U8_64_U __attribute__((__vector_size__(8), __aligned__(1)));
+typedef uint16x4_t VECTOR_U16_64_A;
+typedef u16 VECTOR_U16_64_U __attribute__((__vector_size__(8), __aligned__(2)));
+typedef uint32x2_t VECTOR_U32_64_A;
+typedef u32 VECTOR_U32_64_U __attribute__((__vector_size__(8), __aligned__(4)));
+typedef uint8x16_t VECTOR_U8_128_A;
+typedef u8 VECTOR_U8_128_U __attribute__((__vector_size__(16), __aligned__(1)));
+typedef uint16x8_t VECTOR_U16_128_A;
+typedef u16 VECTOR_U16_128_U __attribute__((__vector_size__(16), __aligned__(2)));
+typedef uint32x4_t VECTOR_U32_128_A;
+typedef u32 VECTOR_U32_128_U __attribute__((__vector_size__(16), __aligned__(4)));
+// larger than 128
+typedef u8 VECTOR_U8_256_A __attribute__((__vector_size__(32), __aligned__(32)));
+typedef u8 VECTOR_U8_256_U __attribute__((__vector_size__(32), __aligned__(1)));
+typedef u16 VECTOR_U16_256_A __attribute__((__vector_size__(32), __aligned__(32)));
+typedef u16 VECTOR_U16_256_U __attribute__((__vector_size__(32), __aligned__(2)));
+typedef u32 VECTOR_U32_256_A __attribute__((__vector_size__(32), __aligned__(32)));
+typedef u32 VECTOR_U32_256_U __attribute__((__vector_size__(32), __aligned__(4)));
+typedef u8 VECTOR_U8_512_A __attribute__((__vector_size__(64), __aligned__(64)));
+typedef u8 VECTOR_U8_512_U __attribute__((__vector_size__(64), __aligned__(1)));
+typedef u16 VECTOR_U16_512_A __attribute__((__vector_size__(64), __aligned__(64)));
+typedef u16 VECTOR_U16_512_U __attribute__((__vector_size__(64), __aligned__(2)));
+typedef u32 VECTOR_U32_512_A __attribute__((__vector_size__(64), __aligned__(64)));
+typedef u32 VECTOR_U32_512_U __attribute__((__vector_size__(64), __aligned__(4)));
 #else
 typedef u8 VECTOR_U8_32_A __attribute__((__vector_size__(4), __aligned__(4)));
 typedef u8 VECTOR_U8_32_U __attribute__((__vector_size__(4), __aligned__(1)));
