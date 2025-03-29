@@ -7,7 +7,7 @@
 #include <string.h>
 
 /* Common SIMD vector types. */
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && !defined(__clang__)
 typedef u32 VECTOR_U8_32_A;
 
 typedef __declspec(align(1)) struct {
