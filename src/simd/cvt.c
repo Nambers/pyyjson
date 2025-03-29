@@ -3,7 +3,7 @@
 #include "unicode/uvector.h"
 
 force_inline void _long_back_elevate_1_4_small_tail_2(u8 **restrict read_end_addr, u32 **restrict write_end_addr) {
-#if SIMD_BIT_SIZE == 256
+#if PYYJSON_X86 && SIMD_BIT_SIZE == 256
     // 64 -> 256.
     SIMD_128 x_read;
     SIMD_256 elevated;
@@ -12,7 +12,7 @@ force_inline void _long_back_elevate_1_4_small_tail_2(u8 **restrict read_end_add
     x_read = broadcast_64_128(*(i64 *)*read_end_addr);
     elevated = elevate_1_4_to_256(x_read);
     write_256((void *)*write_end_addr, elevated);
-#else
+#elif PYYJSON_X86
     SIMD_128 x_read, elevated;
     *read_end_addr -= 8;
     *write_end_addr -= 8;
@@ -24,6 +24,8 @@ force_inline void _long_back_elevate_1_4_small_tail_2(u8 **restrict read_end_add
     x_read = unpack_hi_64_128(x_read, x_read);
     elevated = elevate_1_4_to_128(x_read);
     write_128((void *)((*write_end_addr) + 4), elevated);
+#elif PYYJSON_AARCH
+    assert(false);
 #endif
 }
 
@@ -63,16 +65,20 @@ force_inline void _long_back_elevate_1_4_loop_impl(u8 *restrict read_start, u8 *
 #endif
 
 force_inline void _long_back_elevate_1_4_small_tail_1(u8 **restrict read_end_addr, u32 **restrict write_end_addr) {
+#if PYYJSON_X86
     SIMD_128 x_read, elevated;
     *read_end_addr -= 4;
     *write_end_addr -= 4;
     x_read = broadcast_32_128(*(i32 *)*read_end_addr);
     elevated = elevate_1_4_to_128(x_read);
     write_128((void *)*write_end_addr, elevated);
+#elif PYYJSON_AARCH
+    assert(false);
+#endif
 }
 
 
-#if SIMD_BIT_SIZE > 128
+#if PYYJSON_X86 && SIMD_BIT_SIZE > 128
 force_inline void _long_back_elevate_1_2_loop_impl(u8 *restrict read_start, u8 *restrict read_end, u16 *restrict write_end, Py_ssize_t read_once_count, SIMD_HALF_TYPE (*load_interface)(const void *), void (*write_interface)(void *, SIMD_TYPE)) {
     read_end -= read_once_count;
     write_end -= read_once_count;
@@ -88,21 +94,29 @@ force_inline void _long_back_elevate_1_2_loop_impl(u8 *restrict read_start, u8 *
 }
 #else
 force_inline void _long_back_elevate_1_2_small_tail_1(u8 **read_end_addr, u16 **write_end_addr) {
+#    if PYYJSON_X86
     SIMD_128 x_read, elevated;
     *read_end_addr -= 8;
     *write_end_addr -= 8;
     x_read = broadcast_64_128(*(i64 *)*read_end_addr);
     elevated = elevate_1_2_to_128(x_read);
     write_128((void *)*write_end_addr, elevated);
+#    elif PYYJSON_AARCH
+    assert(false);
+#    endif
 }
 
 force_inline void _long_back_elevate_2_4_small_tail_1(u16 **read_end_addr, u32 **write_end_addr) {
+#    if PYYJSON_X86
     SIMD_128 x_read, elevated;
     *read_end_addr -= 4;
     *write_end_addr -= 4;
     x_read = broadcast_64_128(*(i64 *)*read_end_addr);
     elevated = elevate_2_4_to_128(x_read);
     write_128((void *)*write_end_addr, elevated);
+#    elif PYYJSON_AARCH
+    assert(false);
+#    endif
 }
 #endif // SIMD_BIT_SIZE
 
@@ -112,7 +126,7 @@ void SIMD_NAME_MODIFIER(long_back_elevate_1_2)(u16 *restrict write_start, u8 *re
     // 64(128) -> 128 cannot be aligned anyway.
     u8 *read_end = read_start + len;
     u16 *write_end = write_start + len;
-#if SIMD_BIT_SIZE > 128
+#if PYYJSON_X86 && SIMD_BIT_SIZE > 128
     const Py_ssize_t read_once_count = SIMD_BIT_SIZE / 2 / 8;
     Py_ssize_t tail_len = len & (read_once_count - 1);
     if (tail_len) {
@@ -164,7 +178,7 @@ elevate_dst_aligned:;
 elevate_both_not_aligned:;
     _long_back_elevate_1_2_loop_impl(read_start, read_end, write_end, read_once_count, load_half, write_simd);
     return;
-#else // SIMD_BIT_SIZE == 128
+#elif PYYJSON_X86 // SIMD_BIT_SIZE == 128
     SIMD_128 x_read;
     SIMD_128 x;
     // 16 bytes as a block.
@@ -193,6 +207,8 @@ elevate_both_not_aligned:;
         read_end -= 16;
         write_end -= 16;
     }
+#elif PYYJSON_AARCH
+    assert(false);
 #endif
 }
 
@@ -201,7 +217,7 @@ void SIMD_NAME_MODIFIER(long_back_elevate_1_4)(u32 *restrict write_start, u8 *re
     // 32/64(128) -> 128/256 cannot be aligned anyway.
     u8 *read_end = read_start + len;
     u32 *write_end = write_start + len;
-#if SIMD_BIT_SIZE == 512
+#if PYYJSON_X86 && SIMD_BIT_SIZE == 512
     const Py_ssize_t read_once_count = SIMD_BIT_SIZE / 4 / 8;
     Py_ssize_t tail_len = len & (read_once_count - 1);
     if (tail_len) {
@@ -239,7 +255,7 @@ elevate_dst_aligned:;
 elevate_both_not_aligned:;
     _long_back_elevate_1_4_loop_impl(read_start, read_end, write_end, read_once_count, load_128, write_simd);
     return;
-#else
+#elif PYYJSON_X86
     SIMD_128 x_read;
     SIMD_TYPE SIMD_VAR;
     // 16 bytes as a block.
@@ -305,6 +321,8 @@ elevate_both_not_aligned:;
         read_end -= 16;
         write_end -= 16;
     }
+#elif PYYJSON_AARCH
+    assert(false);
 #endif
 }
 
@@ -314,7 +332,7 @@ void SIMD_NAME_MODIFIER(long_back_elevate_2_4)(u32 *restrict write_start, u16 *r
     // 64(128) -> 128 cannot be aligned anyway.
     u16 *read_end = read_start + len;
     u32 *write_end = write_start + len;
-#if SIMD_BIT_SIZE > 128
+#if PYYJSON_X86 && SIMD_BIT_SIZE > 128
     const Py_ssize_t read_once_count = SIMD_BIT_SIZE / 4 / 8;
     Py_ssize_t tail_len = len & (read_once_count - 1);
     if (tail_len) {
@@ -366,7 +384,7 @@ elevate_dst_aligned:;
 elevate_both_not_aligned:;
     _long_back_elevate_2_4_loop_impl(read_start, read_end, write_end, read_once_count, load_half, write_simd);
     return;
-#else // SIMD_BIT_SIZE == 128
+#elif PYYJSON_X86 // SIMD_BIT_SIZE == 128
     SIMD_128 x_read;
     SIMD_128 x;
     // 16 bytes as a block. i.e. 8 WORDs
@@ -395,5 +413,7 @@ elevate_both_not_aligned:;
         read_end -= 8;
         write_end -= 8;
     }
+#elif PYYJSON_AARCH
+    assert(false);
 #endif
 }
