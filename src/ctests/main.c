@@ -82,13 +82,14 @@ bool wrap_run_test(int (*func)(void), const char *name, TestCounter *counter) {
 
 bool show_test_counter(TestCounter *counter) {
     int failed = counter->total_count - (counter->passed_count + counter->skipped_count);
+    bool success = !failed;
     printf("==================================================================================\n");
-    if (!failed) {
+    if (success) {
         printf(_GREEN "Summary: ALL PASSED, %d tests in total, %d passed, %d skipped." _CLEAR "\n", counter->total_count, counter->passed_count, counter->skipped_count);
     } else {
         printf(_RED "Summary: %d tests in total, %d passed, %d skipped, %d failed." _CLEAR "\n", counter->total_count, counter->passed_count, counter->skipped_count, failed);
     }
-    return !failed;
+    return success;
 }
 
 bool run_c_tests(void) {
