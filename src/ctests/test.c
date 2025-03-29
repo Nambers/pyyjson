@@ -1,6 +1,6 @@
 #include "test.h"
 #include "simd/simd_detect.h"
-#if BUILD_MULTI_LIB
+#if BUILD_MULTI_LIB && PYYJSON_X86
 #    if SIMD_BIT_SIZE == 512
 #        define GUARDED_SIMD                         \
             do {                                     \
@@ -46,6 +46,9 @@
                           ((_u) & 0x01 ? '1' : '0')
 
 int SIMD_NAME_MODIFIER(test_elevate_1_2_to_128)(void) {
+#if PYYJSON_AARCH
+    return INVALID;
+#else
     GUARDED_SIMD;
     u8 input[16];
     u16 dst[8];
@@ -61,9 +64,13 @@ int SIMD_NAME_MODIFIER(test_elevate_1_2_to_128)(void) {
         }
     }
     return PASSED;
+#endif
 }
 
 int SIMD_NAME_MODIFIER(test_elevate_1_4_to_128)(void) {
+#if PYYJSON_AARCH
+    return INVALID;
+#else
     GUARDED_SIMD;
     u8 input[16];
     u32 dst[4];
@@ -79,9 +86,13 @@ int SIMD_NAME_MODIFIER(test_elevate_1_4_to_128)(void) {
         }
     }
     return PASSED;
+#endif
 }
 
 int SIMD_NAME_MODIFIER(test_elevate_2_4_to_128)(void) {
+#if PYYJSON_AARCH
+    return INVALID;
+#else
     GUARDED_SIMD;
     u16 input[8];
     u32 dst[4];
@@ -97,10 +108,14 @@ int SIMD_NAME_MODIFIER(test_elevate_2_4_to_128)(void) {
         }
     }
     return PASSED;
+#endif
 }
 
 int SIMD_NAME_MODIFIER(test_ucs2_encode_3bytes_utf8)(void) {
-#if __AVX512F__ && __AVX512BW__
+#if PYYJSON_AARCH
+    return INVALID;
+#else
+#    if __AVX512F__ && __AVX512BW__
     GUARDED_SIMD;
     u16 input[21];
     u8 output[64];
@@ -115,7 +130,7 @@ int SIMD_NAME_MODIFIER(test_ucs2_encode_3bytes_utf8)(void) {
         CHECK(rt == input[i]);
     }
     return PASSED;
-#elif __AVX2__
+#    elif __AVX2__
     GUARDED_SIMD;
     u16 input[16];
     u8 output[56];
@@ -130,7 +145,8 @@ int SIMD_NAME_MODIFIER(test_ucs2_encode_3bytes_utf8)(void) {
         CHECK(rt == input[i]);
     }
     return PASSED;
-#else
+#    else
     return INVALID;
+#    endif
 #endif
 }

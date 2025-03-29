@@ -23,6 +23,7 @@ force_inline void cpuid(int *info, int x) {
 #    endif
 #endif
 
+#if PYYJSON_X86
 bool _SupportAVX512 = false;
 bool _SupportAVX2 = false;
 
@@ -39,6 +40,7 @@ void check_avx2(void) {
     int ebx = info[1];
     _SupportAVX2 = ebx & (1 << 5);
 }
+#endif
 
 #define _RED "\033[31m"
 #define _GREEN "\033[32m"
@@ -69,12 +71,17 @@ bool wrap_run_test(int (*func)(void), const char *name, TestCounter *counter) {
 }
 
 #define RUN_ONE_TEST(_name) wrap_run_test(_name, #_name, &counter)
-#if BUILD_MULTI_LIB
+#if BUILD_MULTI_LIB && PYYJSON_X86
 #    define RUN_TESTS(_name)              \
         do {                              \
             RUN_ONE_TEST(_name##_avx512); \
             RUN_ONE_TEST(_name##_avx2);   \
             RUN_ONE_TEST(_name##_sse2);   \
+        } while (0)
+#elif BUILD_MULTI_LIB && PYYJSON_AARCH
+#    define RUN_TESTS(_name)            \
+        do {                            \
+            RUN_ONE_TEST(_name##_neon); \
         } while (0)
 #else
 #    define RUN_TESTS(_name) RUN_ONE_TEST(_name);
@@ -93,9 +100,10 @@ bool show_test_counter(TestCounter *counter) {
 }
 
 bool run_c_tests(void) {
+#if PYYJSON_X86
     bool support_avx512 = _SupportAVX512;
     bool support_avx2 = _SupportAVX2;
-
+#endif
     TestCounter counter;
     ZERO_FILL(counter);
 
@@ -113,8 +121,10 @@ int main(int argc, char **argv) {
         return 1;
     }
     srand((u32)time(NULL));
+#if PYYJSON_X86
     check_avx2();
     check_avx512();
+#endif
     //
     int ret = 0;
     //

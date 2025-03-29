@@ -45,11 +45,13 @@ force_inline void fill_random_buffer(void *_buffer, usize length) {
 }
 
 /* DECLARE_TEST macro. */
-#if BUILD_MULTI_LIB
+#if BUILD_MULTI_LIB && PYYJSON_X86
 #    define DECLARE_TEST(_name) \
         int _name##_sse2(void); \
         int _name##_avx2(void); \
         int _name##_avx512(void);
+#elif BUILD_MULTI_LIB && PYYJSON_AARCH
+#    define DECLARE_TEST(_name) int _name##_neon(void);
 #else
 #    define DECLARE_TEST(_name) int _name(void);
 #endif
