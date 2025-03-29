@@ -4,9 +4,10 @@
 #include "Python.h"
 #include "pyyjson.h"
 #include "simd/simd_detect.h"
+#include <string.h>
 
 /* Common SIMD vector types. */
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && !defined(__clang__)
 typedef u32 VECTOR_U8_32_A;
 
 typedef __declspec(align(1)) struct {
@@ -132,8 +133,6 @@ typedef u32 VECTOR_U32_512_U __attribute__((__vector_size__(64), __aligned__(4))
 
 
 #if PYYJSON_X86
-
-
 #    if SIMD_BIT_SIZE == 512
 #        define SIMD_VAR z
 #        define SIMD_TYPE __m512i
@@ -696,6 +695,183 @@ force_inline VECTOR_U16_128_A zip_256_32_to_16(VECTOR_U32_256_A y) {
     return _mm_packus_epi32(x_low, x_high);
 }
 
+/* Read: 32 bytes (16 u16). Write: 56 bytes. Valid in result: 48 bytes. */
+force_inline void ucs2_encode_3bytes_utf8_avx2(u16 *read_in, u8 *writer) {
+    /* abcdefgh|12345678 */
+    VECTOR_U16_256_A _y;
+    memcpy(&_y, read_in, sizeof(_y));
+    VECTOR_U16_256_A y[2];
+    VECTOR_U16_128_A x_low = _mm256_extracti128_si256(_y, 0);
+    VECTOR_U16_128_A x_high = _mm256_extracti128_si256(_y, 1);
+    y[0] = _mm256_set_m128i(x_low, x_low);
+    y[1] = _mm256_set_m128i(x_high, x_high);
+    pyyjson_align(32) static const u8 t1[32] = {
+            0x80, 0x80, 0,
+            0x80, 0x80, 2,
+            0x80, 0x80, 4,
+            0x80, 0x80, 6,
+            0x80, 0x80, 8,
+            0x80, 0x80, 10,
+            0x80, 0x80, 12,
+            0x80, 0x80, 14,
+            0x80, 0x80, 0x80,
+            0x80, 0x80, 0x80,
+            0x80, 0x80};
+    pyyjson_align(32) static const u8 t2[32] = {
+            0x80, 0, 0x80,
+            0x80, 2, 0x80,
+            0x80, 4, 0x80,
+            0x80, 6, 0x80,
+            0x80, 8, 0x80,
+            0x80, 10, 0x80,
+            0x80, 12, 0x80,
+            0x80, 14, 0x80,
+            0x80, 0x80, 0x80,
+            0x80, 0x80, 0x80,
+            0x80, 0x80};
+    pyyjson_align(32) static const u8 t3[32] = {
+            0, 0x80, 0x80,
+            2, 0x80, 0x80,
+            4, 0x80, 0x80,
+            6, 0x80, 0x80,
+            8, 0x80, 0x80,
+            10, 0x80, 0x80,
+            12, 0x80, 0x80,
+            14, 0x80, 0x80,
+            0x80, 0x80, 0x80,
+            0x80, 0x80, 0x80,
+            0x80, 0x80};
+    pyyjson_align(32) static const u8 m1[32] = {
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0, 0, 0, 0,
+            0, 0, 0, 0};
+    pyyjson_align(32) static const u8 m2[32] = {
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0, 0, 0, 0,
+            0, 0, 0, 0};
+    for (int i = 0; i < 2; ++i) {
+        SIMD_256 z = y[i];
+        SIMD_256 z1, z2, z3;
+        /*z1 = 00000000|00000000|abcdefgh */
+        z1 = _mm256_shuffle_epi8(z, *(const SIMD_256 *)t1);
+        /*z2 = gh123456|78000000 */
+        z2 = _mm256_srli_epi16(z, 6);
+        /*z2 = 00000000|gh123456|00000000 */
+        z2 = _mm256_shuffle_epi8(z2, *(const SIMD_256 *)t2);
+        /*z3 = 56780000|00000000 */
+        z3 = _mm256_srli_epi16(z, 12);
+        /*z3 = 56780000|00000000|00000000 */
+        z3 = _mm256_shuffle_epi8(z3, *(const SIMD_256 *)t3);
+        /*z = 56780000|gh123456|abcdefgh */
+        z = _mm256_or_si256(z1, _mm256_or_si256(z2, z3));
+        /*z = 56780000|gh123400|abcdef00 */
+        z = _mm256_and_si256(z, *(const SIMD_256 *)m1);
+        // 5678[mmmm]|gh1234[mm]|abcdef[mm]
+        z = _mm256_or_si256(z, *(const SIMD_256 *)m2);
+        _mm256_storeu_si256((void *)writer, z);
+        writer += 24;
+    }
+}
+
+/* Read: 20 bytes (10 u16). Write: 32 bytes. Valid in result: 30 bytes. */
+// force_inline void ucs2_encode_3bytes_utf8_avx2_v2(u16 *read_in, u8 *writer) {
+//     /* abcdefgh|12345678 */
+//     VECTOR_U16_256_A y;
+//     memcpy(((VECTOR_U16_128_A *)&y) + 1, read_in + 4, 12); // max read 20 bytes
+//     memcpy(((VECTOR_U16_128_A *)&y) + 0, read_in + 0, sizeof(VECTOR_U16_128_A));
+//     pyyjson_align(32) static const u8 t1[32] = {
+//             0x80, 0x80, 0,
+//             0x80, 0x80, 2,
+//             0x80, 0x80, 4,
+//             0x80, 0x80, 6,
+//             0x80, 0x80, 8,
+//             0x80, 0x80, 2,
+//             0x80, 0x80, 4,
+//             0x80, 0x80, 6,
+//             0x80, 0x80, 8,
+//             0x80, 0x80, 10,
+//             0x80, 0x80};
+//     pyyjson_align(32) static const u8 t2[32] = {
+//             0x80, 0, 0x80,
+//             0x80, 2, 0x80,
+//             0x80, 4, 0x80,
+//             0x80, 6, 0x80,
+//             0x80, 8, 0x80,
+//             0x80, 2, 0x80,
+//             0x80, 4, 0x80,
+//             0x80, 6, 0x80,
+//             0x80, 8, 0x80,
+//             0x80, 10, 0x80,
+//             0x80, 0x80};
+//     pyyjson_align(32) static const u8 t3[32] = {
+//             0, 0x80, 0x80,
+//             2, 0x80, 0x80,
+//             4, 0x80, 0x80,
+//             6, 0x80, 0x80,
+//             8, 0x80, 0x80,
+//             10, 0x80, 0x80,
+//             4, 0x80, 0x80,
+//             6, 0x80, 0x80,
+//             8, 0x80, 0x80,
+//             10, 0x80, 0x80,
+//             0x80, 0x80};
+//     pyyjson_align(32) static const u8 m1[32] = {
+//             0xff, 0x3f, 0x3f,
+//             0xff, 0x3f, 0x3f,
+//             0xff, 0x3f, 0x3f,
+//             0xff, 0x3f, 0x3f,
+//             0xff, 0x3f, 0x3f,
+//             0xff, 0x3f, 0x3f,
+//             0xff, 0x3f, 0x3f,
+//             0xff, 0x3f, 0x3f,
+//             0xff, 0x3f, 0x3f,
+//             0xff, 0x3f, 0x3f,
+//             0, 0};
+//     pyyjson_align(32) static const u8 m2[32] = {
+//             0xe0, 0x80, 0x80,
+//             0xe0, 0x80, 0x80,
+//             0xe0, 0x80, 0x80,
+//             0xe0, 0x80, 0x80,
+//             0xe0, 0x80, 0x80,
+//             0xe0, 0x80, 0x80,
+//             0xe0, 0x80, 0x80,
+//             0xe0, 0x80, 0x80,
+//             0xe0, 0x80, 0x80,
+//             0xe0, 0x80, 0x80,
+//             0, 0};
+//     SIMD_256 y1, y2, y3;
+//     /*y1 = 00000000|00000000|abcdefgh */
+//     y1 = _mm256_shuffle_epi8(y, *(const SIMD_256 *)t1);
+//     /*y2 = gh123456|78000000 */
+//     y2 = _mm256_srli_epi16(y, 6);
+//     /*y2 = 00000000|gh123456|00000000 */
+//     y2 = _mm256_shuffle_epi8(y2, *(const SIMD_256 *)t2);
+//     /*y3 = 56780000|00000000 */
+//     y3 = _mm256_srli_epi16(y, 12);
+//     /*y3 = 56780000|00000000|00000000 */
+//     y3 = _mm256_shuffle_epi8(y3, *(const SIMD_256 *)t3);
+//     /*y = 56780000|gh123456|abcdefgh */
+//     y = _mm256_or_si256(y1, _mm256_or_si256(y2, y3));
+//     /*y = 56780000|gh123400|abcdef00 */
+//     y = _mm256_and_si256(y, *(const SIMD_256 *)m1);
+//     // 5678[mmmm]|gh1234[mm]|abcdef[mm]
+//     y = _mm256_or_si256(y, *(const SIMD_256 *)m2);
+//     _mm256_storeu_si256((void *)writer, y);
+// }
 #    endif
 
 /*==============================================================================
@@ -773,6 +949,153 @@ force_inline u64 cmpneq_8_512(VECTOR_U8_512_A a, VECTOR_U8_512_A b) {
 
 force_inline u32 cmpneq_16_512(VECTOR_U16_512_A a, VECTOR_U16_512_A b) {
     return (u32)_mm512_cmpneq_epi16_mask(a, b);
+}
+#    endif
+
+/*==============================================================================
+ * AVX512F && AVX512BW only SIMD code
+ *============================================================================*/
+#    if __AVX512F__ && __AVX512BW__
+/* Read: 42 bytes (21 u16). Write: 64 bytes. Valid in result: 63 bytes. */
+force_inline void ucs2_encode_3bytes_utf8_avx512(u16 *read_in, u8 *writer) {
+    VECTOR_U16_512_A z;
+    memcpy(((VECTOR_U16_128_A *)&z) + 3, read_in + 16, 10); // max read 42 bytes!
+    memcpy(((VECTOR_U16_128_A *)&z) + 2, read_in + 10, sizeof(VECTOR_U16_128_A));
+    memcpy(((VECTOR_U16_128_A *)&z) + 1, read_in + 4, sizeof(VECTOR_U16_128_A));
+    memcpy(((VECTOR_U16_128_A *)&z) + 0, read_in + 0, sizeof(VECTOR_U16_128_A));
+    pyyjson_align(64) static const u8 t1[64] = {
+            0x80, 0x80, 0,
+            0x80, 0x80, 2,
+            0x80, 0x80, 4,
+            0x80, 0x80, 6,
+            0x80, 0x80, 8,
+            0x80, 0x80, 2,
+            0x80, 0x80, 4,
+            0x80, 0x80, 6,
+            0x80, 0x80, 8,
+            0x80, 0x80, 10,
+            0x80, 0x80, 0,
+            0x80, 0x80, 2,
+            0x80, 0x80, 4,
+            0x80, 0x80, 6,
+            0x80, 0x80, 8,
+            0x80, 0x80, 10,
+            0x80, 0x80, 0,
+            0x80, 0x80, 2,
+            0x80, 0x80, 4,
+            0x80, 0x80, 6,
+            0x80, 0x80, 8,
+            0x80};
+    pyyjson_align(64) static const u8 t2[64] = {
+            0x80, 0, 0x80,
+            0x80, 2, 0x80,
+            0x80, 4, 0x80,
+            0x80, 6, 0x80,
+            0x80, 8, 0x80,
+            0x80, 2, 0x80,
+            0x80, 4, 0x80,
+            0x80, 6, 0x80,
+            0x80, 8, 0x80,
+            0x80, 10, 0x80,
+            0x80, 12, 0x80,
+            0x80, 2, 0x80,
+            0x80, 4, 0x80,
+            0x80, 6, 0x80,
+            0x80, 8, 0x80,
+            0x80, 10, 0x80,
+            0x80, 0, 0x80,
+            0x80, 2, 0x80,
+            0x80, 4, 0x80,
+            0x80, 6, 0x80,
+            0x80, 8, 0x80,
+            0x80};
+    pyyjson_align(64) static const u8 t3[64] = {
+            0, 0x80, 0x80,
+            2, 0x80, 0x80,
+            4, 0x80, 0x80,
+            6, 0x80, 0x80,
+            8, 0x80, 0x80,
+            10, 0x80, 0x80,
+            4, 0x80, 0x80,
+            6, 0x80, 0x80,
+            8, 0x80, 0x80,
+            10, 0x80, 0x80,
+            12, 0x80, 0x80,
+            2, 0x80, 0x80,
+            4, 0x80, 0x80,
+            6, 0x80, 0x80,
+            8, 0x80, 0x80,
+            10, 0x80, 0x80,
+            0, 0x80, 0x80,
+            2, 0x80, 0x80,
+            4, 0x80, 0x80,
+            6, 0x80, 0x80,
+            8, 0x80, 0x80,
+            0x80};
+    pyyjson_align(64) static const u8 m1[64] = {
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0};
+    pyyjson_align(64) static const u8 m2[64] = {
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0};
+    VECTOR_U16_512_A z1, z2, z3;
+    /*z1 = 00000000|00000000|abcdefgh */
+    z1 = _mm512_shuffle_epi8(z, *(const SIMD_512 *)t1);
+    /*z2 = gh123456|78000000 */
+    z2 = _mm512_srli_epi16(z, 6);
+    /*z2 = 00000000|gh123456|00000000 */
+    z2 = _mm512_shuffle_epi8(z2, *(const SIMD_512 *)t2);
+    /*z3 = 56780000|00000000 */
+    z3 = _mm512_srli_epi16(z, 12);
+    /*z3 = 56780000|00000000|00000000 */
+    z3 = _mm512_shuffle_epi8(z3, *(const SIMD_512 *)t3);
+    /*z = 56780000|gh123456|abcdefgh */
+    z = _mm512_or_si512(z1, _mm512_or_si512(z2, z3));
+    /*z = 56780000|gh123400|abcdef00 */
+    z = _mm512_and_si512(z, *(const SIMD_512 *)m1);
+    // 5678[mmmm]|gh1234[mm]|abcdef[mm]
+    z = _mm512_or_si512(z, *(const SIMD_512 *)m2);
+    _mm512_storeu_si512((void *)writer, z);
 }
 #    endif
 
