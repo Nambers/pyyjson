@@ -109,6 +109,7 @@ bool run_c_tests(void) {
     RUN_TESTS(test_elevate_1_2_to_128);
     RUN_TESTS(test_elevate_1_4_to_128);
     RUN_TESTS(test_elevate_2_4_to_128);
+    RUN_TESTS(test_ucs2_encode_3bytes_utf8);
 
     show_test_counter(&counter);
     return check_pass;

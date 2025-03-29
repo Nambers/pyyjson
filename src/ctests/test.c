@@ -1,4 +1,33 @@
 #include "test.h"
+#include "simd/simd_detect.h"
+
+#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+#define BYTE_TO_BINARY(byte)             \
+    ((byte) & 0x80 ? '1' : '0'),         \
+            ((byte) & 0x40 ? '1' : '0'), \
+            ((byte) & 0x20 ? '1' : '0'), \
+            ((byte) & 0x10 ? '1' : '0'), \
+            ((byte) & 0x08 ? '1' : '0'), \
+            ((byte) & 0x04 ? '1' : '0'), \
+            ((byte) & 0x02 ? '1' : '0'), \
+            ((byte) & 0x01 ? '1' : '0')
+#define U16_TO_BINARY(_u)                \
+    ((_u) & 0x8000 ? '1' : '0'),         \
+            ((_u) & 0x4000 ? '1' : '0'), \
+            ((_u) & 0x2000 ? '1' : '0'), \
+            ((_u) & 0x1000 ? '1' : '0'), \
+            ((_u) & 0x800 ? '1' : '0'),  \
+            ((_u) & 0x400 ? '1' : '0'),  \
+            ((_u) & 0x200 ? '1' : '0'),  \
+            ((_u) & 0x100 ? '1' : '0'),  \
+            ((_u) & 0x80 ? '1' : '0'),   \
+            ((_u) & 0x40 ? '1' : '0'),   \
+            ((_u) & 0x20 ? '1' : '0'),   \
+            ((_u) & 0x10 ? '1' : '0'),   \
+            ((_u) & 0x08 ? '1' : '0'),   \
+            ((_u) & 0x04 ? '1' : '0'),   \
+            ((_u) & 0x02 ? '1' : '0'),   \
+            ((_u) & 0x01 ? '1' : '0')
 
 bool SIMD_NAME_MODIFIER(test_elevate_1_2_to_128)(void) {
     u8 input[16];
@@ -49,4 +78,38 @@ bool SIMD_NAME_MODIFIER(test_elevate_2_4_to_128)(void) {
         }
     }
     return true;
+}
+
+bool SIMD_NAME_MODIFIER(test_ucs2_encode_3bytes_utf8)(void) {
+#if __AVX512F__ && __AVX512BW__
+    u16 input[21];
+    u8 output[64];
+    for (int i = 0; i < COUNT_OF(input); ++i) {
+        input[i] = 0x800 + (rand() % (0x10000 - 0x800));
+    }
+    ucs2_encode_3bytes_utf8_avx512(input, output);
+    for (int i = 0; i < COUNT_OF(input); ++i) {
+        u32 uni;
+        memcpy(&uni, &output[i * 3], 4);
+        u16 rt = ((uni & 0x0f) << 12) | ((uni & 0x3f00) >> 2) | ((uni & 0x3f0000) >> 16);
+        CHECK(rt == input[i]);
+    }
+    return true;
+#elif __AVX2__
+    u16 input[16];
+    u8 output[48];
+    for (int i = 0; i < COUNT_OF(input); ++i) {
+        input[i] = 0x800 + (rand() % (0x10000 - 0x800));
+    }
+    ucs2_encode_3bytes_utf8_avx2(input, output);
+    for (int i = 0; i < COUNT_OF(input); ++i) {
+        u32 uni;
+        memcpy(&uni, &output[i * 3], 4);
+        u16 rt = ((uni & 0x0f) << 12) | ((uni & 0x3f00) >> 2) | ((uni & 0x3f0000) >> 16);
+        CHECK(rt == input[i]);
+    }
+    return true;
+#else
+    return true;
+#endif
 }
