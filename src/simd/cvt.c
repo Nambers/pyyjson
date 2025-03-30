@@ -238,7 +238,7 @@ elevate_both_not_aligned:;
         VECTOR_U16_128_A x;
         memcpy(&x_read, read_end, 8);
         x = elevate_1_2_to_128(x_read);
-        write_128((void *)write_end, x);
+        write_u16_128((void *)write_end, x);
         read_end -= _BlockSize;
         write_end -= _BlockSize;
     }
@@ -374,7 +374,7 @@ elevate_both_not_aligned:;
         VECTOR_U32_128_A x;
         memcpy(&x_read, read_end, 4);
         x = elevate_1_4_to_128(x_read);
-        write_128((void *)write_end, x);
+        write_u32_128((void *)write_end, x);
         read_end -= _BlockSize;
         write_end -= _BlockSize;
     }
@@ -487,7 +487,7 @@ elevate_both_not_aligned:;
         VECTOR_U32_128_A x;
         memcpy(&x_read, read_end, 8);
         x = elevate_2_4_to_128(x_read);
-        write_128((void *)write_end, x);
+        write_u32_128((void *)write_end, x);
         read_end -= _BlockSize;
         write_end -= _BlockSize;
     }

@@ -1292,5 +1292,33 @@ force_inline void write_real_half(void *dst, SIMD_REAL_HALF_TYPE half) {
 }
 #elif PYYJSON_AARCH
 
+force_inline void write_u8_128(void *dst, VECTOR_U8_128_A x) {
+    memcpy(dst, &x, sizeof(x));
+}
+
+force_inline void write_u16_128(void *dst, VECTOR_U16_128_A x) {
+    memcpy(dst, &x, sizeof(x));
+}
+
+force_inline void write_u32_128(void *dst, VECTOR_U32_128_A x) {
+    memcpy(dst, &x, sizeof(x));
+}
+
+force_inline VECTOR_U16_128_A elevate_1_2_to_128(VECTOR_U8_64_A _in) {
+    return vmovl_u8(_in);
+}
+
+force_inline VECTOR_U32_128_A elevate_2_4_to_128(VECTOR_U16_64_A _in) {
+    return vmovl_u16(_in);
+}
+
+force_inline VECTOR_U32_128_A elevate_1_4_to_128(VECTOR_U8_32_A _in) {
+    VECTOR_U32_128_A _out;
+    for (int i = 0; i < 4; ++i) {
+        _out[i] = _in[i];
+    }
+    return _out;
+}
+
 #endif
 #endif // ENCODE_SIMD_IMPL_H
