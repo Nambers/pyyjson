@@ -502,7 +502,7 @@ fail:;
 #include "unicode/_include_helper/indent_wrap.h"
 #include "unicode/_include_helper/reserve_wrap.h"
 
-#include "simd/check_mask_wrap.inl.c"
+#include "simd/check_mask_wrap.h"
 
 #include "simd/readwrite_utils_wrap.inl.c"
 #include "simd/write_utils_wrap.inl.c"

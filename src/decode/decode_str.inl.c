@@ -2,18 +2,15 @@
 #include "pyyjson.h"
 #include "simd/cvt.h"
 #include "simd/mask_table.h"
+#include "simd/simd_impl.h"
 
 #if COMPILE_UCS_LEVEL == 0
 #    define COMPILE_READ_UCS_LEVEL 1
 #else
 #    define COMPILE_READ_UCS_LEVEL COMPILE_UCS_LEVEL
 #endif
-// #include "encode/encode_simd_utils.inl.h"
-#include "simd/simd_impl.h"
 //
 #include "commondef/r_in.inl.h"
-//
-// #include "simd/check_mask.inl.h"
 
 #define PYYJSON_DECODE_STR PYYJSON_CONCAT2(pyyjson_decode_str, COMPILE_UCS_LEVEL)
 #define SHOULD_READ_PRETTY PYYJSON_CONCAT2(should_read_pretty, COMPILE_UCS_LEVEL)
