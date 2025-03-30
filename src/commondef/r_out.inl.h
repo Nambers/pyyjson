@@ -1,3 +1,8 @@
+#undef CHECK_ESCAPE_IMPL_GET_MASK
+//
+#undef LOAD_U
+#undef LOAD_A
+#undef SET_ALL
 #undef VECTOR_TYPE_U
 #undef VECTOR_TYPE
 #undef READ_UNSIGNED_BIT_NAME
