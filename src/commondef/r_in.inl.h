@@ -1,5 +1,6 @@
 #include "pyyjson.h"
 #include "r_out.inl.h"
+#include "simd/simd_impl.h"
 /*
  * Macros IN
  */

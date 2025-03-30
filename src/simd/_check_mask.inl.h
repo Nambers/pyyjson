@@ -1,9 +1,8 @@
 // requires: READ
-
+#include "commondef/r_in.inl.h"
 #include "pyyjson.h"
 #include "simd_impl.h"
 
-// #define CHECK_ESCAPE_IMPL_GET_MASK PYYJSON_CONCAT2(check_escape_impl_get_mask, COMPILE_READ_UCS_LEVEL)
 #define GET_DONE_COUNT_FROM_MASK PYYJSON_CONCAT2(get_done_count_from_mask, COMPILE_READ_UCS_LEVEL)
 #define CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512 PYYJSON_CONCAT2(check_escape_tail_impl_get_mask_512, COMPILE_READ_UCS_LEVEL)
 
@@ -95,4 +94,4 @@ force_inline SIMD_MASK_TYPE CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(SIMD_512 z, u64 
 
 #undef CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512
 #undef GET_DONE_COUNT_FROM_MASK
-// #undef CHECK_ESCAPE_IMPL_GET_MASK
+#include "commondef/r_out.inl.h"

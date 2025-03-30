@@ -1,5 +1,6 @@
 // requires: READ, WRITE
 
+#include "commondef/rw_in.inl.h"
 #include "pyyjson.h"
 #include "simd_impl.h"
 
@@ -82,3 +83,4 @@ force_inline void DOWNGRADE_STRING(const _FROM_TYPE *src_start, Py_ssize_t copy_
 }
 #endif
 #undef DOWNGRADE_STRING
+#include "commondef/rw_out.inl.h"
