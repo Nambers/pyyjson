@@ -14,11 +14,6 @@ force_inline VECTOR_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restr
     t1 = SET_ALL(_Quote);
     t2 = SET_ALL(_Slash);
     t3 = SET_ALL(ControlMax);
-    // for (int i = 0; i < CHECK_COUNT_MAX; ++i) {
-    //     t1[i] = _Quote;
-    //     t2[i] = _Slash;
-    //     t3[i] = ControlMax;
-    // }
 #if PYYJSON_X86 && SIMD_BIT_SIZE == 512
 #    define CMPEQ PYYJSON_SIMPLE_CONCAT3(_mm512_cmpeq_epi, READ_BIT_SIZE, _mask)
 #    define CMPLT PYYJSON_SIMPLE_CONCAT3(_mm512_cmplt_epu, READ_BIT_SIZE, _mask)
@@ -34,72 +29,7 @@ force_inline VECTOR_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restr
     VECTOR_TYPE m3 = (VECTOR_TYPE)(v < t3);
     return (VECTOR_TYPE)(m1 | m2 | m3);
 #endif
-    // #if SIMD_BIT_SIZE == 512
-    // #    define CUR_QUOTE PYYJSON_SIMPLE_CONCAT2(_Quote_i, READ_BIT_SIZE)
-    // #    define CUR_SLASH PYYJSON_SIMPLE_CONCAT2(_Slash_i, READ_BIT_SIZE)
-    // #    define CUR_CONTROL_MAX PYYJSON_SIMPLE_CONCAT2(_ControlMax_i, READ_BIT_SIZE)
-    // #    define CMPEQ PYYJSON_SIMPLE_CONCAT3(_mm512_cmpeq_epi, READ_BIT_SIZE, _mask)
-    // #    define CMPLT PYYJSON_SIMPLE_CONCAT3(_mm512_cmplt_epu, READ_BIT_SIZE, _mask)
-    // #    define SET1 PYYJSON_SIMPLE_CONCAT2(_mm512_set1_epi, READ_BIT_SIZE)
-    //     *z = load_512((const void *)src);
-    //     const SIMD_512 t1 = SET1(_Quote);     //load_512_aligned((const void *)CUR_QUOTE);
-    //     const SIMD_512 t2 = SET1(_Slash);     //load_512_aligned((const void *)CUR_SLASH);
-    //     const SIMD_512 t3 = SET1(ControlMax); //load_512_aligned((const void *)CUR_CONTROL_MAX);
-    //     SIMD_MASK_TYPE m1 = CMPEQ(*z, t1);    // AVX512BW, AVX512F
-    //     SIMD_MASK_TYPE m2 = CMPEQ(*z, t2);    // AVX512BW, AVX512F
-    //     SIMD_MASK_TYPE m3 = CMPLT(*z, t3);    // AVX512BW, AVX512F
-    //     return m1 | m2 | m3;
-    // #    undef SET1
-    // #    undef CMPLT
-    // #    undef CMPEQ
-    // #    undef CUR_CONTROL_MAX
-    // #    undef CUR_SLASH
-    // #    undef CUR_QUOTE
-    // #else
-    // #    if SIMD_BIT_SIZE == 256
-    // #        define MM_PREFIX _mm256
-    // #    elif SIMD_BIT_SIZE == 128
-    // #        define MM_PREFIX _mm
-    // #    endif
-    // #    define SET1 PYYJSON_SIMPLE_CONCAT3(MM_PREFIX, _set1_epi, READ_BIT_SIZE)
-    // #    define CMPEQ PYYJSON_SIMPLE_CONCAT3(MM_PREFIX, _cmpeq_epi, READ_BIT_SIZE)
-    // #    define SUBS PYYJSON_SIMPLE_CONCAT3(MM_PREFIX, _subs_epu, READ_BIT_SIZE)
-    // #    define AND PYYJSON_CONCAT2(simd_and, SIMD_BIT_SIZE)
-    // #    define OR PYYJSON_CONCAT2(simd_or, SIMD_BIT_SIZE)
-    //     *SIMD_VAR = load_simd((const void *)src);
-    //     SIMD_TYPE t1 = SET1(_Quote);
-    //     SIMD_TYPE t2 = SET1(_Slash);
-    //     SIMD_TYPE t4 = SET1(ControlMax);
-    //     SIMD_TYPE m1 = CMPEQ(*SIMD_VAR, t1);
-    //     SIMD_TYPE m2 = CMPEQ(*SIMD_VAR, t2);
-    // #    if COMPILE_READ_UCS_LEVEL != 4
-    //     SIMD_TYPE m3 = SUBS(t4, *SIMD_VAR);
-    // #    else // COMPILE_READ_UCS_LEVEL == 4
-    //     // there is no `MM_PREFIX_subs_epu32`
-    // #        define CMPGT PYYJSON_CONCAT2(cmpgt_i32, SIMD_BIT_SIZE)
-    //     SIMD_TYPE t3 = SET1(_MinusOne);
-    //     SIMD_TYPE _1 = CMPGT(*SIMD_VAR, t3);
-    //     SIMD_TYPE _2 = CMPGT(t4, *SIMD_VAR);
-    //     SIMD_TYPE m3 = AND(_1, _2);
-    // #        undef CMPGT
-    // #    endif // COMPILE_READ_UCS_LEVEL
-    //     SIMD_TYPE r = OR(OR(m1, m2), m3);
-    //     return r;
-    // #    undef OR
-    // #    undef AND
-    // #    undef SUBS
-    // #    undef CMPEQ
-    // #    undef SET1
-    // #    undef MM_PREFIX
-    // #endif // SIMD_BIT_SIZE
 }
-
-#    undef CMPLT
-#    undef CMPEQ
-#    undef SET1
-// #    undef VECTOR_TYPE
-// #    undef VECTOR_TYPE_U
-#endif
 
 #if PYYJSON_X86
 force_inline u32 GET_DONE_COUNT_FROM_MASK(SIMD_MASK_TYPE mask) {
