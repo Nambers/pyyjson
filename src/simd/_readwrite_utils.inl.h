@@ -1,6 +1,7 @@
 // requires: READ, WRITE
 
 #include "simd_impl.h"
+#include "commondef/rw_in.inl.h"
 
 #define WRITE_SIMD_IMPL PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define TAIL_WRITE_SIMD_IMPL PYYJSON_CONCAT3(tail_write_simd_impl, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
@@ -242,3 +243,4 @@ force_inline void TAIL_WRITE_SIMD_IMPL(const _FROM_TYPE *src, _TARGET_TYPE *dst,
 #undef WRITE_PARTIAL_HEAD
 #undef TAIL_WRITE_SIMD_IMPL
 #undef WRITE_SIMD_IMPL
+#include "commondef/rw_out.inl.h"
