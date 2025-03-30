@@ -35,3 +35,12 @@
 #define SET_ALL PYYJSON_CONCAT3(broadcast, READ_BIT_SIZE, SIMD_BIT_SIZE)
 #define LOAD_A(_x) PYYJSON_CONCAT3(load, SIMD_BIT_SIZE, aligned)((const VECTOR_TYPE *)(_x))
 #define LOAD_U(_x) PYYJSON_CONCAT2(load, SIMD_BIT_SIZE)((const VECTOR_TYPE_U *)(_x))
+#if PYYJSON_X86 && SIMD_BIT_SIZE == 512
+#    define VECTOR_MASK_TYPE READ_512_MASK_TYPE
+#else
+#    define VECTOR_MASK_TYPE VECTOR_TYPE
+#endif
+
+//
+#define CHECK_ESCAPE_IMPL_GET_MASK PYYJSON_CONCAT2(check_escape_impl_get_mask, COMPILE_READ_UCS_LEVEL)
+force_inline VECTOR_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restrict src, VECTOR_TYPE *restrict _out_vec);

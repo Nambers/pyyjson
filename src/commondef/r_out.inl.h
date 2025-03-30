@@ -1,3 +1,5 @@
+#undef CHECK_ESCAPE_IMPL_GET_MASK
+//
 #undef LOAD_U
 #undef LOAD_A
 #undef SET_ALL
