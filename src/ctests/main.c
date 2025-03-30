@@ -111,14 +111,23 @@ bool run_c_tests(void) {
     RUN_TESTS(test_elevate_1_4_to_128);
     RUN_TESTS(test_elevate_2_4_to_128);
     RUN_TESTS(test_ucs2_encode_3bytes_utf8);
+    RUN_TESTS(test_long_elevate_1_2);
 
     return show_test_counter(&counter);
 }
 
 int main(int argc, char **argv) {
+    int ret = 0;
+    PyObject *pModule = NULL;
     if (!initialize_cpython()) {
         fprintf(stderr, "Fail to initialize");
         return 1;
+    }
+    pModule = import_pyyjson();
+    if (!pModule) {
+        fprintf(stderr, "Fail to import pyyjson");
+        ret = 1;
+        goto done;
     }
     srand((u32)time(NULL));
 #if PYYJSON_X86
@@ -126,12 +135,12 @@ int main(int argc, char **argv) {
     check_avx512();
 #endif
     //
-    int ret = 0;
     //
     bool run_test_result = run_c_tests();
     if (!run_test_result) ret = 1;
 
 done:
+    Py_XDECREF(pModule);
     Py_Finalize();
     return ret;
 }

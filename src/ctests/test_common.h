@@ -25,8 +25,58 @@ fail:;
     return false;
 }
 
+#ifdef _WIN32
+#else
+#    include <dlfcn.h>
+
+force_inline PyObject *_make_dlopen_flag_arg(void) {
+    PyObject *args = NULL;
+    PyObject *flag = NULL;
+    args = PyTuple_New(1);
+    if (!args) return NULL;
+    flag = PyLong_FromLong(RTLD_NOW | RTLD_GLOBAL);
+    if (!flag) {
+        Py_DECREF(args);
+        return NULL;
+    }
+    PyTuple_SET_ITEM(args, 0, flag);
+    return args;
+}
+
+force_inline bool set_dlopen_flags(void) {
+    PyObject *setdlopenflags = NULL;
+    PyObject *args = NULL;
+    PyObject *ret = NULL;
+    setdlopenflags = PySys_GetObject("setdlopenflags");
+    if (!setdlopenflags) return NULL;
+    args = _make_dlopen_flag_arg();
+    if (!args) goto fail;
+    ret = PyObject_Call(setdlopenflags, args, NULL);
+    if (!ret) goto fail;
+    Py_DECREF(ret);
+    Py_DECREF(args);
+    Py_DECREF(setdlopenflags);
+    return true;
+fail:;
+    Py_XDECREF(ret);
+    Py_XDECREF(args);
+    Py_XDECREF(setdlopenflags);
+    return false;
+}
+#endif
+
 // returns a new reference
 force_inline PyObject *import_pyyjson(void) {
+#ifdef _WIN32
+#else
+    if (!set_dlopen_flags()) return NULL;
+#endif
     PyObject *pModule = PyImport_ImportModule("pyyjson");
     return pModule;
+fail:;
+#ifdef _WIN32
+#else
+
+#endif
+    return NULL;
 }
