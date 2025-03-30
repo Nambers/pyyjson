@@ -73,10 +73,4 @@ force_inline PyObject *import_pyyjson(void) {
 #endif
     PyObject *pModule = PyImport_ImportModule("pyyjson");
     return pModule;
-fail:;
-#ifdef _WIN32
-#else
-
-#endif
-    return NULL;
 }
