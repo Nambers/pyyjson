@@ -175,7 +175,6 @@
 #endif
 
 #define force_inline static pyyjson_inline
-// #define force_inline force_noinline
 #define force_noinline pyyjson_noinline
 #define likely pyyjson_likely
 #define unlikely pyyjson_unlikely

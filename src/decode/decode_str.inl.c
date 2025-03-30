@@ -832,7 +832,7 @@ force_inline void READ_STR_TAIL(
  @param msg The error message pointer.
  @return Whether success.
  */
-force_inline PyObject *READ_STR(
+static force_noinline PyObject *READ_STR(
         const _FROM_TYPE **restrict reader_addr, /*IN-OUT*/
         const _FROM_TYPE *_reader_end,
         _FROM_TYPE *_temp_write_buffer,
