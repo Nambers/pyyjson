@@ -2,6 +2,7 @@
 
 #include "pyyjson.h"
 #include "simd_impl.h"
+#include "commondef/rw_in.inl.h"
 
 #define DOWNGRADE_STRING PYYJSON_CONCAT3(downgrade_string, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 
@@ -74,53 +75,7 @@ force_inline void DOWNGRADE_STRING(const _FROM_TYPE *src_start, Py_ssize_t copy_
 #undef ZIPTYPE
 #undef ZIP_WRITER
 #undef ZIPPER
-    // #    else // COMPILE_UCS_LEVEL == 4
-    //     const _FROM_TYPE *src = (const _FROM_TYPE *)src_start;
-    //     if (max_char_type == 2) {
-    //         u16 *dst = (u16 *)write_buffer_head;
-    //         SIMD_TYPE SIMD_VAR;
-    //         while (copy_count >= CHECK_COUNT_MAX) {
-    //             SIMD_TYPE SIMD_VAR = load_simd((const void *)src);
-    //             SIMD_REAL_HALF_TYPE half_val = zip_simd_32_to_16(SIMD_VAR);
-    //             write_real_half(dst, half_val);
-    //             // *(SIMD_REAL_HALF_TYPE *)dst = half_val;
-    //             copy_count -= CHECK_COUNT_MAX;
-    //             dst += CHECK_COUNT_MAX;
-    //             src += CHECK_COUNT_MAX;
-    //         }
-    //         if (copy_count) {
-    //             Py_ssize_t additional = CHECK_COUNT_MAX - copy_count;
-    //             src -= additional;
-    //             dst -= additional;
-    //             SIMD_TYPE SIMD_VAR = load_simd((const void *)src);
-    //             SIMD_REAL_HALF_TYPE half_val = zip_simd_32_to_16(SIMD_VAR);
-    //             write_real_half(dst, half_val);
-    //             // *(SIMD_REAL_HALF_TYPE *)dst = half_val;
-    //         }
-    //     } else {
-    //         assert(max_char_type <= 1);
-    //         u8 *dst = (u8 *)write_buffer_head;
-    //         SIMD_TYPE SIMD_VAR;
-    //         while (copy_count >= CHECK_COUNT_MAX) {
-    //             SIMD_TYPE SIMD_VAR = load_simd((const void *)src);
-    //             SIMD_REAL_QUARTER_TYPE quar_val = zip_simd_32_to_8(SIMD_VAR);
-    //             write_real_quarter(dst, quar_val);
-    //             // *(SIMD_REAL_QUARTER_TYPE *)dst = quar_val;
-    //             copy_count -= CHECK_COUNT_MAX;
-    //             dst += CHECK_COUNT_MAX;
-    //             src += CHECK_COUNT_MAX;
-    //         }
-    //         if (copy_count) {
-    //             Py_ssize_t additional = CHECK_COUNT_MAX - copy_count;
-    //             src -= additional;
-    //             dst -= additional;
-    //             SIMD_TYPE SIMD_VAR = load_simd((const void *)src);
-    //             SIMD_REAL_QUARTER_TYPE quar_val = zip_simd_32_to_8(SIMD_VAR);
-    //             write_real_quarter(dst, quar_val);
-    //             // *(SIMD_REAL_QUARTER_TYPE *)dst = quar_val;
-    //         }
-    //     }
-    // #    endif
 }
 
 #undef DOWNGRADE_STRING
+#include "commondef/rw_out.inl.h"
