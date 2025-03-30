@@ -20,6 +20,14 @@ typedef struct DECODE_SRC_INFO {
 } DECODE_SRC_INFO;
 
 /**
+ This table is used to convert 4 hex character sequence to a number.
+ A valid hex character [0-9A-Fa-f] will mapped to it's raw number [0x00, 0x0F],
+ an invalid hex character will mapped to [0xF0].
+ (generate with misc/make_tables.c)
+ */
+extern const u8 hex_conv_table[256];
+
+/**
  Scans an escaped character sequence as a UTF-16 code unit (branchless).
  e.g. "\\u005C" should pass "005C" as `cur`.
  
