@@ -2,6 +2,7 @@
 
 #include "simd_impl.h"
 #include "mask_table.h"
+#include "commondef/w_in.inl.h"
 
 #define WRITE_PARTIAL_HEAD PYYJSON_CONCAT2(write_partial_head, COMPILE_WRITE_UCS_LEVEL)
 #define WRITE_PARTIAL_TAIL PYYJSON_CONCAT2(write_partial_tail, COMPILE_WRITE_UCS_LEVEL)
@@ -41,3 +42,4 @@ force_inline void WRITE_PARTIAL_TAIL(void *restrict dst, SIMD_TYPE SIMD_VAR, Py_
 
 #undef WRITE_PARTIAL_HEAD
 #undef WRITE_PARTIAL_TAIL
+#include "commondef/w_out.inl.h"

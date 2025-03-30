@@ -469,7 +469,7 @@ force_inline u32 read_b4_unicode(u32 uni) {
 
 #include "decode_float_wrap.inl.c"
 
-#include "simd/write_utils_wrap.inl.c"
+#include "simd/write_utils_wrap.h"
 
 #include "simd/readwrite_utils_wrap.h"
 
