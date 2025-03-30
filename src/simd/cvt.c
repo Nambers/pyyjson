@@ -233,12 +233,27 @@ elevate_both_not_aligned:;
     }
     read_end -= _BlockSize;
     write_end -= _BlockSize;
-    while (read_end >= read_start) {
+    const usize loop_count = (read_end - read_start) / _BlockSize + 1;
+    for (usize i = 0; i < loop_count / 2; ++i) {
+        VECTOR_U8_128_A x_read;
+        VECTOR_U16_256_A x;
+        memcpy(&x_read, read_end, sizeof(x_read));
+        // ushll + ushll2
+        for (usize i = 0; i < 16; ++i) {
+            x[i] = x_read[i];
+        }
+        memcpy(write_end, &x, sizeof(x));
+        read_end -= _BlockSize * 2;
+        write_end -= _BlockSize * 2;
+    }
+    if (0 != (loop_count & 1)) {
         VECTOR_U8_64_A x_read;
         VECTOR_U16_128_A x;
-        memcpy(&x_read, read_end, 8);
-        x = elevate_1_2_to_128(x_read);
-        write_u16_128((void *)write_end, x);
+        memcpy(&x_read, read_end, sizeof(x_read));
+        for (usize i = 0; i < 8; ++i) {
+            x[i] = x_read[i];
+        }
+        memcpy(write_end, &x, sizeof(x));
         read_end -= _BlockSize;
         write_end -= _BlockSize;
     }
@@ -369,7 +384,21 @@ elevate_both_not_aligned:;
     }
     read_end -= _BlockSize;
     write_end -= _BlockSize;
-    while (read_end >= read_start) {
+    const usize loop_count = (read_end - read_start) / _BlockSize + 1;
+    for (usize i = 0; i < loop_count / 4; ++i) {
+        // elevate_1_4_to_128 in ARM is not very fast.
+        // this should be compiled to some tbl instructions, which might be faster
+        VECTOR_U8_128_A x_read;
+        memcpy(&x_read, read_end, sizeof(x_read));
+        VECTOR_U32_512_A x;
+        for (usize i = 0; i < 16; ++i) {
+            x[i] = x_read[i];
+        }
+        memcpy(write_end, &x, sizeof(x));
+        read_end -= _BlockSize * 4;
+        write_end -= _BlockSize * 4;
+    }
+    for (usize i = 0; i < (loop_count & 3); ++i) {
         VECTOR_U8_32_A x_read;
         VECTOR_U32_128_A x;
         memcpy(&x_read, read_end, 4);
@@ -482,12 +511,27 @@ elevate_both_not_aligned:;
     }
     read_end -= _BlockSize;
     write_end -= _BlockSize;
-    while (read_end >= read_start) {
+    const usize loop_count = (read_end - read_start) / _BlockSize + 1;
+    for (usize i = 0; i < loop_count / 2; ++i) {
+        VECTOR_U16_128_A x_read;
+        VECTOR_U32_256_A x;
+        memcpy(&x_read, read_end, sizeof(x_read));
+        // ushll + ushll2
+        for (usize i = 0; i < 8; ++i) {
+            x[i] = x_read[i];
+        }
+        memcpy(write_end, &x, sizeof(x));
+        read_end -= _BlockSize * 2;
+        write_end -= _BlockSize * 2;
+    }
+    if (0 != (loop_count & 1)) {
         VECTOR_U16_64_A x_read;
         VECTOR_U32_128_A x;
-        memcpy(&x_read, read_end, 8);
-        x = elevate_2_4_to_128(x_read);
-        write_u32_128((void *)write_end, x);
+        memcpy(&x_read, read_end, sizeof(x_read));
+        for (usize i = 0; i < 4; ++i) {
+            x[i] = x_read[i];
+        }
+        memcpy(write_end, &x, sizeof(x));
         read_end -= _BlockSize;
         write_end -= _BlockSize;
     }
