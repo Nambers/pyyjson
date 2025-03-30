@@ -50,11 +50,12 @@ typedef struct EncodeStackVars {
     PyObject *key, *val;
     PyObject *cur_obj;           // = in_obj;
     Py_ssize_t cur_pos;          // = 0;
-    Py_ssize_t cur_nested_depth; //= 0;
+    Py_ssize_t cur_nested_depth; // = 0;
     Py_ssize_t cur_list_size;
     // alias thread local buffer
-    EncodeCtnWithIndex *ctn_stack; //= obj_viewer->ctn_stack;
+    EncodeCtnWithIndex *ctn_stack; // = obj_viewer->ctn_stack;
     UnicodeInfo unicode_info;
+    bool cur_is_tuple;
 } EncodeStackVars;
 
 #define GET_VEC(stack_vars) ((stack_vars)->vec)

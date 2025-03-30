@@ -649,6 +649,7 @@ PYYJSON_DUMPS_OBJ(
         assert(!stack_vars->cur_nested_depth);
         stack_vars->cur_nested_depth = 1;
         // NOTE: ctn_stack[0] is always invalid
+        stack_vars->cur_is_tuple = false;
         goto arr_val_begin;
     } else {
         if (unlikely(!PyTuple_CheckExact(stack_vars->cur_obj))) {
@@ -664,7 +665,9 @@ PYYJSON_DUMPS_OBJ(
         assert(_c);
         assert(!stack_vars->cur_nested_depth);
         stack_vars->cur_nested_depth = 1;
-        goto tuple_val_begin;
+        stack_vars->cur_is_tuple = true;
+        goto arr_val_begin;
+        // goto tuple_val_begin;
     }
 
     Py_UNREACHABLE();
@@ -672,10 +675,14 @@ PYYJSON_DUMPS_OBJ(
     switch (jump_flag) {
 #    if COMPILE_UCS_LEVEL == 1
         case JumpFlag_Elevate1_ArrVal: {
-            if (PyList_CheckExact(stack_vars->cur_obj))
+            if (PyList_CheckExact(stack_vars->cur_obj)) {
+                stack_vars->cur_is_tuple = false;
                 goto arr_val_begin;
-            else
-                goto tuple_val_begin;
+            } else {
+                stack_vars->cur_is_tuple = true;
+                goto arr_val_begin;
+                // goto tuple_val_begin;
+            }
             break;
         }
         case JumpFlag_Elevate1_ObjVal: {
@@ -688,10 +695,14 @@ PYYJSON_DUMPS_OBJ(
         }
 #    elif COMPILE_UCS_LEVEL == 2
         case JumpFlag_Elevate2_ArrVal: {
-            if (PyList_CheckExact(stack_vars->cur_obj))
+            if (PyList_CheckExact(stack_vars->cur_obj)) {
+                stack_vars->cur_is_tuple = false;
                 goto arr_val_begin;
-            else
-                goto tuple_val_begin;
+            } else {
+                stack_vars->cur_is_tuple = true;
+                goto arr_val_begin;
+                // goto tuple_val_begin;
+            }
             break;
         }
         case JumpFlag_Elevate2_ObjVal: {
@@ -704,10 +715,14 @@ PYYJSON_DUMPS_OBJ(
         }
 #    elif COMPILE_UCS_LEVEL == 4
         case JumpFlag_Elevate4_ArrVal: {
-            if (PyList_CheckExact(stack_vars->cur_obj))
+            if (PyList_CheckExact(stack_vars->cur_obj)) {
+                stack_vars->cur_is_tuple = false;
                 goto arr_val_begin;
-            else
-                goto tuple_val_begin;
+            } else {
+                stack_vars->cur_is_tuple = true;
+                goto arr_val_begin;
+                // goto tuple_val_begin;
+            }
             break;
         }
         case JumpFlag_Elevate4_ObjVal: {
@@ -761,13 +776,16 @@ dict_pair_begin:;
                 break;
             }
             case JumpFlag_ArrValBegin: {
+                stack_vars->cur_is_tuple = false;
                 goto arr_val_begin;
             }
             case JumpFlag_DictPairBegin: {
                 goto dict_pair_begin;
             }
             case JumpFlag_TupleValBegin: {
-                goto tuple_val_begin;
+                stack_vars->cur_is_tuple = true;
+                goto arr_val_begin;
+                // goto tuple_val_begin;
             }
             case JumpFlag_Fail: {
                 goto fail;
@@ -811,11 +829,14 @@ dict_pair_begin:;
             goto dict_pair_begin;
         } else if (PyList_CheckExact(stack_vars->cur_obj)) {
             stack_vars->cur_list_size = PyList_GET_SIZE(stack_vars->cur_obj);
+            stack_vars->cur_is_tuple = false;
             goto arr_val_begin;
         } else {
             assert(PyTuple_CheckExact(stack_vars->cur_obj));
             stack_vars->cur_list_size = PyTuple_GET_SIZE(stack_vars->cur_obj);
-            goto tuple_val_begin;
+            stack_vars->cur_is_tuple = true;
+            goto arr_val_begin;
+            // goto tuple_val_begin;
         }
     }
 
@@ -825,7 +846,11 @@ arr_val_begin:;
     assert(stack_vars->cur_list_size != 0);
 
     if (stack_vars->cur_pos < stack_vars->cur_list_size) {
-        stack_vars->val = PyList_GET_ITEM(stack_vars->cur_obj, stack_vars->cur_pos);
+        if (likely(!stack_vars->cur_is_tuple)) {
+            stack_vars->val = PyList_GET_ITEM(stack_vars->cur_obj, stack_vars->cur_pos);
+        } else {
+            stack_vars->val = PyTuple_GET_ITEM(stack_vars->cur_obj, stack_vars->cur_pos);
+        }
         stack_vars->cur_pos++;
         //
         EncodeValJumpFlag jump_flag = ENCODE_PROCESS_VAL(stack_vars->val, stack_vars, false);
@@ -834,13 +859,16 @@ arr_val_begin:;
                 break;
             }
             case JumpFlag_ArrValBegin: {
+                stack_vars->cur_is_tuple = false;
                 goto arr_val_begin;
             }
             case JumpFlag_DictPairBegin: {
                 goto dict_pair_begin;
             }
             case JumpFlag_TupleValBegin: {
-                goto tuple_val_begin;
+                stack_vars->cur_is_tuple = true;
+                // goto tuple_val_begin;
+                goto arr_val_begin;
             }
             case JumpFlag_Fail: {
                 goto fail;
@@ -885,87 +913,90 @@ arr_val_begin:;
             goto dict_pair_begin;
         } else if (PyList_CheckExact(stack_vars->cur_obj)) {
             stack_vars->cur_list_size = PyList_GET_SIZE(stack_vars->cur_obj);
+            stack_vars->cur_is_tuple = false;
             goto arr_val_begin;
         } else {
             assert(PyTuple_CheckExact(stack_vars->cur_obj));
             stack_vars->cur_list_size = PyTuple_GET_SIZE(stack_vars->cur_obj);
-            goto tuple_val_begin;
-        }
-    }
-    Py_UNREACHABLE();
-
-tuple_val_begin:;
-    assert(stack_vars->cur_list_size != 0);
-
-    if (stack_vars->cur_pos < stack_vars->cur_list_size) {
-        stack_vars->val = PyTuple_GET_ITEM(stack_vars->cur_obj, stack_vars->cur_pos);
-        stack_vars->cur_pos++;
-        //
-        EncodeValJumpFlag jump_flag = ENCODE_PROCESS_VAL(stack_vars->val, stack_vars, false);
-        switch ((jump_flag)) {
-            case JumpFlag_Default: {
-                break;
-            }
-            case JumpFlag_ArrValBegin: {
-                goto arr_val_begin;
-            }
-            case JumpFlag_DictPairBegin: {
-                goto dict_pair_begin;
-            }
-            case JumpFlag_TupleValBegin: {
-                goto tuple_val_begin;
-            }
-            case JumpFlag_Fail: {
-                goto fail;
-            }
-#if COMPILE_UCS_LEVEL < 1
-            case JumpFlag_Elevate1_ArrVal: {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(JumpFlag_Elevate1_ArrVal, stack_vars);
-            }
-#endif
-#if COMPILE_UCS_LEVEL < 2
-            case JumpFlag_Elevate2_ArrVal: {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(JumpFlag_Elevate2_ArrVal, stack_vars);
-            }
-#endif
-#if COMPILE_UCS_LEVEL < 4
-            case JumpFlag_Elevate4_ArrVal: {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(JumpFlag_Elevate4_ArrVal, stack_vars);
-            }
-#endif
-            default: {
-                Py_UNREACHABLE();
-            }
-        }
-        //
-        goto tuple_val_begin;
-    } else {
-        // list end
-        assert(stack_vars->cur_nested_depth);
-        EncodeCtnWithIndex *last_pos = _CTN_STACK(stack_vars) + (--stack_vars->cur_nested_depth);
-
-        bool _c = VECTOR_APPEND_ARR_END(&GET_VEC(stack_vars), stack_vars->cur_nested_depth);
-        GOTO_FAIL_ON_UNLIKELY_ERR(!_c);
-        if (unlikely(stack_vars->cur_nested_depth == 0)) {
-            goto success;
-        }
-
-        // update cur_obj and cur_pos
-        stack_vars->cur_obj = last_pos->ctn;
-        stack_vars->cur_pos = last_pos->index;
-
-        if (PyDict_CheckExact(stack_vars->cur_obj)) {
-            goto dict_pair_begin;
-        } else if (PyList_CheckExact(stack_vars->cur_obj)) {
-            stack_vars->cur_list_size = PyList_GET_SIZE(stack_vars->cur_obj);
+            stack_vars->cur_is_tuple = true;
             goto arr_val_begin;
-        } else {
-            assert(PyTuple_CheckExact(stack_vars->cur_obj));
-            stack_vars->cur_list_size = PyTuple_GET_SIZE(stack_vars->cur_obj);
-            goto tuple_val_begin;
+            // goto tuple_val_begin;
         }
     }
     Py_UNREACHABLE();
+
+    // tuple_val_begin:;
+    //     assert(stack_vars->cur_list_size != 0);
+
+    //     if (stack_vars->cur_pos < stack_vars->cur_list_size) {
+    //         stack_vars->val = PyTuple_GET_ITEM(stack_vars->cur_obj, stack_vars->cur_pos);
+    //         stack_vars->cur_pos++;
+    //         //
+    //         EncodeValJumpFlag jump_flag = ENCODE_PROCESS_VAL(stack_vars->val, stack_vars, false);
+    //         switch ((jump_flag)) {
+    //             case JumpFlag_Default: {
+    //                 break;
+    //             }
+    //             case JumpFlag_ArrValBegin: {
+    //                 goto arr_val_begin;
+    //             }
+    //             case JumpFlag_DictPairBegin: {
+    //                 goto dict_pair_begin;
+    //             }
+    //             case JumpFlag_TupleValBegin: {
+    //                 goto tuple_val_begin;
+    //             }
+    //             case JumpFlag_Fail: {
+    //                 goto fail;
+    //             }
+    // #if COMPILE_UCS_LEVEL < 1
+    //             case JumpFlag_Elevate1_ArrVal: {
+    //                 return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(JumpFlag_Elevate1_ArrVal, stack_vars);
+    //             }
+    // #endif
+    // #if COMPILE_UCS_LEVEL < 2
+    //             case JumpFlag_Elevate2_ArrVal: {
+    //                 return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(JumpFlag_Elevate2_ArrVal, stack_vars);
+    //             }
+    // #endif
+    // #if COMPILE_UCS_LEVEL < 4
+    //             case JumpFlag_Elevate4_ArrVal: {
+    //                 return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(JumpFlag_Elevate4_ArrVal, stack_vars);
+    //             }
+    // #endif
+    //             default: {
+    //                 Py_UNREACHABLE();
+    //             }
+    //         }
+    //         //
+    //         goto tuple_val_begin;
+    //     } else {
+    //         // list end
+    //         assert(stack_vars->cur_nested_depth);
+    //         EncodeCtnWithIndex *last_pos = _CTN_STACK(stack_vars) + (--stack_vars->cur_nested_depth);
+
+    //         bool _c = VECTOR_APPEND_ARR_END(&GET_VEC(stack_vars), stack_vars->cur_nested_depth);
+    //         GOTO_FAIL_ON_UNLIKELY_ERR(!_c);
+    //         if (unlikely(stack_vars->cur_nested_depth == 0)) {
+    //             goto success;
+    //         }
+
+    //         // update cur_obj and cur_pos
+    //         stack_vars->cur_obj = last_pos->ctn;
+    //         stack_vars->cur_pos = last_pos->index;
+
+    //         if (PyDict_CheckExact(stack_vars->cur_obj)) {
+    //             goto dict_pair_begin;
+    //         } else if (PyList_CheckExact(stack_vars->cur_obj)) {
+    //             stack_vars->cur_list_size = PyList_GET_SIZE(stack_vars->cur_obj);
+    //             goto arr_val_begin;
+    //         } else {
+    //             assert(PyTuple_CheckExact(stack_vars->cur_obj));
+    //             stack_vars->cur_list_size = PyTuple_GET_SIZE(stack_vars->cur_obj);
+    //             goto tuple_val_begin;
+    //         }
+    //     }
+    //     Py_UNREACHABLE();
 
 success:;
     assert(stack_vars->cur_nested_depth == 0);
