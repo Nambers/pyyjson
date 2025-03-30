@@ -1,22 +1,31 @@
 // requires: WRITE
 
-#include "simd_impl.h"
 #include "mask_table.h"
+#include "simd_impl.h"
 
 #define WRITE_PARTIAL_HEAD PYYJSON_CONCAT2(write_partial_head, COMPILE_WRITE_UCS_LEVEL)
 #define WRITE_PARTIAL_TAIL PYYJSON_CONCAT2(write_partial_tail, COMPILE_WRITE_UCS_LEVEL)
 
 // WRITE_PARTIAL_HEAD defines for 512 and 128
-#if SIMD_BIT_SIZE == 512 || !PYYJSON_HAS_BLENDV
+#if PYYJSON_X86
+#    if SIMD_BIT_SIZE == 512 || !PYYJSON_HAS_BLENDV
 force_inline void WRITE_PARTIAL_HEAD(void *restrict dst, SIMD_TYPE SIMD_VAR, Py_ssize_t head_cnt) {
-#    if SIMD_BIT_SIZE == 512
-#        define MASK_WRITER PYYJSON_SIMPLE_CONCAT2(_mm512_mask_storeu_epi, WRITE_BIT_SIZE)
+#        if SIMD_BIT_SIZE == 512
+#            define MASK_WRITER PYYJSON_SIMPLE_CONCAT2(_mm512_mask_storeu_epi, WRITE_BIT_SIZE)
     MASK_WRITER(dst, ((READ_512_MASK_TYPE)1 << (usize)head_cnt) - 1, SIMD_VAR);
-#        undef MASK_WRITER
-#    else
+#            undef MASK_WRITER
+#        else
     static_assert(SIMD_BIT_SIZE == 128, "SIMD_BIT_SIZE == 128");
     if (head_cnt) write_simd(dst, SIMD_VAR);
+#        endif
+}
 #    endif
+#elif PYYJSON_AARCH
+force_inline void WRITE_PARTIAL_HEAD(void *restrict dst, poly128_t x, Py_ssize_t head_cnt) {
+    if (head_cnt) {
+        *(VECTOR_U8_128_U *)dst = (VECTOR_U8_128_U)x;
+    }
+    assert(false);
 }
 #endif
 

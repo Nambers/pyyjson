@@ -8,10 +8,14 @@
 #define WRITE_PARTIAL_HEAD PYYJSON_CONCAT2(write_partial_head, COMPILE_WRITE_UCS_LEVEL)
 #define WRITE_PARTIAL_TAIL PYYJSON_CONCAT2(write_partial_tail, COMPILE_WRITE_UCS_LEVEL)
 
-#if SIMD_BIT_SIZE == 512 || !PYYJSON_HAS_BLENDV
+#if PYYJSON_X86
+#    if SIMD_BIT_SIZE == 512 || !PYYJSON_HAS_BLENDV
 force_inline void WRITE_PARTIAL_HEAD(void *restrict dst, SIMD_TYPE SIMD_VAR, Py_ssize_t head_cnt);
-#else
+#    else
 force_inline void WRITE_PARTIAL_TAIL(void *restrict dst, SIMD_TYPE SIMD_VAR, Py_ssize_t tail_cnt);
+#    endif
+#elif PYYJSON_AARCH
+force_inline void WRITE_PARTIAL_HEAD(void *restrict dst, poly128_t SIMD_VAR, Py_ssize_t head_cnt);
 #endif
 
 force_inline void WRITE_SIMD_IMPL(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR) {
