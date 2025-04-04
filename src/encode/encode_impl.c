@@ -23,6 +23,12 @@ typedef enum EncodeValJumpFlag {
     JumpFlag_Fail,
 } EncodeValJumpFlag;
 
+typedef enum EncodeCallFlag {
+    CallFlag_ObjVal,
+    CallFlag_ArrVal,
+    CallFlag_Key,
+} EncodeCallFlag;
+
 typedef enum PyFastTypes {
     T_Unicode,
     T_Long,
