@@ -48,7 +48,8 @@ force_inline bool ctn_grow_check(DecodeCtnStackInfo *decode_ctn_info) {
 #    if PY_MINOR_VERSION == 13
 PyAPI_FUNC(Py_hash_t) _Py_HashBytes(const void *, Py_ssize_t);
 #    endif // PY_MINOR_VERSION == 13
-PyAPI_FUNC(int) _PyDict_SetItem_KnownHash(PyObject *mp, PyObject *key, PyObject *item, Py_hash_t hash);
+PyAPI_FUNC(int) _PyDict_SetItem_KnownHash_LockHeld(PyObject *mp, PyObject *key, PyObject *item, Py_hash_t hash);
+#    define _PyDict_SetItem_KnownHash _PyDict_SetItem_KnownHash_LockHeld
 #endif // PY_MINOR_VERSION >= 13
 
 #if PY_MINOR_VERSION >= 12
@@ -153,7 +154,7 @@ force_inline PyObject *get_key_cache(const u8 *unicode_str, pyyjson_hash_t hash,
 
 force_inline void make_hash(PyASCIIObject *ascii, const u8 *unicode_str, size_t real_len) {
 #if PY_MINOR_VERSION >= 14
-    ascii->hash = PyUnicode_Type.tp_hash(PYYJSON_CAST(PyObject *, ascii));
+    ascii->hash = Py_HashBuffer(unicode_str, real_len);
 #else
     ascii->hash = _Py_HashBytes(unicode_str, real_len);
 #endif
