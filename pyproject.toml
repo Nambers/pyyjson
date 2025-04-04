@@ -1,2 +1,11 @@
 [tool.autopep8]
 max-line-length = 160
+
+[tool.pylint]
+disable = [
+    "C0114",
+    "C0115",
+    "C0116",
+    "C0415",
+]
+max-line-length = 160
