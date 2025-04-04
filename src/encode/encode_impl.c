@@ -58,8 +58,6 @@ typedef struct EncodeStackVars {
     bool cur_is_tuple;
 } EncodeStackVars;
 
-#define GET_VEC(stack_vars) ((stack_vars)->vec)
-
 force_inline void memorize_ascii_to_ucs4(UnicodeVector *vec, UnicodeInfo *unicode_info) {
     Py_ssize_t len = vec->head.write_u8 - (u8 *)GET_VEC_ASCII_START(vec);
     unicode_info->ascii_size = len;
@@ -168,13 +166,13 @@ force_inline bool init_stack_vars(EncodeStackVars *stack_vars, PyObject *in_obj)
         return false;
     }
     memset(&stack_vars->unicode_info, 0, sizeof(UnicodeInfo));
-    GET_VEC(stack_vars) = PyObject_Malloc(PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
+    stack_vars->vec = PyObject_Malloc(PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
 #ifndef NDEBUG
-    memset(GET_VEC(stack_vars), 0, PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
+    memset(stack_vars->vec, 0, PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
 #endif
-    if (likely(GET_VEC(stack_vars))) {
-        GET_VEC(stack_vars)->head.write_u8 = (u8 *)(((PyASCIIObject *)GET_VEC(stack_vars)) + 1);
-        GET_VEC(stack_vars)->head.write_end = (void *)((u8 *)(GET_VEC(stack_vars)) + PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
+    if (likely(stack_vars->vec)) {
+        stack_vars->vec->head.write_u8 = (u8 *)(((PyASCIIObject *)stack_vars->vec) + 1);
+        stack_vars->vec->head.write_end = (void *)((u8 *)(stack_vars->vec) + PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
         return true;
     }
     PyErr_NoMemory();
