@@ -606,7 +606,7 @@ static force_noinline PyObject *
 PYYJSON_DUMPS_OBJ(
 #if COMPILE_UCS_LEVEL > 0
         EncodeValJumpFlag jump_flag,
-        EncodeStackVars *restrict stack_vars
+        EncodeStackVars *restrict in_stack_vars
 #else
         PyObject *in_obj
 #endif
@@ -615,8 +615,8 @@ PYYJSON_DUMPS_OBJ(
     do {                                      \
         if (unlikely(_condition)) goto fail;  \
     } while (0)
-#if COMPILE_UCS_LEVEL == 0
     EncodeStackVars _stack_vars;
+#if COMPILE_UCS_LEVEL == 0
     EncodeStackVars *restrict stack_vars = &_stack_vars;
     if (unlikely(!init_stack_vars(stack_vars, in_obj))) {
         goto fail;
@@ -672,6 +672,9 @@ PYYJSON_DUMPS_OBJ(
 
     Py_UNREACHABLE();
 #else
+    // avoid retriving data from memory, better store them on register
+    memcpy(&_stack_vars, in_stack_vars, sizeof(EncodeStackVars));
+    EncodeStackVars *stack_vars = &_stack_vars;
     switch (jump_flag) {
 #    if COMPILE_UCS_LEVEL == 1
         case JumpFlag_Elevate1_ArrVal: {
