@@ -605,7 +605,7 @@ static force_noinline PyObject *
 PYYJSON_DUMPS_OBJ(
 #if COMPILE_UCS_LEVEL > 0
         EncodeValJumpFlag jump_flag,
-        EncodeStackVars *restrict in_stack_vars
+        EncodeStackVars _stack_vars
 #else
         PyObject *in_obj
 #endif
@@ -614,8 +614,8 @@ PYYJSON_DUMPS_OBJ(
     do {                                      \
         if (unlikely(_condition)) goto fail;  \
     } while (0)
-    EncodeStackVars _stack_vars;
 #if COMPILE_UCS_LEVEL == 0
+    EncodeStackVars _stack_vars;
     if (unlikely(!init_stack_vars(&_stack_vars, in_obj))) {
         goto fail;
     }
@@ -664,13 +664,12 @@ PYYJSON_DUMPS_OBJ(
         _stack_vars.cur_nested_depth = 1;
         _stack_vars.cur_is_tuple = true;
         goto arr_val_begin;
-        // goto tuple_val_begin;
     }
 
     Py_UNREACHABLE();
 #else
     // avoid retriving data from memory, better store them on register
-    memcpy(&_stack_vars, in_stack_vars, sizeof(EncodeStackVars));
+    // memcpy(&_stack_vars, in_stack_vars, sizeof(EncodeStackVars));
     switch (jump_flag) {
 #    if COMPILE_UCS_LEVEL == 1
         case JumpFlag_Elevate1_ArrVal: {
@@ -750,17 +749,17 @@ dict_pair_begin:;
         {
 #if COMPILE_UCS_LEVEL < 1
             if (unlikely(_stack_vars.unicode_info.cur_ucs_type == 1)) {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(JumpFlag_Elevate1_Key, &_stack_vars);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(JumpFlag_Elevate1_Key, _stack_vars);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 2
             if (unlikely(_stack_vars.unicode_info.cur_ucs_type == 2)) {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(JumpFlag_Elevate2_Key, &_stack_vars);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(JumpFlag_Elevate2_Key, _stack_vars);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 4
             if (unlikely(_stack_vars.unicode_info.cur_ucs_type == 4)) {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(JumpFlag_Elevate4_Key, &_stack_vars);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(JumpFlag_Elevate4_Key, _stack_vars);
             }
 #endif
         }
@@ -787,17 +786,17 @@ dict_pair_begin:;
             }
 #if COMPILE_UCS_LEVEL < 1
             case JumpFlag_Elevate1_ObjVal: {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(JumpFlag_Elevate1_ObjVal, &_stack_vars);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(JumpFlag_Elevate1_ObjVal, _stack_vars);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 2
             case JumpFlag_Elevate2_ObjVal: {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(JumpFlag_Elevate2_ObjVal, &_stack_vars);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(JumpFlag_Elevate2_ObjVal, _stack_vars);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 4
             case JumpFlag_Elevate4_ObjVal: {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(JumpFlag_Elevate4_ObjVal, &_stack_vars);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(JumpFlag_Elevate4_ObjVal, _stack_vars);
             }
 #endif
             default: {
@@ -868,17 +867,17 @@ arr_val_begin:;
             }
 #if COMPILE_UCS_LEVEL < 1
             case JumpFlag_Elevate1_ArrVal: {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(JumpFlag_Elevate1_ArrVal, &_stack_vars);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(JumpFlag_Elevate1_ArrVal, _stack_vars);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 2
             case JumpFlag_Elevate2_ArrVal: {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(JumpFlag_Elevate2_ArrVal, &_stack_vars);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(JumpFlag_Elevate2_ArrVal, _stack_vars);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 4
             case JumpFlag_Elevate4_ArrVal: {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(JumpFlag_Elevate4_ArrVal, &_stack_vars);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(JumpFlag_Elevate4_ArrVal, _stack_vars);
             }
 #endif
             default: {
