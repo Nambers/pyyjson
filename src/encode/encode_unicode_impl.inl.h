@@ -16,13 +16,13 @@
 // define here
 #define VECTOR_WRITE_UNICODE_IMPL PYYJSON_CONCAT4(vector_write_unicode_impl, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define VECTOR_WRITE_UNICODE_TRAILING_IMPL PYYJSON_CONCAT4(vector_write_unicode_trailing_impl, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
-#define VECTOR_WRITE_ESCAPE_IMPL PYYJSON_CONCAT4(vector_write_escape_impl, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
+#define VECTOR_WRITE_ESCAPE_AUTO_RESERVE PYYJSON_CONCAT4(vector_write_escape_auto_reserve, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
+#define VECTOR_WRITE_ESCAPE_NO_RESERVE PYYJSON_CONCAT4(vector_write_escape_no_reserve, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512 PYYJSON_CONCAT2(check_escape_tail_impl_get_mask_512, COMPILE_READ_UCS_LEVEL)
 #define WRITE_SIMD_IMPL PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define MASK_ELEVATE_WRITE_512 PYYJSON_CONCAT3(mask_elevate_write_512, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 
 // forward declaration
-// force_inline VECTOR_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restrict src, VECTOR_TYPE *restrict _out_vec);
 force_inline u32 GET_DONE_COUNT_FROM_MASK(SIMD_MASK_TYPE mask);
 #if SIMD_BIT_SIZE == 512
 force_inline SIMD_MASK_TYPE CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(SIMD_512 z, SIMD_MASK_TYPE rw_mask);
@@ -32,7 +32,7 @@ force_inline void WRITE_SIMD_IMPL(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR);
 
 extern _TARGET_TYPE _CONTROL_SEQ_TABLE[(_Slash + 1) * 8];
 
-static force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(UnicodeVector **restrict vec_addr, const _FROM_TYPE *restrict src, Py_ssize_t len, Py_ssize_t additional_len) {
+force_inline UnicodeVector *VECTOR_WRITE_ESCAPE_AUTO_RESERVE(UnicodeVector **restrict vec_addr, const _FROM_TYPE *restrict src, Py_ssize_t len, Py_ssize_t additional_len) {
     UnicodeVector *vec = *vec_addr;
     _TARGET_TYPE *writer = _WRITER(vec);
     const _FROM_TYPE *src_end = src + len;
@@ -62,6 +62,38 @@ static force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(UnicodeVector **re
                 vec = VEC_RESERVE(vec_addr, _CopyLen + len + TAIL_PADDING / sizeof(_TARGET_TYPE) + additional_len);
                 RETURN_ON_UNLIKELY_ERR(!vec);
                 writer = _WRITER(vec);
+                memcpy((void *)writer, (const void *)copy_ptr, _CopyLen * sizeof(_TARGET_TYPE));
+                writer += 6;
+            }
+        }
+        src++;
+    }
+    _WRITER(vec) = writer;
+    return vec;
+}
+
+force_inline UnicodeVector *VECTOR_WRITE_ESCAPE_NO_RESERVE(UnicodeVector **restrict vec_addr, const _FROM_TYPE *restrict src, Py_ssize_t len, Py_ssize_t additional_len) {
+    UnicodeVector *vec = *vec_addr;
+    _TARGET_TYPE *writer = _WRITER(vec);
+    const _FROM_TYPE *src_end = src + len;
+    while (src < src_end) {
+        _TARGET_TYPE srcval = (_TARGET_TYPE)*src;
+        usize unicode_point = (usize)srcval;
+        Py_ssize_t copy_count = (unicode_point <= _Slash) ? _ControlJump[unicode_point] : 0;
+        if (likely(!copy_count)) {
+            *writer++ = srcval;
+        } else {
+            _TARGET_TYPE *copy_ptr = &_CONTROL_SEQ_TABLE[unicode_point * 8];
+            if (copy_count == 2) {
+                memcpy((void *)writer, (const void *)copy_ptr, 2 * sizeof(_TARGET_TYPE));
+                writer += 2;
+            } else {
+                assert(6 == copy_count);
+#if COMPILE_WRITE_UCS_LEVEL < 4 || SIZEOF_VOID_P == 8
+                const usize _CopyLen = 8;
+#else //  COMPILE_WRITE_UCS_LEVEL == 4 && SIZEOF_VOID_P < 8
+                const usize _CopyLen = 6;
+#endif
                 memcpy((void *)writer, (const void *)copy_ptr, _CopyLen * sizeof(_TARGET_TYPE));
                 writer += 6;
             }
@@ -108,7 +140,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
         if (tzcnt) MASK_ELEVATE_WRITE_512(_WRITER(vec), z, tzcnt);
 #        endif
         _WRITER(vec) += tzcnt;
-        vec = VECTOR_WRITE_ESCAPE_IMPL(vec_addr, src + tzcnt, len - tzcnt, 0);
+        vec = VECTOR_WRITE_ESCAPE_AUTO_RESERVE(vec_addr, src + tzcnt, len - tzcnt, 0);
         RETURN_ON_UNLIKELY_ERR(!vec);
     }
     return vec;
@@ -141,7 +173,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
 #        endif
         _WRITER(vec) += len;
     } else {
-        vec = VECTOR_WRITE_ESCAPE_IMPL(vec_addr, src, len, 0);
+        vec = VECTOR_WRITE_ESCAPE_AUTO_RESERVE(vec_addr, src, len, 0);
         RETURN_ON_UNLIKELY_ERR(!vec);
     }
     return vec;
@@ -179,7 +211,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
 #        endif     // COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
         _WRITER(vec) += len;
     } else {
-        vec = VECTOR_WRITE_ESCAPE_IMPL(vec_addr, src, len, 0);
+        vec = VECTOR_WRITE_ESCAPE_AUTO_RESERVE(vec_addr, src, len, 0);
         RETURN_ON_UNLIKELY_ERR(!vec);
     }
     return vec;
@@ -221,7 +253,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_IMPL(UnicodeVector **restrict v
             _WRITER(vec) += done_count;
             Py_ssize_t process_escape_count = PYYJSON_ENCODE_ESCAPE_ONCE_BYTES / sizeof(_FROM_TYPE);
             process_escape_count = process_escape_count > len ? len : process_escape_count;
-            vec = VECTOR_WRITE_ESCAPE_IMPL(vec_addr, src, process_escape_count, len - process_escape_count);
+            vec = VECTOR_WRITE_ESCAPE_AUTO_RESERVE(vec_addr, src, process_escape_count, len - process_escape_count);
             RETURN_ON_UNLIKELY_ERR(!vec);
             len -= process_escape_count;
             src += process_escape_count;
@@ -300,7 +332,8 @@ force_inline bool PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, COMPILE_R
 // #undef CHECK_ESCAPE_IMPL_GET_MASK
 #undef _CONTROL_SEQ_TABLE
 #undef CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512
-#undef VECTOR_WRITE_ESCAPE_IMPL
+#undef VECTOR_WRITE_ESCAPE_NO_RESERVE
+#undef VECTOR_WRITE_ESCAPE_AUTO_RESERVE
 #undef VECTOR_WRITE_UNICODE_TRAILING_IMPL
 #undef VECTOR_WRITE_UNICODE_IMPL
 #undef _TARGET_TYPE
