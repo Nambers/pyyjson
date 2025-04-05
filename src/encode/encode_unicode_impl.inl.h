@@ -32,7 +32,6 @@ force_inline void WRITE_SIMD_IMPL(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR);
 
 extern _TARGET_TYPE _CONTROL_SEQ_TABLE[(_Slash + 1) * 8];
 
-
 static force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(UnicodeVector **restrict vec_addr, const _FROM_TYPE *restrict src, Py_ssize_t len, Py_ssize_t additional_len) {
     UnicodeVector *vec = *vec_addr;
     _TARGET_TYPE *writer = _WRITER(vec);
@@ -73,153 +72,137 @@ static force_noinline UnicodeVector *VECTOR_WRITE_ESCAPE_IMPL(UnicodeVector **re
     return vec;
 }
 
+#if PYYJSON_X86
+
+
+#    if SIMD_BIT_SIZE == 512
+
+
 force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t len, UnicodeVector **vec_addr) {
+#        define _MASKZ_LOADU PYYJSON_SIMPLE_CONCAT2(_mm512_maskz_loadu_epi, READ_BIT_SIZE)
+#        define _MASK_STOREU PYYJSON_SIMPLE_CONCAT2(_mm512_mask_storeu_epi, READ_BIT_SIZE)
     assert(vec_addr);
     UnicodeVector *vec = *vec_addr;
-#if SIMD_BIT_SIZE == 512 && PYYJSON_X86
     SIMD_512 z;
-#    if COMPILE_READ_UCS_LEVEL == 1
-#        define _MASKZ_LOADU _mm512_maskz_loadu_epi8
-#        define _MASK_STOREU _mm512_mask_storeu_epi8
-#    elif COMPILE_READ_UCS_LEVEL == 2
-#        define _MASKZ_LOADU _mm512_maskz_loadu_epi16
-#        define _MASK_STOREU _mm512_mask_storeu_epi16
-#    else // COMPILE_READ_UCS_LEVEL == 4
-#        define _MASKZ_LOADU _mm512_maskz_loadu_epi32
-#        define _MASK_STOREU _mm512_mask_storeu_epi32
-#    endif
     u64 rw_mask, tail_mask;
     rw_mask = ((u64)1 << (usize)len) - 1;
     z = _MASKZ_LOADU(rw_mask, (const void *)src);
     tail_mask = CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(z, rw_mask);
     if (likely(check_mask_zero(tail_mask))) {
-#    if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
+#        if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
         _MASK_STOREU((void *)_WRITER(vec), rw_mask, z);
-#    else
+#        else
         MASK_ELEVATE_WRITE_512(_WRITER(vec), z, len);
-#    endif
+#        endif
         _WRITER(vec) += len;
     } else {
-#    if COMPILE_READ_UCS_LEVEL == 1
+#        if COMPILE_READ_UCS_LEVEL == 1
         usize tzcnt = (usize)u64_tz_bits(tail_mask);
-#    else
+#        else
         usize tzcnt = (usize)u32_tz_bits((u32)tail_mask);
-#    endif
+#        endif
         assert(tzcnt < (usize)len);
-#    if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
+#        if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
         _MASK_STOREU((void *)_WRITER(vec), ((u64)1 << tzcnt) - 1, z);
-#    else
+#        else
         if (tzcnt) MASK_ELEVATE_WRITE_512(_WRITER(vec), z, tzcnt);
-#    endif
+#        endif
         _WRITER(vec) += tzcnt;
         vec = VECTOR_WRITE_ESCAPE_IMPL(vec_addr, src + tzcnt, len - tzcnt, 0);
         RETURN_ON_UNLIKELY_ERR(!vec);
     }
-#    undef _MASKZ_LOADU
-#    undef _MASK_STOREU
-#elif SIMD_BIT_SIZE == 256
+    return vec;
+#        undef _MASKZ_LOADU
+#        undef _MASK_STOREU
+}
+
+
+#    elif SIMD_BIT_SIZE == 256
+
+
+force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t len, UnicodeVector **vec_addr) {
+    assert(vec_addr);
+    UnicodeVector *vec = *vec_addr;
     VECTOR_TYPE y;
     const _FROM_TYPE *load_start = src + len - CHECK_COUNT_MAX;
     _TARGET_TYPE *store_start = _WRITER(vec) + len - CHECK_COUNT_MAX;
     __m256i mask, check_mask;
-#    define MASK_READER PYYJSON_CONCAT2(read_tail_mask_table, READ_BIT_SIZE)
+#        define MASK_READER PYYJSON_CONCAT2(read_tail_mask_table, READ_BIT_SIZE)
     mask = load_256_aligned(MASK_READER(CHECK_COUNT_MAX - len));
-#    undef MASK_READER
+#        undef MASK_READER
     check_mask = CHECK_ESCAPE_IMPL_GET_MASK(load_start, &y);
     check_mask = simd_and_256(check_mask, mask);
     if (likely(check_mask_zero(check_mask))) {
-#    if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
+#        if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
         assert((Py_ssize_t)store_start >= (Py_ssize_t)vec);
         WRITE_SIMD_256_WITH_WRITEMASK(store_start, y, mask);
-#    else
+#        else
         BACK_WRITE_SIMD256_WITH_TAIL_LEN(store_start, y, len, vec);
-#    endif
+#        endif
         _WRITER(vec) += len;
     } else {
         vec = VECTOR_WRITE_ESCAPE_IMPL(vec_addr, src, len, 0);
         RETURN_ON_UNLIKELY_ERR(!vec);
     }
-#elif PYYJSON_AARCH
-// #    define VECTOR_TYPE PYYJSON_SIMPLE_CONCAT(VECTOR_U, READ_BIT_SIZE, _128_A)
-    assert(len < CHECK_COUNT_MAX);
-    VECTOR_TYPE x, mask, check_mask;
-    const _FROM_TYPE *load_start = src + len - CHECK_COUNT_MAX;
-    _TARGET_TYPE *store_start = _WRITER(vec) + len - CHECK_COUNT_MAX;
-#    define MASK_TABLE_READER PYYJSON_CONCAT2(read_tail_mask_table, READ_BIT_SIZE)
-    // mask = load_128_aligned(MASK_TABLE_READER(CHECK_COUNT_MAX - len));
-    mask = *(VECTOR_TYPE *)MASK_TABLE_READER(CHECK_COUNT_MAX - len);
-#    undef MASK_TABLE_READER
-    check_mask = CHECK_ESCAPE_IMPL_GET_MASK(load_start, &x);
-    check_mask = simd_and_128(check_mask, mask);
-    if (likely(check_mask_zero(check_mask))) {
-#    if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
-#        if __SSE4_1__
-        x = blendv_128(load_128((const void *)store_start), x, mask);
-        write_128((void *)store_start, x);
-#        else  // < __SSE4_1__
-        x = runtime_right_shift_128bits(x, COMPILE_READ_UCS_LEVEL * (int)(CHECK_COUNT_MAX - len));
-        write_128(_WRITER(vec), x);
-#        endif // __SSE4_1__
-#    else      // COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
-        x = runtime_right_shift_128bits(x, COMPILE_READ_UCS_LEVEL * (int)(CHECK_COUNT_MAX - len));
-        WRITE_SIMD_IMPL(_WRITER(vec), x);
-#    endif     // COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
-        _WRITER(vec) += len;
-    } else {
-        vec = VECTOR_WRITE_ESCAPE_IMPL(vec_addr, src, len, 0);
-        RETURN_ON_UNLIKELY_ERR(!vec);
-    }
-// #    undef VECTOR_TYPE
-#else // SIMD_BIT_SIZE == 128
+    return vec;
+}
+
+
+#    else
+// SIMD_BIT_SIZE == 128, x86
+
+force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t len, UnicodeVector **vec_addr) {
+    assert(vec_addr);
+    UnicodeVector *vec = *vec_addr;
     // TODO
     assert(len < CHECK_COUNT_MAX);
     VECTOR_TYPE x, mask, check_mask;
     const _FROM_TYPE *load_start = src + len - CHECK_COUNT_MAX;
     _TARGET_TYPE *store_start = _WRITER(vec) + len - CHECK_COUNT_MAX;
-#    define MASK_TABLE_READER PYYJSON_CONCAT2(read_tail_mask_table, READ_BIT_SIZE)
+#        define MASK_TABLE_READER PYYJSON_CONCAT2(read_tail_mask_table, READ_BIT_SIZE)
     mask = load_128_aligned(MASK_TABLE_READER(CHECK_COUNT_MAX - len));
-#    undef MASK_TABLE_READER
+#        undef MASK_TABLE_READER
     check_mask = CHECK_ESCAPE_IMPL_GET_MASK(load_start, &x);
     check_mask = simd_and_128(check_mask, mask);
     if (likely(check_mask_zero(check_mask))) {
-#    if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
-#        if __SSE4_1__
+#        if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
+#            if __SSE4_1__
         x = blendv_128(load_128((const void *)store_start), x, mask);
         write_128((void *)store_start, x);
-#        else  // < __SSE4_1__
+#            else  // < __SSE4_1__
         x = runtime_right_shift_128bits(x, COMPILE_READ_UCS_LEVEL * (int)(CHECK_COUNT_MAX - len));
         write_128(_WRITER(vec), x);
-#        endif // __SSE4_1__
-#    else      // COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
+#            endif // __SSE4_1__
+#        else      // COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
         x = runtime_right_shift_128bits(x, COMPILE_READ_UCS_LEVEL * (int)(CHECK_COUNT_MAX - len));
         WRITE_SIMD_IMPL(_WRITER(vec), x);
-#    endif     // COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
+#        endif     // COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
         _WRITER(vec) += len;
     } else {
         vec = VECTOR_WRITE_ESCAPE_IMPL(vec_addr, src, len, 0);
         RETURN_ON_UNLIKELY_ERR(!vec);
     }
-#endif
     return vec;
 }
 
-static_assert(sizeof(PyASCIIObject) >= 16, "sizeof(PyASCIIObject) == ?");
-#if SIZEOF_VOID_P == 8
-// avx and above may be enabled.
-static_assert(sizeof(PyASCIIObject) >= 32, "sizeof(PyASCIIObject) == ?");
+
+#    endif
+
+#elif PYYJSON_AARCH
+
 #endif
 
 force_inline UnicodeVector *VECTOR_WRITE_UNICODE_IMPL(UnicodeVector **restrict vec_addr, _FROM_TYPE *src, Py_ssize_t len) {
     UnicodeVector *vec = *vec_addr;
     usize total_size = (usize)len;
     VECTOR_TYPE SIMD_VAR;
-//     __m128i x;
-// #if SIMD_BIT_SIZE == 256
-//     VECTOR_TYPE y;
-// #endif
-// #if SIMD_BIT_SIZE == 512
-//     VECTOR_TYPE z;
-// #endif
+    //     __m128i x;
+    // #if SIMD_BIT_SIZE == 256
+    //     VECTOR_TYPE y;
+    // #endif
+    // #if SIMD_BIT_SIZE == 512
+    //     VECTOR_TYPE z;
+    // #endif
     SIMD_MASK_TYPE mask;
     // SIMD_BIT_MASK_TYPE bit_mask;
     bool _c;

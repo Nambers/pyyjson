@@ -109,4 +109,10 @@ typedef uint64_t u64;
 typedef size_t usize;
 
 
+/* Some feature checks. */
+
+// avx and above may be enabled.
+static_assert(sizeof(PyASCIIObject) >= 4 * SIZEOF_VOID_P, "sizeof(PyASCIIObject) == ?");
+
+
 #endif
