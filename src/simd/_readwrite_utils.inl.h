@@ -31,16 +31,16 @@ force_inline void WRITE_SIMD_IMPL(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR) {
     EXTRACTOR(SIMD_VAR, &x1, &x2, &x3, &x4);
     // 0
     write_simd((void *)dst, ELEVATOR(x1));
-    dst += CHECK_COUNT_MAX / 4;
+    dst += READ_BATCH_COUNT / 4;
     // 1
     write_simd((void *)dst, ELEVATOR(x2));
-    dst += CHECK_COUNT_MAX / 4;
+    dst += READ_BATCH_COUNT / 4;
     // 2
     write_simd((void *)dst, ELEVATOR(x3));
-    dst += CHECK_COUNT_MAX / 4;
+    dst += READ_BATCH_COUNT / 4;
     // 3
     write_simd((void *)dst, ELEVATOR(x4));
-    dst += CHECK_COUNT_MAX / 4;
+    dst += READ_BATCH_COUNT / 4;
 #        undef ELEVATOR
 #        undef EXTRACTOR
 #    else
@@ -50,10 +50,10 @@ force_inline void WRITE_SIMD_IMPL(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR) {
     EXTRACTOR(SIMD_VAR, &v1, &v2);
     // 0
     write_simd((void *)dst, ELEVATOR(v1));
-    dst += CHECK_COUNT_MAX / 2;
+    dst += READ_BATCH_COUNT / 2;
     // 1
     write_simd((void *)dst, ELEVATOR(v2));
-    dst += CHECK_COUNT_MAX / 2;
+    dst += READ_BATCH_COUNT / 2;
 #        undef ELEVATOR
 #        undef EXTRACTOR
 #    endif // r->w == 1->4
@@ -82,12 +82,12 @@ force_inline void TAIL_WRITE_SIMD_IMPL(const _FROM_TYPE *src, _TARGET_TYPE *dst,
     SIMD_TYPE SIMD_VAR = _MASKZ_LOADU(((READ_512_MASK_TYPE)1 << tail_count) - 1, (const void *)src);
 #    undef _MASKZ_LOADU
 #else
-    const _FROM_TYPE *load_start = src + tail_count - CHECK_COUNT_MAX;
+    const _FROM_TYPE *load_start = src + tail_count - READ_BATCH_COUNT;
     SIMD_TYPE SIMD_VAR = load_simd((const void *)load_start);
 #endif
 #if _NEED_RUNTIME_SHIFT
     static_assert(SIMD_BIT_SIZE == 128, "SIMD_BIT_SIZE == 128");
-    SIMD_VAR = runtime_right_shift_128bits(SIMD_VAR, (CHECK_COUNT_MAX - tail_count) * sizeof(_TARGET_TYPE));
+    SIMD_VAR = runtime_right_shift_128bits(SIMD_VAR, (READ_BATCH_COUNT - tail_count) * sizeof(_TARGET_TYPE));
 #endif
 
 #undef _LOAD_WITH_MASKU
@@ -105,17 +105,17 @@ force_inline void TAIL_WRITE_SIMD_IMPL(const _FROM_TYPE *src, _TARGET_TYPE *dst,
 
     EXTRACTOR(SIMD_VAR, &base[0], &base[1]);
 #    if _WRITE_HEAD_FIRST
-    split_tail_len_two_parts(tail_count, CHECK_COUNT_MAX, &tail_split[1], &tail_split[0]);
+    split_tail_len_two_parts(tail_count, READ_BATCH_COUNT, &tail_split[1], &tail_split[0]);
 #    else
-    split_tail_len_two_parts(tail_count, CHECK_COUNT_MAX, &tail_split[0], &tail_split[1]);
+    split_tail_len_two_parts(tail_count, READ_BATCH_COUNT, &tail_split[0], &tail_split[1]);
 #    endif
 #else // WR_DIV == 4
 #    define EXTRACTOR PYYJSON_CONCAT3(extract, SIMD_BIT_SIZE, four_parts)
     EXTRACTOR(SIMD_VAR, &base[0], &base[1], &base[2], &base[3]);
 #    if _WRITE_HEAD_FIRST
-    split_tail_len_four_parts(tail_count, CHECK_COUNT_MAX, &tail_split[3], &tail_split[2], &tail_split[1], &tail_split[0]);
+    split_tail_len_four_parts(tail_count, READ_BATCH_COUNT, &tail_split[3], &tail_split[2], &tail_split[1], &tail_split[0]);
 #    else
-    split_tail_len_four_parts(tail_count, CHECK_COUNT_MAX, &tail_split[0], &tail_split[1], &tail_split[2], &tail_split[3]);
+    split_tail_len_four_parts(tail_count, READ_BATCH_COUNT, &tail_split[0], &tail_split[1], &tail_split[2], &tail_split[3]);
 #    endif
 #endif
 #undef EXTRACTOR
@@ -127,7 +127,7 @@ force_inline void TAIL_WRITE_SIMD_IMPL(const _FROM_TYPE *src, _TARGET_TYPE *dst,
 #    define ELEVATOR
 #endif
 #if !_WRITE_HEAD_FIRST
-    dst = dst + tail_count - CHECK_COUNT_MAX;
+    dst = dst + tail_count - READ_BATCH_COUNT;
 #endif
     for (usize i = 0; i < WR_DIV; ++i) {
 #if _WRITE_HEAD_FIRST
@@ -135,7 +135,7 @@ force_inline void TAIL_WRITE_SIMD_IMPL(const _FROM_TYPE *src, _TARGET_TYPE *dst,
 #else
         WRITE_PARTIAL_TAIL(dst, ELEVATOR(base[i]), tail_split[i]);
 #endif
-        dst += CHECK_COUNT_MAX / WR_DIV;
+        dst += READ_BATCH_COUNT / WR_DIV;
     }
 #undef ELEVATOR
 #undef _WRITE_HEAD_FIRST
@@ -157,18 +157,18 @@ force_inline void TAIL_WRITE_SIMD_IMPL(const _FROM_TYPE *src, _TARGET_TYPE *dst,
     // #    elif WR_DIV == 2
     // #        define EXTRACTOR PYYJSON_CONCAT3(extract, SIMD_BIT_SIZE, two_parts)
     //     EXTRACTOR(SIMD_VAR, &base[0], &base[1]);
-    //     split_tail_len_two_parts(tail_count, CHECK_COUNT_MAX, &tail_split[1], &tail_split[0]);
+    //     split_tail_len_two_parts(tail_count, READ_BATCH_COUNT, &tail_split[1], &tail_split[0]);
     // #    else
     // #        define EXTRACTOR PYYJSON_CONCAT3(extract, SIMD_BIT_SIZE, four_parts)
     //     EXTRACTOR(SIMD_VAR, &base[0], &base[1], &base[2], &base[3]);
-    //     split_tail_len_four_parts(tail_count, CHECK_COUNT_MAX, &tail_split[3], &tail_split[2], &tail_split[1], &tail_split[0]);
+    //     split_tail_len_four_parts(tail_count, READ_BATCH_COUNT, &tail_split[3], &tail_split[2], &tail_split[1], &tail_split[0]);
     // #    endif
     // #    undef EXTRACTOR
 
     //     // step 3. elevate and write
     //     for (usize i = 0; i < WR_DIV; ++i) {
     //         WRITE_PARTIAL_HEAD(dst, ELEVATOR(base[i]), tail_split[i]);
-    //         dst += CHECK_COUNT_MAX / WR_DIV;
+    //         dst += READ_BATCH_COUNT / WR_DIV;
     //     }
     // #elif WRITE_SUPPORT_MASK_WRITE || PYYJSON_HAS_BLENDV
     //     // avx2 and _TARGET_TYPE is u32 || sse4.1 or above
@@ -177,7 +177,7 @@ force_inline void TAIL_WRITE_SIMD_IMPL(const _FROM_TYPE *src, _TARGET_TYPE *dst,
     //     // since we can ensure the 32 bytes before src is always readable,
     //     // load directly
     //     static_assert(SIMD_BIT_SIZE < 512);
-    //     _FROM_TYPE *load_start = src + tail_count - CHECK_COUNT_MAX;
+    //     _FROM_TYPE *load_start = src + tail_count - READ_BATCH_COUNT;
     //     SIMD_TYPE SIMD_VAR = simd_load((const void *)src);
 
     //     // step 2. extract parts
@@ -190,18 +190,18 @@ force_inline void TAIL_WRITE_SIMD_IMPL(const _FROM_TYPE *src, _TARGET_TYPE *dst,
     // #    elif WR_DIV == 2
     // #        define EXTRACTOR PYYJSON_CONCAT3(extract, SIMD_BIT_SIZE, two_parts)
     //     EXTRACTOR(SIMD_VAR, &base[0], &base[1]);
-    //     split_tail_len_two_parts(tail_count, CHECK_COUNT_MAX, &tail_split[0], &tail_split[1]);
+    //     split_tail_len_two_parts(tail_count, READ_BATCH_COUNT, &tail_split[0], &tail_split[1]);
     // #    else
     // #        define EXTRACTOR PYYJSON_CONCAT3(extract, SIMD_BIT_SIZE, four_parts)
     //     EXTRACTOR(SIMD_VAR, &base[0], &base[1], &base[2], &base[3]);
-    //     split_tail_len_four_parts(tail_count, CHECK_COUNT_MAX, &tail_split[0], &tail_split[1], &tail_split[2], &tail_split[3]);
+    //     split_tail_len_four_parts(tail_count, READ_BATCH_COUNT, &tail_split[0], &tail_split[1], &tail_split[2], &tail_split[3]);
     // #    endif
     // #    undef EXTRACTOR
 
     //     // step 3. elevate and write
     //     for (usize i = 0; i < WR_DIV; ++i) {
     //         WRITE_PARTIAL_TAIL(dst, ELEVATOR(base[i]), tail_split[i]);
-    //         dst += CHECK_COUNT_MAX / WR_DIV;
+    //         dst += READ_BATCH_COUNT / WR_DIV;
     //     }
 
     // #else
@@ -212,9 +212,9 @@ force_inline void TAIL_WRITE_SIMD_IMPL(const _FROM_TYPE *src, _TARGET_TYPE *dst,
     //     // since we can ensure the 32 bytes before src is always readable,
     //     // load directly
     //     static_assert(SIMD_BIT_SIZE < 512);
-    //     _FROM_TYPE *load_start = src + tail_count - CHECK_COUNT_MAX;
+    //     _FROM_TYPE *load_start = src + tail_count - READ_BATCH_COUNT;
     //     SIMD_128 x = simd_load((const void *)src);
-    //     x = runtime_right_shift_128bits(x, (CHECK_COUNT_MAX - tail_count) * sizeof(_TARGET_TYPE));
+    //     x = runtime_right_shift_128bits(x, (READ_BATCH_COUNT - tail_count) * sizeof(_TARGET_TYPE));
 
     //     // step 2. extract parts. Note that we reverse the `split_tail_len` result here
     //     // to achieve `split_head_len`
@@ -227,18 +227,18 @@ force_inline void TAIL_WRITE_SIMD_IMPL(const _FROM_TYPE *src, _TARGET_TYPE *dst,
     // #    elif WR_DIV == 2
     // #        define EXTRACTOR PYYJSON_CONCAT3(extract, SIMD_BIT_SIZE, two_parts)
     //     EXTRACTOR(SIMD_VAR, &base[0], &base[1]);
-    //     split_tail_len_two_parts(tail_count, CHECK_COUNT_MAX, &tail_split[1], &tail_split[0]);
+    //     split_tail_len_two_parts(tail_count, READ_BATCH_COUNT, &tail_split[1], &tail_split[0]);
     // #    else
     // #        define EXTRACTOR PYYJSON_CONCAT3(extract, SIMD_BIT_SIZE, four_parts)
     //     EXTRACTOR(SIMD_VAR, &base[0], &base[1], &base[2], &base[3]);
-    //     split_tail_len_four_parts(tail_count, CHECK_COUNT_MAX, &tail_split[3], &tail_split[2], &tail_split[1], &tail_split[0]);
+    //     split_tail_len_four_parts(tail_count, READ_BATCH_COUNT, &tail_split[3], &tail_split[2], &tail_split[1], &tail_split[0]);
     // #    endif
     // #    undef EXTRACTOR
 
     //     // step 3. elevate and write
     //     for (usize i = 0; i < WR_DIV; ++i) {
     //         WRITE_PARTIAL_HEAD(dst, ELEVATOR(base[i]), tail_split[i]);
-    //         dst += CHECK_COUNT_MAX / WR_DIV;
+    //         dst += READ_BATCH_COUNT / WR_DIV;
     //     }
     // #endif
 }

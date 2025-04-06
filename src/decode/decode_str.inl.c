@@ -576,9 +576,9 @@ force_inline void READ_STR_IN_LOOP(
     if (check_mask_zero(check_mask)) {
         // no special characters in this slice, won't be an ending
         // should be extremely fast if the string is long enough
-        decode_src_info->src += CHECK_COUNT_MAX;
-        MOVE_WRITER(decode_unicode_info, write_as, CHECK_COUNT_MAX);
-        if (need_check_max_char) CHECK_MAX_CHAR_IN_LOOP(SIMD_VAR, read_state, false, CHECK_COUNT_MAX); // compile time determined
+        decode_src_info->src += READ_BATCH_COUNT;
+        MOVE_WRITER(decode_unicode_info, write_as, READ_BATCH_COUNT);
+        if (need_check_max_char) CHECK_MAX_CHAR_IN_LOOP(SIMD_VAR, read_state, false, READ_BATCH_COUNT); // compile time determined
     } else {
         // this is not an *unlikely* case
         // for example, for short keys less than 16 bytes,
@@ -767,11 +767,11 @@ force_inline void READ_STR_TAIL(
 #else
     static_assert(sizeof(SIMD_MASK_TYPE) == sizeof(SIMD_TYPE), "sizeof(SIMD_MASK_TYPE) == sizeof(SIMD_TYPE)");
     // load backward
-    assert(decode_src_info->src + CHECK_COUNT_MAX > decode_src_info->src_end);
+    assert(decode_src_info->src + READ_BATCH_COUNT > decode_src_info->src_end);
     VECTOR_TYPE SIMD_VAR;
     // simd_load_head points to the addr to load
     // always assume that the 32 bytes before `src` is readable
-    const _FROM_TYPE *simd_load_head = decode_src_info->src_end - CHECK_COUNT_MAX;
+    const _FROM_TYPE *simd_load_head = decode_src_info->src_end - READ_BATCH_COUNT;
     SIMD_MASK_TYPE check_mask = CHECK_ESCAPE_IMPL_GET_MASK(simd_load_head, &SIMD_VAR);
     Py_ssize_t invalid_head_count = decode_src_info->src - simd_load_head;
     SIMD_MASK_TYPE tail_mask;
@@ -849,7 +849,7 @@ static force_noinline PyObject *READ_STR(
             .src_end = _reader_end,
     };
 
-    const _FROM_TYPE *const last_src_batch = _decode_src_info.src_end - CHECK_COUNT_MAX;
+    const _FROM_TYPE *const last_src_batch = _decode_src_info.src_end - READ_BATCH_COUNT;
 
     if (unlikely(_decode_src_info.src > last_src_batch)) goto read_tail;
 #if COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_ASCII
@@ -1296,13 +1296,13 @@ force_inline void FAST_SKIP_SPACES(const _FROM_TYPE **cur_addr, const _FROM_TYPE
     const _FROM_TYPE *cur = *cur_addr;
     assert(*cur == ' ');
 loop:;
-    if (likely(cur + CHECK_COUNT_MAX < end)) {
+    if (likely(cur + READ_BATCH_COUNT < end)) {
         SIMD_TYPE SIMD_VAR = load_simd((const void *)cur);
 #define CMPNEQ PYYJSON_CONCAT3(cmpneq, READ_BIT_SIZE, SIMD_BIT_SIZE)
         SIMD_MASK_TYPE m = CMPNEQ(SIMD_VAR, template);
 #undef CMPNEQ
         if (check_mask_zero(m)) {
-            cur += CHECK_COUNT_MAX;
+            cur += READ_BATCH_COUNT;
             goto loop;
         } else {
             u32 done_count = GET_DONE_COUNT_FROM_MASK(m);
