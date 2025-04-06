@@ -1,3 +1,9 @@
+#undef _WVECx4_A_
+#undef _WVECx2_A_
+#undef _WVEC_U_
+#undef _WVEC_A_
+#undef WRITE_UNSIGNED_BIT_NAME
+#undef WRITE_BATCH_COUNT
 #undef WRITE_BIT_SIZE
 #undef _TARGET_TYPE
 #undef _WRITER

@@ -6,10 +6,10 @@
 #define GET_DONE_COUNT_FROM_MASK PYYJSON_CONCAT2(get_done_count_from_mask, COMPILE_READ_UCS_LEVEL)
 #define CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512 PYYJSON_CONCAT2(check_escape_tail_impl_get_mask_512, COMPILE_READ_UCS_LEVEL)
 
-force_inline VECTOR_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restrict src, VECTOR_TYPE *restrict _out_vec) {
-    VECTOR_TYPE v = LOAD_U(src);
+force_inline VECTOR_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restrict src, _VEC_A_ *restrict _out_vec) {
+    _VEC_A_ v = LOAD_U(src);
     *_out_vec = v;
-    VECTOR_TYPE t1, t2, t3;
+    _VEC_A_ t1, t2, t3;
     t1 = SET_ALL(_Quote);
     t2 = SET_ALL(_Slash);
     t3 = SET_ALL(ControlMax);
@@ -23,10 +23,10 @@ force_inline VECTOR_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restr
 #    undef CMPEQ
 #    undef CMPLT
 #else
-    VECTOR_TYPE m1 = (VECTOR_TYPE)(v == t1);
-    VECTOR_TYPE m2 = (VECTOR_TYPE)(v == t2);
-    VECTOR_TYPE m3 = (VECTOR_TYPE)(v < t3);
-    return (VECTOR_TYPE)(m1 | m2 | m3);
+    _VEC_A_ m1 = (_VEC_A_)(v == t1);
+    _VEC_A_ m2 = (_VEC_A_)(v == t2);
+    _VEC_A_ m3 = (_VEC_A_)(v < t3);
+    return (_VEC_A_)(m1 | m2 | m3);
 #endif
 }
 
@@ -64,7 +64,7 @@ force_inline u32 GET_DONE_COUNT_FROM_MASK(SIMD_MASK_TYPE mask) {
     return done_count;
 }
 #elif PYYJSON_AARCH
-// force_inline u32 GET_DONE_COUNT_FROM_MASK(VECTOR_TYPE mask) {
+// force_inline u32 GET_DONE_COUNT_FROM_MASK(_VEC_A_ mask) {
 // }
 #endif
 

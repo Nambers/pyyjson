@@ -132,6 +132,20 @@ typedef u16 VECTOR_U16_512_A __attribute__((__vector_size__(64), __aligned__(64)
 typedef u16 VECTOR_U16_512_U __attribute__((__vector_size__(64), __aligned__(2)));
 typedef u32 VECTOR_U32_512_A __attribute__((__vector_size__(64), __aligned__(64)));
 typedef u32 VECTOR_U32_512_U __attribute__((__vector_size__(64), __aligned__(4)));
+
+typedef u8 VECTOR_U8_1024_A __attribute__((__vector_size__(128), __aligned__(128)));
+typedef u8 VECTOR_U8_1024_U __attribute__((__vector_size__(128), __aligned__(1)));
+typedef u16 VECTOR_U16_1024_A __attribute__((__vector_size__(128), __aligned__(128)));
+typedef u16 VECTOR_U16_1024_U __attribute__((__vector_size__(128), __aligned__(2)));
+typedef u32 VECTOR_U32_1024_A __attribute__((__vector_size__(128), __aligned__(128)));
+typedef u32 VECTOR_U32_1024_U __attribute__((__vector_size__(128), __aligned__(4)));
+
+typedef u8 VECTOR_U8_2048_A __attribute__((__vector_size__(256), __aligned__(256)));
+typedef u8 VECTOR_U8_2048_U __attribute__((__vector_size__(256), __aligned__(1)));
+typedef u16 VECTOR_U16_2048_A __attribute__((__vector_size__(256), __aligned__(256)));
+typedef u16 VECTOR_U16_2048_U __attribute__((__vector_size__(256), __aligned__(2)));
+typedef u32 VECTOR_U32_2048_A __attribute__((__vector_size__(256), __aligned__(256)));
+typedef u32 VECTOR_U32_2048_U __attribute__((__vector_size__(256), __aligned__(4)));
 #else
 typedef u8 VECTOR_U8_32_A __attribute__((__vector_size__(4), __aligned__(4)));
 typedef u8 VECTOR_U8_32_U __attribute__((__vector_size__(4), __aligned__(1)));
@@ -163,6 +177,20 @@ typedef u16 VECTOR_U16_512_A __attribute__((__vector_size__(64), __aligned__(64)
 typedef u16 VECTOR_U16_512_U __attribute__((__vector_size__(64), __aligned__(2)));
 typedef u32 VECTOR_U32_512_A __attribute__((__vector_size__(64), __aligned__(64)));
 typedef u32 VECTOR_U32_512_U __attribute__((__vector_size__(64), __aligned__(4)));
+
+typedef u8 VECTOR_U8_1024_A __attribute__((__vector_size__(128), __aligned__(128)));
+typedef u8 VECTOR_U8_1024_U __attribute__((__vector_size__(128), __aligned__(1)));
+typedef u16 VECTOR_U16_1024_A __attribute__((__vector_size__(128), __aligned__(128)));
+typedef u16 VECTOR_U16_1024_U __attribute__((__vector_size__(128), __aligned__(2)));
+typedef u32 VECTOR_U32_1024_A __attribute__((__vector_size__(128), __aligned__(128)));
+typedef u32 VECTOR_U32_1024_U __attribute__((__vector_size__(128), __aligned__(4)));
+
+typedef u8 VECTOR_U8_2048_A __attribute__((__vector_size__(256), __aligned__(256)));
+typedef u8 VECTOR_U8_2048_U __attribute__((__vector_size__(256), __aligned__(1)));
+typedef u16 VECTOR_U16_2048_A __attribute__((__vector_size__(256), __aligned__(256)));
+typedef u16 VECTOR_U16_2048_U __attribute__((__vector_size__(256), __aligned__(2)));
+typedef u32 VECTOR_U32_2048_A __attribute__((__vector_size__(256), __aligned__(256)));
+typedef u32 VECTOR_U32_2048_U __attribute__((__vector_size__(256), __aligned__(4)));
 #endif
 
 

@@ -153,7 +153,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
 force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t len, UnicodeVector **vec_addr) {
     assert(vec_addr);
     UnicodeVector *vec = *vec_addr;
-    VECTOR_TYPE y;
+    _VEC_A_ y;
     const _FROM_TYPE *load_start = src + len - READ_BATCH_COUNT;
     _TARGET_TYPE *store_start = _WRITER(vec) + len - READ_BATCH_COUNT;
     __m256i mask, check_mask;
@@ -186,7 +186,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
     UnicodeVector *vec = *vec_addr;
     // TODO
     assert(len < READ_BATCH_COUNT);
-    VECTOR_TYPE x, mask, check_mask;
+    _VEC_A_ x, mask, check_mask;
     const _FROM_TYPE *load_start = src + len - READ_BATCH_COUNT;
     _TARGET_TYPE *store_start = _WRITER(vec) + len - READ_BATCH_COUNT;
 #        define MASK_TABLE_READER PYYJSON_CONCAT2(read_tail_mask_table, READ_BIT_SIZE)
@@ -223,7 +223,7 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
 #endif
 
 force_inline UnicodeVector *VECTOR_WRITE_UNICODE_LOOP(UnicodeVector **restrict vec_addr, const _FROM_TYPE **src_addr, usize *len_addr) {
-    VECTOR_TYPE SIMD_VAR;
+    _VEC_A_ SIMD_VAR;
     SIMD_MASK_TYPE mask;
     UnicodeVector *vec = *vec_addr;
     const _FROM_TYPE *src = *src_addr;

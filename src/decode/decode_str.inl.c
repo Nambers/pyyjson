@@ -58,7 +58,7 @@
 #define READ_NUMBER PYYJSON_CONCAT2(read_number, COMPILE_READ_UCS_LEVEL)
 #define CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512 PYYJSON_CONCAT2(check_escape_tail_impl_get_mask_512, COMPILE_READ_UCS_LEVEL)
 
-// force_inline VECTOR_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restrict src, VECTOR_TYPE *restrict _out_vec);
+
 force_inline u32 GET_DONE_COUNT_FROM_MASK(SIMD_MASK_TYPE mask);
 #if COMPILE_READ_UCS_LEVEL <= 2
 force_inline void WRITE_SIMD_IMPL_TARGET2(u16 *dst, SIMD_TYPE SIMD_VAR);
@@ -548,7 +548,7 @@ force_inline void READ_STR_IN_LOOP(
         int write_as, // one of 1,2,4
         bool do_copy,
         bool need_check_max_char) {
-    VECTOR_TYPE SIMD_VAR;
+    _VEC_A_ SIMD_VAR;
     SIMD_MASK_TYPE check_mask = CHECK_ESCAPE_IMPL_GET_MASK(decode_src_info->src, &SIMD_VAR);
     if (do_copy) {                               // compile time determined
         if (write_as > COMPILE_READ_UCS_LEVEL) { // compile time determined
@@ -768,7 +768,7 @@ force_inline void READ_STR_TAIL(
     static_assert(sizeof(SIMD_MASK_TYPE) == sizeof(SIMD_TYPE), "sizeof(SIMD_MASK_TYPE) == sizeof(SIMD_TYPE)");
     // load backward
     assert(decode_src_info->src + READ_BATCH_COUNT > decode_src_info->src_end);
-    VECTOR_TYPE SIMD_VAR;
+    _VEC_A_ SIMD_VAR;
     // simd_load_head points to the addr to load
     // always assume that the 32 bytes before `src` is readable
     const _FROM_TYPE *simd_load_head = decode_src_info->src_end - READ_BATCH_COUNT;

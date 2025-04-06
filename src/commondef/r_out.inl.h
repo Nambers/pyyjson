@@ -3,8 +3,8 @@
 #undef LOAD_U
 #undef LOAD_A
 #undef SET_ALL
-#undef VECTOR_TYPE_U
-#undef VECTOR_TYPE
+#undef _VEC_U_
+#undef _VEC_A_
 #undef READ_UNSIGNED_BIT_NAME
 #undef READ_BATCH_COUNT
 #undef READ_512_MASK_TYPE
