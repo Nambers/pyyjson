@@ -283,7 +283,7 @@ elseif(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|Intel")
         message("Release mode, enabling maximal optimization")
         target_compile_options(commonBuild INTERFACE -Werror -Wno-psabi -pedantic -pedantic-errors)
     else()
-        target_compile_options(commonBuild INTERFACE -O0)
+        target_compile_options(commonBuild INTERFACE -O0 -Wno-psabi)
 
         message("Debug mode, enabling debug symbols")
     endif()
