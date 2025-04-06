@@ -1,7 +1,7 @@
 // requires: READ, WRITE
 
-#include "simd_impl.h"
 #include "commondef/rw_in.inl.h"
+#include "simd_impl.h"
 
 #define WRITE_SIMD_IMPL PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define TAIL_WRITE_SIMD_IMPL PYYJSON_CONCAT3(tail_write_simd_impl, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
@@ -242,6 +242,87 @@ force_inline void TAIL_WRITE_SIMD_IMPL(const _FROM_TYPE *src, _TARGET_TYPE *dst,
     //     }
     // #endif
 }
+#if WR_DIV == 2
+force_inline _WVECx4_A_ VECTOR_ELEVATE4(_VECx2_A_ src_vec) {
+    register union {
+        _WVECx4_A_ v4;
+        _WVEC_A_ v1[4];
+    } ret;
+#    if PYYJSON_X86 && SIMD_BIT_SIZE >= 256
+    register union {
+        _VECx2_A_ v2;
+        _VEC_half_A_ vh[4];
+    } src;
+
+    src.v2 = src_vec;
+#        define ELEVATOR PYYJSON_CONCAT5(elevate, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL, to, SIMD_BIT_SIZE)
+    ret.v1[0] = ELEVATOR(src.vh[0]);
+    ret.v1[1] = ELEVATOR(src.vh[1]);
+    ret.v1[2] = ELEVATOR(src.vh[2]);
+    ret.v1[3] = ELEVATOR(src.vh[3]);
+#        undef ELEVATOR
+#    elif PYYJSON_X86
+
+    register union {
+        _VECx2_A_ v2;
+        _VEC_A_ v1[2];
+    } src;
+
+    src.v2 = src_vec;
+#        define ELEVATOR PYYJSON_CONCAT5(elevate, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL, to, 128)
+    ret.v1[0] = ELEVATOR(src.v1[0]);
+    ret.v1[2] = ELEVATOR(src.v1[1]);
+    ret.v1[1] = ELEVATOR(unpack_hi_64_128(src.v1[0], src.v1[0]));
+    ret.v1[3] = ELEVATOR(unpack_hi_64_128(src.v1[1], src.v1[1]));
+#        undef ELEVATOR
+#    endif
+    return ret.v4;
+}
+#elif WR_DIV == 4
+force_inline _WVECx4_A_ VECTOR_ELEVATE4(_VEC_A_ src_vec) {
+    register union {
+        _WVECx4_A_ v4;
+        _WVEC_A_ v1[4];
+    } ret;
+
+#    if PYYJSON_X86 && SIMD_BIT_SIZE == 512
+    register union {
+        _VEC_A_ v1;
+        _VEC_quad_A_ vq[4];
+    } src;
+
+    src.v1 = src_vec;
+    ret.v1[0] = elevate_1_4_to_512(src.vq[0]);
+    ret.v1[1] = elevate_1_4_to_512(src.vq[1]);
+    ret.v1[2] = elevate_1_4_to_512(src.vq[2]);
+    ret.v1[3] = elevate_1_4_to_512(src.vq[3]);
+
+#    elif PYYJSON_X86 && SIMD_BIT_SIZE == 256
+    register union {
+        _VEC_A_ v1;
+        _VEC_half_A_ vh[2];
+    } src;
+
+    src.v1 = src_vec;
+    ret.v1[0] = elevate_1_4_to_256(src.vh[0]);
+    ret.v1[2] = elevate_1_4_to_256(src.vh[1]);
+    ret.v1[1] = elevate_1_4_to_256(unpack_hi_64_128(src.vh[0], src.vh[0]));
+    ret.v1[3] = elevate_1_4_to_256(unpack_hi_64_128(src.vh[1], src.vh[1]));
+
+#    elif PYYJSON_X86
+    register _VEC_A_ src = src_vec;
+    SIMD_128 src_q[4];
+    extract_128_four_parts(src, src_q + 0, src_q + 1, src_q + 2, src_q + 3);
+    ret.v1[0] = elevate_1_4_to_128(src_q[0]);
+    ret.v1[1] = elevate_1_4_to_128(src_q[1]);
+    ret.v1[2] = elevate_1_4_to_128(src_q[2]);
+    ret.v1[3] = elevate_1_4_to_128(src_q[3]);
+#    else
+
+#    endif
+    return ret.v4;
+}
+#endif
 
 #undef WRITE_PARTIAL_TAIL
 #undef WRITE_PARTIAL_HEAD

@@ -1,3 +1,5 @@
+#undef _WVECx4_U_
+#undef _WVECx2_U_
 #undef _WVECx4_A_
 #undef _WVECx2_A_
 #undef _WVEC_U_

@@ -248,7 +248,7 @@ endif()
 # ------------------------------------------------------------------------------
 if(XCODE)
     set(PYYJSON_FLAGS)
-    list(APPEND PYYJSON_FLAGS "-Wall" "-Wextra" "-Werror" "-pedantic" "-pedantic-errors")
+    list(APPEND PYYJSON_FLAGS "-Wall" "-Wextra" "-Werror" "-pedantic" "-pedantic-errors" "-Wno-psabi")
 
     set_default_xcode_property(commonBuild)
     set_xcode_deployment_version(commonBuild "10.13" "12.0" "12.0" "4.0")
@@ -278,10 +278,10 @@ elseif(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|Intel")
 
     if(CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
         message("Release mode with debug info, enabling maximal optimization and debug symbols")
-        target_compile_options(commonBuild INTERFACE -Werror -pedantic -pedantic-errors)
+        target_compile_options(commonBuild INTERFACE -Werror -Wno-psabi -pedantic -pedantic-errors)
     elseif(CMAKE_BUILD_TYPE MATCHES ".*Rel.*")
         message("Release mode, enabling maximal optimization")
-        target_compile_options(commonBuild INTERFACE -Werror -pedantic -pedantic-errors)
+        target_compile_options(commonBuild INTERFACE -Werror -Wno-psabi -pedantic -pedantic-errors)
     else()
         target_compile_options(commonBuild INTERFACE -O0)
 

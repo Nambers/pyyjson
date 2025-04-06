@@ -3,8 +3,32 @@
 #include "pyyjson.h"
 #include "simd_impl.h"
 
+#define _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL PYYJSON_CONCAT2(_check_escape_impl_get_mask_internal, COMPILE_READ_UCS_LEVEL)
 #define GET_DONE_COUNT_FROM_MASK PYYJSON_CONCAT2(get_done_count_from_mask, COMPILE_READ_UCS_LEVEL)
 #define CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512 PYYJSON_CONCAT2(check_escape_tail_impl_get_mask_512, COMPILE_READ_UCS_LEVEL)
+
+force_inline VECTOR_MASK_TYPE _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL(_VEC_A_ v) {
+    _VEC_A_ t1, t2, t3;
+    t1 = SET_ALL(_Quote);
+    t2 = SET_ALL(_Slash);
+    t3 = SET_ALL(ControlMax);
+    //
+#if PYYJSON_X86 && SIMD_BIT_SIZE == 512
+#    define CMPEQ PYYJSON_SIMPLE_CONCAT3(_mm512_cmpeq_epi, READ_BIT_SIZE, _mask)
+#    define CMPLT PYYJSON_SIMPLE_CONCAT3(_mm512_cmplt_epu, READ_BIT_SIZE, _mask)
+    VECTOR_MASK_TYPE m1 = CMPEQ(v, t1);
+    VECTOR_MASK_TYPE m2 = CMPEQ(v, t2);
+    VECTOR_MASK_TYPE m3 = CMPLT(v, t3);
+    return (m1 | m2 | m3);
+#    undef CMPEQ
+#    undef CMPLT
+#else
+    _VEC_A_ m1 = (_VEC_A_)(v == t1);
+    _VEC_A_ m2 = (_VEC_A_)(v == t2);
+    _VEC_A_ m3 = (_VEC_A_)(v < t3);
+    return (_VEC_A_)(m1 | m2 | m3);
+#endif
+}
 
 force_inline VECTOR_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restrict src, _VEC_A_ *restrict _out_vec) {
     _VEC_A_ v = LOAD_U(src);
@@ -37,7 +61,7 @@ force_inline u32 GET_DONE_COUNT_FROM_MASK(SIMD_MASK_TYPE mask) {
     bit_mask = mask;
     assert(bit_mask);
     u32 done_count = u64_tz_bits(bit_mask); // / sizeof(_FROM_TYPE);
-#elif SIMD_BIT_SIZE == 256
+#    elif SIMD_BIT_SIZE == 256
     // for bit size < 512, we don't have cmp_epu8, the mask is calculated by subs_epu8
     // so we have to cmpeq with zero to get the real bit mask.
     mask = cmpeq0_8_256(mask);
@@ -68,6 +92,67 @@ force_inline u32 GET_DONE_COUNT_FROM_MASK(SIMD_MASK_TYPE mask) {
 // }
 #endif
 
+force_inline void CHECK_MASK_AND_GET_DONE_COUNT(_VEC_A_ vec, bool *out_checked, usize *out_done_count) {
+    VECTOR_MASK_TYPE check_mask = _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL(vec);
+    bool checked = check_mask_zero(check_mask);
+    *out_checked = checked;
+    if (likely(checked)) {
+        return;
+    }
+    *out_done_count = GET_DONE_COUNT_FROM_MASK(check_mask);
+}
+
+force_inline void CHECK_MASK_AND_GET_DONE_COUNTx2(_VECx2_A_ vec2, bool *out_checked, usize *out_done_count) {
+    VECTOR_MASK_TYPE check_mask[2];
+    VECTOR_MASK_TYPE merged_mask;
+    check_mask[0] = _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL(_Py_CAST(_VEC_A_ *, &vec2)[0]);
+    check_mask[1] = _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL(_Py_CAST(_VEC_A_ *, &vec2)[1]);
+    merged_mask = check_mask[0] | check_mask[1];
+    bool checked = check_mask_zero(merged_mask);
+    *out_checked = checked;
+    if (likely(checked)) {
+        return;
+    }
+    if (check_mask_zero(check_mask[0])) {
+        *out_done_count = READ_BATCH_COUNT + GET_DONE_COUNT_FROM_MASK(check_mask[1]);
+        return;
+    }
+    *out_done_count = GET_DONE_COUNT_FROM_MASK(check_mask[0]);
+    return;
+}
+
+force_inline void CHECK_MASK_AND_GET_DONE_COUNTx4(_VECx4_A_ vec4, bool *out_checked, usize *out_done_count) {
+    VECTOR_MASK_TYPE check_mask[4];
+    VECTOR_MASK_TYPE merged_mask[2];
+    check_mask[0] = _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL(_Py_CAST(_VEC_A_ *, &vec4)[0]);
+    check_mask[1] = _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL(_Py_CAST(_VEC_A_ *, &vec4)[1]);
+    check_mask[2] = _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL(_Py_CAST(_VEC_A_ *, &vec4)[2]);
+    check_mask[3] = _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL(_Py_CAST(_VEC_A_ *, &vec4)[3]);
+    merged_mask[0] = check_mask[0] | check_mask[1];
+    merged_mask[1] = check_mask[2] | check_mask[3];
+    merged_mask[0] = merged_mask[0] | merged_mask[1];
+    bool checked = check_mask_zero(merged_mask[0]);
+    *out_checked = checked;
+    if (likely(checked)) {
+        return;
+    }
+    if (!check_mask_zero(check_mask[0])) {
+        *out_done_count = GET_DONE_COUNT_FROM_MASK(check_mask[0]);
+        return;
+    }
+    if (!check_mask_zero(check_mask[1])) {
+        *out_done_count = READ_BATCH_COUNT + GET_DONE_COUNT_FROM_MASK(check_mask[1]);
+        return;
+    }
+    if (!check_mask_zero(check_mask[2])) {
+        *out_done_count = READ_BATCH_COUNT * 2 + GET_DONE_COUNT_FROM_MASK(check_mask[2]);
+        return;
+    }
+    *out_done_count = READ_BATCH_COUNT * 3 + GET_DONE_COUNT_FROM_MASK(check_mask[3]);
+    return;
+}
+
+
 #if PYYJSON_X86 && SIMD_BIT_SIZE == 512
 force_inline SIMD_MASK_TYPE CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(SIMD_512 z, u64 rw_mask) {
 #    define CUR_QUOTE PYYJSON_SIMPLE_CONCAT2(_Quote_i, READ_BIT_SIZE)
@@ -94,4 +179,5 @@ force_inline SIMD_MASK_TYPE CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(SIMD_512 z, u64 
 
 #undef CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512
 #undef GET_DONE_COUNT_FROM_MASK
+#undef _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL
 #include "commondef/r_out.inl.h"

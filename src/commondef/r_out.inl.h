@@ -1,5 +1,15 @@
+#undef CHECK_MASK_AND_GET_DONE_COUNTx4
+#undef CHECK_MASK_AND_GET_DONE_COUNTx2
+#undef CHECK_MASK_AND_GET_DONE_COUNT
 #undef CHECK_ESCAPE_IMPL_GET_MASK
 //
+#undef _VEC_half_U_
+#undef _VEC_half_A_
+#undef _VECx4_U_
+#undef _VECx2_U_
+#undef _VECx4_A_
+#undef _VECx2_A_
+#undef VECTOR_MASK_TYPE
 #undef LOAD_U
 #undef LOAD_A
 #undef SET_ALL

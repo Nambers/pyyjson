@@ -1,6 +1,5 @@
 #include "commondef/i_in.inl.h"
-#include "commondef/r_in.inl.h"
-#include "commondef/w_in.inl.h"
+#include "commondef/rw_in.inl.h"
 #include "simd/simd_detect.h"
 #include "simd/simd_impl.h"
 #include "unicode/include/indent.h"
@@ -12,6 +11,7 @@
 #define BACK_WRITE_SIMD256_WITH_TAIL_LEN PYYJSON_CONCAT3(back_write_simd256_with_tail_len, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define _CONTROL_SEQ_TABLE PYYJSON_CONCAT2(_ControlSeqTable, COMPILE_WRITE_UCS_LEVEL)
 #define VECTOR_WRITE_UNICODE_IMPL PYYJSON_CONCAT4(vector_write_unicode_impl, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
+#define VECTOR_WRITE_UNICODE_LOOPx4 PYYJSON_CONCAT4(vector_write_unicode_loopx4, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define VECTOR_WRITE_UNICODE_LOOP PYYJSON_CONCAT4(vector_write_unicode_loop, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define VECTOR_WRITE_UNICODE_TRAILING_IMPL PYYJSON_CONCAT4(vector_write_unicode_trailing_impl, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define VECTOR_WRITE_ESCAPE_AUTO_RESERVE PYYJSON_CONCAT4(vector_write_escape_auto_reserve, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
@@ -222,6 +222,74 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE 
 
 #endif
 
+
+// #if WR_DIV != 1
+
+// force_inline void ELEVATE_ALL(_VEC_A_ *vec_arr, _WVEC_A_ *wvec_arr, usize vec_bytesize) {
+//     for (usize i = 0; i < vec_bytesize / sizeof(_FROM_TYPE); i++) {
+//         (*wvec_arr)[i] = (*vec_arr)[i];
+//     }
+// }
+// #endif
+
+force_inline UnicodeVector *VECTOR_WRITE_UNICODE_LOOPx4(UnicodeVector **restrict vec_addr, const _FROM_TYPE **src_addr, usize *len_addr) {
+#if WR_DIV == 1
+#    define SRC_T _VECx4_A_
+#    define SRC_T_U _VECx4_U_
+#    define CHECKER CHECK_MASK_AND_GET_DONE_COUNTx4
+#elif WR_DIV == 2
+#    define SRC_T _VECx2_A_
+#    define SRC_T_U _VECx2_U_
+#    define CHECKER CHECK_MASK_AND_GET_DONE_COUNTx2
+#else
+#    define SRC_T _VEC_A_
+#    define SRC_T_U _VEC_U_
+#    define CHECKER CHECK_MASK_AND_GET_DONE_COUNT
+#endif
+    UnicodeVector *vec = *vec_addr;
+    register SRC_T read_vec;
+    read_vec = *(const SRC_T_U *)(*src_addr);
+
+    {
+#if WR_DIV == 1
+        static_assert(sizeof(_WVECx4_A_) == sizeof(read_vec), "");
+        *(_WVECx4_U_ *)_WRITER(vec) = read_vec;
+#else
+        register _WVECx4_A_ write_vec = VECTOR_ELEVATE4(read_vec);
+        static_assert(sizeof(read_vec) / sizeof(_FROM_TYPE) == WRITE_BATCH_COUNT * 4, "");
+        static_assert(sizeof(_WVECx4_A_) / sizeof(_TARGET_TYPE) == WRITE_BATCH_COUNT * 4, "");
+        // for(usize i = 0; i < WRITE_BATCH_COUNT * 4; i++) {
+        //     write_vec[i] = read_vec[i];
+        // }
+        *(_WVECx4_U_ *)_WRITER(vec) = write_vec;
+#endif
+    }
+    bool checked;
+    usize done_count;
+    CHECKER(read_vec, &checked, &done_count);
+    if (likely(checked)) {
+        *src_addr += WRITE_BATCH_COUNT * 4;
+        _WRITER(vec) += WRITE_BATCH_COUNT * 4;
+        *len_addr -= WRITE_BATCH_COUNT * 4;
+    } else {
+        const _FROM_TYPE *escape_pos = (*src_addr) + done_count;
+        *src_addr += done_count + 1;
+        _FROM_TYPE escape_unicode = *escape_pos;
+        assert(escape_unicode == _Quote || escape_unicode == _Slash || escape_unicode < ControlMax);
+        _WRITER(vec) += done_count;
+        *len_addr -= done_count + 1;
+        vec = VEC_RESERVE(vec_addr, 8 + (*len_addr) + TAIL_PADDING / sizeof(_TARGET_TYPE));
+        RETURN_ON_UNLIKELY_ERR(!vec);
+        memcpy(_WRITER(vec), &_CONTROL_SEQ_TABLE[escape_unicode * 8], 8 * sizeof(_TARGET_TYPE));
+        _WRITER(vec) += _ControlJump[escape_unicode];
+    }
+
+    return vec;
+#undef CHECKER
+#undef SRC_T_U
+#undef SRC_T
+}
+
 force_inline UnicodeVector *VECTOR_WRITE_UNICODE_LOOP(UnicodeVector **restrict vec_addr, const _FROM_TYPE **src_addr, usize *len_addr) {
     _VEC_A_ SIMD_VAR;
     SIMD_MASK_TYPE mask;
@@ -254,6 +322,10 @@ force_inline UnicodeVector *VECTOR_WRITE_UNICODE_IMPL(UnicodeVector **restrict v
     UnicodeVector *vec = *vec_addr;
     usize len = (usize)_len;
     bool _c;
+    while (len >= WRITE_BATCH_COUNT * 4) {
+        vec = VECTOR_WRITE_UNICODE_LOOPx4(vec_addr, &src, &len);
+        RETURN_ON_UNLIKELY_ERR(!vec);
+    }
     while (len >= READ_BATCH_COUNT) {
         vec = VECTOR_WRITE_UNICODE_LOOP(vec_addr, &src, &len);
         RETURN_ON_UNLIKELY_ERR(!vec);
@@ -319,8 +391,7 @@ force_inline bool PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, COMPILE_R
 }
 
 #include "commondef/i_out.inl.h"
-#include "commondef/r_out.inl.h"
-#include "commondef/w_out.inl.h"
+#include "commondef/rw_out.inl.h"
 
 #undef MASK_ELEVATE_WRITE_512
 #undef WRITE_SIMD_IMPL
@@ -333,6 +404,7 @@ force_inline bool PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, COMPILE_R
 #undef VECTOR_WRITE_ESCAPE_AUTO_RESERVE
 #undef VECTOR_WRITE_UNICODE_TRAILING_IMPL
 #undef VECTOR_WRITE_UNICODE_LOOP
+#undef VECTOR_WRITE_UNICODE_LOOPx4
 #undef VECTOR_WRITE_UNICODE_IMPL
 #undef _TARGET_TYPE
 #undef _WRITER
