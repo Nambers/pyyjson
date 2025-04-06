@@ -3,11 +3,8 @@
 
 #include "pymacro.h"
 #include "pyyjson.h"
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
 
-#define PYYJSON_MEMCPY_MAX_ALIGN 64
+
 #if __AVX512F__
 #    define pyyjson_memcpy(_d, _s, _size) pyyjson_memcpy_simd((_d), (_s), (_size), 512)
 #    define PYYJSON_MEMCPY_SIMD_SIZE 64
@@ -57,6 +54,41 @@ typedef __declspec(align(256)) struct {
     u64 v[32];
 } aligned256;
 
+typedef __declspec(align(1)) struct {
+    u8 v[1];
+} unaligned1;
+
+typedef __declspec(align(1)) struct {
+    u8 v[2];
+} unaligned2;
+
+typedef __declspec(align(1)) struct {
+    u6 v[4];
+} unaligned4;
+
+typedef __declspec(align(1)) struct {
+    u8 v[8];
+} unaligned8;
+
+typedef __declspec(align(1)) struct {
+    u8 v[16];
+} unaligned16;
+
+typedef __declspec(align(1)) struct {
+    u8 v[32];
+} unaligned32;
+
+typedef __declspec(align(1)) struct {
+    u8 v[64];
+} unaligned64;
+
+typedef __declspec(align(1)) struct {
+    u8 v[128];
+} unaligned128;
+
+typedef __declspec(align(1)) struct {
+    u8 v[256];
+} unaligned256;
 #else
 typedef u8 aligned1 __attribute__((__vector_size__(1), __aligned__(1)));
 typedef u16 aligned2 __attribute__((__vector_size__(2), __aligned__(2)));
@@ -67,6 +99,16 @@ typedef u64 aligned32 __attribute__((__vector_size__(32), __aligned__(32)));
 typedef u64 aligned64 __attribute__((__vector_size__(64), __aligned__(64)));
 typedef u64 aligned128 __attribute__((__vector_size__(128), __aligned__(128)));
 typedef u64 aligned256 __attribute__((__vector_size__(256), __aligned__(256)));
+
+typedef u8 unaligned1 __attribute__((__vector_size__(1), __aligned__(1)));
+typedef u8 unaligned2 __attribute__((__vector_size__(2), __aligned__(1)));
+typedef u8 unaligned4 __attribute__((__vector_size__(4), __aligned__(1)));
+typedef u8 unaligned8 __attribute__((__vector_size__(8), __aligned__(1)));
+typedef u8 unaligned16 __attribute__((__vector_size__(16), __aligned__(1)));
+typedef u8 unaligned32 __attribute__((__vector_size__(32), __aligned__(1)));
+typedef u8 unaligned64 __attribute__((__vector_size__(64), __aligned__(1)));
+typedef u8 unaligned128 __attribute__((__vector_size__(128), __aligned__(1)));
+typedef u8 unaligned256 __attribute__((__vector_size__(256), __aligned__(1)));
 #endif
 
 force_inline void __pyyjson_memcpy(char **restrict dest_addr, const char **restrict src_addr, size_t n_bytes) {
@@ -78,7 +120,7 @@ force_inline void __pyyjson_memcpy(char **restrict dest_addr, const char **restr
 force_inline void pyyjson_memcpy_aligned_all_power2(void *restrict dest, const void *restrict src, size_t n_bytes) {
 #define COPY_ALIGNED(_size)                   \
     {                                         \
-        aligned##_size __tmp;                 \
+        register aligned##_size __tmp;        \
         __tmp = *(const aligned##_size *)src; \
         *(aligned##_size *)dest = __tmp;      \
         break;                                \
@@ -112,12 +154,12 @@ force_inline void pyyjson_memcpy_aligned_all_power2(void *restrict dest, const v
 }
 
 force_inline void pyyjson_memcpy_aligned_store_power2(void *restrict dest, const void *restrict src, size_t n_bytes) {
-#define COPY_TO_ALIGNED_DST(_size)       \
-    {                                    \
-        aligned##_size __tmp;            \
-        memcpy(&__tmp, src, _size);      \
-        *(aligned##_size *)dest = __tmp; \
-        break;                           \
+#define COPY_TO_ALIGNED_DST(_size)                          \
+    {                                                       \
+        register aligned##_size __tmp;                      \
+        __tmp = (aligned##_size)(*(unaligned##_size *)src); \
+        *(aligned##_size *)dest = __tmp;                    \
+        break;                                              \
     }
 
     switch (n_bytes) {
