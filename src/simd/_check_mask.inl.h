@@ -105,8 +105,8 @@ force_inline void CHECK_MASK_AND_GET_DONE_COUNT(_VEC_A_ vec, bool *out_checked, 
 force_inline void CHECK_MASK_AND_GET_DONE_COUNTx2(_VECx2_A_ vec2, bool *out_checked, usize *out_done_count) {
     VECTOR_MASK_TYPE check_mask[2];
     VECTOR_MASK_TYPE merged_mask;
-    check_mask[0] = _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL(_Py_CAST(_VEC_A_ *, &vec2)[0]);
-    check_mask[1] = _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL(_Py_CAST(_VEC_A_ *, &vec2)[1]);
+    check_mask[0] = _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL(PYYJSON_CAST(_VEC_A_ *, &vec2)[0]);
+    check_mask[1] = _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL(PYYJSON_CAST(_VEC_A_ *, &vec2)[1]);
     merged_mask = check_mask[0] | check_mask[1];
     bool checked = check_mask_zero(merged_mask);
     *out_checked = checked;
@@ -124,10 +124,10 @@ force_inline void CHECK_MASK_AND_GET_DONE_COUNTx2(_VECx2_A_ vec2, bool *out_chec
 force_inline void CHECK_MASK_AND_GET_DONE_COUNTx4(_VECx4_A_ vec4, bool *out_checked, usize *out_done_count) {
     VECTOR_MASK_TYPE check_mask[4];
     VECTOR_MASK_TYPE merged_mask[2];
-    check_mask[0] = _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL(_Py_CAST(_VEC_A_ *, &vec4)[0]);
-    check_mask[1] = _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL(_Py_CAST(_VEC_A_ *, &vec4)[1]);
-    check_mask[2] = _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL(_Py_CAST(_VEC_A_ *, &vec4)[2]);
-    check_mask[3] = _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL(_Py_CAST(_VEC_A_ *, &vec4)[3]);
+    check_mask[0] = _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL(PYYJSON_CAST(_VEC_A_ *, &vec4)[0]);
+    check_mask[1] = _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL(PYYJSON_CAST(_VEC_A_ *, &vec4)[1]);
+    check_mask[2] = _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL(PYYJSON_CAST(_VEC_A_ *, &vec4)[2]);
+    check_mask[3] = _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL(PYYJSON_CAST(_VEC_A_ *, &vec4)[3]);
     merged_mask[0] = check_mask[0] | check_mask[1];
     merged_mask[1] = check_mask[2] | check_mask[3];
     merged_mask[0] = merged_mask[0] | merged_mask[1];

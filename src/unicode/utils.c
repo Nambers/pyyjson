@@ -2,7 +2,7 @@
 #include "uvector.h"
 
 
-#define VEC_MEM_U8_DIFF(_start_, _end_) (_Py_CAST(uintptr_t, (_end_)) - _Py_CAST(uintptr_t, (_start_)))
+#define VEC_MEM_U8_DIFF(_start_, _end_) (PYYJSON_CAST(uintptr_t, (_end_)) - PYYJSON_CAST(uintptr_t, (_start_)))
 
 
 // _PyUnicode_CheckConsistency is hidden in Python 3.13
@@ -12,8 +12,8 @@ extern int _PyUnicode_CheckConsistency(PyObject *op, int check_content);
 
 
 force_inline void vec_set_rwptr_and_size(EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t rw_diff, Py_ssize_t target_size) {
-    unicode_buffer_info->writer.writer_u8 = _Py_CAST(u8 *, unicode_buffer_info->head) + rw_diff;
-    unicode_buffer_info->end = _Py_CAST(u8 *, unicode_buffer_info->head) + target_size;
+    unicode_buffer_info->writer.writer_u8 = PYYJSON_CAST(u8 *, unicode_buffer_info->head) + rw_diff;
+    unicode_buffer_info->end = PYYJSON_CAST(u8 *, unicode_buffer_info->head) + target_size;
 }
 
 force_noinline bool unicode_vec_reserve(EncodeUnicodeBufferInfo *unicode_buffer_info, void *target_ptr) {
@@ -42,16 +42,16 @@ force_noinline bool unicode_vec_reserve(EncodeUnicodeBufferInfo *unicode_buffer_
     unicode_buffer_info->head = new_ptr;
     vec_set_rwptr_and_size(unicode_buffer_info, w_diff, target_size);
 #ifndef NDEBUG
-    memset(unicode_buffer_info->writer.writer_u8, 0, _Py_CAST(u8 *, unicode_buffer_info->end) - unicode_buffer_info->writer.writer_u8);
+    memset(unicode_buffer_info->writer.writer_u8, 0, PYYJSON_CAST(u8 *, unicode_buffer_info->end) - unicode_buffer_info->writer.writer_u8);
 #endif
     return true;
 }
 
 force_noinline void init_py_unicode(void *head, Py_ssize_t size, int kind) {
-    PyCompactUnicodeObject *unicode = _Py_CAST(PyCompactUnicodeObject *, head);
-    PyASCIIObject *ascii = _Py_CAST(PyASCIIObject *, head);
+    PyCompactUnicodeObject *unicode = PYYJSON_CAST(PyCompactUnicodeObject *, head);
+    PyASCIIObject *ascii = PYYJSON_CAST(PyASCIIObject *, head);
     PyObject_Init((PyObject *)unicode, &PyUnicode_Type);
-    void *data = kind ? _Py_CAST(void *, unicode + 1) : _Py_CAST(void *, ascii + 1);
+    void *data = kind ? PYYJSON_CAST(void *, unicode + 1) : PYYJSON_CAST(void *, ascii + 1);
     //
     ascii->length = size;
     ascii->hash = -1;

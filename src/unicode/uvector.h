@@ -21,8 +21,8 @@ typedef struct EncodeUnicodeBufferInfo {
 #define U16_WRITER(_unicode_buffer_info_) ((_unicode_buffer_info_)->writer.writer_u16)
 #define U32_WRITER(_unicode_buffer_info_) ((_unicode_buffer_info_)->writer.writer_u32)
 
-#define GET_VEC_ASCII_START(_unicode_buffer_info_) (_Py_CAST(PyASCIIObject *, (_unicode_buffer_info_)->head) + 1)
-#define GET_VEC_COMPACT_START(_unicode_buffer_info_) (_Py_CAST(PyCompactUnicodeObject *, (_unicode_buffer_info_)->head) + 1)
+#define GET_VEC_ASCII_START(_unicode_buffer_info_) (PYYJSON_CAST(PyASCIIObject *, (_unicode_buffer_info_)->head) + 1)
+#define GET_VEC_COMPACT_START(_unicode_buffer_info_) (PYYJSON_CAST(PyCompactUnicodeObject *, (_unicode_buffer_info_)->head) + 1)
 
 #define VEC_END(_unicode_buffer_info_) ((_unicode_buffer_info_)->end)
 

@@ -179,8 +179,8 @@ force_inline bool init_unicode_buffer(EncodeUnicodeBufferInfo *unicode_buffer_in
 #ifndef NDEBUG
         memset(unicode_buffer_info->head, 0, PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
 #endif
-        unicode_buffer_info->writer.writer_void = _Py_CAST(PyASCIIObject *, unicode_buffer_info->head) + 1;
-        unicode_buffer_info->end = _Py_CAST(u8 *, unicode_buffer_info->head) + PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE;
+        unicode_buffer_info->writer.writer_void = PYYJSON_CAST(PyASCIIObject *, unicode_buffer_info->head) + 1;
+        unicode_buffer_info->end = PYYJSON_CAST(u8 *, unicode_buffer_info->head) + PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE;
     } else {
         PyErr_NoMemory();
         return false;
@@ -274,8 +274,8 @@ force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {
     } else {
         offset = sizeof(PyCompactUnicodeObject);
     }
-    U8_WRITER(&_unicode_buffer_info) = _Py_CAST(u8 *, _unicode_buffer_info.head) + offset;
-    _unicode_buffer_info.end = _Py_CAST(u8 *, _unicode_buffer_info.head) + PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE;
+    U8_WRITER(&_unicode_buffer_info) = PYYJSON_CAST(u8 *, _unicode_buffer_info.head) + offset;
+    _unicode_buffer_info.end = PYYJSON_CAST(u8 *, _unicode_buffer_info.head) + PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE;
     //
     bool success;
     switch (unicode_kind) {
