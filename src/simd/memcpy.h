@@ -17,7 +17,7 @@
 #endif
 
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && !defined(__clang__)
 typedef __declspec(align(1)) struct {
     u8 v[1];
 } aligned1;
