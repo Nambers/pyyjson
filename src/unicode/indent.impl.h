@@ -2,9 +2,9 @@
 #include "include/indent.h"
 #include "include/reserve.h"
 
-force_inline void VECTOR_WRITE_INDENT(UnicodeVector *restrict vec, Py_ssize_t _cur_nested_depth) {
+force_inline void VECTOR_WRITE_INDENT(_TARGET_TYPE **writer_addr, Py_ssize_t _cur_nested_depth) {
 #if COMPILE_INDENT_LEVEL > 0
-    _TARGET_TYPE *writer = _WRITER(vec);
+    _TARGET_TYPE *writer = *writer_addr;
     *writer++ = '\n';
     usize cur_nested_depth = (usize)_cur_nested_depth;
     for (usize i = 0; i < cur_nested_depth; i++) {
@@ -15,21 +15,18 @@ force_inline void VECTOR_WRITE_INDENT(UnicodeVector *restrict vec, Py_ssize_t _c
         *writer++ = ' ';
 #    endif // COMPILE_INDENT_LEVEL == 4
     }
-    _WRITER(vec) += COMPILE_INDENT_LEVEL * cur_nested_depth + 1;
+    *writer_addr = writer;
 #endif // COMPILE_INDENT_LEVEL > 0
 }
 
-force_inline UnicodeVector *INDENT_WRITER(UnicodeVector **vec_addr, Py_ssize_t cur_nested_depth, bool is_in_obj, Py_ssize_t additional_reserve_count) {
-    UnicodeVector *vec;
+force_inline bool INDENT_WRITER(EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t cur_nested_depth, bool is_in_obj, Py_ssize_t additional_reserve_count) {
     if (!is_in_obj && COMPILE_INDENT_LEVEL != 0) {
-        vec = VEC_RESERVE(vec_addr, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + additional_reserve_count);
-        RETURN_ON_UNLIKELY_ERR(!vec);
-        VECTOR_WRITE_INDENT(vec, cur_nested_depth);
+        RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + additional_reserve_count));
+         VECTOR_WRITE_INDENT(&_WRITER(unicode_buffer_info), cur_nested_depth);
     } else {
-        vec = VEC_RESERVE(vec_addr, additional_reserve_count);
-        RETURN_ON_UNLIKELY_ERR(!vec);
+        RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, additional_reserve_count));
     }
-    return vec;
+    return true;
 }
 
 #include "commondef/w_out.inl.h"

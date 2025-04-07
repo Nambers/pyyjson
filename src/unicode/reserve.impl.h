@@ -1,16 +1,12 @@
 #include "commondef/w_in.inl.h"
 #include "include/reserve.h"
 
-force_inline UnicodeVector *VEC_RESERVE(UnicodeVector **vec_addr, Py_ssize_t size) {
-    assert(vec_addr);
-    UnicodeVector *vec = *vec_addr;
-    _TARGET_TYPE *target_ptr = _WRITER(vec) + size;
-    if (unlikely(target_ptr > (_TARGET_TYPE *)VEC_END(vec))) {
-        UnicodeVector *new_vec = unicode_vec_reserve(vec, (void *)target_ptr);
-        vec = new_vec;
-        if (new_vec) *vec_addr = new_vec;
+force_inline bool VEC_RESERVE(EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t size) {
+    _TARGET_TYPE *target_ptr = _WRITER(unicode_buffer_info) + size;
+    if (unlikely(target_ptr > _Py_CAST(_TARGET_TYPE *, unicode_buffer_info->end))) {
+        return unicode_vec_reserve(unicode_buffer_info, (void *)target_ptr);
     }
-    return vec;
+    return true;
 }
 
 #include "commondef/w_out.inl.h"

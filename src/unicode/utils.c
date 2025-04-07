@@ -2,7 +2,7 @@
 #include "uvector.h"
 
 
-#define VEC_MEM_U8_DIFF(vec, ptr) ((Py_ssize_t)ptr - (Py_ssize_t)vec)
+#define VEC_MEM_U8_DIFF(_start_, _end_) (_Py_CAST(uintptr_t, (_end_)) - _Py_CAST(uintptr_t, (_start_)))
 
 
 // _PyUnicode_CheckConsistency is hidden in Python 3.13
@@ -11,48 +11,47 @@ extern int _PyUnicode_CheckConsistency(PyObject *op, int check_content);
 #endif
 
 
-force_inline void vec_set_rwptr_and_size(UnicodeVector *vec, Py_ssize_t rw_diff, Py_ssize_t target_size) {
-    vec->head.write_u8 = (u8 *)(((Py_ssize_t)vec) + rw_diff);
-    vec->head.write_end = (void *)(((Py_ssize_t)vec) + target_size);
+force_inline void vec_set_rwptr_and_size(EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t rw_diff, Py_ssize_t target_size) {
+    unicode_buffer_info->writer.writer_u8 = _Py_CAST(u8 *, unicode_buffer_info->head) + rw_diff;
+    unicode_buffer_info->end = _Py_CAST(u8 *, unicode_buffer_info->head) + target_size;
 }
 
-force_noinline UnicodeVector *unicode_vec_reserve(UnicodeVector *vec, void *target_ptr) {
-    const Py_ssize_t u8_diff = VEC_MEM_U8_DIFF(vec, target_ptr);
+force_noinline bool unicode_vec_reserve(EncodeUnicodeBufferInfo *unicode_buffer_info, void *target_ptr) {
+    const usize u8_diff = VEC_MEM_U8_DIFF(unicode_buffer_info->head, target_ptr);
     assert(u8_diff >= 0);
-    // Py_ssize_t target_size = u8_diff;
-    Py_ssize_t target_size = VEC_MEM_U8_DIFF(vec, VEC_END(vec));
+    usize target_size = VEC_MEM_U8_DIFF(unicode_buffer_info->head, unicode_buffer_info->end);
     assert(target_size >= 0);
 #if PYYJSON_ASAN_CHECK
     // for sanitize=address build, only resize to the *just enough* size.
-    Py_ssize_t inc_size = 0;
+    usize inc_size = 0;
 #else
-    Py_ssize_t inc_size = target_size;
+    usize inc_size = target_size;
 #endif
     if (unlikely(target_size > (PY_SSIZE_T_MAX - inc_size))) {
         PyErr_NoMemory();
-        return NULL;
+        return false;
     }
     target_size = target_size + inc_size;
     target_size = (target_size > u8_diff) ? target_size : u8_diff;
-    Py_ssize_t w_diff = VEC_MEM_U8_DIFF(vec, vec->head.write_u8);
-    void *new_ptr = PyObject_Realloc((void *)vec, (size_t)target_size);
+    Py_ssize_t w_diff = VEC_MEM_U8_DIFF(unicode_buffer_info->head, unicode_buffer_info->writer.writer_u8);
+    void *new_ptr = PyObject_Realloc(unicode_buffer_info->head, target_size);
     if (unlikely(!new_ptr)) {
         PyErr_NoMemory();
-        return NULL;
+        return false;
     }
-    vec = (UnicodeVector *)new_ptr;
-    vec_set_rwptr_and_size(vec, w_diff, target_size);
+    unicode_buffer_info->head = new_ptr;
+    vec_set_rwptr_and_size(unicode_buffer_info, w_diff, target_size);
 #ifndef NDEBUG
-    memset((void *)vec->head.write_u8, 0, (usize)((u8 *)VEC_END(vec) - vec->head.write_u8));
+    memset(unicode_buffer_info->writer.writer_u8, 0, _Py_CAST(u8 *, unicode_buffer_info->end) - unicode_buffer_info->writer.writer_u8);
 #endif
-    return vec;
+    return true;
 }
 
-force_noinline void init_py_unicode(UnicodeVector *restrict vec, Py_ssize_t size, int kind) {
-    PyCompactUnicodeObject *unicode = &vec->unicode_rep.compact_obj;
-    PyASCIIObject *ascii = &vec->unicode_rep.ascii_rep.ascii_obj;
+force_noinline void init_py_unicode(void *head, Py_ssize_t size, int kind) {
+    PyCompactUnicodeObject *unicode = _Py_CAST(PyCompactUnicodeObject *, head);
+    PyASCIIObject *ascii = _Py_CAST(PyASCIIObject *, head);
     PyObject_Init((PyObject *)unicode, &PyUnicode_Type);
-    void *data = kind ? GET_VEC_COMPACT_START(vec) : GET_VEC_ASCII_START(vec);
+    void *data = kind ? _Py_CAST(void *, unicode + 1) : _Py_CAST(void *, ascii + 1);
     //
     ascii->length = size;
     ascii->hash = -1;
@@ -108,15 +107,16 @@ force_noinline void init_py_unicode(UnicodeVector *restrict vec, Py_ssize_t size
     assert(ascii->ob_base.ob_refcnt == 1);
 }
 
-force_noinline bool vector_resize_to_fit(UnicodeVector **restrict vec_addr, Py_ssize_t len, int ucs_type) {
+force_noinline bool vector_resize_to_fit(EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t len, int ucs_type) {
     Py_ssize_t char_size = ucs_type ? ucs_type : 1;
     Py_ssize_t struct_size = ucs_type ? sizeof(PyCompactUnicodeObject) : sizeof(PyASCIIObject);
     assert(len <= ((PY_SSIZE_T_MAX - struct_size) / char_size - 1));
-    // Resizes to a smaller size. It *should* always success
-    UnicodeVector *new_vec = (UnicodeVector *)PyObject_Realloc(*vec_addr, struct_size + (len + 1) * char_size);
-    if (likely(new_vec)) {
-        *vec_addr = new_vec;
-        return true;
+    // Resizes to a smaller size. It *should* always be successful
+    void *new_ptr = PyObject_Realloc(unicode_buffer_info->head, struct_size + (len + 1) * char_size);
+    if (unlikely(!new_ptr)) {
+        return false;
+    } else {
+        unicode_buffer_info->head = new_ptr;
     }
-    return false;
+    return true;
 }

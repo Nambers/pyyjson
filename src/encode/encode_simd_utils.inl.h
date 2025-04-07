@@ -29,7 +29,7 @@ force_inline void WRITE_SIMD_256_WITH_WRITEMASK(_TARGET_TYPE *dst, SIMD_256 y, S
 #endif // COMPILE_READ_UCS_LEVEL == 1 && SIMD_BIT_SIZE == 256
 
 #if SIMD_BIT_SIZE == 256 && COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
-force_inline void BACK_WRITE_SIMD256_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_256 y, Py_ssize_t len, UnicodeVector *vec) {
+force_inline void BACK_WRITE_SIMD256_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_256 y, Py_ssize_t len, void *vec_head) {
     // vec is not used, only for verifying addr
 #    if COMPILE_READ_UCS_LEVEL == 1 && COMPILE_WRITE_UCS_LEVEL == 4
     // 1->4
@@ -80,14 +80,14 @@ force_inline void BACK_WRITE_SIMD256_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_256 y
     // There will be no invalid write as long as the mask table is correct.
     // 0
     if (COMPILE_WRITE_UCS_LEVEL == 4 || part1) {
-        assert(COMPILE_WRITE_UCS_LEVEL == 4 || (Py_ssize_t)dst >= (Py_ssize_t)vec);
+        assert(COMPILE_WRITE_UCS_LEVEL == 4 || (uintptr_t)dst >= (uintptr_t)vec_head);
         writemask = load_256_aligned(MASK_TABLE_READER(READ_BATCH_COUNT / 2 - part1));
         MASK_WRITER(dst, ELEVATOR(x1), writemask);
     }
     dst += READ_BATCH_COUNT / 2;
     // 1
     if (COMPILE_WRITE_UCS_LEVEL == 4 || part2) {
-        assert(COMPILE_WRITE_UCS_LEVEL == 4 || (Py_ssize_t)dst >= (Py_ssize_t)vec);
+        assert(COMPILE_WRITE_UCS_LEVEL == 4 || (uintptr_t)dst >= (uintptr_t)vec_head);
         writemask = load_256_aligned(MASK_TABLE_READER(READ_BATCH_COUNT / 2 - part2));
         MASK_WRITER(dst, ELEVATOR(x2), writemask);
     }
