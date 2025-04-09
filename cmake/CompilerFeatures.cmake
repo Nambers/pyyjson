@@ -53,7 +53,7 @@ function(add_avx512_compile_option TARGET)
     endif()
 
     check_co_type(${CO_TYPE})
-    target_compile_options(${TARGET} ${CO_TYPE} $<$<C_COMPILER_ID:MSVC>:/arch:AVX512> $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>,$<C_COMPILER_ID:Intel>>:-mavx512f> $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>,$<C_COMPILER_ID:Intel>>:-mavx512bw>)
+    target_compile_options(${TARGET} ${CO_TYPE} $<$<C_COMPILER_ID:MSVC>:/arch:AVX512> $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>,$<C_COMPILER_ID:Intel>>:-mavx512f> $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>,$<C_COMPILER_ID:Intel>>:-mavx512bw> $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>,$<C_COMPILER_ID:Intel>>:-mavx512vl>)
 endfunction(add_avx512_compile_option TARGET)
 
 function(add_asan_compile_option TARGET)

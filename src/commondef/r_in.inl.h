@@ -83,3 +83,12 @@ force_inline void CHECK_MASK_AND_GET_DONE_COUNTx2(_VECx2_A_ vec, bool *out_check
 //
 #define CHECK_MASK_AND_GET_DONE_COUNTx4 PYYJSON_CONCAT2(check_mask_and_get_done_countx4, COMPILE_READ_UCS_LEVEL)
 force_inline void CHECK_MASK_AND_GET_DONE_COUNTx4(_VECx4_A_ vec, bool *out_checked, usize *out_done_count);
+//
+#define CHECK_MASK_128_SRC_T PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 128, A)
+#if SIMD_BIT_SIZE == 512
+#define CHECK_MASK_128_SRC_MASK_T __mmask16
+#else
+#define CHECK_MASK_128_SRC_MASK_T CHECK_MASK_128_SRC_T
+#endif
+#define CHECK_MASK_AND_GET_DONE_COUNT_128_WITH_MASK PYYJSON_CONCAT2(check_mask_and_get_done_count_128, COMPILE_READ_UCS_LEVEL)
+force_inline void CHECK_MASK_AND_GET_DONE_COUNT_128_WITH_MASK(CHECK_MASK_128_SRC_T vec, bool *out_checked, usize *out_done_count, CHECK_MASK_128_SRC_MASK_T* optional_mask);

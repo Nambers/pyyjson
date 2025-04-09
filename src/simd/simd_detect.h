@@ -5,7 +5,7 @@
 #if PYYJSON_DETECT_SIMD
 
 #    if PYYJSON_X86
-#        if __AVX512F__ && __AVX512BW__
+#        if __AVX512F__ && __AVX512BW__ && __AVX512VL__
 #            define SIMD_BIT_SIZE 512
 #            define SIMD_FEATURE_NAME avx512
 #        elif __AVX2__

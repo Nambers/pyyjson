@@ -13,6 +13,8 @@
 #define VECTOR_WRITE_UNICODE_IMPL PYYJSON_CONCAT4(vector_write_unicode_impl, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define VECTOR_WRITE_UNICODE_LOOPx4 PYYJSON_CONCAT4(vector_write_unicode_loopx4, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define VECTOR_WRITE_UNICODE_LOOP PYYJSON_CONCAT4(vector_write_unicode_loop, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
+#define VECTOR_WRITE_UNICODE_LOOP_TRAILING_SMALL PYYJSON_CONCAT4(vector_write_unicode_loop_trailing_small, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
+#define VECTOR_WRITE_UNICODE_TRAILING_IMPL2 PYYJSON_CONCAT4(vector_write_unicode_trailing_impl2, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define VECTOR_WRITE_UNICODE_TRAILING_IMPL PYYJSON_CONCAT4(vector_write_unicode_trailing_impl, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define VECTOR_WRITE_ESCAPE_AUTO_RESERVE PYYJSON_CONCAT4(vector_write_escape_auto_reserve, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define VECTOR_WRITE_ESCAPE_NO_RESERVE PYYJSON_CONCAT4(vector_write_escape_no_reserve, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
@@ -172,7 +174,11 @@ force_inline bool VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_s
 #endif
 
 
-force_inline bool VECTOR_WRITE_UNICODE_LOOPx4(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE **src_addr, usize *len_addr) {
+force_inline void VECTOR_WRITE_UNICODE_LOOPx4(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE **src_addr, usize *len_addr) {
+    register usize len = *len_addr;
+    register const _FROM_TYPE *src = *src_addr;
+    register _TARGET_TYPE *dst = _WRITER(unicode_buffer_info);
+    while (len >= WRITE_BATCH_COUNT * 4) {
 #if WR_DIV == 1
 #    define SRC_T _VECx4_A_
 #    define SRC_T_U _VECx4_U_
@@ -186,80 +192,217 @@ force_inline bool VECTOR_WRITE_UNICODE_LOOPx4(EncodeUnicodeBufferInfo *unicode_b
 #    define SRC_T_U _VEC_U_
 #    define CHECKER CHECK_MASK_AND_GET_DONE_COUNT
 #endif
-    register SRC_T read_vec;
-    read_vec = *(const SRC_T_U *)(*src_addr);
+        register SRC_T read_vec;
+        read_vec = *(const SRC_T_U *)src;
 
-    {
+        {
 #if WR_DIV == 1
-        static_assert(sizeof(_WVECx4_A_) == sizeof(read_vec), "");
-        *(_WVECx4_U_ *)_WRITER(unicode_buffer_info) = read_vec;
+            static_assert(sizeof(_WVECx4_A_) == sizeof(read_vec), "");
+            *(_WVECx4_U_ *)dst = read_vec;
 #else
-        register _WVECx4_A_ write_vec = VECTOR_ELEVATE4(read_vec);
-        static_assert(sizeof(read_vec) / sizeof(_FROM_TYPE) == WRITE_BATCH_COUNT * 4, "");
-        static_assert(sizeof(_WVECx4_A_) / sizeof(_TARGET_TYPE) == WRITE_BATCH_COUNT * 4, "");
-        *(_WVECx4_U_ *)_WRITER(unicode_buffer_info) = write_vec;
+            register _WVECx4_A_ write_vec = VECTOR_ELEVATE4(read_vec);
+            static_assert(sizeof(read_vec) / sizeof(_FROM_TYPE) == WRITE_BATCH_COUNT * 4, "");
+            static_assert(sizeof(_WVECx4_A_) / sizeof(_TARGET_TYPE) == WRITE_BATCH_COUNT * 4, "");
+            *(_WVECx4_U_ *)dst = write_vec;
 #endif
+        }
+        bool checked;
+        usize done_count;
+        CHECKER(read_vec, &checked, &done_count);
+        if (likely(checked)) {
+            src += WRITE_BATCH_COUNT * 4;
+            dst += WRITE_BATCH_COUNT * 4;
+            len -= WRITE_BATCH_COUNT * 4;
+        } else {
+            const _FROM_TYPE *escape_pos = (src) + done_count;
+            src += done_count + 1;
+            _FROM_TYPE escape_unicode = *escape_pos;
+            assert(escape_unicode == _Quote || escape_unicode == _Slash || escape_unicode < ControlMax);
+            dst += done_count;
+            len -= done_count + 1;
+            // RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, 8 + (len) + TAIL_PADDING / sizeof(_TARGET_TYPE)));
+            memcpy(dst, &_CONTROL_SEQ_TABLE[escape_unicode * 8], 8 * sizeof(_TARGET_TYPE));
+            dst += _ControlJump[escape_unicode];
+        }
     }
-    bool checked;
-    usize done_count;
-    CHECKER(read_vec, &checked, &done_count);
-    if (likely(checked)) {
-        *src_addr += WRITE_BATCH_COUNT * 4;
-        _WRITER(unicode_buffer_info) += WRITE_BATCH_COUNT * 4;
-        *len_addr -= WRITE_BATCH_COUNT * 4;
-    } else {
-        const _FROM_TYPE *escape_pos = (*src_addr) + done_count;
-        *src_addr += done_count + 1;
-        _FROM_TYPE escape_unicode = *escape_pos;
-        assert(escape_unicode == _Quote || escape_unicode == _Slash || escape_unicode < ControlMax);
-        _WRITER(unicode_buffer_info) += done_count;
-        *len_addr -= done_count + 1;
-        RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, 8 + (*len_addr) + TAIL_PADDING / sizeof(_TARGET_TYPE)));
-        memcpy(_WRITER(unicode_buffer_info), &_CONTROL_SEQ_TABLE[escape_unicode * 8], 8 * sizeof(_TARGET_TYPE));
-        _WRITER(unicode_buffer_info) += _ControlJump[escape_unicode];
-    }
-
-    return true;
+    *len_addr = len;
+    *src_addr = src;
+    _WRITER(unicode_buffer_info) = dst;
+    // return true;
 #undef CHECKER
 #undef SRC_T_U
 #undef SRC_T
 }
 
-force_inline bool VECTOR_WRITE_UNICODE_LOOP(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE **src_addr, usize *len_addr) {
-    _VEC_A_ SIMD_VAR;
-    SIMD_MASK_TYPE mask;
-    mask = CHECK_ESCAPE_IMPL_GET_MASK(*src_addr, &SIMD_VAR);
-    WRITE_SIMD_IMPL(_WRITER(unicode_buffer_info), SIMD_VAR);
-    if (likely(check_mask_zero(mask))) {
-        *src_addr += READ_BATCH_COUNT;
-        _WRITER(unicode_buffer_info) += READ_BATCH_COUNT;
-        *len_addr -= READ_BATCH_COUNT;
+force_inline void VECTOR_WRITE_UNICODE_LOOP(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE **src_addr, usize *len_addr) {
+    register usize len = *len_addr;
+    register const _FROM_TYPE *src = *src_addr;
+    register _TARGET_TYPE *dst = _WRITER(unicode_buffer_info);
+    while (len >= READ_BATCH_COUNT) {
+        _VEC_A_ SIMD_VAR;
+        SIMD_MASK_TYPE mask;
+        mask = CHECK_ESCAPE_IMPL_GET_MASK(src, &SIMD_VAR);
+        WRITE_SIMD_IMPL(dst, SIMD_VAR);
+        if (likely(check_mask_zero(mask))) {
+            src += READ_BATCH_COUNT;
+            dst += READ_BATCH_COUNT;
+            len -= READ_BATCH_COUNT;
+        } else {
+            u32 done_count = GET_DONE_COUNT_FROM_MASK(mask);
+            const _FROM_TYPE *escape_pos = (src) + done_count;
+            src += done_count + 1;
+            _FROM_TYPE escape_unicode = *escape_pos;
+            assert(escape_unicode == _Quote || escape_unicode == _Slash || escape_unicode < ControlMax);
+            dst += done_count;
+            len -= done_count + 1;
+            // RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, 8 + (len) + TAIL_PADDING / sizeof(_TARGET_TYPE)));
+            memcpy(dst, &_CONTROL_SEQ_TABLE[escape_unicode * 8], 8 * sizeof(_TARGET_TYPE));
+            dst += _ControlJump[escape_unicode];
+        }
+    }
+    *len_addr = len;
+    *src_addr = src;
+    _WRITER(unicode_buffer_info) = dst;
+    // return true;
+}
+
+force_inline void VECTOR_WRITE_UNICODE_LOOP_TRAILING_SMALL(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE **src_addr, usize *len_addr) {
+    register usize len = *len_addr;
+    register const _FROM_TYPE *src = *src_addr;
+    register _TARGET_TYPE *dst = _WRITER(unicode_buffer_info);
+    while (len >= 16 / sizeof(_FROM_TYPE)) {
+#define SRC_T PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 128, A)
+#define SRC_T_U PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 128, U)
+#if WR_DIV == 4
+#    define DST_T PYYJSON_CONCAT4(VECTOR, WRITE_UNSIGNED_BIT_NAME, 512, A)
+#    define DST_T_U PYYJSON_CONCAT4(VECTOR, WRITE_UNSIGNED_BIT_NAME, 512, U)
+#elif WR_DIV == 2
+#    define DST_T PYYJSON_CONCAT4(VECTOR, WRITE_UNSIGNED_BIT_NAME, 256, A)
+#    define DST_T_U PYYJSON_CONCAT4(VECTOR, WRITE_UNSIGNED_BIT_NAME, 256, U)
+#elif WR_DIV == 1
+#    define DST_T PYYJSON_CONCAT4(VECTOR, WRITE_UNSIGNED_BIT_NAME, 128, A)
+#    define DST_T_U PYYJSON_CONCAT4(VECTOR, WRITE_UNSIGNED_BIT_NAME, 128, U)
+#endif
+
+        register SRC_T read_vec;
+        read_vec = *(const SRC_T_U *)(src);
+#if WR_DIV == 1
+        *(SRC_T_U *)dst = read_vec;
+#else
+        register DST_T write_vec;
+        write_vec = VECTOR_ELEVATE_128(read_vec);
+        *(DST_T_U *)dst = write_vec;
+#endif
+
+        //
+        bool checked;
+        usize done_count;
+        CHECK_MASK_AND_GET_DONE_COUNT_128_WITH_MASK(read_vec, &checked, &done_count, NULL);
+        if (likely(checked)) {
+            src += 16 / sizeof(_FROM_TYPE);
+            dst += 16 / sizeof(_FROM_TYPE);
+            len -= 16 / sizeof(_FROM_TYPE);
+        } else {
+            const _FROM_TYPE *escape_pos = (src) + done_count;
+            src += done_count + 1;
+            _FROM_TYPE escape_unicode = *escape_pos;
+            assert(escape_unicode == _Quote || escape_unicode == _Slash || escape_unicode < ControlMax);
+            dst += done_count;
+            len -= done_count + 1;
+            // RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, 8 + (len) + TAIL_PADDING / sizeof(_TARGET_TYPE)));
+            memcpy(dst, &_CONTROL_SEQ_TABLE[escape_unicode * 8], 8 * sizeof(_TARGET_TYPE));
+            dst += _ControlJump[escape_unicode];
+        }
+    }
+    *len_addr = len;
+    *src_addr = src;
+    _WRITER(unicode_buffer_info) = dst;
+    // return true;
+#undef DST_T_U
+#undef DST_T
+#undef SRC_T_U
+#undef SRC_T
+}
+
+force_inline bool VECTOR_WRITE_UNICODE_TRAILING_IMPL2(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE **src_addr, usize *len_addr) {
+#define SRC_T PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 128, A)
+#define SRC_T_U PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 128, U)
+#if WR_DIV == 4
+#    define DST_T PYYJSON_CONCAT4(VECTOR, WRITE_UNSIGNED_BIT_NAME, 512, A)
+#    define DST_T_U PYYJSON_CONCAT4(VECTOR, WRITE_UNSIGNED_BIT_NAME, 512, U)
+#elif WR_DIV == 2
+#    define DST_T PYYJSON_CONCAT4(VECTOR, WRITE_UNSIGNED_BIT_NAME, 256, A)
+#    define DST_T_U PYYJSON_CONCAT4(VECTOR, WRITE_UNSIGNED_BIT_NAME, 256, U)
+#elif WR_DIV == 1
+#    define DST_T PYYJSON_CONCAT4(VECTOR, WRITE_UNSIGNED_BIT_NAME, 128, A)
+#    define DST_T_U PYYJSON_CONCAT4(VECTOR, WRITE_UNSIGNED_BIT_NAME, 128, U)
+#endif
+    const _FROM_TYPE *const end = (*src_addr) + (*len_addr);
+    const SRC_T_U *const read_ptr = PYYJSON_CAST(const SRC_T_U *, end - 16 / sizeof(_FROM_TYPE));
+    //
+    register SRC_T read_vec;
+    read_vec = *read_ptr;
+    read_vec = runtime_right_shift_128bits(read_vec, 16 - (*len_addr) * sizeof(_FROM_TYPE));
+    CHECK_MASK_128_SRC_MASK_T mask;
+restart:;
+#if SIMD_BIT_SIZE == 512
+    mask = (1 << (*len_addr)) - 1;
+#else
+    mask = load_128_aligned(read_head_mask_table_8((*len_addr) * sizeof(_FROM_TYPE)));
+#endif
+#if WR_DIV == 1
+    *(SRC_T_U *)_WRITER(unicode_buffer_info) = read_vec;
+#else
+    register DST_T write_vec;
+    write_vec = VECTOR_ELEVATE_128(read_vec);
+    *(DST_T_U *)_WRITER(unicode_buffer_info) = write_vec;
+#endif
+
+    //
+    bool checked;
+    usize done_count;
+    CHECK_MASK_AND_GET_DONE_COUNT_128_WITH_MASK(read_vec, &checked, &done_count, &mask);
+    if (likely(checked)) {
+        _WRITER(unicode_buffer_info) += *len_addr;
+        return true;
     } else {
-        u32 done_count = GET_DONE_COUNT_FROM_MASK(mask);
-        const _FROM_TYPE *escape_pos = (*src_addr) + done_count;
-        *src_addr += done_count + 1;
-        _FROM_TYPE escape_unicode = *escape_pos;
-        assert(escape_unicode == _Quote || escape_unicode == _Slash || escape_unicode < ControlMax);
+        assert(done_count + 1 <= *len_addr);
+        _FROM_TYPE escape_unicode = *((*src_addr) + done_count);
         _WRITER(unicode_buffer_info) += done_count;
-        *len_addr -= done_count + 1;
-        RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, 8 + (*len_addr) + TAIL_PADDING / sizeof(_TARGET_TYPE)));
         memcpy(_WRITER(unicode_buffer_info), &_CONTROL_SEQ_TABLE[escape_unicode * 8], 8 * sizeof(_TARGET_TYPE));
         _WRITER(unicode_buffer_info) += _ControlJump[escape_unicode];
+        if (done_count < (*len_addr) - 1) {
+            read_vec = runtime_right_shift_128bits(read_vec, (done_count + 1) * sizeof(_FROM_TYPE));
+            (*len_addr) -= done_count + 1;
+            (*src_addr) += done_count + 1;
+            goto restart;
+        }
+        return true;
     }
-    return true;
+#undef DST_T_U
+#undef DST_T
+#undef SRC_T_U
+#undef SRC_T
 }
 
 force_inline bool VECTOR_WRITE_UNICODE_IMPL(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE *src, Py_ssize_t _len) {
     usize len = (usize)_len;
-    bool _c;
-    while (len >= WRITE_BATCH_COUNT * 4) {
-        RETURN_ON_UNLIKELY_ERR(!VECTOR_WRITE_UNICODE_LOOPx4(unicode_buffer_info, &src, &len));
-    }
-    while (len >= READ_BATCH_COUNT) {
-        RETURN_ON_UNLIKELY_ERR(!VECTOR_WRITE_UNICODE_LOOP(unicode_buffer_info, &src, &len));
-    }
+    RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, 6 * len + 2 + 16 / sizeof(_FROM_TYPE)));
+    // while (len >= WRITE_BATCH_COUNT * 4) {
+    VECTOR_WRITE_UNICODE_LOOPx4(unicode_buffer_info, &src, &len);
+    // RETURN_ON_UNLIKELY_ERR(!VECTOR_WRITE_UNICODE_LOOPx4(unicode_buffer_info, &src, &len));
+    // }
+    // while (len >= READ_BATCH_COUNT) {
+    VECTOR_WRITE_UNICODE_LOOP(unicode_buffer_info, &src, &len);
+    // RETURN_ON_UNLIKELY_ERR(!VECTOR_WRITE_UNICODE_LOOP(unicode_buffer_info, &src, &len));
+    // }
+    // while (len >= 16 / sizeof(_FROM_TYPE)) {
+    // VECTOR_WRITE_UNICODE_LOOP_TRAILING_SMALL(unicode_buffer_info, &src, &len);
+    // }
     if (!len) goto done;
-    RETURN_ON_UNLIKELY_ERR(!VECTOR_WRITE_UNICODE_TRAILING_IMPL(src, len, unicode_buffer_info));
+    // VECTOR_WRITE_UNICODE_TRAILING_IMPL2(unicode_buffer_info, &src, &len);
+    VECTOR_WRITE_UNICODE_TRAILING_IMPL(src, len, unicode_buffer_info);
+    // RETURN_ON_UNLIKELY_ERR(!VECTOR_WRITE_UNICODE_TRAILING_IMPL(src, len, unicode_buffer_info));
 done:;
     assert(vec_in_boundary(unicode_buffer_info));
     return true;
@@ -320,6 +463,8 @@ force_inline bool PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, COMPILE_R
 #undef VECTOR_WRITE_ESCAPE_NO_RESERVE
 #undef VECTOR_WRITE_ESCAPE_AUTO_RESERVE
 #undef VECTOR_WRITE_UNICODE_TRAILING_IMPL
+#undef VECTOR_WRITE_UNICODE_TRAILING_IMPL2
+#undef VECTOR_WRITE_UNICODE_LOOP_TRAILING_SMALL
 #undef VECTOR_WRITE_UNICODE_LOOP
 #undef VECTOR_WRITE_UNICODE_LOOPx4
 #undef VECTOR_WRITE_UNICODE_IMPL

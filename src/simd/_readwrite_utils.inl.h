@@ -177,6 +177,31 @@ force_inline _WVECx4_A_ VECTOR_ELEVATE4(_VECx2_A_ src_vec) {
 #    endif
     return ret.v4;
 }
+
+force_inline ELEVATE_128_DST_T VECTOR_ELEVATE_128(ELEVATE_128_SRC_T src_vec) {
+#    if PYYJSON_X86 && SIMD_BIT_SIZE >= 256
+#        define ELEVATOR PYYJSON_CONCAT5(elevate, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL, to, 256)
+    return ELEVATOR(src_vec);
+#        undef ELEVATOR
+#    elif PYYJSON_X86
+#        define ELEVATOR PYYJSON_CONCAT5(elevate, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL, to, 128)
+
+    register union {
+        ELEVATE_128_DST_T v2;
+        SIMD_128 v1[2];
+    } ret;
+
+    SIMD_128 x1 = src_vec;
+    SIMD_128 x2 = unpack_hi_64_128(src_vec, src_vec);
+    ret.v1[0] = ELEVATOR(x1);
+    ret.v1[1] = ELEVATOR(x2);
+    return ret.v2;
+#        undef ELEVATOR
+#    elif PYYJSON_AARCH
+    // TODO
+#    endif
+}
+
 #elif WR_DIV == 4
 force_inline _WVECx4_A_ VECTOR_ELEVATE4(_VEC_A_ src_vec) {
     register union {
@@ -220,6 +245,26 @@ force_inline _WVECx4_A_ VECTOR_ELEVATE4(_VEC_A_ src_vec) {
 
 #    endif
     return ret.v4;
+}
+
+force_inline ELEVATE_128_DST_T VECTOR_ELEVATE_128(ELEVATE_128_SRC_T src_vec) {
+#    if PYYJSON_X86 && SIMD_BIT_SIZE == 512
+    return elevate_1_4_to_512(src_vec);
+#    elif PYYJSON_X86 && SIMD_BIT_SIZE == 256
+    register union {
+        VECTOR_U32_512_A v4;
+        VECTOR_U32_256_A v2[2];
+    } ret;
+
+    ret.v2[0] = elevate_1_4_to_256(src_vec);
+    ret.v2[1] = elevate_1_4_to_256(unpack_hi_64_128(src_vec, src_vec));
+    return ret.v4;
+
+#    elif PYYJSON_X86
+    return VECTOR_ELEVATE4(src_vec);
+#    elif PYYJSON_AARCH
+
+#    endif
 }
 #endif
 

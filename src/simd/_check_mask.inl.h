@@ -152,6 +152,61 @@ force_inline void CHECK_MASK_AND_GET_DONE_COUNTx4(_VECx4_A_ vec4, bool *out_chec
     return;
 }
 
+force_inline void CHECK_MASK_AND_GET_DONE_COUNT_128_WITH_MASK(CHECK_MASK_128_SRC_T v, bool *out_checked, usize *out_done_count, CHECK_MASK_128_SRC_MASK_T *optional_mask) {
+#define SET_ALL_128 PYYJSON_CONCAT3(broadcast, READ_BIT_SIZE, 128)
+    CHECK_MASK_128_SRC_T t1, t2, t3;
+    t1 = SET_ALL_128(_Quote);
+    t2 = SET_ALL_128(_Slash);
+    t3 = SET_ALL_128(ControlMax);
+
+#if PYYJSON_X86 && SIMD_BIT_SIZE == 512
+    __mmask16 bit_mask;
+#    define CMPEQ PYYJSON_SIMPLE_CONCAT3(_mm_cmpeq_epi, READ_BIT_SIZE, _mask)
+#    define CMPLT PYYJSON_SIMPLE_CONCAT3(_mm_cmplt_epu, READ_BIT_SIZE, _mask)
+    __mmask16 m1 = (__mmask16)CMPEQ(v, t1);
+    __mmask16 m2 = (__mmask16)CMPEQ(v, t2);
+    __mmask16 m3 = (__mmask16)CMPLT(v, t3);
+    bit_mask = (m1 | m2 | m3);
+    if (optional_mask) {
+        bit_mask = bit_mask & (*optional_mask);
+    }
+    *out_checked = !bit_mask;
+    if (unlikely(bit_mask)) {
+        u32 done_count = u32_tz_bits((u32)bit_mask);
+        *out_done_count = (usize)done_count;
+    }
+#    undef CMPEQ
+#    undef CMPLT
+#else
+    CHECK_MASK_128_SRC_T m1 = (CHECK_MASK_128_SRC_T)(v == t1);
+    CHECK_MASK_128_SRC_T m2 = (CHECK_MASK_128_SRC_T)(v == t2);
+    CHECK_MASK_128_SRC_T m3 = (CHECK_MASK_128_SRC_T)(v < t3);
+    CHECK_MASK_128_SRC_T mask = (CHECK_MASK_128_SRC_T)(m1 | m2 | m3);
+    if (optional_mask) {
+        mask = mask & (*optional_mask);
+    }
+    bool checked = testz_128(mask, mask);
+    *out_checked = checked;
+    if (unlikely(!checked)) {
+        u16 bit_mask;
+#    if COMPILE_READ_UCS_LEVEL != 4
+        // for bit size < 512, we don't have cmp_epu8,
+        // the mask is calculated by subs_epu for ucs < 4
+        // so we have to cmpeq with zero to get the real bit mask.
+        mask = cmpeq0_8_128(mask);
+        bit_mask = to_bitmask_128(mask);
+        bit_mask = ~bit_mask;
+#    else
+        // ucs4 does not have subs_epu, so we don't need cmpeq0.
+        // The mask itself is ready for use
+        bit_mask = to_bitmask_128(mask);
+#    endif // COMPILE_READ_UCS_LEVEL
+        u32 done_count = u32_tz_bits((u32)bit_mask) / sizeof(_FROM_TYPE);
+        *out_done_count = (usize)done_count;
+    }
+#endif
+#undef SET_ALL_128
+}
 
 #if PYYJSON_X86 && SIMD_BIT_SIZE == 512
 force_inline SIMD_MASK_TYPE CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(SIMD_512 z, u64 rw_mask) {
