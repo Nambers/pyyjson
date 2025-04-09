@@ -397,11 +397,11 @@ force_inline bool VECTOR_WRITE_UNICODE_IMPL(EncodeUnicodeBufferInfo *unicode_buf
     // RETURN_ON_UNLIKELY_ERR(!VECTOR_WRITE_UNICODE_LOOP(unicode_buffer_info, &src, &len));
     // }
     // while (len >= 16 / sizeof(_FROM_TYPE)) {
-    VECTOR_WRITE_UNICODE_LOOP_TRAILING_SMALL(unicode_buffer_info, &src, &len);
+    // VECTOR_WRITE_UNICODE_LOOP_TRAILING_SMALL(unicode_buffer_info, &src, &len);
     // }
     if (!len) goto done;
-    VECTOR_WRITE_UNICODE_TRAILING_IMPL2(unicode_buffer_info, &src, &len);
-    // VECTOR_WRITE_UNICODE_TRAILING_IMPL(src, len, unicode_buffer_info);
+    // VECTOR_WRITE_UNICODE_TRAILING_IMPL2(unicode_buffer_info, &src, &len);
+    VECTOR_WRITE_UNICODE_TRAILING_IMPL(src, len, unicode_buffer_info);
     // RETURN_ON_UNLIKELY_ERR(!VECTOR_WRITE_UNICODE_TRAILING_IMPL(src, len, unicode_buffer_info));
 done:;
     assert(vec_in_boundary(unicode_buffer_info));
