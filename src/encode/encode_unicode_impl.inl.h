@@ -422,10 +422,10 @@ done:;
 force_inline bool PYYJSON_CONCAT4(vec_write_key, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)(PyObject *key, Py_ssize_t len, EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t cur_nested_depth) {
     static_assert(COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL, "COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL");
     assert(PyUnicode_GET_LENGTH(key) == len);
-    RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 4 + len + TAIL_PADDING));
+    RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 5 + 6 * len + TAIL_PADDING));
     VECTOR_WRITE_INDENT(&_WRITER(unicode_buffer_info), cur_nested_depth);
     *_WRITER(unicode_buffer_info)++ = '"';
-    RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, 6 * len + 3 + TAIL_PADDING));
+    // RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, 6 * len + 3 + TAIL_PADDING));
     VECTOR_WRITE_UNICODE_IMPL(unicode_buffer_info, (_FROM_TYPE *)get_unicode_data(key), len);
     // RETURN_ON_UNLIKELY_ERR(!);
     // RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, 3 + TAIL_PADDING));
@@ -447,13 +447,13 @@ force_inline bool PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, COMPILE_R
     static_assert(COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL, "COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL");
     assert(PyUnicode_GET_LENGTH(str) == len);
     if (is_in_obj) {
-        RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, 3 + len + TAIL_PADDING));
+        RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, 3 + 6 * len + TAIL_PADDING));
     } else {
-        RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 3 + len + TAIL_PADDING));
+        RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 3 + 6 * len + TAIL_PADDING));
         VECTOR_WRITE_INDENT(&_WRITER(unicode_buffer_info), cur_nested_depth);
     }
     *_WRITER(unicode_buffer_info)++ = '"';
-    RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, 6 * len + 2 + TAIL_PADDING));
+    // RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, 6 * len + 2 + TAIL_PADDING));
     VECTOR_WRITE_UNICODE_IMPL(unicode_buffer_info, (_FROM_TYPE *)get_unicode_data(str), len);
     // RETURN_ON_UNLIKELY_ERR(!);
     // RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, 2 + TAIL_PADDING));
