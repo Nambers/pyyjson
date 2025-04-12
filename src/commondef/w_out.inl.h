@@ -1,3 +1,5 @@
+#undef VEC_WRITE_F64
+#undef VEC_WRITE_U64
 #undef VEC_RESERVE
 #undef _WVECx4_U_
 #undef _WVECx2_U_

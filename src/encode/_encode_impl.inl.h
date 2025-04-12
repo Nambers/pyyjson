@@ -17,9 +17,6 @@
 #include "commondef/iw_in.inl.h"
 #include "unicode/indent_wrap.h"
 
-#define VEC_WRITE_U64 PYYJSON_CONCAT2(vec_write_u64, COMPILE_WRITE_UCS_LEVEL)
-#define VEC_WRITE_F64 PYYJSON_CONCAT2(vec_write_f64, COMPILE_WRITE_UCS_LEVEL)
-
 
 #define WRITE_INDENT_RETURN_IF_FAIL(_unicode_buffer_info_, _cur_nested_depth_, _is_in_obj_, _additional_reserve_count_)                 \
     do {                                                                                                                                \
@@ -229,7 +226,7 @@ force_inline bool VECTOR_APPEND_LONG(EncodeUnicodeBufferInfo *unicode_buffer_inf
             v = -v2;
             sign = 1;
         }
-        VEC_WRITE_U64(unicode_buffer_info, v, sign);
+        VEC_WRITE_U64(&_WRITER(unicode_buffer_info), v, sign);
         *_WRITER(unicode_buffer_info)++ = ',';
     }
     assert(vec_in_boundary(unicode_buffer_info));
@@ -346,7 +343,7 @@ force_inline bool VECTOR_APPEND_FLOAT(EncodeUnicodeBufferInfo *unicode_buffer_in
     WRITE_INDENT_RETURN_IF_FAIL(unicode_buffer_info, cur_nested_depth, is_in_obj, TAIL_PADDING);
     double v = PyFloat_AS_DOUBLE(val);
     u64 *raw = (u64 *)&v;
-    VEC_WRITE_F64(unicode_buffer_info, *raw);
+    VEC_WRITE_F64(&_WRITER(unicode_buffer_info), *raw);
     *_WRITER(unicode_buffer_info)++ = ',';
     return true;
 }
@@ -902,7 +899,5 @@ fail_keytype:;
 #undef _PREPARE_UNICODE_WRITE
 #undef VEC_BACK1
 #undef WRITE_INDENT_RETURN_IF_FAIL
-#undef VEC_WRITE_F64
-#undef VEC_WRITE_U64
 #undef COMPILE_WRITE_UCS_LEVEL
 #undef COMPILE_READ_UCS_LEVEL
