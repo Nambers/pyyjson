@@ -290,17 +290,17 @@ force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {
     switch (unicode_kind) {
         // pass `is_in_obj = true` to avoid unwanted indent check
         case 1: {
-            success = vec_write_str_0_1_1(unicode, len, &_unicode_buffer_info, true, 0);
+            success = unicode_buffer_append_str_internal_0_1_1(unicode, len, &_unicode_buffer_info, true, 0);
             _unicode_buffer_info.writer.writer_u8--;
             break;
         }
         case 2: {
-            success = vec_write_str_0_2_2(unicode, len, &_unicode_buffer_info, true, 0);
+            success = unicode_buffer_append_str_internal_0_2_2(unicode, len, &_unicode_buffer_info, true, 0);
             _unicode_buffer_info.writer.writer_u16--;
             break;
         }
         case 4: {
-            success = vec_write_str_0_4_4(unicode, len, &_unicode_buffer_info, true, 0);
+            success = unicode_buffer_append_str_internal_0_4_4(unicode, len, &_unicode_buffer_info, true, 0);
             _unicode_buffer_info.writer.writer_u32--;
             break;
         }

@@ -58,7 +58,7 @@ force_inline void _ELEVATE_FROM_U8_NUM_BUFFER(_TARGET_TYPE **writer_addr, u8 *bu
  * Write a u64 number to the vector.
  * The space (32 * sizeof(_TARGET_TYPE)) must be reserved before calling this function.
  */
-force_inline void VEC_WRITE_U64(_TARGET_TYPE **writer_addr, u64 val, usize sign) {
+force_inline void WRITE_UNICODE_U64(_TARGET_TYPE **writer_addr, u64 val, usize sign) {
     assert(sign <= 1);
 #if COMPILE_WRITE_UCS_LEVEL == 1
     u8 *buffer = *writer_addr; //_WRITER(unicode_buffer_info);
@@ -82,7 +82,7 @@ force_inline void VEC_WRITE_U64(_TARGET_TYPE **writer_addr, u64 val, usize sign)
  * Write a f64 number to the vector.
  * The space (32 * sizeof(_TARGET_TYPE)) must be reserved before calling this function.
  */
-force_inline void VEC_WRITE_F64(_TARGET_TYPE **writer_addr, u64 val_u64_repr) {
+force_inline void WRITE_UNICODE_F64(_TARGET_TYPE **writer_addr, u64 val_u64_repr) {
 #if COMPILE_WRITE_UCS_LEVEL == 1
     u8 *buffer = *writer_addr; //_WRITER(unicode_buffer_info);
 #else

@@ -54,5 +54,5 @@
 
 force_inline bool VEC_RESERVE(EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t size);
 
-#define VEC_WRITE_U64 PYYJSON_CONCAT2(vec_write_u64, COMPILE_WRITE_UCS_LEVEL)
-#define VEC_WRITE_F64 PYYJSON_CONCAT2(vec_write_f64, COMPILE_WRITE_UCS_LEVEL)
+#define WRITE_UNICODE_U64 PYYJSON_CONCAT2(vec_write_u64, COMPILE_WRITE_UCS_LEVEL)
+#define WRITE_UNICODE_F64 PYYJSON_CONCAT2(vec_write_f64, COMPILE_WRITE_UCS_LEVEL)
