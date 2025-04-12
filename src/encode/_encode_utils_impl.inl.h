@@ -6,7 +6,7 @@
 #endif
 
 #include "commondef/w_in.inl.h"
-#include "unicode/include/reserve.h"
+// #include "unicode/include/reserve.h"
 
 #define _ELEVATE_FROM_U8_NUM_BUFFER PYYJSON_CONCAT2(_elevate_u8_copy, COMPILE_WRITE_UCS_LEVEL)
 #define VEC_WRITE_U64 PYYJSON_CONCAT2(vec_write_u64, COMPILE_WRITE_UCS_LEVEL)

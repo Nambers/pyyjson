@@ -1,3 +1,4 @@
+#undef VEC_RESERVE
 #undef _WVECx4_U_
 #undef _WVECx2_U_
 #undef _WVECx4_A_

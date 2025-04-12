@@ -14,8 +14,8 @@
 #    define COMPILE_WRITE_UCS_LEVEL COMPILE_UCS_LEVEL
 #endif
 
-#include "commondef/w_in.inl.h"
-#include "unicode/include/indent.h"
+#include "commondef/iw_in.inl.h"
+#include "unicode/indent_wrap.h"
 
 #define VEC_WRITE_U64 PYYJSON_CONCAT2(vec_write_u64, COMPILE_WRITE_UCS_LEVEL)
 #define VEC_WRITE_F64 PYYJSON_CONCAT2(vec_write_f64, COMPILE_WRITE_UCS_LEVEL)
@@ -881,7 +881,7 @@ fail_keytype:;
     goto fail;
 }
 
-#include "commondef/w_out.inl.h"
+#include "commondef/iw_out.inl.h"
 
 #undef PYYJSON_DUMPS_OBJ
 #undef ENCODE_PROCESS_VAL

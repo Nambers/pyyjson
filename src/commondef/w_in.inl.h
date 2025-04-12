@@ -1,4 +1,6 @@
 #include "w_out.inl.h"
+#include "unicode/uvector.h"
+
 /*
  * Macros IN
  */
@@ -44,3 +46,10 @@
 #    define _WVECx2_U_ PYYJSON_CONCAT4(VECTOR, WRITE_UNSIGNED_BIT_NAME, 256, U)
 #    define _WVECx4_U_ PYYJSON_CONCAT4(VECTOR, WRITE_UNSIGNED_BIT_NAME, 512, U)
 #endif
+
+/*
+ * Reserve space for the vector.
+ */
+#define VEC_RESERVE PYYJSON_CONCAT2(vec_reserve, COMPILE_WRITE_UCS_LEVEL)
+
+force_inline bool VEC_RESERVE(EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t size);

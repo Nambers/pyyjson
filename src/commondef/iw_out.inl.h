@@ -1,0 +1,2 @@
+#undef INDENT_WRITER
+#undef VECTOR_WRITE_INDENT

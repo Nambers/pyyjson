@@ -1,9 +1,9 @@
-#include "commondef/i_in.inl.h"
+#include "commondef/iw_in.inl.h"
 #include "commondef/rw_in.inl.h"
 #include "simd/simd_detect.h"
 #include "simd/simd_impl.h"
-#include "unicode/include/indent.h"
-#include "unicode/include/reserve.h"
+// #include "unicode/include/reserve.h"
+#include "unicode/indent_wrap.h"
 
 // encode_simd_utils.inl
 #define GET_DONE_COUNT_FROM_MASK PYYJSON_CONCAT2(get_done_count_from_mask, COMPILE_READ_UCS_LEVEL)
@@ -465,7 +465,7 @@ force_inline bool PYYJSON_CONCAT4(vec_write_str, COMPILE_INDENT_LEVEL, COMPILE_R
     return true;
 }
 
-#include "commondef/i_out.inl.h"
+#include "commondef/iw_out.inl.h"
 #include "commondef/rw_out.inl.h"
 
 #undef MASK_ELEVATE_WRITE_512

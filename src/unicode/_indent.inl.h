@@ -1,6 +1,6 @@
-#include "commondef/w_in.inl.h"
-#include "include/indent.h"
-#include "include/reserve.h"
+#include "unicode/reserve_wrap.h"
+#include "commondef/iw_in.inl.h"
+
 
 force_inline void VECTOR_WRITE_INDENT(_TARGET_TYPE **writer_addr, Py_ssize_t _cur_nested_depth) {
 #if COMPILE_INDENT_LEVEL > 0
@@ -29,4 +29,4 @@ force_inline bool INDENT_WRITER(EncodeUnicodeBufferInfo *unicode_buffer_info, Py
     return true;
 }
 
-#include "commondef/w_out.inl.h"
+#include "commondef/iw_out.inl.h"

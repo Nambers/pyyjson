@@ -6,6 +6,15 @@
 #include "tls.h"
 #include "unicode/uvector.h"
 
+/* Implmentations of some inline functions used in current scope */
+#include "unicode/reserve_wrap.h"
+#include "unicode/indent_wrap.h"
+
+#include "simd/check_mask_wrap.h"
+
+#include "simd/readwrite_utils_wrap.h"
+#include "simd/write_utils_wrap.h"
+
 typedef enum EncodeValJumpFlag {
     JumpFlag_Default,
     JumpFlag_ArrValBegin,
@@ -508,12 +517,3 @@ success:;
 fail:;
     return NULL;
 }
-
-/* Implmentations of some inline functions used in current scope */
-#include "unicode/_include_helper/indent_wrap.h"
-#include "unicode/_include_helper/reserve_wrap.h"
-
-#include "simd/check_mask_wrap.h"
-
-#include "simd/readwrite_utils_wrap.h"
-#include "simd/write_utils_wrap.h"
