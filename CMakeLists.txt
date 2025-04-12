@@ -163,7 +163,7 @@ set(SRC_FILES
 
 set(SRC_WITH_SIMD
     src/decode/decode.c
-    src/encode/encode_impl.c
+    src/encode/encode.c
     src/simd/cvt.c
 )
 
