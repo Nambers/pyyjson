@@ -1,8 +1,7 @@
+#include "commondef/rw_in.inl.h"
 #include "simd/mask_table.h"
 #include "simd/simd_detect.h"
-
-#include "commondef/r_in.inl.h"
-#include "commondef/w_in.inl.h"
+#include "simd/simd_impl.h"
 
 
 // write only or read-write
@@ -169,8 +168,7 @@ force_inline void MASK_ELEVATE_WRITE_512(_TARGET_TYPE *dst, SIMD_512 z, Py_ssize
 }
 #endif // SIMD_BIT_SIZE == 512 && COMPILE_READ_UCS_LEVEL != COMPILE_WRITE_UCS_LEVEL
 
-#include "commondef/r_out.inl.h"
-#include "commondef/w_out.inl.h"
+#include "commondef/rw_out.inl.h"
 
 #undef MASK_ELEVATE_WRITE_512
 #undef BACK_WRITE_SIMD256_WITH_TAIL_LEN

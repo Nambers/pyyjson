@@ -228,7 +228,7 @@ force_inline PyFastTypes fast_type_check(PyObject *val) {
  * Some utility functions only related to *write*, like vector reserve, writing number
  * need macro: COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4.
  */
-#include "encode_utils_impl_wrap.inl.h"
+#include "encode_utils_impl_wrap.h"
 
 /* 
  * Some utility functions related to SIMD, like getting escape mask,
@@ -237,7 +237,7 @@ force_inline PyFastTypes fast_type_check(PyObject *val) {
  *      COMPILE_READ_UCS_LEVEL, value: 1, 2, or 4.
  *      COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4.
  */
-#include "encode_simd_utils_wrap.inl.h"
+#include "encode_simd_utils_wrap.h"
 
 /* 
  * Some functions for writing the unicode vector, like writing key, writing value str.
@@ -245,7 +245,7 @@ force_inline PyFastTypes fast_type_check(PyObject *val) {
  *      COMPILE_READ_UCS_LEVEL, value: 1, 2, or 4.
  *      COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4.
  */
-#include "encode_unicode_impl_wrap.inl.h"
+#include "encode_unicode_impl_wrap.h"
 
 /* 
  * Top-level encode functions for encoding container types: dict, list and tuple.
@@ -256,7 +256,7 @@ force_inline PyFastTypes fast_type_check(PyObject *val) {
  *          for more details.
  *      COMPILE_INDENT_LEVEL, value: 0, 2, or 4.
  */
-#include "encode_impl_wrap.inl.h"
+#include "encode_impl_wrap.h"
 
 /* Encodes non-container types. */
 force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {

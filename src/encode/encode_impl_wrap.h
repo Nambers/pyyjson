@@ -1,20 +1,23 @@
-/* -------- */
+#ifndef ENCODE_IMPL_WRAP_H
+#define ENCODE_IMPL_WRAP_H
+
+
 #define COMPILE_INDENT_LEVEL 0
 
 #define COMPILE_UCS_LEVEL 4
-#include "encode_impl.inl.h"
+#include "_encode_impl.inl.h"
 #undef COMPILE_UCS_LEVEL
 
 #define COMPILE_UCS_LEVEL 2
-#include "encode_impl.inl.h"
+#include "_encode_impl.inl.h"
 #undef COMPILE_UCS_LEVEL
 
 #define COMPILE_UCS_LEVEL 1
-#include "encode_impl.inl.h"
+#include "_encode_impl.inl.h"
 #undef COMPILE_UCS_LEVEL
 
 #define COMPILE_UCS_LEVEL 0
-#include "encode_impl.inl.h"
+#include "_encode_impl.inl.h"
 #undef COMPILE_UCS_LEVEL
 
 #undef COMPILE_INDENT_LEVEL
@@ -22,19 +25,19 @@
 #define COMPILE_INDENT_LEVEL 2
 
 #define COMPILE_UCS_LEVEL 4
-#include "encode_impl.inl.h"
+#include "_encode_impl.inl.h"
 #undef COMPILE_UCS_LEVEL
 
 #define COMPILE_UCS_LEVEL 2
-#include "encode_impl.inl.h"
+#include "_encode_impl.inl.h"
 #undef COMPILE_UCS_LEVEL
 
 #define COMPILE_UCS_LEVEL 1
-#include "encode_impl.inl.h"
+#include "_encode_impl.inl.h"
 #undef COMPILE_UCS_LEVEL
 
 #define COMPILE_UCS_LEVEL 0
-#include "encode_impl.inl.h"
+#include "_encode_impl.inl.h"
 #undef COMPILE_UCS_LEVEL
 
 #undef COMPILE_INDENT_LEVEL
@@ -42,19 +45,22 @@
 #define COMPILE_INDENT_LEVEL 4
 
 #define COMPILE_UCS_LEVEL 4
-#include "encode_impl.inl.h"
+#include "_encode_impl.inl.h"
 #undef COMPILE_UCS_LEVEL
 
 #define COMPILE_UCS_LEVEL 2
-#include "encode_impl.inl.h"
+#include "_encode_impl.inl.h"
 #undef COMPILE_UCS_LEVEL
 
 #define COMPILE_UCS_LEVEL 1
-#include "encode_impl.inl.h"
+#include "_encode_impl.inl.h"
 #undef COMPILE_UCS_LEVEL
 
 #define COMPILE_UCS_LEVEL 0
-#include "encode_impl.inl.h"
+#include "_encode_impl.inl.h"
 #undef COMPILE_UCS_LEVEL
 
 #undef COMPILE_INDENT_LEVEL
+
+
+#endif // ENCODE_IMPL_WRAP_H
