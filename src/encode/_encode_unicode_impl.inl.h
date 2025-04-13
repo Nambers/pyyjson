@@ -411,7 +411,7 @@ force_inline bool PYYJSON_CONCAT4(unicode_buffer_append_key_internal, COMPILE_IN
     static_assert(COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL, "COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL");
     assert(PyUnicode_GET_LENGTH(key) == len);
     RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 5 + 6 * len + TAIL_PADDING));
-    VECTOR_WRITE_INDENT(&_WRITER(unicode_buffer_info), cur_nested_depth);
+    WRITE_UNICODE_INDENT(&_WRITER(unicode_buffer_info), cur_nested_depth);
     *_WRITER(unicode_buffer_info)++ = '"';
     VECTOR_WRITE_UNICODE_IMPL(unicode_buffer_info, (_FROM_TYPE *)get_unicode_data(key), len);
     _TARGET_TYPE *writer = _WRITER(unicode_buffer_info);
@@ -435,7 +435,7 @@ force_inline bool PYYJSON_CONCAT4(unicode_buffer_append_str_internal, COMPILE_IN
         RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, 3 + 6 * len + TAIL_PADDING));
     } else {
         RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 3 + 6 * len + TAIL_PADDING));
-        VECTOR_WRITE_INDENT(&_WRITER(unicode_buffer_info), cur_nested_depth);
+        WRITE_UNICODE_INDENT(&_WRITER(unicode_buffer_info), cur_nested_depth);
     }
     *_WRITER(unicode_buffer_info)++ = '"';
     VECTOR_WRITE_UNICODE_IMPL(unicode_buffer_info, (_FROM_TYPE *)get_unicode_data(str), len);

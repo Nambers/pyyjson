@@ -5,8 +5,8 @@
 /*
  * Write indents to unicode vector. Need to reserve space before calling this function.
  */
-#define VECTOR_WRITE_INDENT PYYJSON_CONCAT3(vector_write_indent, COMPILE_INDENT_LEVEL, COMPILE_WRITE_UCS_LEVEL)
-force_inline void VECTOR_WRITE_INDENT(_TARGET_TYPE **writer, Py_ssize_t _cur_nested_depth);
+#define WRITE_UNICODE_INDENT PYYJSON_CONCAT3(write_unicode_indent, COMPILE_INDENT_LEVEL, COMPILE_WRITE_UCS_LEVEL)
+force_inline void WRITE_UNICODE_INDENT(_TARGET_TYPE **writer, Py_ssize_t _cur_nested_depth);
 
 /*
    * Write indents to unicode vector. Will reserve space if needed.

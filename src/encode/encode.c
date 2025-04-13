@@ -7,8 +7,8 @@
 #include "unicode/uvector.h"
 
 /* Implmentations of some inline functions used in current scope */
-#include "unicode/reserve_wrap.h"
 #include "unicode/indent_wrap.h"
+#include "unicode/reserve_wrap.h"
 
 #include "simd/check_mask_wrap.h"
 
