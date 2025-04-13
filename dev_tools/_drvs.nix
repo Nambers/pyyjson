@@ -62,12 +62,10 @@ let
   pyenvs_map = py: (py.withPackages required_python_packages);
   pyenvs = builtins.map pyenvs_map using_pythons;
   sde = pkgs.callPackage ./sde.nix { };
-  llvmDbg = pkgs.enableDebugging pkgs.llvmPackages.libllvm;
 in
 {
   inherit pyenvs; # list
   inherit using_pythons; # list
-  inherit llvmDbg;
   inherit (pkgs)
     bloaty
     clang
