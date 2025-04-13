@@ -14,9 +14,12 @@ jobs:
     - name: Maximize build space
       uses: easimon/maximize-build-space@master
       with:
-        root-reserve-mb: 512
-        swap-size-mb: 1024
+        build-mount-path: '/nix'
         remove-dotnet: 'true'
+        remove-android: 'true'
+        remove-haskell: 'true'
+        remove-codeql: 'true'
+        remove-docker-images: 'true'
     - name: Checkout
       uses: actions/checkout@main
       with:
@@ -25,6 +28,19 @@ jobs:
       uses: cachix/install-nix-action@master
       with:
         github_access_token: '${{ secrets.ACTION_GITHUB_TOKEN }}'
+    - name: Set nix daemon tmp path
+      run: |
+        sudo mkdir --parents /nix/tmp
+        sudo chmod 777 /nix/tmp
+
+        cat > override.conf <<EOF
+        [Service]
+        Environment="TMPDIR=/nix/tmp"
+        EOF
+        sudo mkdir /etc/systemd/system/nix-daemon.service.d/
+        sudo mv override.conf /etc/systemd/system/nix-daemon.service.d/override.conf
+        sudo systemctl daemon-reload
+        sudo systemctl restart nix-daemon
     - name: Import GPG key
       id: import-gpg
       uses: crazy-max/ghaction-import-gpg@master
