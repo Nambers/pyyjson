@@ -246,21 +246,22 @@ force_inline void WRITE_UNICODE_FALSE(_TARGET_TYPE **writer_addr) {
     *writer++ = 's';
     *writer++ = 'e';
     *writer++ = ',';
+    _TARGET_TYPE *writer2 = writer;
 #if COMPILE_UCS_LEVEL == 1
-    *writer++ = 0;
-    *writer++ = 0;
+    *writer2++ = 0;
+    *writer2++ = 0;
 #elif COMPILE_UCS_LEVEL == 2
 #    if SIZEOF_VOID_P == 8
-    *writer++ = 0;
-    *writer++ = 0;
+    *writer2++ = 0;
+    *writer2++ = 0;
 #    endif // SIZEOF_VOID_P
 #else      // COMPILE_UCS_LEVEL == 4
 #    if __AVX__
-    *writer++ = 0;
-    *writer++ = 0;
+    *writer2++ = 0;
+    *writer2++ = 0;
 #    endif // __AVX__
 #endif     // COMPILE_UCS_LEVEL
-    *writer_addr += 6;
+    *writer_addr = writer;
 }
 
 #define UNICODE_BUFFER_APPEND_FALSE PYYJSON_CONCAT3(unicode_buffer_append_false, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
@@ -275,6 +276,7 @@ force_inline bool UNICODE_BUFFER_APPEND_FALSE(EncodeUnicodeBufferInfo *unicode_b
 
 force_inline void WRITE_UNICODE_TRUE(_TARGET_TYPE **writer_addr) {
     _TARGET_TYPE *writer = *writer_addr;
+    _TARGET_TYPE *writer2 = writer;
     //   5,10,20
     //-> 8,16,24/32 (64)
     //-> 8,12,20 (32)
@@ -302,7 +304,7 @@ force_inline void WRITE_UNICODE_TRUE(_TARGET_TYPE **writer_addr) {
 #        endif // __AVX__
 #    endif
 #endif // COMPILE_UCS_LEVEL
-    *writer_addr += 5;
+    *writer_addr = writer2 + 5;
 }
 
 #define UNICODE_BUFFER_APPEND_TRUE PYYJSON_CONCAT3(unicode_buffer_append_true, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
@@ -317,6 +319,7 @@ force_inline bool UNICODE_BUFFER_APPEND_TRUE(EncodeUnicodeBufferInfo *unicode_bu
 
 force_inline void WRITE_UNICODE_NULL(_TARGET_TYPE **writer_addr) {
     _TARGET_TYPE *writer = *writer_addr;
+    _TARGET_TYPE *writer2 = writer;
     //   5,10,20
     //-> 8,16,24/32 (64)
     //-> 8,12,20 (32)
@@ -344,7 +347,7 @@ force_inline void WRITE_UNICODE_NULL(_TARGET_TYPE **writer_addr) {
 #        endif // __AVX__
 #    endif
 #endif // COMPILE_UCS_LEVEL
-    *writer_addr += 5;
+    *writer_addr = writer2 + 5;
 }
 
 #define UNICODE_BUFFER_APPEND_NULL PYYJSON_CONCAT3(unicode_buffer_append_null, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
@@ -379,7 +382,7 @@ force_inline void WRITE_UNICODE_EMPTY_ARR(_TARGET_TYPE **writer_addr) {
 #if SIZEOF_VOID_P == 8 || COMPILE_UCS_LEVEL != 4
     *writer = 0;
 #endif
-    *writer_addr += 3;
+    *writer_addr = writer;
 }
 
 #define UNICODE_BUFFER_APPEND_EMPTY_ARR PYYJSON_CONCAT3(unicode_buffer_append_empty_arr, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
@@ -417,7 +420,7 @@ force_inline void WRITE_UNICODE_EMPTY_OBJ(_TARGET_TYPE **writer_addr) {
 #if SIZEOF_VOID_P == 8 || COMPILE_UCS_LEVEL != 4
     *writer = 0;
 #endif
-    *writer_addr += 3;
+    *writer_addr = writer;
 }
 
 #define UNICODE_BUFFER_APPEND_EMPTY_OBJ PYYJSON_CONCAT3(unicode_buffer_append_empty_obj, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
