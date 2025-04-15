@@ -1,4 +1,5 @@
 {
+  parentShell,
   nix_pyenv_directory,
   pyenv,
   pyenvs,
@@ -130,11 +131,24 @@ in
       cp -r ${orjsonSource} ${debugSourceDir}/orjson
       chmod -R 700 ${debugSourceDir}/orjson
   fi
-
+''
++ lib.optionalString parentShell.debugLLVM ''
+  export PATH=${nix_pyenv_directory}/debugLLVM/bin:$PATH
+''
++ ''
   # save env for external use
   echo "PATH=$PATH" > ${nix_pyenv_directory}/.shell-env
   echo "CC=$CC" >> ${nix_pyenv_directory}/.shell-env
   echo "CXX=$CXX" >> ${nix_pyenv_directory}/.shell-env
+''
++ lib.optionalString parentShell.debugLLVM ''
+  ensure_symlink "${nix_pyenv_directory}/debugLLVM" ${parentShell.__drvs.llvmDbg}
+  if [[ ! -d ${debugSourceDir}/llvm-src-${parentShell.__drvs.llvmDbg.version} ]]; then
+    mkdir -p ${debugSourceDir}/llvm-src-${parentShell.__drvs.llvmDbg.version}
+    cp -r ${parentShell.__drvs.llvmDbg.src}/llvm ${debugSourceDir}/llvm-src-${parentShell.__drvs.llvmDbg.version}/llvm
+    chmod -R 700 ${debugSourceDir}/llvm-src-${parentShell.__drvs.llvmDbg.version}
+    # mv ${debugSourceDir}/llvm-src-${parentShell.__drvs.llvmDbg.version}/llvm/build/lib ${debugSourceDir}/llvm-src-${parentShell.__drvs.llvmDbg.version}/lib
+  fi
 ''
 + lib.optionalString (pkgs.system == "x86_64-linux") ''
   # sde wrapper script

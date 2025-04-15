@@ -38,24 +38,42 @@
         pkgs:
         let
           pkgs-24-05 = import nixpkgs-24-05 { inherit (pkgs) system; };
-          defaultShell = pkgs.callPackage ./dev_tools/shell.nix { inherit pkgs-24-05; };
+          defaultShell = pkgs.callPackage ./dev_tools/shell.nix {
+            inherit pkgs-24-05;
+            debugLLVM = false;
+          };
+          debugLLVMInternal = pkgs.callPackage ./dev_tools/shell.nix {
+            inherit pkgs-24-05;
+            debugLLVM = true;
+          };
           _drvs = pkgs.callPackage ./dev_tools/_drvs.nix { inherit pkgs-24-05; };
           pythonVerConfig = pkgs.lib.importJSON ./dev_tools/pyver.json;
           curVer = pythonVerConfig.curVer;
           leastVer = pythonVerConfig.minSupportVer;
           verLength = curVer - leastVer;
+          mkMyShell =
+            { shell, ... }:
+            (
+              (shell.overrideAttrs {
+                shellHook = pkgs.callPackage ./dev_tools/shellhook.nix {
+                  parentShell = shell;
+                  inherit (shell) inputDerivation;
+                  inherit (_drvs) pyenvs;
+                  nix_pyenv_directory = if shell.debugLLVM then ".nix-pyenv-llvm" else ".nix-pyenv";
+                  pyenv = builtins.elemAt _drvs.pyenvs verLength;
+                  using_python = builtins.elemAt _drvs.using_pythons verLength;
+                };
+              })
+              // {
+                super = shell;
+              }
+            );
         in
         {
           internal = defaultShell;
-          default = defaultShell.overrideAttrs {
-            shellHook = pkgs.callPackage ./dev_tools/shellhook.nix {
-              inherit (defaultShell) inputDerivation;
-              inherit (_drvs) pyenvs;
-              nix_pyenv_directory = ".nix-pyenv";
-              pyenv = builtins.elemAt _drvs.pyenvs verLength;
-              using_python = builtins.elemAt _drvs.using_pythons verLength;
-            };
-          };
+          default = mkMyShell { shell = defaultShell; };
+          inherit debugLLVMInternal;
+          debugLLVM = mkMyShell { shell = debugLLVMInternal; };
         }
       );
     };
