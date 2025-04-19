@@ -68,7 +68,7 @@ force_inline bool BYTES_BUFFER_APPEND_LONG(EncodeUTF8BufferInfo *utf8_buffer_inf
         write_unicode_u64_1(&utf8_buffer_info->writer, v, sign);
         *utf8_buffer_info->writer++ = ',';
     }
-    assert(check_unicode_writer_valid(unicode_buffer_info));
+    // assert(check_unicode_writer_valid(unicode_buffer_info));
     return true;
 }
 
@@ -573,7 +573,6 @@ success:;
     // #if COMPILE_UCS_LEVEL == 1
     //     ascii_elevate1(&_utf8_buffer_info, &_stack_vars.unicode_info);
     // #endif
-    assert(_stack_vars.unicode_info.cur_ucs_type == COMPILE_UCS_LEVEL);
     Py_ssize_t final_len = _utf8_buffer_info.writer - PYYJSON_CAST(u8 *, _utf8_buffer_info.head) + PYBYTES_START_OFFSET;
     // Py_ssize_t final_len = GET_UNICODE_BUFFER_FINAL_LEN(&_utf8_buffer_info);
     {
