@@ -229,7 +229,7 @@ force_inline bool UNICODE_BUFFER_APPEND_LONG(EncodeUnicodeBufferInfo *unicode_bu
         WRITE_UNICODE_U64(&_WRITER(unicode_buffer_info), v, sign);
         *_WRITER(unicode_buffer_info)++ = ',';
     }
-    assert(vec_in_boundary(unicode_buffer_info));
+    assert(check_unicode_writer_valid(unicode_buffer_info));
     return true;
 }
 
@@ -919,8 +919,8 @@ success:;
 #endif
     assert(_stack_vars.unicode_info.cur_ucs_type == COMPILE_UCS_LEVEL);
     Py_ssize_t final_len = GET_VECTOR_FINAL_LEN(&_unicode_buffer_info);
-    GOTO_FAIL_ON_UNLIKELY_ERR(!vector_resize_to_fit(&_unicode_buffer_info, final_len, COMPILE_UCS_LEVEL));
-    init_py_unicode(_unicode_buffer_info.head, final_len, COMPILE_UCS_LEVEL);
+    GOTO_FAIL_ON_UNLIKELY_ERR(!resize_to_fit_pyunicode(&_unicode_buffer_info, final_len, COMPILE_UCS_LEVEL));
+    init_pyunicode(_unicode_buffer_info.head, final_len, COMPILE_UCS_LEVEL);
     return (PyObject *)_unicode_buffer_info.head;
 fail:;
     if (_unicode_buffer_info.head) {

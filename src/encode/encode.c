@@ -4,7 +4,7 @@
 #include "simd/simd_detect.h"
 #include "simd/simd_impl.h"
 #include "tls.h"
-#include "unicode/uvector.h"
+#include "unicode/unicode_buffer.h"
 
 /* Implmentations of some inline functions used in current scope */
 #include "unicode/indent_wrap.h"
@@ -317,11 +317,11 @@ force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {
     Py_ssize_t written_len = (uintptr_t)_unicode_buffer_info.writer.writer_u8 - (uintptr_t)_unicode_buffer_info.head - offset;
     written_len /= unicode_kind;
     assert(written_len >= 2);
-    if (unlikely(!vector_resize_to_fit(&_unicode_buffer_info, written_len, is_ascii ? 0 : unicode_kind))) {
+    if (unlikely(!resize_to_fit_pyunicode(&_unicode_buffer_info, written_len, is_ascii ? 0 : unicode_kind))) {
         PyObject_Free(_unicode_buffer_info.head);
         return NULL;
     }
-    init_py_unicode(_unicode_buffer_info.head, written_len, is_ascii ? 0 : unicode_kind);
+    init_pyunicode(_unicode_buffer_info.head, written_len, is_ascii ? 0 : unicode_kind);
     return (PyObject *)_unicode_buffer_info.head;
 }
 

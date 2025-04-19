@@ -404,7 +404,7 @@ force_inline void VECTOR_WRITE_UNICODE_IMPL(EncodeUnicodeBufferInfo *unicode_buf
     // VECTOR_WRITE_UNICODE_TRAILING_IMPL2(unicode_buffer_info, &src, &len);
     VECTOR_WRITE_UNICODE_TRAILING_IMPL(src, len, unicode_buffer_info);
 done:;
-    assert(vec_in_boundary(unicode_buffer_info));
+    assert(check_unicode_writer_valid(unicode_buffer_info));
 }
 
 force_inline bool PYYJSON_CONCAT4(unicode_buffer_append_key_internal, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)(PyObject *key, Py_ssize_t len, EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t cur_nested_depth) {
@@ -424,7 +424,7 @@ force_inline bool PYYJSON_CONCAT4(unicode_buffer_append_key_internal, COMPILE_IN
 #    endif // SIZEOF_VOID_P == 8 || COMPILE_WRITE_UCS_LEVEL != 4
 #endif     // COMPILE_INDENT_LEVEL > 0
     _WRITER(unicode_buffer_info) += (COMPILE_INDENT_LEVEL > 0) ? 3 : 2;
-    assert(vec_in_boundary(unicode_buffer_info));
+    assert(check_unicode_writer_valid(unicode_buffer_info));
     return true;
 }
 
@@ -443,7 +443,7 @@ force_inline bool PYYJSON_CONCAT4(unicode_buffer_append_str_internal, COMPILE_IN
     *writer++ = '"';
     *writer++ = ',';
     _WRITER(unicode_buffer_info) += 2;
-    assert(vec_in_boundary(unicode_buffer_info));
+    assert(check_unicode_writer_valid(unicode_buffer_info));
     return true;
 }
 

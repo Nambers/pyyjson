@@ -1,5 +1,5 @@
 #include "w_out.inl.h"
-#include "unicode/uvector.h"
+#include "unicode/unicode_buffer.h"
 
 /*
  * Macros IN

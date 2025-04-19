@@ -3,7 +3,7 @@
 
 #include "simd/mask_table.h"
 #include "simd_detect.h"
-#include "unicode/uvector.h"
+#include "unicode/unicode_buffer.h"
 
 
 void SIMD_NAME_MODIFIER(long_back_elevate_1_2)(u16 *restrict write_start, u8 *restrict read_start, Py_ssize_t len);

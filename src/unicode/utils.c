@@ -1,5 +1,5 @@
 #include "pyyjson.h"
-#include "uvector.h"
+#include "unicode_buffer.h"
 
 
 #define VEC_MEM_U8_DIFF(_start_, _end_) (PYYJSON_CAST(uintptr_t, (_end_)) - PYYJSON_CAST(uintptr_t, (_start_)))
@@ -16,7 +16,7 @@ force_inline void vec_set_rwptr_and_size(EncodeUnicodeBufferInfo *unicode_buffer
     unicode_buffer_info->end = PYYJSON_CAST(u8 *, unicode_buffer_info->head) + target_size;
 }
 
-force_noinline bool unicode_vec_reserve(EncodeUnicodeBufferInfo *unicode_buffer_info, void *target_ptr) {
+force_noinline bool unicode_buffer_reserve(EncodeUnicodeBufferInfo *unicode_buffer_info, void *target_ptr) {
     const usize u8_diff = VEC_MEM_U8_DIFF(unicode_buffer_info->head, target_ptr);
     assert(u8_diff >= 0);
     usize target_size = VEC_MEM_U8_DIFF(unicode_buffer_info->head, unicode_buffer_info->end);
@@ -47,7 +47,7 @@ force_noinline bool unicode_vec_reserve(EncodeUnicodeBufferInfo *unicode_buffer_
     return true;
 }
 
-force_noinline void init_py_unicode(void *head, Py_ssize_t size, int kind) {
+force_noinline void init_pyunicode(void *head, Py_ssize_t size, int kind) {
     PyCompactUnicodeObject *unicode = PYYJSON_CAST(PyCompactUnicodeObject *, head);
     PyASCIIObject *ascii = PYYJSON_CAST(PyASCIIObject *, head);
     PyObject_Init((PyObject *)unicode, &PyUnicode_Type);
@@ -107,7 +107,7 @@ force_noinline void init_py_unicode(void *head, Py_ssize_t size, int kind) {
     assert(ascii->ob_base.ob_refcnt == 1);
 }
 
-force_noinline bool vector_resize_to_fit(EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t len, int ucs_type) {
+force_noinline bool resize_to_fit_pyunicode(EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t len, int ucs_type) {
     Py_ssize_t char_size = ucs_type ? ucs_type : 1;
     Py_ssize_t struct_size = ucs_type ? sizeof(PyCompactUnicodeObject) : sizeof(PyASCIIObject);
     assert(len <= ((PY_SSIZE_T_MAX - struct_size) / char_size - 1));

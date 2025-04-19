@@ -1,6 +1,6 @@
 
-#ifndef UVECTOR_H
-#define UVECTOR_H
+#ifndef PYYJSON_UNICODE_BUFFER_H
+#define PYYJSON_UNICODE_BUFFER_H
 
 
 #include "pyyjson.h"
@@ -27,12 +27,12 @@ typedef struct EncodeUnicodeBufferInfo {
 #define VEC_END(_unicode_buffer_info_) ((_unicode_buffer_info_)->end)
 
 
-force_noinline bool unicode_vec_reserve(EncodeUnicodeBufferInfo *unicode_buffer_info, void *target_ptr);
+force_noinline bool unicode_buffer_reserve(EncodeUnicodeBufferInfo *unicode_buffer_info, void *target_ptr);
 
 
-force_noinline void init_py_unicode(void *, Py_ssize_t size, int kind);
+force_noinline void init_pyunicode(void *, Py_ssize_t size, int kind);
 
-force_inline bool vec_in_boundary(EncodeUnicodeBufferInfo *unicode_buffer_info) {
+force_inline bool check_unicode_writer_valid(EncodeUnicodeBufferInfo *unicode_buffer_info) {
     return unicode_buffer_info->writer.writer_u8 <= (u8 *)unicode_buffer_info->end && unicode_buffer_info->writer.writer_u8 >= (u8 *)unicode_buffer_info->head;
 }
 
@@ -44,7 +44,7 @@ force_inline bool vec_in_boundary(EncodeUnicodeBufferInfo *unicode_buffer_info) 
  *     len: Count of valid unicode points in the vector.
  *     ucs_type: The unicode type of the vector (0 stands for ascii).
  */
-force_noinline bool vector_resize_to_fit(EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t len, int ucs_type);
+force_noinline bool resize_to_fit_pyunicode(EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t len, int ucs_type);
 
 
-#endif
+#endif // PYYJSON_UNICODE_BUFFER_H

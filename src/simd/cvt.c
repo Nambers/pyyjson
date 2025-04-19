@@ -1,6 +1,6 @@
 #include "simd/mask_table.h"
 #include "simd/simd_impl.h"
-#include "unicode/uvector.h"
+#include "unicode/unicode_buffer.h"
 
 #if PYYJSON_X86
 force_inline void _long_back_elevate_1_4_small_tail_2(u8 **restrict read_end_addr, u32 **restrict write_end_addr) {

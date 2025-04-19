@@ -49,7 +49,7 @@ force_inline void _ELEVATE_FROM_U8_NUM_BUFFER(_TARGET_TYPE **writer_addr, u8 *bu
 #        undef WRITER
     writer += len;
 #    endif // SIMD_BIT_SIZE != 512 || COMPILE_WRITE_UCS_LEVEL == 4
-    // assert(vec_in_boundary(unicode_buffer_info));
+    // assert(check_unicode_writer_valid(unicode_buffer_info));
 #endif     // COMPILE_WRITE_UCS_LEVEL != 1
     *writer_addr = writer;
 }
@@ -75,7 +75,7 @@ force_inline void WRITE_UNICODE_U64(_TARGET_TYPE **writer_addr, u64 val, usize s
     Py_ssize_t write_len = buffer_end - buffer;
     _ELEVATE_FROM_U8_NUM_BUFFER(writer_addr, buffer, write_len);
 #endif
-    // assert(vec_in_boundary(unicode_buffer_info));
+    // assert(check_unicode_writer_valid(unicode_buffer_info));
 }
 
 /*
