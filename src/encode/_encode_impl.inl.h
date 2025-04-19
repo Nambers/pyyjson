@@ -485,10 +485,10 @@ force_inline bool UNICODE_BUFFER_APPEND_ARR_END(EncodeUnicodeBufferInfo *unicode
     return true;
 }
 
-#define GET_VECTOR_FINAL_LEN PYYJSON_CONCAT2(get_vector_final_len, COMPILE_UCS_LEVEL)
+#define GET_UNICODE_BUFFER_FINAL_LEN PYYJSON_CONCAT2(get_unicode_buffer_final_len, COMPILE_UCS_LEVEL)
 #if COMPILE_INDENT_LEVEL == 0
 // avoid compile again
-force_inline Py_ssize_t GET_VECTOR_FINAL_LEN(EncodeUnicodeBufferInfo *unicode_buffer_info) {
+force_inline Py_ssize_t GET_UNICODE_BUFFER_FINAL_LEN(EncodeUnicodeBufferInfo *unicode_buffer_info) {
 #    if COMPILE_UCS_LEVEL == 0
     return unicode_buffer_info->writer.writer_u8 - (u8 *)GET_VEC_ASCII_START(unicode_buffer_info);
 #    elif COMPILE_UCS_LEVEL == 1
@@ -918,7 +918,7 @@ success:;
     ascii_elevate1(&_unicode_buffer_info, &_stack_vars.unicode_info);
 #endif
     assert(_stack_vars.unicode_info.cur_ucs_type == COMPILE_UCS_LEVEL);
-    Py_ssize_t final_len = GET_VECTOR_FINAL_LEN(&_unicode_buffer_info);
+    Py_ssize_t final_len = GET_UNICODE_BUFFER_FINAL_LEN(&_unicode_buffer_info);
     GOTO_FAIL_ON_UNLIKELY_ERR(!resize_to_fit_pyunicode(&_unicode_buffer_info, final_len, COMPILE_UCS_LEVEL));
     init_pyunicode(_unicode_buffer_info.head, final_len, COMPILE_UCS_LEVEL);
     return (PyObject *)_unicode_buffer_info.head;
@@ -939,7 +939,7 @@ fail_keytype:;
 
 #undef PYYJSON_DUMPS_OBJ
 #undef ENCODE_PROCESS_VAL
-#undef GET_VECTOR_FINAL_LEN
+#undef GET_UNICODE_BUFFER_FINAL_LEN
 #undef UNICODE_BUFFER_APPEND_ARR_END
 #undef WRITE_UNICODE_ARR_END
 #undef UNICODE_BUFFER_APPEND_OBJ_END

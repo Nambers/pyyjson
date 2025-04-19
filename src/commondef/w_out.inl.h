@@ -1,6 +1,6 @@
 #undef WRITE_UNICODE_F64
 #undef WRITE_UNICODE_U64
-#undef VEC_RESERVE
+#undef UNICODE_BUFFER_RESERVE
 #undef _WVECx4_U_
 #undef _WVECx2_U_
 #undef _WVECx4_A_

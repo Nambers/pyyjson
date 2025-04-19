@@ -6,12 +6,11 @@
 #endif
 
 #include "commondef/w_in.inl.h"
-// #include "unicode/include/reserve.h"
 
 #define _ELEVATE_FROM_U8_NUM_BUFFER PYYJSON_CONCAT2(_elevate_u8_copy, COMPILE_WRITE_UCS_LEVEL)
 /*
  * (PRIVATE)
- * Elevate the u8 buffer to the vector.
+ * Convert the u8 buffer to the buffer.
  * The space (32 * sizeof(_TARGET_TYPE)) must be reserved before calling this function.
  */
 force_inline void _ELEVATE_FROM_U8_NUM_BUFFER(_TARGET_TYPE **writer_addr, u8 *buffer, Py_ssize_t len) {
@@ -55,7 +54,7 @@ force_inline void _ELEVATE_FROM_U8_NUM_BUFFER(_TARGET_TYPE **writer_addr, u8 *bu
 }
 
 /*
- * Write a u64 number to the vector.
+ * Write a u64 number to the buffer.
  * The space (32 * sizeof(_TARGET_TYPE)) must be reserved before calling this function.
  */
 force_inline void WRITE_UNICODE_U64(_TARGET_TYPE **writer_addr, u64 val, usize sign) {
@@ -79,7 +78,7 @@ force_inline void WRITE_UNICODE_U64(_TARGET_TYPE **writer_addr, u64 val, usize s
 }
 
 /*
- * Write a f64 number to the vector.
+ * Write a f64 number to the buffer.
  * The space (32 * sizeof(_TARGET_TYPE)) must be reserved before calling this function.
  */
 force_inline void WRITE_UNICODE_F64(_TARGET_TYPE **writer_addr, u64 val_u64_repr) {
@@ -101,5 +100,5 @@ force_inline void WRITE_UNICODE_F64(_TARGET_TYPE **writer_addr, u64 val_u64_repr
 
 #include "commondef/w_out.inl.h"
 
-#undef VEC_RESERVE
+#undef UNICODE_BUFFER_RESERVE
 #undef _ELEVATE_FROM_U8_NUM_BUFFER

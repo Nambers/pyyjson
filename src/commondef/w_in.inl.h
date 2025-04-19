@@ -48,11 +48,11 @@
 #endif
 
 /*
- * Reserve space for the vector.
+ * Reserve space for the unicode buffer.
  */
-#define VEC_RESERVE PYYJSON_CONCAT2(vec_reserve, COMPILE_WRITE_UCS_LEVEL)
+#define UNICODE_BUFFER_RESERVE PYYJSON_CONCAT2(unicode_buffer_reserve, COMPILE_WRITE_UCS_LEVEL)
 
-force_inline bool VEC_RESERVE(EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t size);
+force_inline bool UNICODE_BUFFER_RESERVE(EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t size);
 
 #define WRITE_UNICODE_U64 PYYJSON_CONCAT2(vec_write_u64, COMPILE_WRITE_UCS_LEVEL)
 #define WRITE_UNICODE_F64 PYYJSON_CONCAT2(vec_write_f64, COMPILE_WRITE_UCS_LEVEL)

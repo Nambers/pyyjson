@@ -3,7 +3,7 @@
 
 
 /* 
- * Some utility functions only related to *write*, like vector reserve, writing number
+ * Some utility functions only related to *write*, like unicode buffer reserve, writing number
  * need macro: COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4.
  */
 

@@ -36,13 +36,13 @@ force_inline bool check_unicode_writer_valid(EncodeUnicodeBufferInfo *unicode_bu
     return unicode_buffer_info->writer.writer_u8 <= (u8 *)unicode_buffer_info->end && unicode_buffer_info->writer.writer_u8 >= (u8 *)unicode_buffer_info->head;
 }
 
-/* Resize the vector pointed by `vec_addr`.
- * If resize succeed, the vector will be updated to the new address and return true.
- * Otherwise, `vec_addr` left unchanged and returns false.
+/* Resize the buffer described by `unicode_buffer_info`.
+ * If resize succeed, the buffer will be updated to the new address and return true.
+ * Otherwise, buffer left unchanged and returns false.
  * Args:
- *     vec_addr: The address of the vector.
- *     len: Count of valid unicode points in the vector.
- *     ucs_type: The unicode type of the vector (0 stands for ascii).
+ *     unicode_buffer_info: The buffer.
+ *     len: Count of valid unicode points in the buffer.
+ *     ucs_type: The unicode type of the buffer (0 stands for ascii).
  */
 force_noinline bool resize_to_fit_pyunicode(EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t len, int ucs_type);
 

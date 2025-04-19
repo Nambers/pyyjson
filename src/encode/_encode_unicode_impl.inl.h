@@ -10,13 +10,13 @@
 #define WRITE_SIMD_256_WITH_WRITEMASK PYYJSON_CONCAT2(write_simd_256_with_writemask, COMPILE_WRITE_UCS_LEVEL)
 #define BACK_WRITE_SIMD256_WITH_TAIL_LEN PYYJSON_CONCAT3(back_write_simd256_with_tail_len, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define _CONTROL_SEQ_TABLE PYYJSON_CONCAT2(_ControlSeqTable, COMPILE_WRITE_UCS_LEVEL)
-#define VECTOR_WRITE_UNICODE_IMPL PYYJSON_CONCAT4(vector_write_unicode_impl, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
-#define VECTOR_WRITE_UNICODE_LOOPx4 PYYJSON_CONCAT4(vector_write_unicode_loopx4, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
-#define VECTOR_WRITE_UNICODE_LOOP PYYJSON_CONCAT4(vector_write_unicode_loop, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
-#define VECTOR_WRITE_UNICODE_LOOP_TRAILING_SMALL PYYJSON_CONCAT4(vector_write_unicode_loop_trailing_small, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
-#define VECTOR_WRITE_UNICODE_TRAILING_IMPL2 PYYJSON_CONCAT4(vector_write_unicode_trailing_impl2, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
-#define VECTOR_WRITE_UNICODE_TRAILING_IMPL PYYJSON_CONCAT4(vector_write_unicode_trailing_impl, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
-#define VECTOR_WRITE_ESCAPE_NO_RESERVE PYYJSON_CONCAT4(vector_write_escape_no_reserve, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
+#define WRITE_UNICODE_IMPL PYYJSON_CONCAT4(write_unicode_impl, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
+#define WRITE_UNICODE_LOOPx4 PYYJSON_CONCAT4(write_unicode_loopx4, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
+#define WRITE_UNICODE_LOOP PYYJSON_CONCAT4(write_unicode_loop, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
+#define WRITE_UNICODE_LOOP_TRAILING_SMALL PYYJSON_CONCAT4(write_unicode_loop_trailing_small, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
+#define WRITE_UNICODE_TRAILING_IMPL2 PYYJSON_CONCAT4(write_unicode_trailing_impl2, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
+#define WRITE_UNICODE_TRAILING_IMPL PYYJSON_CONCAT4(write_unicode_trailing_impl, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
+#define WRITE_ESCAPE_NO_RESERVE PYYJSON_CONCAT4(write_escape_no_reserve, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512 PYYJSON_CONCAT2(check_escape_tail_impl_get_mask_512, COMPILE_READ_UCS_LEVEL)
 #define WRITE_SIMD_IMPL PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define MASK_ELEVATE_WRITE_512 PYYJSON_CONCAT3(mask_elevate_write_512, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
@@ -31,7 +31,7 @@ force_inline void WRITE_SIMD_IMPL(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR);
 
 extern _TARGET_TYPE _CONTROL_SEQ_TABLE[(_Slash + 1) * 8];
 
-force_inline void VECTOR_WRITE_ESCAPE_NO_RESERVE(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE *restrict src, Py_ssize_t len, Py_ssize_t additional_len) {
+force_inline void WRITE_ESCAPE_NO_RESERVE(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE *restrict src, Py_ssize_t len, Py_ssize_t additional_len) {
     const _FROM_TYPE *src_end = src + len;
     while (src < src_end) {
         _TARGET_TYPE srcval = (_TARGET_TYPE)*src;
@@ -42,7 +42,7 @@ force_inline void VECTOR_WRITE_ESCAPE_NO_RESERVE(EncodeUnicodeBufferInfo *unicod
         } else {
             _TARGET_TYPE *copy_ptr = &_CONTROL_SEQ_TABLE[unicode_point * 8];
             if (copy_count == 2) {
-                // RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, 2 + len + TAIL_PADDING / sizeof(_TARGET_TYPE) + additional_len));
+                // RETURN_ON_UNLIKELY_ERR(!UNICODE_BUFFER_RESERVE(unicode_buffer_info, 2 + len + TAIL_PADDING / sizeof(_TARGET_TYPE) + additional_len));
                 memcpy((void *)_WRITER(unicode_buffer_info), (const void *)copy_ptr, 2 * sizeof(_TARGET_TYPE));
                 _WRITER(unicode_buffer_info) += 2;
             } else {
@@ -52,7 +52,7 @@ force_inline void VECTOR_WRITE_ESCAPE_NO_RESERVE(EncodeUnicodeBufferInfo *unicod
 #else //  COMPILE_WRITE_UCS_LEVEL == 4 && SIZEOF_VOID_P < 8
                 const usize _CopyLen = 6;
 #endif
-                // RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, _CopyLen + len + TAIL_PADDING / sizeof(_TARGET_TYPE) + additional_len));
+                // RETURN_ON_UNLIKELY_ERR(!UNICODE_BUFFER_RESERVE(unicode_buffer_info, _CopyLen + len + TAIL_PADDING / sizeof(_TARGET_TYPE) + additional_len));
                 memcpy(_WRITER(unicode_buffer_info), (const void *)copy_ptr, _CopyLen * sizeof(_TARGET_TYPE));
                 _WRITER(unicode_buffer_info) += 6;
             }
@@ -67,7 +67,7 @@ force_inline void VECTOR_WRITE_ESCAPE_NO_RESERVE(EncodeUnicodeBufferInfo *unicod
 #    if SIMD_BIT_SIZE == 512
 
 
-force_inline void VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t len, EncodeUnicodeBufferInfo *unicode_buffer_info) {
+force_inline void WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t len, EncodeUnicodeBufferInfo *unicode_buffer_info) {
 #        define _MASKZ_LOADU PYYJSON_SIMPLE_CONCAT2(_mm512_maskz_loadu_epi, READ_BIT_SIZE)
 #        define _MASK_STOREU PYYJSON_SIMPLE_CONCAT2(_mm512_mask_storeu_epi, READ_BIT_SIZE)
     _TARGET_TYPE *dst = _WRITER(unicode_buffer_info);
@@ -98,8 +98,8 @@ force_inline void VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_s
 #        endif
         dst += tzcnt;
         _WRITER(unicode_buffer_info) = dst;
-        VECTOR_WRITE_ESCAPE_NO_RESERVE(unicode_buffer_info, src + tzcnt, len - tzcnt, 0);
-        // RETURN_ON_UNLIKELY_ERR(!VECTOR_WRITE_ESCAPE_NO_RESERVE(unicode_buffer_info, src + tzcnt, len - tzcnt, 0));
+        WRITE_ESCAPE_NO_RESERVE(unicode_buffer_info, src + tzcnt, len - tzcnt, 0);
+        // RETURN_ON_UNLIKELY_ERR(!WRITE_ESCAPE_NO_RESERVE(unicode_buffer_info, src + tzcnt, len - tzcnt, 0));
     }
     // return true;
 #        undef _MASKZ_LOADU
@@ -110,7 +110,7 @@ force_inline void VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_s
 #    elif SIMD_BIT_SIZE == 256
 
 
-force_inline void VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t len, EncodeUnicodeBufferInfo *unicode_buffer_info) {
+force_inline void WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t len, EncodeUnicodeBufferInfo *unicode_buffer_info) {
     _TARGET_TYPE *dst = _WRITER(unicode_buffer_info);
     _VEC_A_ y;
     const _FROM_TYPE *load_start = src + len - READ_BATCH_COUNT;
@@ -132,8 +132,8 @@ force_inline void VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_s
         _WRITER(unicode_buffer_info) = dst;
     } else {
         _WRITER(unicode_buffer_info) = dst;
-        VECTOR_WRITE_ESCAPE_NO_RESERVE(unicode_buffer_info, src, len, 0);
-        // RETURN_ON_UNLIKELY_ERR(!VECTOR_WRITE_ESCAPE_NO_RESERVE(unicode_buffer_info, src, len, 0));
+        WRITE_ESCAPE_NO_RESERVE(unicode_buffer_info, src, len, 0);
+        // RETURN_ON_UNLIKELY_ERR(!WRITE_ESCAPE_NO_RESERVE(unicode_buffer_info, src, len, 0));
     }
 
     // return true;
@@ -143,7 +143,7 @@ force_inline void VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_s
 #    else
 // SIMD_BIT_SIZE == 128, x86
 
-force_inline void VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t len, EncodeUnicodeBufferInfo *unicode_buffer_info) {
+force_inline void WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t len, EncodeUnicodeBufferInfo *unicode_buffer_info) {
     _TARGET_TYPE *dst = _WRITER(unicode_buffer_info);
     assert(len < READ_BATCH_COUNT);
     _VEC_A_ x, mask, check_mask;
@@ -171,8 +171,8 @@ force_inline void VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_s
         _WRITER(unicode_buffer_info) = dst;
     } else {
         _WRITER(unicode_buffer_info) = dst;
-        VECTOR_WRITE_ESCAPE_NO_RESERVE(unicode_buffer_info, src, len, 0);
-        // RETURN_ON_UNLIKELY_ERR(!VECTOR_WRITE_ESCAPE_NO_RESERVE(unicode_buffer_info, src, len, 0));
+        WRITE_ESCAPE_NO_RESERVE(unicode_buffer_info, src, len, 0);
+        // RETURN_ON_UNLIKELY_ERR(!WRITE_ESCAPE_NO_RESERVE(unicode_buffer_info, src, len, 0));
     }
     // return true;
 }
@@ -185,7 +185,7 @@ force_inline void VECTOR_WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_s
 #endif
 
 
-force_inline void VECTOR_WRITE_UNICODE_LOOPx4(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE **src_addr, usize *len_addr) {
+force_inline void WRITE_UNICODE_LOOPx4(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE **src_addr, usize *len_addr) {
     register usize len = *len_addr;
     register const _FROM_TYPE *src = *src_addr;
     register _TARGET_TYPE *dst = _WRITER(unicode_buffer_info);
@@ -231,7 +231,7 @@ force_inline void VECTOR_WRITE_UNICODE_LOOPx4(EncodeUnicodeBufferInfo *unicode_b
             assert(escape_unicode == _Quote || escape_unicode == _Slash || escape_unicode < ControlMax);
             dst += done_count;
             len -= done_count + 1;
-            // RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, 8 + (len) + TAIL_PADDING / sizeof(_TARGET_TYPE)));
+            // RETURN_ON_UNLIKELY_ERR(!UNICODE_BUFFER_RESERVE(unicode_buffer_info, 8 + (len) + TAIL_PADDING / sizeof(_TARGET_TYPE)));
             memcpy(dst, &_CONTROL_SEQ_TABLE[escape_unicode * 8], 8 * sizeof(_TARGET_TYPE));
             dst += _ControlJump[escape_unicode];
         }
@@ -245,7 +245,7 @@ force_inline void VECTOR_WRITE_UNICODE_LOOPx4(EncodeUnicodeBufferInfo *unicode_b
 #undef SRC_T
 }
 
-force_inline void VECTOR_WRITE_UNICODE_LOOP(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE **src_addr, usize *len_addr) {
+force_inline void WRITE_UNICODE_LOOP(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE **src_addr, usize *len_addr) {
     register usize len = *len_addr;
     register const _FROM_TYPE *src = *src_addr;
     register _TARGET_TYPE *dst = _WRITER(unicode_buffer_info);
@@ -266,7 +266,7 @@ force_inline void VECTOR_WRITE_UNICODE_LOOP(EncodeUnicodeBufferInfo *unicode_buf
             assert(escape_unicode == _Quote || escape_unicode == _Slash || escape_unicode < ControlMax);
             dst += done_count;
             len -= done_count + 1;
-            // RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, 8 + (len) + TAIL_PADDING / sizeof(_TARGET_TYPE)));
+            // RETURN_ON_UNLIKELY_ERR(!UNICODE_BUFFER_RESERVE(unicode_buffer_info, 8 + (len) + TAIL_PADDING / sizeof(_TARGET_TYPE)));
             memcpy(dst, &_CONTROL_SEQ_TABLE[escape_unicode * 8], 8 * sizeof(_TARGET_TYPE));
             dst += _ControlJump[escape_unicode];
         }
@@ -277,7 +277,7 @@ force_inline void VECTOR_WRITE_UNICODE_LOOP(EncodeUnicodeBufferInfo *unicode_buf
     // return true;
 }
 
-force_inline void VECTOR_WRITE_UNICODE_LOOP_TRAILING_SMALL(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE **src_addr, usize *len_addr) {
+force_inline void WRITE_UNICODE_LOOP_TRAILING_SMALL(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE **src_addr, usize *len_addr) {
     register usize len = *len_addr;
     register const _FROM_TYPE *src = *src_addr;
     register _TARGET_TYPE *dst = _WRITER(unicode_buffer_info);
@@ -320,7 +320,7 @@ force_inline void VECTOR_WRITE_UNICODE_LOOP_TRAILING_SMALL(EncodeUnicodeBufferIn
             assert(escape_unicode == _Quote || escape_unicode == _Slash || escape_unicode < ControlMax);
             dst += done_count;
             len -= done_count + 1;
-            // RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, 8 + (len) + TAIL_PADDING / sizeof(_TARGET_TYPE)));
+            // RETURN_ON_UNLIKELY_ERR(!UNICODE_BUFFER_RESERVE(unicode_buffer_info, 8 + (len) + TAIL_PADDING / sizeof(_TARGET_TYPE)));
             memcpy(dst, &_CONTROL_SEQ_TABLE[escape_unicode * 8], 8 * sizeof(_TARGET_TYPE));
             dst += _ControlJump[escape_unicode];
         }
@@ -335,7 +335,7 @@ force_inline void VECTOR_WRITE_UNICODE_LOOP_TRAILING_SMALL(EncodeUnicodeBufferIn
 #undef SRC_T
 }
 
-force_inline bool VECTOR_WRITE_UNICODE_TRAILING_IMPL2(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE **src_addr, usize *len_addr) {
+force_inline bool WRITE_UNICODE_TRAILING_IMPL2(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE **src_addr, usize *len_addr) {
 #define SRC_T PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 128, A)
 #define SRC_T_U PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 128, U)
 #if WR_DIV == 4
@@ -396,13 +396,13 @@ restart:;
 #undef SRC_T
 }
 
-force_inline void VECTOR_WRITE_UNICODE_IMPL(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE *src, Py_ssize_t _len) {
+force_inline void WRITE_UNICODE_IMPL(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE *src, Py_ssize_t _len) {
     usize len = (usize)_len;
-    VECTOR_WRITE_UNICODE_LOOPx4(unicode_buffer_info, &src, &len);
-    VECTOR_WRITE_UNICODE_LOOP(unicode_buffer_info, &src, &len);
+    WRITE_UNICODE_LOOPx4(unicode_buffer_info, &src, &len);
+    WRITE_UNICODE_LOOP(unicode_buffer_info, &src, &len);
     if (!len) goto done;
-    // VECTOR_WRITE_UNICODE_TRAILING_IMPL2(unicode_buffer_info, &src, &len);
-    VECTOR_WRITE_UNICODE_TRAILING_IMPL(src, len, unicode_buffer_info);
+    // WRITE_UNICODE_TRAILING_IMPL2(unicode_buffer_info, &src, &len);
+    WRITE_UNICODE_TRAILING_IMPL(src, len, unicode_buffer_info);
 done:;
     assert(check_unicode_writer_valid(unicode_buffer_info));
 }
@@ -410,10 +410,10 @@ done:;
 force_inline bool PYYJSON_CONCAT4(unicode_buffer_append_key_internal, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)(PyObject *key, Py_ssize_t len, EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t cur_nested_depth) {
     static_assert(COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL, "COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL");
     assert(PyUnicode_GET_LENGTH(key) == len);
-    RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 5 + 6 * len + TAIL_PADDING));
+    RETURN_ON_UNLIKELY_ERR(!UNICODE_BUFFER_RESERVE(unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 5 + 6 * len + TAIL_PADDING));
     WRITE_UNICODE_INDENT(&_WRITER(unicode_buffer_info), cur_nested_depth);
     *_WRITER(unicode_buffer_info)++ = '"';
-    VECTOR_WRITE_UNICODE_IMPL(unicode_buffer_info, (_FROM_TYPE *)get_unicode_data(key), len);
+    WRITE_UNICODE_IMPL(unicode_buffer_info, (_FROM_TYPE *)get_unicode_data(key), len);
     _TARGET_TYPE *writer = _WRITER(unicode_buffer_info);
     *writer++ = '"';
     *writer++ = ':';
@@ -432,13 +432,13 @@ force_inline bool PYYJSON_CONCAT4(unicode_buffer_append_str_internal, COMPILE_IN
     static_assert(COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL, "COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL");
     assert(PyUnicode_GET_LENGTH(str) == len);
     if (is_in_obj) {
-        RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, 3 + 6 * len + TAIL_PADDING));
+        RETURN_ON_UNLIKELY_ERR(!UNICODE_BUFFER_RESERVE(unicode_buffer_info, 3 + 6 * len + TAIL_PADDING));
     } else {
-        RETURN_ON_UNLIKELY_ERR(!VEC_RESERVE(unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 3 + 6 * len + TAIL_PADDING));
+        RETURN_ON_UNLIKELY_ERR(!UNICODE_BUFFER_RESERVE(unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 3 + 6 * len + TAIL_PADDING));
         WRITE_UNICODE_INDENT(&_WRITER(unicode_buffer_info), cur_nested_depth);
     }
     *_WRITER(unicode_buffer_info)++ = '"';
-    VECTOR_WRITE_UNICODE_IMPL(unicode_buffer_info, (_FROM_TYPE *)get_unicode_data(str), len);
+    WRITE_UNICODE_IMPL(unicode_buffer_info, (_FROM_TYPE *)get_unicode_data(str), len);
     _TARGET_TYPE *writer = _WRITER(unicode_buffer_info);
     *writer++ = '"';
     *writer++ = ',';
@@ -457,12 +457,12 @@ force_inline bool PYYJSON_CONCAT4(unicode_buffer_append_str_internal, COMPILE_IN
 #undef GET_DONE_COUNT_FROM_MASK
 #undef _CONTROL_SEQ_TABLE
 #undef CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512
-#undef VECTOR_WRITE_ESCAPE_NO_RESERVE
-#undef VECTOR_WRITE_UNICODE_TRAILING_IMPL
-#undef VECTOR_WRITE_UNICODE_TRAILING_IMPL2
-#undef VECTOR_WRITE_UNICODE_LOOP_TRAILING_SMALL
-#undef VECTOR_WRITE_UNICODE_LOOP
-#undef VECTOR_WRITE_UNICODE_LOOPx4
-#undef VECTOR_WRITE_UNICODE_IMPL
+#undef WRITE_ESCAPE_NO_RESERVE
+#undef WRITE_UNICODE_TRAILING_IMPL
+#undef WRITE_UNICODE_TRAILING_IMPL2
+#undef WRITE_UNICODE_LOOP_TRAILING_SMALL
+#undef WRITE_UNICODE_LOOP
+#undef WRITE_UNICODE_LOOPx4
+#undef WRITE_UNICODE_IMPL
 #undef _TARGET_TYPE
 #undef _WRITER

@@ -234,7 +234,7 @@ force_inline PyFastTypes fast_type_check(PyObject *val) {
 }
 
 /* 
- * Some utility functions only related to *write*, like vector reserve, writing number
+ * Some utility functions only related to *write*, like unicode buffer reserve, writing number
  * need macro: COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4.
  */
 #include "encode_utils_impl_wrap.h"
@@ -249,7 +249,7 @@ force_inline PyFastTypes fast_type_check(PyObject *val) {
 #include "encode_simd_utils_wrap.h"
 
 /* 
- * Some functions for writing the unicode vector, like writing key, writing value str.
+ * Some functions for writing the unicode buffer, like writing key, writing value str.
  * need macro:
  *      COMPILE_READ_UCS_LEVEL, value: 1, 2, or 4.
  *      COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4.
