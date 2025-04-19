@@ -11,6 +11,8 @@
 /build-*
 /test.c
 /*.json
+*.ll
+*.s
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
