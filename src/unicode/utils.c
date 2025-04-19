@@ -11,11 +11,6 @@ extern int _PyUnicode_CheckConsistency(PyObject *op, int check_content);
 #endif
 
 
-force_inline void vec_set_rwptr_and_size(EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t rw_diff, Py_ssize_t target_size) {
-    unicode_buffer_info->writer.writer_u8 = PYYJSON_CAST(u8 *, unicode_buffer_info->head) + rw_diff;
-    unicode_buffer_info->end = PYYJSON_CAST(u8 *, unicode_buffer_info->head) + target_size;
-}
-
 force_noinline bool unicode_buffer_reserve(EncodeUnicodeBufferInfo *unicode_buffer_info, void *target_ptr) {
     const usize u8_diff = VEC_MEM_U8_DIFF(unicode_buffer_info->head, target_ptr);
     assert(u8_diff >= 0);
@@ -40,7 +35,8 @@ force_noinline bool unicode_buffer_reserve(EncodeUnicodeBufferInfo *unicode_buff
         return false;
     }
     unicode_buffer_info->head = new_ptr;
-    vec_set_rwptr_and_size(unicode_buffer_info, w_diff, target_size);
+    unicode_buffer_info->writer.writer_u8 = PYYJSON_CAST(u8 *, unicode_buffer_info->head) + w_diff;
+    unicode_buffer_info->end = PYYJSON_CAST(u8 *, unicode_buffer_info->head) + target_size;
 #ifndef NDEBUG
     memset(unicode_buffer_info->writer.writer_u8, 0, PYYJSON_CAST(u8 *, unicode_buffer_info->end) - unicode_buffer_info->writer.writer_u8);
 #endif

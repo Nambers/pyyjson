@@ -134,43 +134,6 @@ static void make_ucs4(const u8 *data, usize size, PyObject **ucs4) {
     *ucs4 = ret_unicode;
 }
 
-// force_inline usize get_vectorcall_length(TestArgSettings *setting) {
-//     usize vectorcall_length = 1;
-//     for (usize k = 1; k < COUNT_OF(setting->args); k++) {
-//         if (!setting->args[k]) break;
-//         vectorcall_length++;
-//     }
-//     return vectorcall_length;
-// }
-
-// void test_one_decode_encode(PyObject *input, TestArgSettings *decode_setting, TestArgSettings *encode_setting, TestResult *result) {
-//     PyObject *decoded = NULL, *encoded = NULL;
-//     usize vectorcall_length;
-//     //
-//     decode_setting->args[0] = input;
-//     vectorcall_length = get_vectorcall_length(decode_setting);
-//     decoded = PyObject_Vectorcall(decode_func, decode_setting->args, vectorcall_length, NULL);
-//     if (!decoded) {
-//         goto call_fail;
-//     }
-//     //
-//     encode_setting->args[0] = decoded;
-//     vectorcall_length = get_vectorcall_length(encode_setting);
-//     encoded = PyObject_Vectorcall(encode_func, encode_setting->args, vectorcall_length, NULL);
-//     if (!encoded) {
-//         goto call_fail;
-//     }
-//     goto done;
-// call_fail:;
-//     PyErr_Clear();
-//     goto done;
-// done:;
-//     decode_setting->args[0] = NULL;
-//     encode_setting->args[0] = NULL;
-//     result->decoded = decoded;
-//     result->encoded = encoded;
-// }
-
 static void parse_input_to_bytes(const u8 *data, usize size, PyObject **bytes, PyObject **str, PyObject **ucs1, PyObject **ucs2, PyObject **ucs4) {
     *bytes = PyBytes_FromStringAndSize((const char *)data, (Py_ssize_t)size);
     if (!*bytes) PyErr_Clear();
