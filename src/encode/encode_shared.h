@@ -74,6 +74,8 @@ force_inline Py_ssize_t get_indent_char_count(Py_ssize_t cur_nested_depth, Py_ss
  * Python Utils
  *============================================================================*/
 
+#define PYBYTES_START_OFFSET (offsetof(PyBytesObject, ob_sval))
+
 extern PyObject *JSONEncodeError;
 
 force_inline void *get_unicode_data(PyObject *unicode) {
