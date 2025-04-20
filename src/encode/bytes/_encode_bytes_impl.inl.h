@@ -2,10 +2,10 @@
 #include "tls.h"
 #include <stddef.h>
 
-#define INDENT_WRITER_BYTES PYYJSON_CONCAT3(indent_writer, COMPILE_INDENT_LEVEL, 1)
-#define WRITE_INDENT_RETURN_IF_FAIL(_unicode_buffer_info_, _cur_nested_depth_, _is_in_obj_, _additional_reserve_count_)                                                  \
-    do {                                                                                                                                                                 \
-        if (unlikely(!INDENT_WRITER_BYTES((EncodeUnicodeBufferInfo *)_unicode_buffer_info_, _cur_nested_depth_, _is_in_obj_, _additional_reserve_count_))) return false; \
+#define BYTES_INDENT_WRITER PYYJSON_CONCAT2(bytes_indent_writer, COMPILE_INDENT_LEVEL)
+#define WRITE_INDENT_RETURN_IF_FAIL(_unicode_buffer_info_, _cur_nested_depth_, _is_in_obj_, _additional_reserve_count_)                       \
+    do {                                                                                                                                      \
+        if (unlikely(!BYTES_INDENT_WRITER(_unicode_buffer_info_, _cur_nested_depth_, _is_in_obj_, _additional_reserve_count_))) return false; \
     } while (0)
 
 #define WRITE_BYTES_FALSE PYYJSON_CONCAT3(write_unicode_false, COMPILE_INDENT_LEVEL, 1)
@@ -35,6 +35,16 @@
 #define BYTES_BUFFER_APPEND_OBJ_END PYYJSON_CONCAT2(bytes_buffer_append_obj_end, COMPILE_INDENT_LEVEL)
 
 #define ENCODE_PROCESS_BYTES_VAL PYYJSON_CONCAT2(encode_process_bytes_val, COMPILE_INDENT_LEVEL)
+
+force_inline bool BYTES_INDENT_WRITER(EncodeUTF8BufferInfo *utf8_buffer_info, Py_ssize_t cur_nested_depth, bool is_in_obj, usize additional_reserve_count) {
+    if (!is_in_obj && COMPILE_INDENT_LEVEL != 0) {
+        RETURN_ON_UNLIKELY_ERR(!bytes_buffer_reserve(utf8_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + additional_reserve_count));
+        PYYJSON_CONCAT3(write_unicode_indent, COMPILE_INDENT_LEVEL, 1)(&utf8_buffer_info->writer, cur_nested_depth);
+    } else {
+        RETURN_ON_UNLIKELY_ERR(!bytes_buffer_reserve(utf8_buffer_info, additional_reserve_count));
+    }
+    return true;
+}
 
 force_inline bool BYTES_BUFFER_APPEND_LONG(EncodeUTF8BufferInfo *utf8_buffer_info, Py_ssize_t cur_nested_depth, PyObject *val, bool is_in_obj) {
     assert(PyLong_CheckExact(val));
@@ -72,7 +82,47 @@ force_inline bool BYTES_BUFFER_APPEND_LONG(EncodeUTF8BufferInfo *utf8_buffer_inf
     return true;
 }
 
-force_inline bool BYTES_BUFFER_APPEND_KEY(PyObject *val, EncodeUTF8BufferInfo *utf8_buffer_info, Py_ssize_t cur_nested_depth) {
+force_inline bool BYTES_BUFFER_APPEND_KEY(PyObject *val, EncodeUTF8BufferInfo *restrict utf8_buffer_info, Py_ssize_t cur_nested_depth) {
+    PyASCIIObject *ascii_obj = PYYJSON_CAST(PyASCIIObject *, val);
+    int kind;
+    if (ascii_obj->state.ascii) {
+        kind = 0;
+    } else {
+        kind = ascii_obj->state.kind;
+    }
+    usize len = ascii_obj->length;
+    RETURN_ON_UNLIKELY_ERR(!bytes_buffer_reserve(utf8_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 5 + 6 * len + TAIL_PADDING));
+    *utf8_buffer_info->writer++ = '"';
+    switch (kind) {
+        case 0: {
+            bytes_write_ascii(&utf8_buffer_info->writer, PYYJSON_CAST(u8 *, PYYJSON_CAST(PyASCIIObject *, val) + 1), len);
+            break;
+        }
+        case 1: {
+            bytes_write_ucs1(&utf8_buffer_info->writer, PYYJSON_CAST(u8 *, PYYJSON_CAST(PyCompactUnicodeObject *, val) + 1), len);
+            break;
+        }
+        case 2: {
+            bytes_write_ucs2(&utf8_buffer_info->writer, PYYJSON_CAST(u16 *, PYYJSON_CAST(PyCompactUnicodeObject *, val) + 1), len);
+            break;
+        }
+        case 4: {
+            bytes_write_ucs4(&utf8_buffer_info->writer, PYYJSON_CAST(u32 *, PYYJSON_CAST(PyCompactUnicodeObject *, val) + 1), len);
+            break;
+        }
+        default:
+            Py_UNREACHABLE();
+            assert(false);
+    }
+    *utf8_buffer_info->writer++ = '"';
+    *utf8_buffer_info->writer++ = ':';
+    if (COMPILE_INDENT_LEVEL > 0) {
+        *utf8_buffer_info->writer++ = ' ';
+    }
+#if SIZEOF_VOID_P == 8
+    *utf8_buffer_info->writer = 0;
+#endif
+    return true;
     //     RETURN_ON_UNLIKELY_ERR(!UNICODE_BUFFER_RESERVE(unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 5 + 6 * len + TAIL_PADDING));
     //     WRITE_UNICODE_INDENT(&_WRITER(unicode_buffer_info), cur_nested_depth);
     //     *_WRITER(unicode_buffer_info)++ = '"';
@@ -89,7 +139,7 @@ force_inline bool BYTES_BUFFER_APPEND_KEY(PyObject *val, EncodeUTF8BufferInfo *u
     //     _WRITER(unicode_buffer_info) += (COMPILE_INDENT_LEVEL > 0) ? 3 : 2;
     //     assert(check_unicode_writer_valid(unicode_buffer_info));
     //     return true;
-    return false;
+    // return false;
 }
 
 force_inline bool BYTES_BUFFER_APPEND_STR(PyObject *val, EncodeUTF8BufferInfo *utf8_buffer_info, Py_ssize_t cur_nested_depth, bool is_in_obj) {
@@ -623,4 +673,4 @@ fail_keytype:;
 #undef WRITE_BYTES_TRUE
 #undef WRITE_BYTES_FALSE
 #undef WRITE_INDENT_RETURN_IF_FAIL
-#undef INDENT_WRITER_BYTES
+#undef BYTES_INDENT_WRITER

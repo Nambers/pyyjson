@@ -2,10 +2,7 @@
 #include "commondef/rw_in.inl.h"
 #include "simd/simd_detect.h"
 #include "simd/simd_impl.h"
-// #include "unicode/include/reserve.h"
-#include "unicode/indent_wrap.h"
 
-// encode_simd_utils.inl
 #define GET_DONE_COUNT_FROM_MASK PYYJSON_CONCAT2(get_done_count_from_mask, COMPILE_READ_UCS_LEVEL)
 #define WRITE_SIMD_256_WITH_WRITEMASK PYYJSON_CONCAT2(write_simd_256_with_writemask, COMPILE_WRITE_UCS_LEVEL)
 #define BACK_WRITE_SIMD256_WITH_TAIL_LEN PYYJSON_CONCAT3(back_write_simd256_with_tail_len, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
@@ -31,20 +28,21 @@ force_inline void WRITE_SIMD_IMPL(_TARGET_TYPE *dst, SIMD_TYPE SIMD_VAR);
 
 extern _TARGET_TYPE _CONTROL_SEQ_TABLE[(_Slash + 1) * 8];
 
-force_inline void WRITE_ESCAPE_NO_RESERVE(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE *restrict src, Py_ssize_t len, Py_ssize_t additional_len) {
+force_inline void WRITE_ESCAPE_NO_RESERVE(_TARGET_TYPE **dst_addr, const _FROM_TYPE *restrict src, Py_ssize_t len, Py_ssize_t additional_len) {
     const _FROM_TYPE *src_end = src + len;
+    _TARGET_TYPE *dst = *dst_addr;
     while (src < src_end) {
         _TARGET_TYPE srcval = (_TARGET_TYPE)*src;
         usize unicode_point = (usize)srcval;
         Py_ssize_t copy_count = (unicode_point <= _Slash) ? _ControlJump[unicode_point] : 0;
         if (likely(!copy_count)) {
-            *_WRITER(unicode_buffer_info)++ = srcval;
+            *dst++ = srcval;
         } else {
             _TARGET_TYPE *copy_ptr = &_CONTROL_SEQ_TABLE[unicode_point * 8];
             if (copy_count == 2) {
                 // RETURN_ON_UNLIKELY_ERR(!UNICODE_BUFFER_RESERVE(unicode_buffer_info, 2 + len + TAIL_PADDING / sizeof(_TARGET_TYPE) + additional_len));
-                memcpy((void *)_WRITER(unicode_buffer_info), (const void *)copy_ptr, 2 * sizeof(_TARGET_TYPE));
-                _WRITER(unicode_buffer_info) += 2;
+                memcpy((void *)dst, (const void *)copy_ptr, 2 * sizeof(_TARGET_TYPE));
+                dst += 2;
             } else {
                 assert(6 == copy_count);
 #if COMPILE_WRITE_UCS_LEVEL < 4 || SIZEOF_VOID_P == 8
@@ -53,12 +51,13 @@ force_inline void WRITE_ESCAPE_NO_RESERVE(EncodeUnicodeBufferInfo *unicode_buffe
                 const usize _CopyLen = 6;
 #endif
                 // RETURN_ON_UNLIKELY_ERR(!UNICODE_BUFFER_RESERVE(unicode_buffer_info, _CopyLen + len + TAIL_PADDING / sizeof(_TARGET_TYPE) + additional_len));
-                memcpy(_WRITER(unicode_buffer_info), (const void *)copy_ptr, _CopyLen * sizeof(_TARGET_TYPE));
-                _WRITER(unicode_buffer_info) += 6;
+                memcpy(dst, (const void *)copy_ptr, _CopyLen * sizeof(_TARGET_TYPE));
+                dst += 6;
             }
         }
         src++;
     }
+    *dst_addr = dst;
 }
 
 #if PYYJSON_X86
@@ -67,10 +66,10 @@ force_inline void WRITE_ESCAPE_NO_RESERVE(EncodeUnicodeBufferInfo *unicode_buffe
 #    if SIMD_BIT_SIZE == 512
 
 
-force_inline void WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t len, EncodeUnicodeBufferInfo *unicode_buffer_info) {
+force_inline void WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t len, _TARGET_TYPE **dst_addr) {
 #        define _MASKZ_LOADU PYYJSON_SIMPLE_CONCAT2(_mm512_maskz_loadu_epi, READ_BIT_SIZE)
 #        define _MASK_STOREU PYYJSON_SIMPLE_CONCAT2(_mm512_mask_storeu_epi, READ_BIT_SIZE)
-    _TARGET_TYPE *dst = _WRITER(unicode_buffer_info);
+    _TARGET_TYPE *dst = *dst_addr;
     SIMD_512 z;
     u64 rw_mask, tail_mask;
     rw_mask = ((u64)1 << (usize)len) - 1;
@@ -83,7 +82,7 @@ force_inline void WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t 
         MASK_ELEVATE_WRITE_512(dst, z, len);
 #        endif
         dst += len;
-        _WRITER(unicode_buffer_info) = dst;
+        *dst_addr = dst;
     } else {
 #        if COMPILE_READ_UCS_LEVEL == 1
         usize tzcnt = (usize)u64_tz_bits(tail_mask);
@@ -97,9 +96,9 @@ force_inline void WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t 
         if (tzcnt) MASK_ELEVATE_WRITE_512(dst, z, tzcnt);
 #        endif
         dst += tzcnt;
-        _WRITER(unicode_buffer_info) = dst;
-        WRITE_ESCAPE_NO_RESERVE(unicode_buffer_info, src + tzcnt, len - tzcnt, 0);
-        // RETURN_ON_UNLIKELY_ERR(!WRITE_ESCAPE_NO_RESERVE(unicode_buffer_info, src + tzcnt, len - tzcnt, 0));
+        *dst_addr = dst;
+        WRITE_ESCAPE_NO_RESERVE(dst_addr, src + tzcnt, len - tzcnt, 0);
+        // RETURN_ON_UNLIKELY_ERR(!WRITE_ESCAPE_NO_RESERVE(&_WRITER(unicode_buffer_info), src + tzcnt, len - tzcnt, 0));
     }
     // return true;
 #        undef _MASKZ_LOADU
@@ -110,8 +109,8 @@ force_inline void WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t 
 #    elif SIMD_BIT_SIZE == 256
 
 
-force_inline void WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t len, EncodeUnicodeBufferInfo *unicode_buffer_info) {
-    _TARGET_TYPE *dst = _WRITER(unicode_buffer_info);
+force_inline void WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t len, _TARGET_TYPE **dst_addr) {
+    _TARGET_TYPE *dst = *dst_addr;
     _VEC_A_ y;
     const _FROM_TYPE *load_start = src + len - READ_BATCH_COUNT;
     _TARGET_TYPE *store_start = dst + len - READ_BATCH_COUNT;
@@ -123,17 +122,17 @@ force_inline void WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t 
     check_mask = simd_and_256(check_mask, mask);
     if (likely(check_mask_zero(check_mask))) {
 #        if COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
-        assert((Py_ssize_t)store_start >= (Py_ssize_t)unicode_buffer_info->head);
+        // assert((Py_ssize_t)store_start >= (Py_ssize_t)unicode_buffer_info->head);
         WRITE_SIMD_256_WITH_WRITEMASK(store_start, y, mask);
 #        else
-        BACK_WRITE_SIMD256_WITH_TAIL_LEN(store_start, y, len, unicode_buffer_info->head);
+        BACK_WRITE_SIMD256_WITH_TAIL_LEN(store_start, y, len);
 #        endif
         dst += len;
-        _WRITER(unicode_buffer_info) = dst;
+        *dst_addr = dst;
     } else {
-        _WRITER(unicode_buffer_info) = dst;
-        WRITE_ESCAPE_NO_RESERVE(unicode_buffer_info, src, len, 0);
-        // RETURN_ON_UNLIKELY_ERR(!WRITE_ESCAPE_NO_RESERVE(unicode_buffer_info, src, len, 0));
+        *dst_addr = dst;
+        WRITE_ESCAPE_NO_RESERVE(dst_addr, src, len, 0);
+        // RETURN_ON_UNLIKELY_ERR(!WRITE_ESCAPE_NO_RESERVE(&_WRITER(unicode_buffer_info), src, len, 0));
     }
 
     // return true;
@@ -143,8 +142,8 @@ force_inline void WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t 
 #    else
 // SIMD_BIT_SIZE == 128, x86
 
-force_inline void WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t len, EncodeUnicodeBufferInfo *unicode_buffer_info) {
-    _TARGET_TYPE *dst = _WRITER(unicode_buffer_info);
+force_inline void WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t len, _TARGET_TYPE **dst_addr) {
+    _TARGET_TYPE *dst = *dst_addr;
     assert(len < READ_BATCH_COUNT);
     _VEC_A_ x, mask, check_mask;
     const _FROM_TYPE *load_start = src + len - READ_BATCH_COUNT;
@@ -168,13 +167,11 @@ force_inline void WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t 
         WRITE_SIMD_IMPL(dst, x);
 #        endif     // COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
         dst += len;
-        _WRITER(unicode_buffer_info) = dst;
+        *dst_addr = dst;
     } else {
-        _WRITER(unicode_buffer_info) = dst;
-        WRITE_ESCAPE_NO_RESERVE(unicode_buffer_info, src, len, 0);
-        // RETURN_ON_UNLIKELY_ERR(!WRITE_ESCAPE_NO_RESERVE(unicode_buffer_info, src, len, 0));
+        *dst_addr = dst;
+        WRITE_ESCAPE_NO_RESERVE(dst_addr, src, len, 0);
     }
-    // return true;
 }
 
 
@@ -185,10 +182,10 @@ force_inline void WRITE_UNICODE_TRAILING_IMPL(const _FROM_TYPE *src, Py_ssize_t 
 #endif
 
 
-force_inline void WRITE_UNICODE_LOOPx4(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE **src_addr, usize *len_addr) {
+force_inline void WRITE_UNICODE_LOOPx4(_TARGET_TYPE **dst_addr, const _FROM_TYPE **src_addr, usize *len_addr) {
     register usize len = *len_addr;
     register const _FROM_TYPE *src = *src_addr;
-    register _TARGET_TYPE *dst = _WRITER(unicode_buffer_info);
+    register _TARGET_TYPE *dst = *dst_addr;
     while (len >= WRITE_BATCH_COUNT * 4) {
 #if WR_DIV == 1
 #    define SRC_T _VECx4_A_
@@ -238,17 +235,17 @@ force_inline void WRITE_UNICODE_LOOPx4(EncodeUnicodeBufferInfo *unicode_buffer_i
     }
     *len_addr = len;
     *src_addr = src;
-    _WRITER(unicode_buffer_info) = dst;
+    *dst_addr = dst;
     // return true;
 #undef CHECKER
 #undef SRC_T_U
 #undef SRC_T
 }
 
-force_inline void WRITE_UNICODE_LOOP(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE **src_addr, usize *len_addr) {
+force_inline void WRITE_UNICODE_LOOP(_TARGET_TYPE **dst_addr, const _FROM_TYPE **src_addr, usize *len_addr) {
     register usize len = *len_addr;
     register const _FROM_TYPE *src = *src_addr;
-    register _TARGET_TYPE *dst = _WRITER(unicode_buffer_info);
+    register _TARGET_TYPE *dst = *dst_addr;
     while (len >= READ_BATCH_COUNT) {
         _VEC_A_ SIMD_VAR;
         SIMD_MASK_TYPE mask;
@@ -273,7 +270,7 @@ force_inline void WRITE_UNICODE_LOOP(EncodeUnicodeBufferInfo *unicode_buffer_inf
     }
     *len_addr = len;
     *src_addr = src;
-    _WRITER(unicode_buffer_info) = dst;
+    *dst_addr = dst;
     // return true;
 }
 
@@ -398,11 +395,11 @@ restart:;
 
 force_inline void WRITE_UNICODE_IMPL(EncodeUnicodeBufferInfo *unicode_buffer_info, const _FROM_TYPE *src, Py_ssize_t _len) {
     usize len = (usize)_len;
-    WRITE_UNICODE_LOOPx4(unicode_buffer_info, &src, &len);
-    WRITE_UNICODE_LOOP(unicode_buffer_info, &src, &len);
+    WRITE_UNICODE_LOOPx4(&_WRITER(unicode_buffer_info), &src, &len);
+    WRITE_UNICODE_LOOP(&_WRITER(unicode_buffer_info), &src, &len);
     if (!len) goto done;
     // WRITE_UNICODE_TRAILING_IMPL2(unicode_buffer_info, &src, &len);
-    WRITE_UNICODE_TRAILING_IMPL(src, len, unicode_buffer_info);
+    WRITE_UNICODE_TRAILING_IMPL(src, len, &_WRITER(unicode_buffer_info));
 done:;
     assert(check_unicode_writer_valid(unicode_buffer_info));
 }

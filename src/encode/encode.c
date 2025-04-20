@@ -296,6 +296,10 @@ force_inline void init_pybytes(PyObject *in_new_bytes, usize final_len) {
     new_bytes->ob_sval[final_len] = 0;
 }
 
+force_inline bool bytes_buffer_reserve(EncodeUTF8BufferInfo *utf8_buffer_info, Py_ssize_t target_size) {
+    return unicode_buffer_reserve_1(PYYJSON_CAST(EncodeUnicodeBufferInfo *, utf8_buffer_info), target_size);
+}
+
 /* 
  * Some utility functions only related to *write*, like unicode buffer reserve, writing number
  * need macro: COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4.
@@ -330,12 +334,14 @@ force_inline void init_pybytes(PyObject *in_new_bytes, usize final_len) {
  */
 #include "encode_impl_wrap.h"
 
+// #include "bytes/encode_utf8.h"
+
 /* 
  * Top-level encode functions for encoding container types tp bytes.
  * need macro:
  *      COMPILE_INDENT_LEVEL, value: 0, 2, or 4.
  */
-#include "bytes/encode_bytes_impl_wrap.h"
+// #include "bytes/encode_bytes_impl_wrap.h"
 
 /* Encodes non-container types. */
 force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {

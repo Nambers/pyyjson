@@ -20,7 +20,7 @@
 
 #define WRITE_INDENT_RETURN_IF_FAIL(_unicode_buffer_info_, _cur_nested_depth_, _is_in_obj_, _additional_reserve_count_)                 \
     do {                                                                                                                                \
-        if (unlikely(!INDENT_WRITER(_unicode_buffer_info_, _cur_nested_depth_, _is_in_obj_, _additional_reserve_count_))) return false; \
+        if (unlikely(!UNICODE_INDENT_WRITER(_unicode_buffer_info_, _cur_nested_depth_, _is_in_obj_, _additional_reserve_count_))) return false; \
     } while (0)
 
 

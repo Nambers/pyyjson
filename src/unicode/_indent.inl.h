@@ -17,7 +17,7 @@ force_inline void WRITE_UNICODE_INDENT(_TARGET_TYPE **writer_addr, Py_ssize_t _c
 #endif // COMPILE_INDENT_LEVEL > 0
 }
 
-force_inline bool INDENT_WRITER(EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t cur_nested_depth, bool is_in_obj, Py_ssize_t additional_reserve_count) {
+force_inline bool UNICODE_INDENT_WRITER(EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t cur_nested_depth, bool is_in_obj, Py_ssize_t additional_reserve_count) {
     if (!is_in_obj && COMPILE_INDENT_LEVEL != 0) {
         RETURN_ON_UNLIKELY_ERR(!UNICODE_BUFFER_RESERVE(unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + additional_reserve_count));
         WRITE_UNICODE_INDENT(&_WRITER(unicode_buffer_info), cur_nested_depth);
