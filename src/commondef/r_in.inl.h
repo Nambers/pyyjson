@@ -1,6 +1,6 @@
 #include "pyyjson.h"
 #include "r_out.inl.h"
-#include "simd/simd_impl.h"
+#include "simd/union_vector.h"
 /*
  * Macros IN
  */
@@ -71,6 +71,9 @@
 #    define _VEC_quad_U_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 32, U)
 #endif
 
+#define UNIONVECx2 PYYJSON_CONCAT4(UnionVectorA, READ_UNSIGNED_BIT_NAME, SIMD_BIT_SIZE, x2)
+#define UNIONVECx4 PYYJSON_CONCAT4(UnionVectorA, READ_UNSIGNED_BIT_NAME, SIMD_BIT_SIZE, x4)
+
 //
 #define CHECK_ESCAPE_IMPL_GET_MASK PYYJSON_CONCAT2(check_escape_impl_get_mask, COMPILE_READ_UCS_LEVEL)
 force_inline VECTOR_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restrict src, _VEC_A_ *restrict _out_vec);
@@ -86,9 +89,9 @@ force_inline void CHECK_MASK_AND_GET_DONE_COUNTx4(_VECx4_A_ vec, bool *out_check
 //
 #define CHECK_MASK_128_SRC_T PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 128, A)
 #if SIMD_BIT_SIZE == 512
-#define CHECK_MASK_128_SRC_MASK_T __mmask16
+#    define CHECK_MASK_128_SRC_MASK_T __mmask16
 #else
-#define CHECK_MASK_128_SRC_MASK_T CHECK_MASK_128_SRC_T
+#    define CHECK_MASK_128_SRC_MASK_T CHECK_MASK_128_SRC_T
 #endif
 #define CHECK_MASK_AND_GET_DONE_COUNT_128_WITH_MASK PYYJSON_CONCAT2(check_mask_and_get_done_count_128, COMPILE_READ_UCS_LEVEL)
-force_inline void CHECK_MASK_AND_GET_DONE_COUNT_128_WITH_MASK(CHECK_MASK_128_SRC_T vec, bool *out_checked, usize *out_done_count, CHECK_MASK_128_SRC_MASK_T* optional_mask);
+force_inline void CHECK_MASK_AND_GET_DONE_COUNT_128_WITH_MASK(CHECK_MASK_128_SRC_T vec, bool *out_checked, usize *out_done_count, CHECK_MASK_128_SRC_MASK_T *optional_mask);

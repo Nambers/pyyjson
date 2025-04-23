@@ -6,6 +6,10 @@
 #undef CHECK_MASK_AND_GET_DONE_COUNT
 #undef CHECK_ESCAPE_IMPL_GET_MASK
 //
+#undef UNIONVECx4
+#undef UNIONVECx2
+#undef _VEC_quad_U_
+#undef _VEC_quad_A_
 #undef _VEC_half_U_
 #undef _VEC_half_A_
 #undef _VECx4_U_

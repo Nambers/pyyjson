@@ -11,6 +11,7 @@
 #include <stdalign.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 #if defined(_POSIX_THREADS)
 #    include <pthread.h>
 #    define TLS_KEY_TYPE pthread_key_t
@@ -113,6 +114,7 @@ typedef size_t usize;
 
 // avx and above may be enabled.
 static_assert(sizeof(PyASCIIObject) >= 4 * SIZEOF_VOID_P, "sizeof(PyASCIIObject) == ?");
+// static_assert(offsetof(PyBytesObject, ob_sval) >= 4 * SIZEOF_VOID_P, "sizeof(PyASCIIObject) == ?");
 
 
 #endif

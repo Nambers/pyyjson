@@ -1,5 +1,5 @@
-#ifndef ENCODE_SIMD_IMPL_H
-#define ENCODE_SIMD_IMPL_H
+#ifndef PYYJSON_SIMD_IMPL_H
+#define PYYJSON_SIMD_IMPL_H
 
 #include "Python.h"
 #include "pyyjson.h"
@@ -1349,4 +1349,4 @@ force_inline VECTOR_U32_128_A elevate_1_4_to_128(VECTOR_U8_32_A _in) {
 }
 
 #endif
-#endif // ENCODE_SIMD_IMPL_H
+#endif // PYYJSON_SIMD_IMPL_H
