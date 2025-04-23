@@ -4,6 +4,9 @@
 #include "simd_impl.h"
 
 #define _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL PYYJSON_CONCAT2(_check_escape_impl_get_mask_internal, COMPILE_READ_UCS_LEVEL)
+#define _GET_DONE_COUNT_FROM_MASK_128 PYYJSON_CONCAT2(_get_done_count_from_mask_128, COMPILE_READ_UCS_LEVEL)
+#define _GET_DONE_COUNT_FROM_MASK_256 PYYJSON_CONCAT2(_get_done_count_from_mask_256, COMPILE_READ_UCS_LEVEL)
+#define _GET_DONE_COUNT_FROM_MASK_512 PYYJSON_CONCAT2(_get_done_count_from_mask_512, COMPILE_READ_UCS_LEVEL)
 #define GET_DONE_COUNT_FROM_MASK PYYJSON_CONCAT2(get_done_count_from_mask, COMPILE_READ_UCS_LEVEL)
 #define CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512 PYYJSON_CONCAT2(check_escape_tail_impl_get_mask_512, COMPILE_READ_UCS_LEVEL)
 
@@ -55,13 +58,20 @@ force_inline VECTOR_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restr
 }
 
 #if PYYJSON_X86
-force_inline u32 GET_DONE_COUNT_FROM_MASK(SIMD_MASK_TYPE mask) {
-    SIMD_BIT_MASK_TYPE bit_mask;
 #    if SIMD_BIT_SIZE == 512
+
+force_inline u32 _GET_DONE_COUNT_FROM_MASK_512(u64 mask) {
+    u64 bit_mask;
     bit_mask = mask;
     assert(bit_mask);
     u32 done_count = u64_tz_bits(bit_mask); // / sizeof(_FROM_TYPE);
-#    elif SIMD_BIT_SIZE == 256
+    return done_count;
+}
+#    endif
+
+#    if SIMD_BIT_SIZE >= 256
+force_inline u32 _GET_DONE_COUNT_FROM_MASK_256(__m256i mask) {
+    u32 bit_mask;
     // for bit size < 512, we don't have cmp_epu8, the mask is calculated by subs_epu8
     // so we have to cmpeq with zero to get the real bit mask.
     mask = cmpeq0_8_256(mask);
@@ -69,23 +79,37 @@ force_inline u32 GET_DONE_COUNT_FROM_MASK(SIMD_MASK_TYPE mask) {
     bit_mask = ~bit_mask;
     assert(bit_mask);
     u32 done_count = u32_tz_bits(bit_mask) / sizeof(_FROM_TYPE);
-#    else // SIMD_BIT_SIZE
-#        if COMPILE_READ_UCS_LEVEL != 4
+    return done_count;
+}
+#    endif
+
+force_inline u32 _GET_DONE_COUNT_FROM_MASK_128(__m128i mask) {
+    u16 bit_mask;
+#    if COMPILE_READ_UCS_LEVEL != 4
     // for bit size < 512, we don't have cmp_epu8,
     // the mask is calculated by subs_epu for ucs < 4
     // so we have to cmpeq with zero to get the real bit mask.
     mask = cmpeq0_8_128(mask);
     bit_mask = to_bitmask_128(mask);
     bit_mask = ~bit_mask;
-#        else
+#    else
     // ucs4 does not have subs_epu, so we don't need cmpeq0.
     // The mask itself is ready for use
     bit_mask = to_bitmask_128(mask);
-#        endif // COMPILE_READ_UCS_LEVEL
+#    endif // COMPILE_READ_UCS_LEVEL
     assert(bit_mask);
     u32 done_count = u32_tz_bits((u32)bit_mask) / sizeof(_FROM_TYPE);
-#    endif
     return done_count;
+}
+
+force_inline u32 GET_DONE_COUNT_FROM_MASK(SIMD_MASK_TYPE mask) {
+#    if SIMD_BIT_SIZE == 512
+    return _GET_DONE_COUNT_FROM_MASK_512(mask);
+#    elif SIMD_BIT_SIZE == 256
+    return _GET_DONE_COUNT_FROM_MASK_256(mask);
+#    else
+    return _GET_DONE_COUNT_FROM_MASK_128(mask);
+#    endif
 }
 #elif PYYJSON_AARCH
 // force_inline u32 GET_DONE_COUNT_FROM_MASK(_VEC_A_ mask) {
@@ -234,5 +258,8 @@ force_inline SIMD_MASK_TYPE CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(SIMD_512 z, u64 
 
 #undef CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512
 #undef GET_DONE_COUNT_FROM_MASK
+#undef _GET_DONE_COUNT_FROM_MASK_512
+#undef _GET_DONE_COUNT_FROM_MASK_256
+#undef _GET_DONE_COUNT_FROM_MASK_128
 #undef _CHECK_ESCAPE_IMPL_GET_MASK_INTERNAL
 #include "commondef/r_out.inl.h"

@@ -25,7 +25,7 @@ force_inline void encode_one_special_ucs1(u8 **writer_addr, u8 unicode) {
         *writer++ = (unicode >> 6) | 0xc0;
     } else {
         assert(unicode < ControlMax || unicode == _Quote || unicode == _Slash);
-        memcpy(writer, &_control_seq_table_8[unicode * 8], 8);
+        memcpy(writer, &_ControlSeqTable_1[unicode * 8], 8);
         writer += _ControlJump[unicode];
     }
 
@@ -237,7 +237,7 @@ restart:;
     VECTOR_U8_256_A t3 = SET_ALL(ControlMax);
     VECTOR_U8_256_A t4 = SET_ALL(0x80);
     vec.y = *(const VECTOR_U8_256_U *)last_batch_start;
-    m0.y = (vec == t1) | (vec == t2) | (vec < t3) | (vec & t4);
+    m0.y = (vec.y == t1) | (vec.y == t2) | (vec.y < t3) | (vec.y & t4);
     const usize half_batch = READ_BATCH_COUNT / 2;
     VECTOR_U8_128_A x, m;
     int shift;
@@ -246,18 +246,18 @@ restart:;
         shift = PYYJSON_CAST(int, READ_BATCH_COUNT - len);
         x = runtime_right_shift_128bits(vec.x[0], shift);
         m = runtime_right_shift_128bits(m0.x[0], shift);
-        *(_VEC_U_ *)writer = x;
-        *(_VEC_U_ *)(writer + len) = vec.x[1];
-        bool check1 = check_mask_zero(m);
-        bool check2 = check_mask_zero(m0.x[1]);
+        *(VECTOR_U8_128_U *)writer = x;
+        *(VECTOR_U8_128_U *)(writer + len) = vec.x[1];
+        bool check1 = testz_128(m, m);
+        bool check2 = testz_128(m0.x[1], m0.x[1]);
         if (likely(check1 && check2)) {
             writer += len;
         } else {
             usize done_count;
             if (check1) {
-                done_count = len - half_batch + get_done_count_from_mask_1(m0.x[1]);
+                done_count = len - half_batch + _get_done_count_from_mask_128_1(m0.x[1]);
             } else {
-                done_count = get_done_count_from_mask_1(m);
+                done_count = _get_done_count_from_mask_128_1(m);
             }
             assert(done_count < len);
             len -= done_count + 1;
@@ -277,11 +277,11 @@ restart:;
             x = vec.x[1];
             m = m0.x[1];
         }
-        *(_VEC_U_ *)writer = x;
-        if (likely(check_mask_zero(m))) {
+        *(VECTOR_U8_128_U *)writer = x;
+        if (likely(testz_128(m, m))) {
             writer += len;
         } else {
-            usize done_count = get_done_count_from_mask_1(m);
+            usize done_count = _get_done_count_from_mask_128_1(m);
             assert(done_count < len);
             len -= done_count + 1;
             writer += done_count;
