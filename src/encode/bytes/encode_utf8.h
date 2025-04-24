@@ -21,8 +21,8 @@ force_inline void encode_one_special_ucs1(u8 **writer_addr, u8 unicode) {
     u8 *writer = *writer_addr;
 
     if (unicode >= 128) {
-        *writer++ = (unicode & 0x3f) | 0x80;
         *writer++ = (unicode >> 6) | 0xc0;
+        *writer++ = (unicode & 0x3f) | 0x80;
     } else {
         assert(unicode < ControlMax || unicode == _Quote || unicode == _Slash);
         memcpy(writer, &_ControlSeqTable_1[unicode * 8], 8);
@@ -55,19 +55,19 @@ force_inline void check_ascii_in_ucs1_and_get_done_countx4(UNIONVECx4 vec, bool 
     m.x[0] = _mm512_cmpeq_epi8_mask(vec.x[0], t1) |
              _mm512_cmpeq_epi8_mask(vec.x[0], t2) |
              _mm512_cmplt_epu8_mask(vec.x[0], t3) |
-             _mm512_movepi8_mask(_mm512_and_epi64(vec.x[0], t4));
+             _mm512_movepi8_mask(vec.x[0]);
     m.x[1] = _mm512_cmpeq_epi8_mask(vec.x[1], t1) |
              _mm512_cmpeq_epi8_mask(vec.x[1], t2) |
              _mm512_cmplt_epu8_mask(vec.x[1], t3) |
-             _mm512_movepi8_mask(_mm512_and_epi64(vec.x[1], t4));
+             _mm512_movepi8_mask(vec.x[1]);
     m.x[2] = _mm512_cmpeq_epi8_mask(vec.x[2], t1) |
              _mm512_cmpeq_epi8_mask(vec.x[2], t2) |
              _mm512_cmplt_epu8_mask(vec.x[2], t3) |
-             _mm512_movepi8_mask(_mm512_and_epi64(vec.x[2], t4));
+             _mm512_movepi8_mask(vec.x[2]);
     m.x[3] = _mm512_cmpeq_epi8_mask(vec.x[3], t1) |
              _mm512_cmpeq_epi8_mask(vec.x[3], t2) |
              _mm512_cmplt_epu8_mask(vec.x[3], t3) |
-             _mm512_movepi8_mask(_mm512_and_epi64(vec.x[3], t4));
+             _mm512_movepi8_mask(vec.x[3]);
 #else
     UNIONVECx4 m;
     _VEC_A_ r;
@@ -108,7 +108,7 @@ force_inline void check_ascii_in_ucs1_and_get_done_count(_VEC_A_ vec, bool *out_
     m = _mm512_cmpeq_epi8_mask(vec, t1) |
         _mm512_cmpeq_epi8_mask(vec, t2) |
         _mm512_cmplt_epu8_mask(vec, t3) |
-        _mm512_movepi8_mask(_mm512_and_epi64(vec, t4));
+        _mm512_movepi8_mask(vec);
 #else
     _VEC_A_ m;
     m = (vec == t1) | (vec == t2) | (vec < t3) | (vec & t4);
@@ -297,9 +297,9 @@ restart:;
     *writer_addr = writer;
     return;
 #elif PYYJSON_X86 && SIMD_BIT_SIZE == 512
-
+    // TODO
 #elif PYYJSON_AARCH
-
+    // TODO
 #endif
 }
 
@@ -314,29 +314,28 @@ force_inline void bytes_write_ucs1(u8 **writer_addr, const u8 *src, usize len) {
             while (CAN_LOOP4) {
                 continuous = ascii_in_ucs1_encode_loop4(writer_addr, &src, &len);
                 if (unlikely(!continuous)) {
-                    goto encode_special;
+                    goto encode_one;
                 }
             }
             assert(!CAN_LOOP4);
             while (CAN_LOOP) {
                 continuous = ascii_in_ucs1_encode_loop(writer_addr, &src, &len);
                 if (unlikely(!continuous)) {
-                    goto encode_special;
+                    goto encode_one;
                 }
             }
             assert(!CAN_LOOP);
             break;
         } else {
-            goto do_encode_special;
+            goto do_encode_one;
         }
-    encode_special:;
+    encode_one:;
         unicode = *src;
-    do_encode_special:;
+    do_encode_one:;
         encode_one_ucs1(writer_addr, unicode);
         src++;
         len--;
     }
-loop_over:;
     if (!len) return;
     bytes_write_ucs1_trailing(writer_addr, src, len);
 
@@ -350,10 +349,324 @@ loop_over:;
 /* UCS2 src. */
 #define COMPILE_READ_UCS_LEVEL 2
 #include "commondef/r_in.inl.h"
+#define COMPILE_WRITE_UCS_LEVEL 1
+#include "commondef/w_in.inl.h"
 
-force_inline void bytes_write_ucs2(u8 **writer_addr, const u16 *src, usize len) {
+force_inline void check_ascii_in_ucs2_and_get_done_countx4(UNIONVECx4 vec, bool *out_checked, usize *out_done_count) {
+    _VEC_A_ t1 = SET_ALL(_Quote);
+    _VEC_A_ t2 = SET_ALL(_Slash);
+    _VEC_A_ t3 = SET_ALL(ControlMax);
+    _VEC_A_ t4 = SET_ALL(0x80);
+#if PYYJSON_X86 && SIMD_BIT_SIZE == 512
+    struct {
+        u32 x[4];
+    } m;
+
+    u32 r;
+
+    m.x[0] = _mm512_cmpeq_epi16_mask(vec.x[0], t1) |
+             _mm512_cmpeq_epi16_mask(vec.x[0], t2) |
+             _mm512_cmplt_epu16_mask(vec.x[0], t3) |
+             _mm512_cmpge_epu16_mask(vec.x[0], t4);
+    m.x[1] = _mm512_cmpeq_epi16_mask(vec.x[1], t1) |
+             _mm512_cmpeq_epi16_mask(vec.x[1], t2) |
+             _mm512_cmplt_epu16_mask(vec.x[1], t3) |
+             _mm512_cmpge_epu16_mask(vec.x[1], t4);
+    m.x[2] = _mm512_cmpeq_epi16_mask(vec.x[2], t1) |
+             _mm512_cmpeq_epi16_mask(vec.x[2], t2) |
+             _mm512_cmplt_epu16_mask(vec.x[2], t3) |
+             _mm512_cmpge_epu16_mask(vec.x[2], t4);
+    m.x[3] = _mm512_cmpeq_epi16_mask(vec.x[3], t1) |
+             _mm512_cmpeq_epi16_mask(vec.x[3], t2) |
+             _mm512_cmplt_epu16_mask(vec.x[3], t3) |
+             _mm512_cmpge_epu16_mask(vec.x[3], t4);
+#else
+    UNIONVECx4 m;
+    _VEC_A_ r;
+    m.x[0] = (vec.x[0] == t1) | (vec.x[0] == t2) | (vec.x[0] < t3) | (vec.x[0] >= t4);
+    m.x[1] = (vec.x[1] == t1) | (vec.x[1] == t2) | (vec.x[1] < t3) | (vec.x[1] >= t4);
+    m.x[2] = (vec.x[2] == t1) | (vec.x[2] == t2) | (vec.x[2] < t3) | (vec.x[2] >= t4);
+    m.x[3] = (vec.x[3] == t1) | (vec.x[3] == t2) | (vec.x[3] < t3) | (vec.x[3] >= t4);
+#endif
+
+    r = m.x[0] | m.x[1];
+    r = r | (m.x[2] | m.x[3]);
+
+    if (check_mask_zero(r)) {
+        *out_checked = true;
+    } else {
+        *out_checked = false;
+        usize done_count = 0;
+        for (int i = 0; i < 4; ++i) {
+            if (check_mask_zero(m.x[i])) {
+                done_count += READ_BATCH_COUNT;
+            } else {
+                done_count += get_done_count_from_mask_2(m.x[i]);
+                break;
+            }
+        }
+        *out_done_count = done_count;
+    }
 }
 
+force_inline void check_ascii_in_ucs2_and_get_done_count(_VEC_A_ vec, bool *out_checked, usize *out_done_count) {
+    _VEC_A_ t1 = SET_ALL(_Quote);
+    _VEC_A_ t2 = SET_ALL(_Slash);
+    _VEC_A_ t3 = SET_ALL(ControlMax);
+    _VEC_A_ t4 = SET_ALL(0x80);
+#if PYYJSON_X86 && SIMD_BIT_SIZE == 512
+    u32 m;
+
+    m = _mm512_cmpeq_epi16_mask(vec, t1) |
+        _mm512_cmpeq_epi16_mask(vec, t2) |
+        _mm512_cmplt_epu16_mask(vec, t3) |
+        _mm512_cmpge_epu16_mask(vec, t4);
+#else
+    _VEC_A_ m;
+    m = (vec == t1) | (vec == t2) | (vec < t3) | (vec >= t4);
+#endif
+
+    if (check_mask_zero(m)) {
+        *out_checked = true;
+    } else {
+        *out_checked = false;
+        *out_done_count = get_done_count_from_mask_2(m);
+    }
+}
+
+force_inline bool ascii_in_ucs2_encode_loop4(u8 **dst_addr, const u16 **src_addr, usize *len_addr) {
+    // prepare
+    u8 *dst = *dst_addr;
+    const u16 *src = *src_addr;
+    usize len = *len_addr;
+
+    UNIONVECx4 vec;
+
+    // read
+    vec.x[0] = *(const _VEC_U_ *)(src + READ_BATCH_COUNT * 0);
+    vec.x[1] = *(const _VEC_U_ *)(src + READ_BATCH_COUNT * 1);
+    vec.x[2] = *(const _VEC_U_ *)(src + READ_BATCH_COUNT * 2);
+    vec.x[3] = *(const _VEC_U_ *)(src + READ_BATCH_COUNT * 3);
+
+    // write
+    *(_WVEC_half_U_ *)(dst + READ_BATCH_COUNT * 0) = (_WVEC_half_U_)zip_simd_16_to_8(vec.x[0]);
+    *(_WVEC_half_U_ *)(dst + READ_BATCH_COUNT * 1) = (_WVEC_half_U_)zip_simd_16_to_8(vec.x[1]);
+    *(_WVEC_half_U_ *)(dst + READ_BATCH_COUNT * 2) = (_WVEC_half_U_)zip_simd_16_to_8(vec.x[2]);
+    *(_WVEC_half_U_ *)(dst + READ_BATCH_COUNT * 3) = (_WVEC_half_U_)zip_simd_16_to_8(vec.x[3]);
+
+    // check
+    bool checked;
+    usize done_count;
+    check_ascii_in_ucs2_and_get_done_countx4(vec, &checked, &done_count);
+
+    // update ptr
+    if (likely(checked)) {
+        dst += 4 * READ_BATCH_COUNT;
+        src += 4 * READ_BATCH_COUNT;
+        len -= 4 * READ_BATCH_COUNT;
+    } else {
+        dst += done_count;
+        src += done_count;
+        len -= done_count;
+    }
+    *dst_addr = dst;
+    *src_addr = src;
+    *len_addr = len;
+    return checked;
+}
+
+force_inline bool ascii_in_ucs2_encode_loop(u8 **dst_addr, const u16 **src_addr, usize *len_addr) {
+    // prepare
+    u8 *dst = *dst_addr;
+    const u16 *src = *src_addr;
+    usize len = *len_addr;
+
+    _VEC_A_ vec;
+
+    // read
+    vec = *(const _VEC_U_ *)src;
+
+    // write
+    *(_WVEC_half_U_ *)dst = (_WVEC_half_U_)zip_simd_16_to_8(vec);
+
+    // check
+    bool checked;
+    usize done_count;
+    check_ascii_in_ucs2_and_get_done_count(vec, &checked, &done_count);
+
+    // update ptr
+    if (likely(checked)) {
+        dst += READ_BATCH_COUNT;
+        src += READ_BATCH_COUNT;
+        len -= READ_BATCH_COUNT;
+    } else {
+        dst += done_count;
+        src += done_count;
+        len -= done_count;
+    }
+    *dst_addr = dst;
+    *src_addr = src;
+    *len_addr = len;
+    return checked;
+}
+
+force_inline void check_2bytes_in_ucs2_and_get_done_count(_VEC_A_ vec, bool *out_checked, usize *out_done_count) {
+    _VEC_A_ t1 = SET_ALL(0x80);
+    _VEC_A_ t2 = SET_ALL(0x800);
+#if PYYJSON_X86 && SIMD_BIT_SIZE == 512
+    u32 m;
+    m = _mm512_cmplt_epu16_mask(vec, t1) | _mm512_cmpge_epu16_mask(vec, t2);
+#else
+    _VEC_A_ m;
+    m = (vec < t1) | (vec >= t2);
+#endif
+
+    if (check_mask_zero(m)) {
+        *out_checked = true;
+    } else {
+        *out_checked = false;
+        *out_done_count = get_done_count_from_mask_2(m);
+    }
+}
+
+force_inline bool _2bytes_in_ucs2_encode_loop(u8 **dst_addr, const u16 **src_addr, usize *len_addr) {
+    // prepare
+    u8 *dst = *dst_addr;
+    const u16 *src = *src_addr;
+    usize len = *len_addr;
+
+    _VEC_A_ vec;
+
+    // read
+    vec = *(const _VEC_U_ *)src;
+
+    // write
+#if PYYJSON_X86
+#    if SIMD_BIT_SIZE == 512
+    ucs2_encode_2bytes_utf8_avx512(vec, dst);
+#    elif SIMD_BIT_SIZE == 256
+    ucs2_encode_2bytes_utf8_avx2(vec, dst);
+#    else
+    ucs2_encode_2bytes_utf8_sse2(vec, dst);
+#    endif
+#else
+    // TODO
+#endif
+
+    // check
+    bool checked;
+    usize done_count;
+    check_2bytes_in_ucs2_and_get_done_count(vec, &checked, &done_count);
+
+    // update ptr
+    if (likely(checked)) {
+        dst += READ_BATCH_COUNT;
+        src += READ_BATCH_COUNT;
+        len -= READ_BATCH_COUNT;
+    } else {
+        dst += done_count;
+        src += done_count;
+        len -= done_count;
+    }
+    *dst_addr = dst;
+    *src_addr = src;
+    *len_addr = len;
+    return checked;
+}
+
+force_inline bool _3bytes_in_ucs2_encode_loop(u8 **dst_addr, const u16 **src_addr, usize *len_addr) {
+    // TODO, a bit compicated
+
+    return false;
+}
+
+force_inline void bytes_write_ucs2_trailing(u8 **dst_addr, const u16 *src, usize len) {
+    // TODO, a bit compicated
+}
+
+force_inline void encode_one_ucs2(u8 **writer_addr, u16 unicode) {
+    if (unicode < 128) {
+        if (unicode >= ControlMax && unicode != _Slash && unicode != _Quote) {
+            *(*writer_addr)++ = unicode;
+        } else {
+            encode_one_special_ucs1(writer_addr, (u8)unicode);
+        }
+    } else if (unicode < 0x800) {
+        // 2 bytes
+        u8 *writer = *writer_addr;
+        *writer++ = (unicode >> 6) | 0xc0;
+        *writer++ = (unicode & 0x3f) | 0x80;
+        *writer_addr = writer;
+    } else {
+        // 3 bytes
+        u8 *writer = *writer_addr;
+        *writer++ = (unicode >> 12) | 0xe0;
+        *writer++ = ((unicode & 0xfc0) >> 6) | 0x80;
+        *writer++ = (unicode & 0x3f) | 0x80;
+        *writer_addr = writer;
+    }
+}
+
+force_inline void bytes_write_ucs2(u8 **writer_addr, const u16 *src, usize len) {
+#define CAN_LOOP4 (len >= READ_BATCH_COUNT)
+#define CAN_LOOP (len >= READ_BATCH_COUNT)
+    while (CAN_LOOP) {
+        u16 unicode;
+        unicode = *src;
+        if (unicode < 128) {
+            // ascii range
+            bool continuous;
+            while (CAN_LOOP4) {
+                continuous = ascii_in_ucs2_encode_loop4(writer_addr, &src, &len);
+                if (unlikely(!continuous)) {
+                    goto encode_one;
+                }
+            }
+            assert(!CAN_LOOP4);
+            while (CAN_LOOP) {
+                continuous = ascii_in_ucs2_encode_loop(writer_addr, &src, &len);
+                if (unlikely(!continuous)) {
+                    goto encode_one;
+                }
+            }
+            assert(!CAN_LOOP);
+            break;
+        } else if (unicode < 0x800) {
+            bool continuous;
+            while (CAN_LOOP) {
+                continuous = _2bytes_in_ucs2_encode_loop(writer_addr, &src, &len);
+                if (unlikely(!continuous)) {
+                    goto encode_one;
+                }
+            }
+            assert(!CAN_LOOP);
+            break;
+        } else {
+            bool continuous;
+            while (CAN_LOOP) {
+                continuous = _3bytes_in_ucs2_encode_loop(writer_addr, &src, &len);
+                if (unlikely(!continuous)) {
+                    goto encode_one;
+                }
+            }
+            assert(!CAN_LOOP);
+            break;
+        }
+    encode_one:;
+        unicode = *src;
+    do_encode_one:;
+        encode_one_ucs2(writer_addr, unicode);
+        src++;
+        len--;
+    }
+    if (!len) return;
+    bytes_write_ucs2_trailing(writer_addr, src, len);
+#undef CAN_LOOP
+#undef CAN_LOOP4
+}
+
+#include "commondef/w_out.inl.h"
+#undef COMPILE_WRITE_UCS_LEVEL
 #include "commondef/r_out.inl.h"
 #undef COMPILE_READ_UCS_LEVEL
 

@@ -580,6 +580,25 @@ force_inline bool check_mask_zero(SIMD_MASK_TYPE mask) {
 #    endif
 }
 
+/*
+ * UTF-8.
+ */
+
+force_inline void ucs2_encode_2bytes_utf8_sse2(VECTOR_U16_128_A x, u8 *writer) {
+    /* abcdefgh|12300000 -> gh123[mmm]|abcdef[mm] */
+    /*x1 = gh123000|00000000 */
+    VECTOR_U16_128_A x1 = _mm_srli_epi16(x, 6);
+    /*x2 = ????????|abcdefgh */
+    VECTOR_U16_128_A x2 = _mm_bslli_si128(x, 1);
+    /*x2 = 00000000|abcdef00 */
+    x2 = x2 & broadcast_16_128(0x3f00);
+    /*y = gh123000|abcdef00 */
+    x = x1 | x2;
+    /*y = gh123[mmm]|abcdef[mm] */
+    x = x | broadcast_16_128(0x80c0);
+    *(VECTOR_U16_128_U *)writer = x;
+}
+
 /*==============================================================================
  * SSE4.1 only SIMD code
  *============================================================================*/
@@ -934,6 +953,31 @@ force_inline void ucs2_encode_3bytes_utf8_avx2(u16 *read_in, u8 *writer) {
 //     y = _mm256_or_si256(y, *(const SIMD_256 *)m2);
 //     _mm256_storeu_si256((void *)writer, y);
 // }
+
+force_inline void ucs2_encode_2bytes_utf8_avx2(VECTOR_U16_256_A y, u8 *writer) {
+    /* abcdefgh|12300000 -> gh123[mmm]|abcdef[mm] */
+    pyyjson_align(16) static const u8 t1[16] = {
+            0x80, 0,
+            0x80, 2,
+            0x80, 4,
+            0x80, 6,
+            0x80, 8,
+            0x80, 10,
+            0x80, 12,
+            0x80, 14};
+    /*y1 = gh123000|00000000 */
+    VECTOR_U16_256_A y1 = _mm256_srli_epi16(y, 6);
+    /*y2 = 00000000|abcdefgh */
+    VECTOR_U16_256_A y2 = _mm256_shuffle_epi8(y, _mm256_broadcastsi128_si256(*(const SIMD_128 *)t1));
+    /*y = gh123000|abcdefgh */
+    y = y1 | y2;
+    /*y = gh123000|abcdef00 */
+    y = y & broadcast_16_256(0x3fff);
+    /*y = gh123[mmm]|abcdef[mm] */
+    y = y | broadcast_16_256(0x80c0);
+    *(VECTOR_U16_256_U *)writer = y;
+}
+
 #    endif
 
 /*==============================================================================
@@ -1158,6 +1202,30 @@ force_inline void ucs2_encode_3bytes_utf8_avx512(u16 *read_in, u8 *writer) {
     // 5678[mmmm]|gh1234[mm]|abcdef[mm]
     z = _mm512_or_si512(z, *(const SIMD_512 *)m2);
     _mm512_storeu_si512((void *)writer, z);
+}
+
+force_inline void ucs2_encode_2bytes_utf8_avx512(VECTOR_U16_512_A z, u8 *writer) {
+    /* abcdefgh|12300000 -> gh123[mmm]|abcdef[mm] */
+    pyyjson_align(16) static const u8 t1[16] = {
+            0x80, 0,
+            0x80, 2,
+            0x80, 4,
+            0x80, 6,
+            0x80, 8,
+            0x80, 10,
+            0x80, 12,
+            0x80, 14};
+    /*z1 = gh123000|00000000 */
+    VECTOR_U16_512_A z1 = _mm512_srli_epi16(z, 6);
+    /*z2 = 00000000|abcdefgh */
+    VECTOR_U16_512_A z2 = _mm512_shuffle_epi8(z, _mm512_broadcast_i32x4(*(const SIMD_128 *)t1));
+    /*z = gh123000|abcdefgh */
+    z = z1 | z2;
+    /*z = gh123000|abcdef00 */
+    z = z & broadcast_16_512(0x3fff);
+    /*z = gh123[mmm]|abcdef[mm] */
+    z = z | broadcast_16_512(0x80c0);
+    *(VECTOR_U16_512_U *)writer = z;
 }
 #    endif
 
