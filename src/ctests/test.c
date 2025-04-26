@@ -142,32 +142,54 @@ int SIMD_NAME_MODIFIER(test_ucs2_encode_3bytes_utf8)(void) {
 #else
 #    if __AVX512F__ && __AVX512BW__
     GUARDED_SIMD;
-    u16 input[21];
-    u8 output[64];
+    u16 input[32];
+    u8 output[96];
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = 0x800 + (rand() % (0x10000 - 0x800));
     }
-    ucs2_encode_3bytes_utf8_avx512(input, output);
+    ucs2_encode_3bytes_utf8_avx512(*(VECTOR_U16_512_A *)input, output);
     for (int i = 0; i < COUNT_OF(input); ++i) {
         u32 uni;
         memcpy(&uni, &output[i * 3], 4);
         u16 rt = ((uni & 0x0f) << 12) | ((uni & 0x3f00) >> 2) | ((uni & 0x3f0000) >> 16);
-        CHECK(rt == input[i]);
+        if (rt != input[i]) {
+            printf("input[%d]: " U16_TO_BINARY_PATTERN "\n", i, U16_TO_BINARY(input[i]));
+            printf("output[%d]: " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN "\n", i,
+                   BYTE_TO_BINARY(output[i * 3]), BYTE_TO_BINARY(output[i * 3 + 1]), BYTE_TO_BINARY(output[i * 3 + 2]));
+            // printf("rt[%d]: " U16_TO_BINARY_PATTERN "\n", i, U16_TO_BINARY(rt));
+            u8 test1 = (input[i] >> 12) | 0xe0;
+            u8 test2 = ((input[i] & 0xfc0) >> 6) | 0x80;
+            u8 test3 = (input[i] & 0x3f) | 0x80;
+            printf("encoded: " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN "\n", BYTE_TO_BINARY(test1), BYTE_TO_BINARY(test2), BYTE_TO_BINARY(test3));
+            CHECK(false);
+        }
+        // CHECK(rt == input[i]);
     }
     return PASSED;
 #    elif __AVX2__
     GUARDED_SIMD;
     u16 input[16];
-    u8 output[56];
+    u8 output[48];
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = 0x800 + (rand() % (0x10000 - 0x800));
     }
-    ucs2_encode_3bytes_utf8_avx2(input, output);
+    ucs2_encode_3bytes_utf8_avx2((VECTOR_U8_256_A) * (VECTOR_U8_256_U *)input, output);
     for (int i = 0; i < COUNT_OF(input); ++i) {
         u32 uni;
         memcpy(&uni, &output[i * 3], 4);
         u16 rt = ((uni & 0x0f) << 12) | ((uni & 0x3f00) >> 2) | ((uni & 0x3f0000) >> 16);
-        CHECK(rt == input[i]);
+        if (rt != input[i]) {
+            printf("input[%d]: " U16_TO_BINARY_PATTERN "\n", i, U16_TO_BINARY(input[i]));
+            printf("output[%d]: " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN "\n", i,
+                   BYTE_TO_BINARY(output[i * 3]), BYTE_TO_BINARY(output[i * 3 + 1]), BYTE_TO_BINARY(output[i * 3 + 2]));
+            // printf("rt[%d]: " U16_TO_BINARY_PATTERN "\n", i, U16_TO_BINARY(rt));
+            u8 test1 = (input[i] >> 12) | 0xe0;
+            u8 test2 = ((input[i] & 0xfc0) >> 6) | 0x80;
+            u8 test3 = (input[i] & 0x3f) | 0x80;
+            printf("encoded: " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN "\n", BYTE_TO_BINARY(test1), BYTE_TO_BINARY(test2), BYTE_TO_BINARY(test3));
+            CHECK(false);
+        }
+        // CHECK(rt == input[i]);
     }
     return PASSED;
 #    else
