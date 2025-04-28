@@ -599,80 +599,181 @@ force_inline void ucs2_encode_2bytes_utf8_sse2(VECTOR_U16_128_A x, u8 *writer) {
     *(VECTOR_U16_128_U *)writer = x;
 }
 
+// force_inline void ucs2_encode_3bytes_utf8_ssse3(VECTOR_U16_128_A x, u8 *writer) {
+//     /* abcdefgh|12345678 -> 5678[mmmm]|gh1234[mm]|abcdef[mm] */
+// #    if __SSSE3__
+//     // we need __SSSE3__ for _mm_shuffle_epi8
+//     static const VECTOR_U8_128_A t1 = {
+//             0x80, 0x80, 0,
+//             0x80, 0x80, 2,
+//             0x80, 0x80, 4,
+//             0x80, 0x80, 6,
+//             0x80, 0x80, 8,
+//             0x80};
+//     static const VECTOR_U8_128_A t2 = {
+//             0x80, 0, 0x80,
+//             0x80, 2, 0x80,
+//             0x80, 4, 0x80,
+//             0x80, 6, 0x80,
+//             0x80, 8, 0x80,
+//             0x80};
+//     static const VECTOR_U8_128_A t3 = {
+//             0, 0x80, 0x80,
+//             2, 0x80, 0x80,
+//             4, 0x80, 0x80,
+//             6, 0x80, 0x80,
+//             8, 0x80, 0x80,
+//             10};
+//     static const VECTOR_U8_128_A m1 = {
+//             0xff, 0x3f, 0x3f,
+//             0xff, 0x3f, 0x3f,
+//             0xff, 0x3f, 0x3f,
+//             0xff, 0x3f, 0x3f,
+//             0xff, 0x3f, 0x3f,
+//             0xff};
+//     static const VECTOR_U8_128_A m2 = {
+//             0xe0, 0x80, 0x80,
+//             0xe0, 0x80, 0x80,
+//             0xe0, 0x80, 0x80,
+//             0xe0, 0x80, 0x80,
+//             0xe0, 0x80, 0x80,
+//             0xe0};
+//     /* x1 = gh123456|78000000 */
+//     VECTOR_U16_128_A x1 = _mm_srli_epi16(x, 6);
+//     /* x2 = 56780000|00000000 */
+//     VECTOR_U16_128_A x2 = _mm_srli_epi16(x, 12);
+//     /* x3 = 00000000|00000000|abcdefgh */
+//     VECTOR_U8_128_A x3 = _mm_shuffle_epi8(x, t1);
+//     /* x4 = 00000000|gh123456|00000000 */
+//     VECTOR_U8_128_A x4 = _mm_shuffle_epi8(x1, t2);
+//     /* x5 = 56780000|00000000|00000000 */
+//     VECTOR_U8_128_A x5 = _mm_shuffle_epi8(x2, t3);
+//     /* x6 = 56780000|gh123456|abcdefgh */
+//     VECTOR_U8_128_A x6 = x3 | x4 | x5;
+//     /* x6 = 5678[mmmm]|gh1234[mm]|abcdef[mm] */
+//     x6 = (x6 & m1) | m2;
+//     /* want: gh1234[mm]|abcdef[mm]|5678[mmmm]|gh1234[mm]|... */
+//     /* x = abcdefgh|12345678 */
+//     x = _mm_bsrli_si128(x, 10);
+//     /* x1 = gh123456|78000000 */
+//     x1 = _mm_bsrli_si128(x1, 10);
+//     /* x2 = 56780000|00000000 */
+//     x2 = _mm_bsrli_si128(x2, 10);
+//     /* x3 = gh123456|00000000|00000000|gh123456 */
+//     x3 = _mm_shuffle_epi8(x1, t3);
+//     /* x4 = 00000000|00000000|56780000|00000000 */
+//     x4 = _mm_shuffle_epi8(x2, t1);
+//     /* x5 = 00000000|abcdefgh|00000000|00000000 */
+//     x5 = _mm_shuffle_epi8(x, t2);
+//     /* x7 = gh123456|abcdefgh|56780000|gh123456 */
+//     VECTOR_U8_128_A x7 = x3 | x4 | x5;
+//     VECTOR_U8_128_A m3 = _mm_bsrli_si128(m1, 1);
+//     VECTOR_U8_128_A m4 = _mm_bsrli_si128(m2, 1);
+//     /* x7 = gh1234[mm]|abcdef[mm]|5678[mmmm]|gh1234[mm] */
+//     x7 = (x7 & m3) | m4;
+//     *(VECTOR_U8_128_U *)writer = x6;
+//     *(VECTOR_U8_128_U *)(writer + 16) = x7;
+// #    else
+//     assert(false);
+//     Py_UNREACHABLE();
+// #    endif
+// }
+
 force_inline void ucs2_encode_3bytes_utf8_ssse3(VECTOR_U16_128_A x, u8 *writer) {
-    /* abcdefgh|12345678 -> 5678[mmmm]|gh1234[mm]|abcdef[mm] */
 #    if __SSSE3__
-    // we need __SSSE3__ for _mm_shuffle_epi8
     static const VECTOR_U8_128_A t1 = {
             0x80, 0x80, 0,
-            0x80, 0x80, 2,
             0x80, 0x80, 4,
-            0x80, 0x80, 6,
             0x80, 0x80, 8,
-            0x80};
+            0x80, 0x80, 12,
+            0x80, 0x80, 0x80, 0x80};
     static const VECTOR_U8_128_A t2 = {
             0x80, 0, 0x80,
-            0x80, 2, 0x80,
             0x80, 4, 0x80,
-            0x80, 6, 0x80,
             0x80, 8, 0x80,
-            0x80};
+            0x80, 12, 0x80,
+            0x80, 0x80, 0x80, 0x80};
     static const VECTOR_U8_128_A t3 = {
             0, 0x80, 0x80,
-            2, 0x80, 0x80,
             4, 0x80, 0x80,
-            6, 0x80, 0x80,
             8, 0x80, 0x80,
-            10};
+            12, 0x80, 0x80,
+            0x80, 0x80, 0x80, 0x80};
     static const VECTOR_U8_128_A m1 = {
             0xff, 0x3f, 0x3f,
             0xff, 0x3f, 0x3f,
             0xff, 0x3f, 0x3f,
             0xff, 0x3f, 0x3f,
-            0xff, 0x3f, 0x3f,
-            0xff};
+            0xff, 0xff, 0xff, 0xff};
     static const VECTOR_U8_128_A m2 = {
             0xe0, 0x80, 0x80,
             0xe0, 0x80, 0x80,
             0xe0, 0x80, 0x80,
             0xe0, 0x80, 0x80,
+            0, 0, 0, 0};
+    VECTOR_U32_128_A x1 = elevate_2_4_to_128(x);
+    VECTOR_U32_128_A x2 = elevate_2_4_to_128(unpack_hi_64_128(x, x));
+    VECTOR_U32_128_A x3 = _mm_srli_epi32(x1, 6);
+    VECTOR_U32_128_A x4 = _mm_srli_epi32(x1, 12);
+    VECTOR_U32_128_A x5 = _mm_srli_epi32(x2, 6);
+    VECTOR_U32_128_A x6 = _mm_srli_epi32(x2, 12);
+    VECTOR_U8_128_A x7 = _mm_shuffle_epi8(x1, t1);
+    VECTOR_U8_128_A x8 = _mm_shuffle_epi8(x3, t2);
+    VECTOR_U8_128_A x9 = _mm_shuffle_epi8(x4, t3);
+    VECTOR_U8_128_A x10 = _mm_shuffle_epi8(x2, t1);
+    VECTOR_U8_128_A x11 = _mm_shuffle_epi8(x5, t2);
+    VECTOR_U8_128_A x12 = _mm_shuffle_epi8(x6, t3);
+    VECTOR_U8_128_A x13 = ((x7 | x8 | x9) & m1) | m2;
+    VECTOR_U8_128_A x14 = ((x10 | x11 | x12) & m1) | m2;
+    VECTOR_U8_128_A x15 = _mm_alignr_epi8(x14, _mm_bslli_si128(x13, 4), 4);
+    VECTOR_U8_128_A x16 = _mm_bsrli_si128(x14, 4);
+    *(VECTOR_U8_128_U *)(writer + 0) = x15;
+    *(VECTOR_U8_128_U *)(writer + 16) = x16;
+#    else
+    assert(false);
+    Py_UNREACHABLE();
+#    endif
+}
+
+force_inline void ucs4_encode_3bytes_utf8_ssse3(VECTOR_U32_128_A x, u8 *writer) {
+#    if __SSSE3__
+    static const VECTOR_U8_128_A t1 = {
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            0x80, 0x80, 0x80, 0x80};
+    static const VECTOR_U8_128_A t2 = {
+            0x80, 0, 0x80,
+            0x80, 4, 0x80,
+            0x80, 8, 0x80,
+            0x80, 12, 0x80,
+            0x80, 0x80, 0x80, 0x80};
+    static const VECTOR_U8_128_A t3 = {
+            0, 0x80, 0x80,
+            4, 0x80, 0x80,
+            8, 0x80, 0x80,
+            12, 0x80, 0x80,
+            0x80, 0x80, 0x80, 0x80};
+    static const VECTOR_U8_128_A m1 = {
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0xff, 0xff, 0xff};
+    static const VECTOR_U8_128_A m2 = {
             0xe0, 0x80, 0x80,
-            0xe0};
-    /* x1 = gh123456|78000000 */
-    VECTOR_U16_128_A x1 = _mm_srli_epi16(x, 6);
-    /* x2 = 56780000|00000000 */
-    VECTOR_U16_128_A x2 = _mm_srli_epi16(x, 12);
-    /* x3 = 00000000|00000000|abcdefgh */
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0, 0, 0, 0};
+    VECTOR_U32_128_A x1 = _mm_srli_epi32(x, 6);
+    VECTOR_U32_128_A x2 = _mm_srli_epi32(x, 12);
     VECTOR_U8_128_A x3 = _mm_shuffle_epi8(x, t1);
-    /* x4 = 00000000|gh123456|00000000 */
     VECTOR_U8_128_A x4 = _mm_shuffle_epi8(x1, t2);
-    /* x5 = 56780000|00000000|00000000 */
     VECTOR_U8_128_A x5 = _mm_shuffle_epi8(x2, t3);
-    /* x6 = 56780000|gh123456|abcdefgh */
-    VECTOR_U8_128_A x6 = x3 | x4 | x5;
-    /* x6 = 5678[mmmm]|gh1234[mm]|abcdef[mm] */
-    x6 = (x6 & m1) | m2;
-    /* want: gh1234[mm]|abcdef[mm]|5678[mmmm]|gh1234[mm]|... */
-    /* x = abcdefgh|12345678 */
-    x = _mm_bsrli_si128(x, 10);
-    /* x1 = gh123456|78000000 */
-    x1 = _mm_bsrli_si128(x1, 10);
-    /* x2 = 56780000|00000000 */
-    x2 = _mm_bsrli_si128(x2, 10);
-    /* x3 = gh123456|00000000|00000000|gh123456 */
-    x3 = _mm_shuffle_epi8(x1, t3);
-    /* x4 = 00000000|00000000|56780000|00000000 */
-    x4 = _mm_shuffle_epi8(x2, t1);
-    /* x5 = 00000000|abcdefgh|00000000|00000000 */
-    x5 = _mm_shuffle_epi8(x, t2);
-    /* x7 = gh123456|abcdefgh|56780000|gh123456 */
-    VECTOR_U8_128_A x7 = x3 | x4 | x5;
-    VECTOR_U8_128_A m3 = _mm_bsrli_si128(m1, 1);
-    VECTOR_U8_128_A m4 = _mm_bsrli_si128(m2, 1);
-    /* x7 = gh1234[mm]|abcdef[mm]|5678[mmmm]|gh1234[mm] */
-    x7 = (x7 & m3) | m4;
+    VECTOR_U8_128_A x6 = ((x3 | x4 | x5) & m1) | m2;
     *(VECTOR_U8_128_U *)writer = x6;
-    *(VECTOR_U8_128_U *)(writer + 16) = x7;
 #    else
     assert(false);
     Py_UNREACHABLE();
@@ -1190,6 +1291,84 @@ force_inline void ucs2_encode_2bytes_utf8_avx2(VECTOR_U16_256_A y, u8 *writer) {
     *(VECTOR_U16_256_U *)writer = y;
 }
 
+force_inline void ucs4_encode_3bytes_utf8_avx2(VECTOR_U32_256_A y, u8 *writer) {
+    /* abcdefgh|12345678|00000000|00000000 -> 5678[mmmm]|gh1234[mm]|abcdef[mm] */
+    VECTOR_U8_256_A t1 = {
+            0x80, 0x80, 0x80, 0x80,
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            //
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            0x80, 0x80, 0x80, 0x80};
+    VECTOR_U8_256_A t2 = {
+            0x80, 0x80, 0x80, 0x80,
+            0x80, 0, 0x80,
+            0x80, 4, 0x80,
+            0x80, 8, 0x80,
+            0x80, 12, 0x80,
+            //
+            0x80, 0, 0x80,
+            0x80, 4, 0x80,
+            0x80, 8, 0x80,
+            0x80, 12, 0x80,
+            0x80, 0x80, 0x80, 0x80};
+    VECTOR_U8_256_A t3 = {
+            0x80, 0x80, 0x80, 0x80,
+            0, 0x80, 0x80,
+            4, 0x80, 0x80,
+            8, 0x80, 0x80,
+            12, 0x80, 0x80,
+            //
+            0, 0x80, 0x80,
+            4, 0x80, 0x80,
+            8, 0x80, 0x80,
+            12, 0x80, 0x80,
+            0x80, 0x80, 0x80, 0x80};
+    VECTOR_U8_256_A m1 = {
+            0xff, 0xff, 0xff, 0xff,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            //
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0xff, 0xff, 0xff};
+    VECTOR_U8_256_A m2 = {
+            0, 0, 0, 0,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            //
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0, 0, 0, 0};
+    VECTOR_U32_256_A mw = {0, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0};
+    /* y1 = gh123456|78000000|00000000|00000000 */
+    VECTOR_U32_256_A y1 = _mm256_srli_epi32(y, 6);
+    /* y2 = 56780000|00000000|00000000|00000000 */
+    VECTOR_U32_256_A y2 = _mm256_srli_epi32(y, 12);
+
+    /* y3 = 00000000|00000000|abcdefgh */
+    VECTOR_U8_256_A y3 = _mm256_shuffle_epi8(y, t1);
+    /* y4 = 00000000|gh123456|00000000 */
+    VECTOR_U8_256_A y4 = _mm256_shuffle_epi8(y1, t2);
+    /* y5 = 56780000|00000000|00000000 */
+    VECTOR_U8_256_A y5 = _mm256_shuffle_epi8(y2, t3);
+    VECTOR_U8_256_A y6 = ((y3 | y4 | y5) & m1) | m2;
+    _mm256_maskstore_epi32(PYYJSON_CAST(int *, writer - 4), mw, y6);
+}
+
 #    endif
 
 /*==============================================================================
@@ -1645,6 +1824,144 @@ force_inline void ucs2_encode_2bytes_utf8_avx512(VECTOR_U16_512_A z, u8 *writer)
     z = z | broadcast_16_512(0x80c0);
     *(VECTOR_U16_512_U *)writer = z;
 }
+
+force_inline void ucs4_encode_3bytes_utf8_avx512(VECTOR_U32_512_A z, u8 *writer) {
+    /* abcdefgh|12345678|00000000|00000000 -> 5678[mmmm]|gh1234[mm]|abcdef[mm] */
+    VECTOR_U8_512_A t1 = {
+            0x80, 0x80, 0x80, 0x80,
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            //
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            0x80, 0x80, 0x80, 0x80,
+            //
+            0x80, 0x80, 0x80, 0x80,
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            //
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            0x80, 0x80, 0x80, 0x80};
+    VECTOR_U8_512_A t2 = {
+            0x80, 0x80, 0x80, 0x80,
+            0x80, 0, 0x80,
+            0x80, 4, 0x80,
+            0x80, 8, 0x80,
+            0x80, 12, 0x80,
+            //
+            0x80, 0, 0x80,
+            0x80, 4, 0x80,
+            0x80, 8, 0x80,
+            0x80, 12, 0x80,
+            0x80, 0x80, 0x80, 0x80,
+            //
+            0x80, 0x80, 0x80, 0x80,
+            0x80, 0, 0x80,
+            0x80, 4, 0x80,
+            0x80, 8, 0x80,
+            0x80, 12, 0x80,
+            //
+            0x80, 0, 0x80,
+            0x80, 4, 0x80,
+            0x80, 8, 0x80,
+            0x80, 12, 0x80,
+            0x80, 0x80, 0x80, 0x80};
+    VECTOR_U8_512_A t3 = {
+            0x80, 0x80, 0x80, 0x80,
+            0, 0x80, 0x80,
+            4, 0x80, 0x80,
+            8, 0x80, 0x80,
+            12, 0x80, 0x80,
+            //
+            0, 0x80, 0x80,
+            4, 0x80, 0x80,
+            8, 0x80, 0x80,
+            12, 0x80, 0x80,
+            0x80, 0x80, 0x80, 0x80,
+            //
+            0x80, 0x80, 0x80, 0x80,
+            0, 0x80, 0x80,
+            4, 0x80, 0x80,
+            8, 0x80, 0x80,
+            12, 0x80, 0x80,
+            //
+            0, 0x80, 0x80,
+            4, 0x80, 0x80,
+            8, 0x80, 0x80,
+            12, 0x80, 0x80,
+            0x80, 0x80, 0x80, 0x80};
+    VECTOR_U8_512_A m1 = {
+            0xff, 0xff, 0xff, 0xff,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            //
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0xff, 0xff, 0xff,
+            //
+            0xff, 0xff, 0xff, 0xff,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            //
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0xff, 0xff, 0xff};
+    VECTOR_U8_512_A m2 = {
+            0, 0, 0, 0,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            //
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0, 0, 0, 0,
+            //
+            0, 0, 0, 0,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            //
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0, 0, 0, 0};
+    /* z1 = gh123456|78000000|00000000|00000000 */
+    VECTOR_U32_512_A z1 = _mm512_srli_epi32(z, 6);
+    /* z2 = 56780000|00000000|00000000|00000000 */
+    VECTOR_U32_512_A z2 = _mm512_srli_epi32(z, 12);
+    /* z3 = 00000000|00000000|abcdefgh */
+    VECTOR_U8_512_A z3 = _mm512_shuffle_epi8(z, t1);
+    /* z4 = 00000000|gh123456|00000000 */
+    VECTOR_U8_512_A z4 = _mm512_shuffle_epi8(z1, t2);
+    /* z5 = 56780000|00000000|00000000 */
+    VECTOR_U8_512_A z5 = _mm512_shuffle_epi8(z2, t3);
+    VECTOR_U8_512_A z6 = ((z3 | z4 | z5) & m1) | m2;
+    _mm512_mask_storeu_epi8(writer - 4, 0xffffff0, z6);
+    _mm512_mask_storeu_epi8(writer - 12, 0xffffff000000000, z6);
+}
+
 #    endif
 
 /*==============================================================================
