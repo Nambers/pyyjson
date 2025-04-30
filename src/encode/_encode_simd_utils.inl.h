@@ -12,18 +12,18 @@
 
 #if COMPILE_READ_UCS_LEVEL == 1 && SIMD_BIT_SIZE == 256
 force_inline void WRITE_SIMD_256_WITH_WRITEMASK(_TARGET_TYPE *dst, SIMD_256 y, SIMD_256 mask) {
-#    if COMPILE_WRITE_UCS_LEVEL == 4
-    // we can use _mm256_maskstore_epi32
-    _mm256_maskstore_epi32((i32 *)dst, mask, y);
-#    elif COMPILE_WRITE_UCS_LEVEL < 4
+    // #    if COMPILE_WRITE_UCS_LEVEL == 4
+    //     // we can use _mm256_maskstore_epi32
+    //     _mm256_maskstore_epi32((i32 *)dst, mask, y);
+    // #    elif COMPILE_WRITE_UCS_LEVEL < 4
     // load-then-blend-then-write
     SIMD_256 blend;
     blend = load_256(dst);
     y = _mm256_blendv_epi8(blend, y, mask);
     _mm256_storeu_si256((__m256i *)dst, y);
-#    else
-#        error "Compiler unreachable code"
-#    endif
+    // #    else
+    // #        error "Compiler unreachable code"
+    // #    endif
 }
 #endif // COMPILE_READ_UCS_LEVEL == 1 && SIMD_BIT_SIZE == 256
 
@@ -38,6 +38,7 @@ force_inline void BACK_WRITE_SIMD256_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_256 y
     SIMD_128 x1, x2, x3, x4;
     split_tail_len_four_parts(len, READ_BATCH_COUNT, &part1, &part2, &part3, &part4);
     extract_256_four_parts(SIMD_VAR, &x1, &x2, &x3, &x4);
+    // TODO: BAD, rewrite this
     // NOTE: for this case (x86_64 and COMPILE_WRITE_UCS_LEVEL is 4),
     // `write_simd_256_with_writemask_4` uses `_mm256_maskstore_epi32` to write.
     // There will be no invalid write as long as the mask table is correct.
@@ -46,22 +47,22 @@ force_inline void BACK_WRITE_SIMD256_WITH_TAIL_LEN(_TARGET_TYPE *dst, SIMD_256 y
     // 0
     writemask = load_256_aligned(read_tail_mask_table_32(write_count_max - part1));
     assert(part1 || testz_256(writemask));
-    write_simd_256_with_writemask_4(dst, elevate_1_4_to_256(x1), writemask);
+    if (part1) write_simd_256_with_writemask_4(dst, elevate_1_4_to_256(x1), writemask);
     dst += write_count_max;
     // 1
     writemask = load_256_aligned(read_tail_mask_table_32(write_count_max - part2));
     assert(part2 || testz_256(writemask));
-    write_simd_256_with_writemask_4(dst, elevate_1_4_to_256(x2), writemask);
+    if (part2) write_simd_256_with_writemask_4(dst, elevate_1_4_to_256(x2), writemask);
     dst += write_count_max;
     // 2
     writemask = load_256_aligned(read_tail_mask_table_32(write_count_max - part3));
     assert(part3 || testz_256(writemask));
-    write_simd_256_with_writemask_4(dst, elevate_1_4_to_256(x3), writemask);
+    if (part3) write_simd_256_with_writemask_4(dst, elevate_1_4_to_256(x3), writemask);
     dst += write_count_max;
     // 3
     writemask = load_256_aligned(read_tail_mask_table_32(write_count_max - part4));
     assert(part4 || testz_256(writemask));
-    write_simd_256_with_writemask_4(dst, elevate_1_4_to_256(x4), writemask);
+    if (part4) write_simd_256_with_writemask_4(dst, elevate_1_4_to_256(x4), writemask);
     dst += write_count_max;
 #    else // COMPILE_READ_UCS_LEVEL != 1 || COMPILE_WRITE_UCS_LEVEL != 4
 #        define MASK_TABLE_READER PYYJSON_CONCAT2(read_tail_mask_table, WRITE_BIT_SIZE)

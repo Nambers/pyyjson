@@ -39,10 +39,16 @@
 #        else
 #            define PYYJSON_HAS_BLENDV 0
 #        endif
+#        if SIMD_BIT_SIZE >= 512
+#            define WRITE_SUPPORT_MASK_WRITE 1
+#        else
+#            define WRITE_SUPPORT_MASK_WRITE 0
+#        endif
 #    elif PYYJSON_AARCH
 #        define SIMD_FEATURE_NAME neon
 #        define PYYJSON_HAS_BLENDV 0
 #        define SIMD_BIT_SIZE 128
+#        define WRITE_SUPPORT_MASK_WRITE 0
 // aarch64 TODO
 #    else
 #        error "unsupported architecture"

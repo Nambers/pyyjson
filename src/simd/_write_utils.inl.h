@@ -2,6 +2,7 @@
 
 #include "mask_table.h"
 #include "simd_impl.h"
+//
 #include "commondef/w_in.inl.h"
 
 #define WRITE_PARTIAL_HEAD PYYJSON_CONCAT2(write_partial_head, COMPILE_WRITE_UCS_LEVEL)
@@ -33,19 +34,19 @@ force_inline void WRITE_PARTIAL_HEAD(void *restrict dst, poly128_t x, Py_ssize_t
 // WRITE_PARTIAL_TAIL defines for 256 and 128
 #if SIMD_BIT_SIZE != 512 && PYYJSON_HAS_BLENDV
 force_inline void WRITE_PARTIAL_TAIL(void *restrict dst, SIMD_TYPE SIMD_VAR, Py_ssize_t tail_cnt) {
-#    if WRITE_SUPPORT_MASK_WRITE
-    static_assert(SIMD_BIT_SIZE == 256 && COMPILE_WRITE_UCS_LEVEL == 4, "");
-    _mm256_maskstore_epi32((i32 *)dst, load_simd_aligned(read_tail_mask_reversed_table_32(tail_cnt)), SIMD_VAR);
-#    else
+    // #    if WRITE_SUPPORT_MASK_WRITE
+    //     static_assert(SIMD_BIT_SIZE == 256 && COMPILE_WRITE_UCS_LEVEL == 4, "");
+    //     _mm256_maskstore_epi32((i32 *)dst, load_simd_aligned(read_tail_mask_reversed_table_32(tail_cnt)), SIMD_VAR);
+    // #    else
     static_assert(PYYJSON_HAS_BLENDV, "PYYJSON_HAS_BLENDV");
-#        define BLENDV_WRITER PYYJSON_CONCAT2(blendv_writetail, SIMD_BIT_SIZE)
-#        define MASK_TABLE_READER PYYJSON_CONCAT2(read_tail_mask_reversed_table, WRITE_BIT_SIZE)
+#    define BLENDV_WRITER PYYJSON_CONCAT2(blendv_writetail, SIMD_BIT_SIZE)
+#    define MASK_TABLE_READER PYYJSON_CONCAT2(read_tail_mask_reversed_table, WRITE_BIT_SIZE)
     if (tail_cnt) {
         BLENDV_WRITER(SIMD_VAR, dst, load_simd_aligned(MASK_TABLE_READER(tail_cnt)));
     }
-#        undef MASK_TABLE_READER
-#        undef BLENDV_WRITER
-#    endif
+#    undef MASK_TABLE_READER
+#    undef BLENDV_WRITER
+    // #    endif
 }
 #endif
 

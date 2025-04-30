@@ -174,15 +174,15 @@ int SIMD_NAME_MODIFIER(test_ucs2_encode_3bytes_utf8)(void) {
 #else
 #    if __AVX512F__ && __AVX512BW__
     GUARDED_SIMD;
-    pyyjson_align(64) u16 input[32];
+    u16 input[32];
     u8 output[96];
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = 0x800 + (rand() % (0x10000 - 0x800));
     }
-    ucs2_encode_3bytes_utf8_avx512(*(VECTOR_U16_512_A *)input, output);
+    ucs2_encode_3bytes_utf8_avx512((VECTOR_U16_512_A) * (VECTOR_U16_512_U *)input, output);
     for (int i = 0; i < COUNT_OF(input); ++i) {
         u32 uni = 0;
-        memcpy(&uni, &output[i * 3], 4);
+        memcpy(&uni, &output[i * 3], 3);
         u16 rt = ((uni & 0x0f) << 12) | ((uni & 0x3f00) >> 2) | ((uni & 0x3f0000) >> 16);
         if (rt != input[i]) {
             printf("input[%d]: " U16_TO_BINARY_PATTERN "\n", i, U16_TO_BINARY(input[i]));
@@ -208,7 +208,7 @@ int SIMD_NAME_MODIFIER(test_ucs2_encode_3bytes_utf8)(void) {
     ucs2_encode_3bytes_utf8_avx2((VECTOR_U8_256_A) * (VECTOR_U8_256_U *)input, output);
     for (int i = 0; i < COUNT_OF(input); ++i) {
         u32 uni = 0;
-        memcpy(&uni, &output[i * 3], 4);
+        memcpy(&uni, &output[i * 3], 3);
         u16 rt = ((uni & 0x0f) << 12) | ((uni & 0x3f00) >> 2) | ((uni & 0x3f0000) >> 16);
         if (rt != input[i]) {
             printf("input[%d]: " U16_TO_BINARY_PATTERN "\n", i, U16_TO_BINARY(input[i]));
@@ -236,15 +236,15 @@ int SIMD_NAME_MODIFIER(test_ucs4_encode_3bytes_utf8)(void) {
 #else
 #    if __AVX512F__ && __AVX512BW__ && __AVX512VL__
     GUARDED_SIMD;
-    pyyjson_align(64) u32 input[16];
+    u32 input[16];
     u8 output[48];
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = (0x800 + (rand() % (0x100000 - 0x800))) & 0xffff;
     }
-    ucs4_encode_3bytes_utf8_avx512(*(VECTOR_U32_512_A *)input, output);
+    ucs4_encode_3bytes_utf8_avx512((VECTOR_U32_512_A) * (VECTOR_U32_512_U *)input, output);
     for (int i = 0; i < COUNT_OF(input); ++i) {
         u32 uni = 0;
-        memcpy(&uni, &output[i * 3], 4);
+        memcpy(&uni, &output[i * 3], 3);
         u32 rt = ((uni & 0x0f) << 12) | ((uni & 0x3f00) >> 2) | ((uni & 0x3f0000) >> 16);
         if (rt != input[i]) {
             printf("rt      : " U32_TO_BINARY_PATTERN "\n", U32_TO_BINARY(rt));
@@ -261,16 +261,15 @@ int SIMD_NAME_MODIFIER(test_ucs4_encode_3bytes_utf8)(void) {
     return PASSED;
 #    elif __AVX2__
     GUARDED_SIMD;
-    GUARDED_SIMD;
-    pyyjson_align(32) u32 input[8];
+    u32 input[8];
     u8 output[24];
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = (0x800 + (rand() % (0x100000 - 0x800))) & 0xffff;
     }
-    ucs4_encode_3bytes_utf8_avx2(*(VECTOR_U8_256_A *)input, output);
+    ucs4_encode_3bytes_utf8_avx2((VECTOR_U8_256_A) * (VECTOR_U8_256_U *)input, output);
     for (int i = 0; i < COUNT_OF(input); ++i) {
         u32 uni = 0;
-        memcpy(&uni, &output[i * 3], 4);
+        memcpy(&uni, &output[i * 3], 3);
         u32 rt = ((uni & 0x0f) << 12) | ((uni & 0x3f00) >> 2) | ((uni & 0x3f0000) >> 16);
         if (rt != input[i]) {
             printf("input[%d]: " U16_TO_BINARY_PATTERN "\n", i, U16_TO_BINARY((u16)input[i]));
