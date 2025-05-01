@@ -96,6 +96,40 @@ int SIMD_NAME_MODIFIER(test_ucs2_encode_3bytes_utf8)(void) {
 #endif
 }
 
+int SIMD_NAME_MODIFIER(test_ucs2_encode_2bytes_utf8)(void) {
+#if PYYJSON_AARCH
+    return INVALID;
+#else
+#    if __AVX512F__ && __AVX512BW__ && __AVX512VL__
+    GUARDED_SIMD;
+    u16 input[32];
+    u8 output[64];
+    for (int i = 0; i < COUNT_OF(input); ++i) {
+        input[i] = get_random_2bytes_u16();
+    }
+    ucs2_encode_2bytes_utf8_avx512((VECTOR_U16_512_A) * (VECTOR_U16_512_U *)input, output);
+    return check_ucs2_2bytes(input, output, COUNT_OF(input));
+#    elif __AVX2__
+    GUARDED_SIMD;
+    u16 input[16];
+    u8 output[32];
+    for (int i = 0; i < COUNT_OF(input); ++i) {
+        input[i] = get_random_2bytes_u16();
+    }
+    ucs2_encode_2bytes_utf8_avx2((VECTOR_U8_256_A) * (VECTOR_U8_256_U *)input, output);
+    return check_ucs2_2bytes(input, output, COUNT_OF(input));
+#    else
+    u16 input[8];
+    u8 output[16];
+    for (int i = 0; i < COUNT_OF(input); ++i) {
+        input[i] = get_random_2bytes_u16();
+    }
+    ucs2_encode_2bytes_utf8_sse2((VECTOR_U8_128_A) * (VECTOR_U8_128_U *)input, output);
+    return check_ucs2_2bytes(input, output, COUNT_OF(input));
+#    endif
+#endif
+}
+
 int SIMD_NAME_MODIFIER(test_ucs4_encode_3bytes_utf8)(void) {
 #if PYYJSON_AARCH
     return INVALID;
@@ -105,7 +139,7 @@ int SIMD_NAME_MODIFIER(test_ucs4_encode_3bytes_utf8)(void) {
     u32 input[16];
     u8 output[48];
     for (int i = 0; i < COUNT_OF(input); ++i) {
-        input[i] = (0x800 + (rand() % (0x100000 - 0x800))) & 0xffff;
+        input[i] = get_random_3bytes_u16();
     }
     ucs4_encode_3bytes_utf8_avx512((VECTOR_U32_512_A) * (VECTOR_U32_512_U *)input, output);
     return check_ucs4_3bytes(input, output, COUNT_OF(input));
