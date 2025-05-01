@@ -2,6 +2,9 @@
 #define PYYJSON_CTESTS_TOOLS_H
 
 #include "test.h"
+
+uintptr_t find_extension_symbol(const char *symbol_name);
+
 int check_ascii_ascii(u8 *input, u8 *output, int count);
 int check_ucs1_2bytes(u8 *input, u8 *output, int count);
 int check_ucs1_ascii(u8 *input, u8 *output, int count);

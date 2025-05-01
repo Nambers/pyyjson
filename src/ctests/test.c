@@ -1,48 +1,6 @@
 #include "test.h"
 #include "simd/simd_detect.h"
 #include "tools.h"
-#ifdef _WIN32
-#    include <windows.h>
-#else
-#    include <dlfcn.h>
-#endif
-
-#if BUILD_MULTI_LIB && PYYJSON_X86
-#    if SIMD_BIT_SIZE == 512
-#        define GUARDED_SIMD                         \
-            do {                                     \
-                if (!_SupportAVX512) return SKIPPED; \
-            } while (0)
-#    elif SIMD_BIT_SIZE == 256
-#        define GUARDED_SIMD                       \
-            do {                                   \
-                if (!_SupportAVX2) return SKIPPED; \
-            } while (0)
-#    else
-#        define GUARDED_SIMD ((void)0)
-#    endif
-#else
-#    define GUARDED_SIMD ((void)0)
-#endif
-
-#define TEST_STRINGIZE_EX(_x) #_x
-#define TEST_STRINGIZE(_x) TEST_STRINGIZE_EX(_x)
-
-static force_noinline uintptr_t find_extension_symbol(const char *symbol_name) {
-#ifdef _WIN32
-    static HMODULE handle = NULL;
-    if (!handle) handle = GetModuleHandle(NULL);
-    if (!handle) return 0;
-    uintptr_t ret = (uintptr_t)GetProcAddress(handle, symbol_name);
-    return ret;
-#else
-    static void *handle = NULL;
-    if (!handle) handle = dlopen(NULL, RTLD_NOW);
-    if (!handle) return 0;
-    uintptr_t ret = (uintptr_t)dlsym(handle, symbol_name);
-    return ret;
-#endif
-}
 
 int SIMD_NAME_MODIFIER(test_elevate_1_2_to_128)(void) {
 #if PYYJSON_AARCH
@@ -119,7 +77,7 @@ int SIMD_NAME_MODIFIER(test_ucs2_encode_3bytes_utf8)(void) {
     u16 input[32];
     u8 output[96];
     for (int i = 0; i < COUNT_OF(input); ++i) {
-        input[i] = get_random_ucs2();
+        input[i] = get_random_3bytes_u16();
     }
     ucs2_encode_3bytes_utf8_avx512((VECTOR_U16_512_A) * (VECTOR_U16_512_U *)input, output);
     return check_ucs2_3bytes(input, output, COUNT_OF(input));
@@ -128,7 +86,7 @@ int SIMD_NAME_MODIFIER(test_ucs2_encode_3bytes_utf8)(void) {
     u16 input[16];
     u8 output[48];
     for (int i = 0; i < COUNT_OF(input); ++i) {
-        input[i] = get_random_ucs2();
+        input[i] = get_random_3bytes_u16();
     }
     ucs2_encode_3bytes_utf8_avx2((VECTOR_U8_256_A) * (VECTOR_U8_256_U *)input, output);
     return check_ucs2_3bytes(input, output, COUNT_OF(input));
@@ -156,7 +114,7 @@ int SIMD_NAME_MODIFIER(test_ucs4_encode_3bytes_utf8)(void) {
     u32 input[8];
     u8 output[24];
     for (int i = 0; i < COUNT_OF(input); ++i) {
-        input[i] = get_random_ucs2();
+        input[i] = get_random_3bytes_u16();
     }
     ucs4_encode_3bytes_utf8_avx2((VECTOR_U8_256_A) * (VECTOR_U8_256_U *)input, output);
     return check_ucs4_3bytes(input, output, COUNT_OF(input));

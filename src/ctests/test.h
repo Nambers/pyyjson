@@ -5,6 +5,27 @@
 
 /* Helper macros. */
 
+#if BUILD_MULTI_LIB && PYYJSON_X86
+#    if SIMD_BIT_SIZE == 512
+#        define GUARDED_SIMD                         \
+            do {                                     \
+                if (!_SupportAVX512) return SKIPPED; \
+            } while (0)
+#    elif SIMD_BIT_SIZE == 256
+#        define GUARDED_SIMD                       \
+            do {                                   \
+                if (!_SupportAVX2) return SKIPPED; \
+            } while (0)
+#    else
+#        define GUARDED_SIMD ((void)0)
+#    endif
+#else
+#    define GUARDED_SIMD ((void)0)
+#endif
+
+#define TEST_STRINGIZE_EX(_x) #_x
+#define TEST_STRINGIZE(_x) TEST_STRINGIZE_EX(_x)
+
 #define CHECK(_x)                   \
     do {                            \
         bool _check_result_ = (_x); \
@@ -57,8 +78,20 @@ force_inline u32 get_random_in_range(int a, int b) {
     return r + a;
 }
 
-force_inline u16 get_random_ucs2(void) {
+force_inline u8 get_random_ascii_u8(void) {
+    return (u8)get_random_in_range(0, 0x80);
+}
+
+force_inline u16 get_random_2bytes_u16(void) {
+    return (u16)get_random_in_range(0x80, 0x800);
+}
+
+force_inline u16 get_random_3bytes_u16(void) {
     return (u16)get_random_in_range(0x800, 0x10000);
+}
+
+force_inline u32 get_random_4bytes_u32(void) {
+    return (u32)get_random_in_range(0x10000, 0x110000);
 }
 
 /* DECLARE_TEST macro. */
@@ -73,7 +106,7 @@ force_inline u16 get_random_ucs2(void) {
 #    define DECLARE_TEST(_name) int _name(void);
 #endif
 
-/* Tests. */
+/* Declare tests. */
 
 DECLARE_TEST(test_elevate_1_2_to_128)
 DECLARE_TEST(test_elevate_1_4_to_128)

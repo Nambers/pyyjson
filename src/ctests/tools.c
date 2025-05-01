@@ -1,5 +1,9 @@
 #include "test.h"
-
+#ifdef _WIN32
+#    include <windows.h>
+#else
+#    include <dlfcn.h>
+#endif
 
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define U16_TO_BINARY_PATTERN BYTE_TO_BINARY_PATTERN BYTE_TO_BINARY_PATTERN
@@ -62,6 +66,22 @@
                           ((_u) & 0x01 ? '1' : '0')
 #define TEST_STRINGIZE_EX(_x) #_x
 #define TEST_STRINGIZE(_x) TEST_STRINGIZE_EX(_x)
+
+uintptr_t find_extension_symbol(const char *symbol_name) {
+#ifdef _WIN32
+    static HMODULE handle = NULL;
+    if (!handle) handle = GetModuleHandle(NULL);
+    if (!handle) return 0;
+    uintptr_t ret = (uintptr_t)GetProcAddress(handle, symbol_name);
+    return ret;
+#else
+    static void *handle = NULL;
+    if (!handle) handle = dlopen(NULL, RTLD_NOW);
+    if (!handle) return 0;
+    uintptr_t ret = (uintptr_t)dlsym(handle, symbol_name);
+    return ret;
+#endif
+}
 
 bool check_unicode_encode(u32 origin_unicode, u8 *bytes_rep, int index_for_print) {
     bool same;
