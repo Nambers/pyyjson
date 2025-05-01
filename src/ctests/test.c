@@ -1,5 +1,6 @@
 #include "test.h"
 #include "simd/simd_detect.h"
+#include "tools.h"
 #ifdef _WIN32
 #    include <windows.h>
 #else
@@ -24,65 +25,6 @@
 #    define GUARDED_SIMD ((void)0)
 #endif
 
-#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
-#define U16_TO_BINARY_PATTERN BYTE_TO_BINARY_PATTERN BYTE_TO_BINARY_PATTERN
-#define U32_TO_BINARY_PATTERN U16_TO_BINARY_PATTERN U16_TO_BINARY_PATTERN
-#define BYTE_TO_BINARY(_u) ((_u) & 0x80 ? '1' : '0'), \
-                           ((_u) & 0x40 ? '1' : '0'), \
-                           ((_u) & 0x20 ? '1' : '0'), \
-                           ((_u) & 0x10 ? '1' : '0'), \
-                           ((_u) & 0x08 ? '1' : '0'), \
-                           ((_u) & 0x04 ? '1' : '0'), \
-                           ((_u) & 0x02 ? '1' : '0'), \
-                           ((_u) & 0x01 ? '1' : '0')
-#define U16_TO_BINARY(_u) ((_u) & 0x8000 ? '1' : '0'), \
-                          ((_u) & 0x4000 ? '1' : '0'), \
-                          ((_u) & 0x2000 ? '1' : '0'), \
-                          ((_u) & 0x1000 ? '1' : '0'), \
-                          ((_u) & 0x800 ? '1' : '0'),  \
-                          ((_u) & 0x400 ? '1' : '0'),  \
-                          ((_u) & 0x200 ? '1' : '0'),  \
-                          ((_u) & 0x100 ? '1' : '0'),  \
-                          ((_u) & 0x80 ? '1' : '0'),   \
-                          ((_u) & 0x40 ? '1' : '0'),   \
-                          ((_u) & 0x20 ? '1' : '0'),   \
-                          ((_u) & 0x10 ? '1' : '0'),   \
-                          ((_u) & 0x08 ? '1' : '0'),   \
-                          ((_u) & 0x04 ? '1' : '0'),   \
-                          ((_u) & 0x02 ? '1' : '0'),   \
-                          ((_u) & 0x01 ? '1' : '0')
-#define U32_TO_BINARY(_u) ((_u) & 0x80000000 ? '1' : '0'), \
-                          ((_u) & 0x40000000 ? '1' : '0'), \
-                          ((_u) & 0x20000000 ? '1' : '0'), \
-                          ((_u) & 0x10000000 ? '1' : '0'), \
-                          ((_u) & 0x8000000 ? '1' : '0'),  \
-                          ((_u) & 0x4000000 ? '1' : '0'),  \
-                          ((_u) & 0x2000000 ? '1' : '0'),  \
-                          ((_u) & 0x1000000 ? '1' : '0'),  \
-                          ((_u) & 0x800000 ? '1' : '0'),   \
-                          ((_u) & 0x400000 ? '1' : '0'),   \
-                          ((_u) & 0x200000 ? '1' : '0'),   \
-                          ((_u) & 0x100000 ? '1' : '0'),   \
-                          ((_u) & 0x80000 ? '1' : '0'),    \
-                          ((_u) & 0x40000 ? '1' : '0'),    \
-                          ((_u) & 0x20000 ? '1' : '0'),    \
-                          ((_u) & 0x10000 ? '1' : '0'),    \
-                          ((_u) & 0x8000 ? '1' : '0'),     \
-                          ((_u) & 0x4000 ? '1' : '0'),     \
-                          ((_u) & 0x2000 ? '1' : '0'),     \
-                          ((_u) & 0x1000 ? '1' : '0'),     \
-                          ((_u) & 0x800 ? '1' : '0'),      \
-                          ((_u) & 0x400 ? '1' : '0'),      \
-                          ((_u) & 0x200 ? '1' : '0'),      \
-                          ((_u) & 0x100 ? '1' : '0'),      \
-                          ((_u) & 0x80 ? '1' : '0'),       \
-                          ((_u) & 0x40 ? '1' : '0'),       \
-                          ((_u) & 0x20 ? '1' : '0'),       \
-                          ((_u) & 0x10 ? '1' : '0'),       \
-                          ((_u) & 0x08 ? '1' : '0'),       \
-                          ((_u) & 0x04 ? '1' : '0'),       \
-                          ((_u) & 0x02 ? '1' : '0'),       \
-                          ((_u) & 0x01 ? '1' : '0')
 #define TEST_STRINGIZE_EX(_x) #_x
 #define TEST_STRINGIZE(_x) TEST_STRINGIZE_EX(_x)
 
@@ -172,58 +114,24 @@ int SIMD_NAME_MODIFIER(test_ucs2_encode_3bytes_utf8)(void) {
 #if PYYJSON_AARCH
     return INVALID;
 #else
-#    if __AVX512F__ && __AVX512BW__
+#    if __AVX512F__ && __AVX512BW__ && __AVX512VL__
     GUARDED_SIMD;
     u16 input[32];
     u8 output[96];
     for (int i = 0; i < COUNT_OF(input); ++i) {
-        input[i] = 0x800 + (rand() % (0x10000 - 0x800));
+        input[i] = get_random_ucs2();
     }
     ucs2_encode_3bytes_utf8_avx512((VECTOR_U16_512_A) * (VECTOR_U16_512_U *)input, output);
-    for (int i = 0; i < COUNT_OF(input); ++i) {
-        u32 uni = 0;
-        memcpy(&uni, &output[i * 3], 3);
-        u16 rt = ((uni & 0x0f) << 12) | ((uni & 0x3f00) >> 2) | ((uni & 0x3f0000) >> 16);
-        if (rt != input[i]) {
-            printf("input[%d]: " U16_TO_BINARY_PATTERN "\n", i, U16_TO_BINARY(input[i]));
-            printf("output[%d]: " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN "\n", i,
-                   BYTE_TO_BINARY(output[i * 3]), BYTE_TO_BINARY(output[i * 3 + 1]), BYTE_TO_BINARY(output[i * 3 + 2]));
-            // printf("rt[%d]: " U16_TO_BINARY_PATTERN "\n", i, U16_TO_BINARY(rt));
-            u8 test1 = (input[i] >> 12) | 0xe0;
-            u8 test2 = ((input[i] & 0xfc0) >> 6) | 0x80;
-            u8 test3 = (input[i] & 0x3f) | 0x80;
-            printf("encoded: " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN "\n", BYTE_TO_BINARY(test1), BYTE_TO_BINARY(test2), BYTE_TO_BINARY(test3));
-            CHECK(false);
-        }
-        // CHECK(rt == input[i]);
-    }
-    return PASSED;
+    return check_ucs2_3bytes(input, output, COUNT_OF(input));
 #    elif __AVX2__
     GUARDED_SIMD;
     u16 input[16];
     u8 output[48];
     for (int i = 0; i < COUNT_OF(input); ++i) {
-        input[i] = 0x800 + (rand() % (0x10000 - 0x800));
+        input[i] = get_random_ucs2();
     }
     ucs2_encode_3bytes_utf8_avx2((VECTOR_U8_256_A) * (VECTOR_U8_256_U *)input, output);
-    for (int i = 0; i < COUNT_OF(input); ++i) {
-        u32 uni = 0;
-        memcpy(&uni, &output[i * 3], 3);
-        u16 rt = ((uni & 0x0f) << 12) | ((uni & 0x3f00) >> 2) | ((uni & 0x3f0000) >> 16);
-        if (rt != input[i]) {
-            printf("input[%d]: " U16_TO_BINARY_PATTERN "\n", i, U16_TO_BINARY(input[i]));
-            printf("output[%d]: " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN "\n", i,
-                   BYTE_TO_BINARY(output[i * 3]), BYTE_TO_BINARY(output[i * 3 + 1]), BYTE_TO_BINARY(output[i * 3 + 2]));
-            // printf("rt[%d]: " U16_TO_BINARY_PATTERN "\n", i, U16_TO_BINARY(rt));
-            u8 test1 = (input[i] >> 12) | 0xe0;
-            u8 test2 = ((input[i] & 0xfc0) >> 6) | 0x80;
-            u8 test3 = (input[i] & 0x3f) | 0x80;
-            printf("encoded: " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN "\n", BYTE_TO_BINARY(test1), BYTE_TO_BINARY(test2), BYTE_TO_BINARY(test3));
-            CHECK(false);
-        }
-        // CHECK(rt == input[i]);
-    }
-    return PASSED;
+    return check_ucs2_3bytes(input, output, COUNT_OF(input));
 #    else
     return INVALID;
 #    endif
@@ -242,47 +150,16 @@ int SIMD_NAME_MODIFIER(test_ucs4_encode_3bytes_utf8)(void) {
         input[i] = (0x800 + (rand() % (0x100000 - 0x800))) & 0xffff;
     }
     ucs4_encode_3bytes_utf8_avx512((VECTOR_U32_512_A) * (VECTOR_U32_512_U *)input, output);
-    for (int i = 0; i < COUNT_OF(input); ++i) {
-        u32 uni = 0;
-        memcpy(&uni, &output[i * 3], 3);
-        u32 rt = ((uni & 0x0f) << 12) | ((uni & 0x3f00) >> 2) | ((uni & 0x3f0000) >> 16);
-        if (rt != input[i]) {
-            printf("rt      : " U32_TO_BINARY_PATTERN "\n", U32_TO_BINARY(rt));
-            printf("input[%d]: " U32_TO_BINARY_PATTERN "\n", i, U32_TO_BINARY(input[i]));
-            printf("output[%d]: " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN "\n", i,
-                   BYTE_TO_BINARY(output[i * 3]), BYTE_TO_BINARY(output[i * 3 + 1]), BYTE_TO_BINARY(output[i * 3 + 2]));
-            u8 test1 = (input[i] >> 12) | 0xe0;
-            u8 test2 = ((input[i] & 0xfc0) >> 6) | 0x80;
-            u8 test3 = (input[i] & 0x3f) | 0x80;
-            printf("encoded: " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN "\n", BYTE_TO_BINARY(test1), BYTE_TO_BINARY(test2), BYTE_TO_BINARY(test3));
-            CHECK(false);
-        }
-    }
-    return PASSED;
+    return check_ucs4_3bytes(input, output, COUNT_OF(input));
 #    elif __AVX2__
     GUARDED_SIMD;
     u32 input[8];
     u8 output[24];
     for (int i = 0; i < COUNT_OF(input); ++i) {
-        input[i] = (0x800 + (rand() % (0x100000 - 0x800))) & 0xffff;
+        input[i] = get_random_ucs2();
     }
     ucs4_encode_3bytes_utf8_avx2((VECTOR_U8_256_A) * (VECTOR_U8_256_U *)input, output);
-    for (int i = 0; i < COUNT_OF(input); ++i) {
-        u32 uni = 0;
-        memcpy(&uni, &output[i * 3], 3);
-        u32 rt = ((uni & 0x0f) << 12) | ((uni & 0x3f00) >> 2) | ((uni & 0x3f0000) >> 16);
-        if (rt != input[i]) {
-            printf("input[%d]: " U16_TO_BINARY_PATTERN "\n", i, U16_TO_BINARY((u16)input[i]));
-            printf("output[%d]: " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN "\n", i,
-                   BYTE_TO_BINARY(output[i * 3]), BYTE_TO_BINARY(output[i * 3 + 1]), BYTE_TO_BINARY(output[i * 3 + 2]));
-            u8 test1 = (input[i] >> 12) | 0xe0;
-            u8 test2 = ((input[i] & 0xfc0) >> 6) | 0x80;
-            u8 test3 = (input[i] & 0x3f) | 0x80;
-            printf("encoded: " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN "\n", BYTE_TO_BINARY(test1), BYTE_TO_BINARY(test2), BYTE_TO_BINARY(test3));
-            CHECK(false);
-        }
-    }
-    return PASSED;
+    return check_ucs4_3bytes(input, output, COUNT_OF(input));
 #    else
     return INVALID;
 #    endif

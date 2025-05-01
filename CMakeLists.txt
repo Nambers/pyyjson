@@ -168,6 +168,7 @@ set(SRC_WITH_SIMD
 )
 
 set(SRC_TEST
+    src/ctests/tools.c
     src/ctests/main.c
 )
 

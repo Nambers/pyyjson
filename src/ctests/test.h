@@ -1,4 +1,5 @@
-
+#ifndef PYYJSON_CTESTS_TEST_H
+#define PYYJSON_CTESTS_TEST_H
 #include "simd/mask_table.h"
 #include "simd/simd_impl.h"
 
@@ -44,6 +45,22 @@ force_inline void fill_random_buffer(void *_buffer, usize length) {
     }
 }
 
+force_inline u32 get_random_in_range(int a, int b) {
+    if (a > b) {
+        int tmp = a;
+        a = b;
+        b = tmp;
+    }
+    int r = rand();
+    int range_size = b - a;
+    r = (r % range_size);
+    return r + a;
+}
+
+force_inline u16 get_random_ucs2(void) {
+    return (u16)get_random_in_range(0x800, 0x10000);
+}
+
 /* DECLARE_TEST macro. */
 #if BUILD_MULTI_LIB && PYYJSON_X86
 #    define DECLARE_TEST(_name) \
@@ -64,3 +81,5 @@ DECLARE_TEST(test_elevate_2_4_to_128)
 DECLARE_TEST(test_ucs2_encode_3bytes_utf8)
 DECLARE_TEST(test_ucs4_encode_3bytes_utf8)
 DECLARE_TEST(test_long_elevate_1_2)
+
+#endif // PYYJSON_CTESTS_TEST_H

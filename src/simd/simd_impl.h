@@ -1562,209 +1562,360 @@ force_inline u32 cmpneq_16_512(VECTOR_U16_512_A a, VECTOR_U16_512_A b) {
 #    if __AVX512F__ && __AVX512BW__
 force_inline void ucs2_encode_3bytes_utf8_avx512(VECTOR_U16_512_A z, u8 *writer) {
     VECTOR_U8_512_A t1 = {
+            0x80, 0x80, 0x80, 0x80,
             0x80, 0x80, 0,
-            0x80, 0x80, 2,
             0x80, 0x80, 4,
-            0x80, 0x80, 6,
             0x80, 0x80, 8,
-            0x80,
-            //
-            4, 0x80, 0x80,
-            6, 0x80, 0x80,
-            8, 0x80, 0x80,
-            10, 0x80, 0x80,
-            12, 0x80, 0x80,
-            14,
+            0x80, 0x80, 12,
             //
             0x80, 0x80, 0,
-            0x80, 0x80, 2,
             0x80, 0x80, 4,
-            0x80, 0x80, 6,
             0x80, 0x80, 8,
-            0x80,
+            0x80, 0x80, 12,
+            0x80, 0x80, 0x80, 0x80,
             //
-            4, 0x80, 0x80,
-            6, 0x80, 0x80,
-            8, 0x80, 0x80,
-            10, 0x80, 0x80,
-            12, 0x80, 0x80,
-            14};
+            0x80, 0x80, 0x80, 0x80,
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            //
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            0x80, 0x80, 0x80, 0x80};
     VECTOR_U8_512_A t2 = {
+            0x80, 0x80, 0x80, 0x80,
             0x80, 0, 0x80,
-            0x80, 2, 0x80,
             0x80, 4, 0x80,
-            0x80, 6, 0x80,
             0x80, 8, 0x80,
-            0x80,
-            //
-            0x80, 0x80, 6,
-            0x80, 0x80, 8,
-            0x80, 0x80, 10,
-            0x80, 0x80, 12,
-            0x80, 0x80, 14,
-            0x80,
+            0x80, 12, 0x80,
             //
             0x80, 0, 0x80,
-            0x80, 2, 0x80,
             0x80, 4, 0x80,
-            0x80, 6, 0x80,
             0x80, 8, 0x80,
-            0x80,
+            0x80, 12, 0x80,
+            0x80, 0x80, 0x80, 0x80,
             //
-            0x80, 0x80, 6,
-            0x80, 0x80, 8,
-            0x80, 0x80, 10,
-            0x80, 0x80, 12,
-            0x80, 0x80, 14,
-            0x80};
+            0x80, 0x80, 0x80, 0x80,
+            0x80, 0, 0x80,
+            0x80, 4, 0x80,
+            0x80, 8, 0x80,
+            0x80, 12, 0x80,
+            //
+            0x80, 0, 0x80,
+            0x80, 4, 0x80,
+            0x80, 8, 0x80,
+            0x80, 12, 0x80,
+            0x80, 0x80, 0x80, 0x80};
     VECTOR_U8_512_A t3 = {
+            0x80, 0x80, 0x80, 0x80,
             0, 0x80, 0x80,
-            2, 0x80, 0x80,
             4, 0x80, 0x80,
-            6, 0x80, 0x80,
             8, 0x80, 0x80,
-            10,
-            //
-            0x80, 6, 0x80,
-            0x80, 8, 0x80,
-            0x80, 10, 0x80,
-            0x80, 12, 0x80,
-            0x80, 14, 0x80,
-            0x80,
+            12, 0x80, 0x80,
             //
             0, 0x80, 0x80,
-            2, 0x80, 0x80,
             4, 0x80, 0x80,
-            6, 0x80, 0x80,
             8, 0x80, 0x80,
-            10,
+            12, 0x80, 0x80,
+            0x80, 0x80, 0x80, 0x80,
             //
-            0x80, 6, 0x80,
-            0x80, 8, 0x80,
-            0x80, 10, 0x80,
-            0x80, 12, 0x80,
-            0x80, 14, 0x80,
-            0x80};
+            0x80, 0x80, 0x80, 0x80,
+            0, 0x80, 0x80,
+            4, 0x80, 0x80,
+            8, 0x80, 0x80,
+            12, 0x80, 0x80,
+            //
+            0, 0x80, 0x80,
+            4, 0x80, 0x80,
+            8, 0x80, 0x80,
+            12, 0x80, 0x80,
+            0x80, 0x80, 0x80, 0x80};
     VECTOR_U8_512_A m1 = {
+            0xff, 0xff, 0xff, 0xff,
             0xff, 0x3f, 0x3f,
             0xff, 0x3f, 0x3f,
             0xff, 0x3f, 0x3f,
             0xff, 0x3f, 0x3f,
-            0xff, 0x3f, 0x3f,
-            0xff,
-            //
-            0x3f, 0xff, 0x3f,
-            0x3f, 0xff, 0x3f,
-            0x3f, 0xff, 0x3f,
-            0x3f, 0xff, 0x3f,
-            0x3f, 0xff, 0x3f,
-            0x3f,
             //
             0xff, 0x3f, 0x3f,
             0xff, 0x3f, 0x3f,
             0xff, 0x3f, 0x3f,
             0xff, 0x3f, 0x3f,
-            0xff, 0x3f, 0x3f,
-            0xff,
+            0xff, 0xff, 0xff, 0xff,
             //
-            0x3f, 0xff, 0x3f,
-            0x3f, 0xff, 0x3f,
-            0x3f, 0xff, 0x3f,
-            0x3f, 0xff, 0x3f,
-            0x3f, 0xff, 0x3f,
-            0x3f};
+            0xff, 0xff, 0xff, 0xff,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            //
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0xff, 0xff, 0xff};
     VECTOR_U8_512_A m2 = {
+            0, 0, 0, 0,
             0xe0, 0x80, 0x80,
             0xe0, 0x80, 0x80,
             0xe0, 0x80, 0x80,
             0xe0, 0x80, 0x80,
-            0xe0, 0x80, 0x80,
-            0xe0,
-            //
-            0x80, 0xe0, 0x80,
-            0x80, 0xe0, 0x80,
-            0x80, 0xe0, 0x80,
-            0x80, 0xe0, 0x80,
-            0x80, 0xe0, 0x80,
-            0x80,
             //
             0xe0, 0x80, 0x80,
             0xe0, 0x80, 0x80,
             0xe0, 0x80, 0x80,
             0xe0, 0x80, 0x80,
-            0xe0, 0x80, 0x80,
-            0xe0,
+            0, 0, 0, 0,
             //
-            0x80, 0xe0, 0x80,
-            0x80, 0xe0, 0x80,
-            0x80, 0xe0, 0x80,
-            0x80, 0xe0, 0x80,
-            0x80, 0xe0, 0x80,
-            0x80};
-    /* z1 = gh123456|78000000 */
-    VECTOR_U16_512_A z1 = _mm512_srli_epi16(z, 6);
-    /* z2 = 56780000|00000000 */
-    VECTOR_U16_512_A z2 = _mm512_srli_epi16(z, 12);
-    /* z3 = 00000000|00000000|abcdefgh */
-    VECTOR_U8_512_A z3 = _mm512_shuffle_epi8(z, t1);
-    /* z4 = 00000000|gh123456|00000000 */
-    VECTOR_U8_512_A z4 = _mm512_shuffle_epi8(z1, t2);
-    /* z5 = 56780000|00000000|00000000 */
-    VECTOR_U8_512_A z5 = _mm512_shuffle_epi8(z2, t3);
-    /* z6 = 56780000|gh123456|abcdefgh */
-    VECTOR_U8_512_A z6 = z3 | z4 | z5;
-    /* z7 = 5678[mmmm]|gh1234[mm]|abcdef[mm] */
-    VECTOR_U8_512_A z7 = (z6 & m1) | m2;
+            0, 0, 0, 0,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            //
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0, 0, 0, 0};
+    VECTOR_U32_512_A z1 = elevate_2_4_to_512(_mm512_extracti64x4_epi64(z, 0));
+    VECTOR_U32_512_A z2 = elevate_2_4_to_512(_mm512_extracti64x4_epi64(z, 1));
+    /* z3,z4 = gh123456|78000000 */
+    VECTOR_U16_512_A z3 = _mm512_srli_epi32(z1, 6);
+    VECTOR_U16_512_A z4 = _mm512_srli_epi32(z2, 6);
+    /* z5,z6 = 56780000|00000000 */
+    VECTOR_U16_512_A z5 = _mm512_srli_epi32(z1, 12);
+    VECTOR_U16_512_A z6 = _mm512_srli_epi32(z2, 12);
+    /* z7,z8 = 00000000|00000000|abcdefgh */
+    VECTOR_U8_512_A z7 = _mm512_shuffle_epi8(z1, t1);
+    VECTOR_U8_512_A z8 = _mm512_shuffle_epi8(z2, t1);
+    /* z9,z10 = 00000000|gh123456|00000000 */
+    VECTOR_U8_512_A z9 = _mm512_shuffle_epi8(z3, t2);
+    VECTOR_U8_512_A z10 = _mm512_shuffle_epi8(z4, t2);
+    /* z11,z12 = 56780000|00000000|00000000 */
+    VECTOR_U8_512_A z11 = _mm512_shuffle_epi8(z5, t3);
+    VECTOR_U8_512_A z12 = _mm512_shuffle_epi8(z6, t3);
     //
-    VECTOR_U16_256_A y, y1, y2;
-    {
-        SIMD_128 _x1, _x2, _x3, _x4;
-        extract_512_four_parts(z, &_x1, &_x2, &_x3, &_x4);
-        y = _mm256_set_m128i(_mm_alignr_epi8(_x4, _x3, 10), _mm_alignr_epi8(_x2, _x1, 10));
-    }
-    {
-        SIMD_128 _x1, _x2, _x3, _x4;
-        extract_512_four_parts(z1, &_x1, &_x2, &_x3, &_x4);
-        y1 = _mm256_set_m128i(_mm_alignr_epi8(_x4, _x3, 10), _mm_alignr_epi8(_x2, _x1, 10));
-    }
-    {
-        SIMD_128 _x1, _x2, _x3, _x4;
-        extract_512_four_parts(z2, &_x1, &_x2, &_x3, &_x4);
-        y2 = _mm256_set_m128i(_mm_alignr_epi8(_x4, _x3, 12), _mm_alignr_epi8(_x2, _x1, 12));
-    }
-    /* x3 = gh123456|00000000|00000000 */
-    VECTOR_U8_128_A _t3 = _mm512_extracti32x4_epi32(t3, 0);
-    VECTOR_U8_256_A y3 = _mm256_shuffle_epi8(y1, _mm256_set_m128i(_t3, _t3));
-    /* x4 = 00000000|abcdefgh|00000000 */
-    VECTOR_U8_128_A _t2 = _mm512_extracti32x4_epi32(t2, 0);
-    VECTOR_U8_256_A y4 = _mm256_shuffle_epi8(y, _mm256_set_m128i(_t2, _t2));
-    /* x5 = 00000000|00000000|56780000 */
-    VECTOR_U8_128_A _t1 = _mm512_extracti32x4_epi32(t1, 0);
-    VECTOR_U8_256_A y5 = _mm256_shuffle_epi8(y2, _mm256_set_m128i(_t1, _t1));
-    /* x6 = gh123456|abcdefgh|56780000 */
-    VECTOR_U8_256_A y6 = y3 | y4 | y5;
-    VECTOR_U8_256_A my1, my2;
-    {
-        SIMD_128 _x1, _x2, _x3, _x4;
-        extract_512_four_parts(m1, &_x1, &_x2, &_x3, &_x4);
-        my1 = _mm256_set_m128i(_mm_alignr_epi8(_x4, _x3, 1), _mm_alignr_epi8(_x2, _x1, 1));
-    }
-    {
-        SIMD_128 _x1, _x2, _x3, _x4;
-        extract_512_four_parts(m2, &_x1, &_x2, &_x3, &_x4);
-        my2 = _mm256_set_m128i(_mm_alignr_epi8(_x4, _x3, 1), _mm_alignr_epi8(_x2, _x1, 1));
-    }
-    VECTOR_U8_256_A y7 = (y6 & my1) | my2;
-    SIMD_128 w1, w2, w3, w4, w5, w6;
-    extract_256_two_parts(y7, &w2, &w5);
-    extract_512_four_parts(z7, &w1, &w3, &w4, &w6);
-    *(VECTOR_U8_128_U *)(writer + 0) = w1;
-    *(VECTOR_U8_128_U *)(writer + 16) = w2;
-    *(VECTOR_U8_128_U *)(writer + 32) = w3;
-    *(VECTOR_U8_128_U *)(writer + 48) = w4;
-    *(VECTOR_U8_128_U *)(writer + 64) = w5;
-    *(VECTOR_U8_128_U *)(writer + 80) = w6;
+    VECTOR_U8_512_A z13 = ((z7 | z9 | z11) & m1) | m2;
+    VECTOR_U8_512_A z14 = ((z8 | z10 | z12) & m1) | m2;
+    // [0, 24)
+    _mm512_mask_storeu_epi32(writer - 4, 0x7e, z13);
+    // [48, 72)
+    _mm512_mask_storeu_epi32(writer + 44, 0x7e, z14);
+    // [24, 48)
+    _mm512_mask_storeu_epi32(writer - 12, 0x7e00, z13);
+    // [72, 96)
+    _mm512_mask_storeu_epi32(writer + 36, 0x7e00, z14);
 }
+
+// force_inline void ucs2_encode_3bytes_utf8_avx512(VECTOR_U16_512_A z, u8 *writer) {
+//     VECTOR_U8_512_A t1 = {
+//             0x80, 0x80, 0,
+//             0x80, 0x80, 2,
+//             0x80, 0x80, 4,
+//             0x80, 0x80, 6,
+//             0x80, 0x80, 8,
+//             0x80,
+//             //
+//             4, 0x80, 0x80,
+//             6, 0x80, 0x80,
+//             8, 0x80, 0x80,
+//             10, 0x80, 0x80,
+//             12, 0x80, 0x80,
+//             14,
+//             //
+//             0x80, 0x80, 0,
+//             0x80, 0x80, 2,
+//             0x80, 0x80, 4,
+//             0x80, 0x80, 6,
+//             0x80, 0x80, 8,
+//             0x80,
+//             //
+//             4, 0x80, 0x80,
+//             6, 0x80, 0x80,
+//             8, 0x80, 0x80,
+//             10, 0x80, 0x80,
+//             12, 0x80, 0x80,
+//             14};
+//     VECTOR_U8_512_A t2 = {
+//             0x80, 0, 0x80,
+//             0x80, 2, 0x80,
+//             0x80, 4, 0x80,
+//             0x80, 6, 0x80,
+//             0x80, 8, 0x80,
+//             0x80,
+//             //
+//             0x80, 0x80, 6,
+//             0x80, 0x80, 8,
+//             0x80, 0x80, 10,
+//             0x80, 0x80, 12,
+//             0x80, 0x80, 14,
+//             0x80,
+//             //
+//             0x80, 0, 0x80,
+//             0x80, 2, 0x80,
+//             0x80, 4, 0x80,
+//             0x80, 6, 0x80,
+//             0x80, 8, 0x80,
+//             0x80,
+//             //
+//             0x80, 0x80, 6,
+//             0x80, 0x80, 8,
+//             0x80, 0x80, 10,
+//             0x80, 0x80, 12,
+//             0x80, 0x80, 14,
+//             0x80};
+//     VECTOR_U8_512_A t3 = {
+//             0, 0x80, 0x80,
+//             2, 0x80, 0x80,
+//             4, 0x80, 0x80,
+//             6, 0x80, 0x80,
+//             8, 0x80, 0x80,
+//             10,
+//             //
+//             0x80, 6, 0x80,
+//             0x80, 8, 0x80,
+//             0x80, 10, 0x80,
+//             0x80, 12, 0x80,
+//             0x80, 14, 0x80,
+//             0x80,
+//             //
+//             0, 0x80, 0x80,
+//             2, 0x80, 0x80,
+//             4, 0x80, 0x80,
+//             6, 0x80, 0x80,
+//             8, 0x80, 0x80,
+//             10,
+//             //
+//             0x80, 6, 0x80,
+//             0x80, 8, 0x80,
+//             0x80, 10, 0x80,
+//             0x80, 12, 0x80,
+//             0x80, 14, 0x80,
+//             0x80};
+//     VECTOR_U8_512_A m1 = {
+//             0xff, 0x3f, 0x3f,
+//             0xff, 0x3f, 0x3f,
+//             0xff, 0x3f, 0x3f,
+//             0xff, 0x3f, 0x3f,
+//             0xff, 0x3f, 0x3f,
+//             0xff,
+//             //
+//             0x3f, 0xff, 0x3f,
+//             0x3f, 0xff, 0x3f,
+//             0x3f, 0xff, 0x3f,
+//             0x3f, 0xff, 0x3f,
+//             0x3f, 0xff, 0x3f,
+//             0x3f,
+//             //
+//             0xff, 0x3f, 0x3f,
+//             0xff, 0x3f, 0x3f,
+//             0xff, 0x3f, 0x3f,
+//             0xff, 0x3f, 0x3f,
+//             0xff, 0x3f, 0x3f,
+//             0xff,
+//             //
+//             0x3f, 0xff, 0x3f,
+//             0x3f, 0xff, 0x3f,
+//             0x3f, 0xff, 0x3f,
+//             0x3f, 0xff, 0x3f,
+//             0x3f, 0xff, 0x3f,
+//             0x3f};
+//     VECTOR_U8_512_A m2 = {
+//             0xe0, 0x80, 0x80,
+//             0xe0, 0x80, 0x80,
+//             0xe0, 0x80, 0x80,
+//             0xe0, 0x80, 0x80,
+//             0xe0, 0x80, 0x80,
+//             0xe0,
+//             //
+//             0x80, 0xe0, 0x80,
+//             0x80, 0xe0, 0x80,
+//             0x80, 0xe0, 0x80,
+//             0x80, 0xe0, 0x80,
+//             0x80, 0xe0, 0x80,
+//             0x80,
+//             //
+//             0xe0, 0x80, 0x80,
+//             0xe0, 0x80, 0x80,
+//             0xe0, 0x80, 0x80,
+//             0xe0, 0x80, 0x80,
+//             0xe0, 0x80, 0x80,
+//             0xe0,
+//             //
+//             0x80, 0xe0, 0x80,
+//             0x80, 0xe0, 0x80,
+//             0x80, 0xe0, 0x80,
+//             0x80, 0xe0, 0x80,
+//             0x80, 0xe0, 0x80,
+//             0x80};
+//     /* z1 = gh123456|78000000 */
+//     VECTOR_U16_512_A z1 = _mm512_srli_epi16(z, 6);
+//     /* z2 = 56780000|00000000 */
+//     VECTOR_U16_512_A z2 = _mm512_srli_epi16(z, 12);
+//     /* z3 = 00000000|00000000|abcdefgh */
+//     VECTOR_U8_512_A z3 = _mm512_shuffle_epi8(z, t1);
+//     /* z4 = 00000000|gh123456|00000000 */
+//     VECTOR_U8_512_A z4 = _mm512_shuffle_epi8(z1, t2);
+//     /* z5 = 56780000|00000000|00000000 */
+//     VECTOR_U8_512_A z5 = _mm512_shuffle_epi8(z2, t3);
+//     /* z6 = 56780000|gh123456|abcdefgh */
+//     VECTOR_U8_512_A z6 = z3 | z4 | z5;
+//     /* z7 = 5678[mmmm]|gh1234[mm]|abcdef[mm] */
+//     VECTOR_U8_512_A z7 = (z6 & m1) | m2;
+//     //
+//     VECTOR_U16_256_A y, y1, y2;
+//     {
+//         SIMD_128 _x1, _x2, _x3, _x4;
+//         extract_512_four_parts(z, &_x1, &_x2, &_x3, &_x4);
+//         y = _mm256_set_m128i(_mm_alignr_epi8(_x4, _x3, 10), _mm_alignr_epi8(_x2, _x1, 10));
+//     }
+//     {
+//         SIMD_128 _x1, _x2, _x3, _x4;
+//         extract_512_four_parts(z1, &_x1, &_x2, &_x3, &_x4);
+//         y1 = _mm256_set_m128i(_mm_alignr_epi8(_x4, _x3, 10), _mm_alignr_epi8(_x2, _x1, 10));
+//     }
+//     {
+//         SIMD_128 _x1, _x2, _x3, _x4;
+//         extract_512_four_parts(z2, &_x1, &_x2, &_x3, &_x4);
+//         y2 = _mm256_set_m128i(_mm_alignr_epi8(_x4, _x3, 12), _mm_alignr_epi8(_x2, _x1, 12));
+//     }
+//     /* x3 = gh123456|00000000|00000000 */
+//     VECTOR_U8_128_A _t3 = _mm512_extracti32x4_epi32(t3, 0);
+//     VECTOR_U8_256_A y3 = _mm256_shuffle_epi8(y1, _mm256_set_m128i(_t3, _t3));
+//     /* x4 = 00000000|abcdefgh|00000000 */
+//     VECTOR_U8_128_A _t2 = _mm512_extracti32x4_epi32(t2, 0);
+//     VECTOR_U8_256_A y4 = _mm256_shuffle_epi8(y, _mm256_set_m128i(_t2, _t2));
+//     /* x5 = 00000000|00000000|56780000 */
+//     VECTOR_U8_128_A _t1 = _mm512_extracti32x4_epi32(t1, 0);
+//     VECTOR_U8_256_A y5 = _mm256_shuffle_epi8(y2, _mm256_set_m128i(_t1, _t1));
+//     /* x6 = gh123456|abcdefgh|56780000 */
+//     VECTOR_U8_256_A y6 = y3 | y4 | y5;
+//     VECTOR_U8_256_A my1, my2;
+//     {
+//         SIMD_128 _x1, _x2, _x3, _x4;
+//         extract_512_four_parts(m1, &_x1, &_x2, &_x3, &_x4);
+//         my1 = _mm256_set_m128i(_mm_alignr_epi8(_x4, _x3, 1), _mm_alignr_epi8(_x2, _x1, 1));
+//     }
+//     {
+//         SIMD_128 _x1, _x2, _x3, _x4;
+//         extract_512_four_parts(m2, &_x1, &_x2, &_x3, &_x4);
+//         my2 = _mm256_set_m128i(_mm_alignr_epi8(_x4, _x3, 1), _mm_alignr_epi8(_x2, _x1, 1));
+//     }
+//     VECTOR_U8_256_A y7 = (y6 & my1) | my2;
+//     SIMD_128 w1, w2, w3, w4, w5, w6;
+//     extract_256_two_parts(y7, &w2, &w5);
+//     extract_512_four_parts(z7, &w1, &w3, &w4, &w6);
+//     *(VECTOR_U8_128_U *)(writer + 0) = w1;
+//     *(VECTOR_U8_128_U *)(writer + 16) = w2;
+//     *(VECTOR_U8_128_U *)(writer + 32) = w3;
+//     *(VECTOR_U8_128_U *)(writer + 48) = w4;
+//     *(VECTOR_U8_128_U *)(writer + 64) = w5;
+//     *(VECTOR_U8_128_U *)(writer + 80) = w6;
+// }
 
 // /* Read: 42 bytes (21 u16). Write: 64 bytes. Valid in result: 63 bytes. */
 // force_inline void ucs2_encode_3bytes_utf8_avx512(u16 *read_in, u8 *writer) {
