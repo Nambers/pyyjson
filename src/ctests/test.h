@@ -114,6 +114,7 @@ DECLARE_TEST(test_elevate_2_4_to_128)
 DECLARE_TEST(test_ucs2_encode_3bytes_utf8)
 DECLARE_TEST(test_ucs2_encode_2bytes_utf8)
 DECLARE_TEST(test_ucs4_encode_3bytes_utf8)
+DECLARE_TEST(test_ucs4_encode_2bytes_utf8)
 DECLARE_TEST(test_long_elevate_1_2)
 
 #endif // PYYJSON_CTESTS_TEST_H

@@ -580,6 +580,30 @@ force_inline bool check_mask_zero(SIMD_MASK_TYPE mask) {
 #    endif
 }
 
+/* Zip. */
+force_inline u64 zip_128_32_to_16(VECTOR_U32_128_A x) {
+#    if __SSE4_1__
+    return real_extract_first_64_from_128(_mm_packus_epi32(x, x));
+#    else
+    // in this case we don't have the convenient `_mm_packus_epi32`
+    // TODO: is this really faster than *dst++ = *src++ ???
+    /* x =  aa00bb00|cc00dd00 */
+    /* x1 = 00cc00dd|00000000 */
+    SIMD_128 x1 = _mm_srli_si128(x, 6);
+    /* x2 = bb00cc00|dd000000 */
+    SIMD_128 x2 = _mm_srli_si128(x, 4);
+    /* x3 = 00dd0000|00000000 */
+    SIMD_128 x3 = _mm_srli_si128(x, 10);
+    /* x4 = aaccbbdd|cc00dd00 */
+    SIMD_128 x4 = simd_or_128(x, x1);
+    /* x5 = bbddcc00|dd000000 */
+    SIMD_128 x5 = simd_or_128(x2, x3);
+    /* x6 = aabbccdd|???????? */
+    SIMD_128 x6 = _mm_unpacklo_epi16(x4, x5);
+    return real_extract_first_64_from_128(x6);
+#    endif
+}
+
 /*
  * UTF-8.
  */
@@ -778,6 +802,23 @@ force_inline void ucs4_encode_3bytes_utf8_ssse3(VECTOR_U32_128_A x, u8 *writer) 
     assert(false);
     Py_UNREACHABLE();
 #    endif
+}
+
+force_inline void ucs4_encode_2bytes_utf8_sse2(VECTOR_U32_128_A x, u8 *writer) {
+    /* abcdefgh|12300000|00000000|00000000 -> gh123[mmm]|abcdef[mm] */
+    VECTOR_U8_128_A m1 = broadcast_32_128(0xfff83f00);
+    /* x1 = gh123000|00000000|00000000|00000000 */
+    VECTOR_U32_128_A x1 = _mm_srli_epi32(x, 6);
+    /* x2 = ????????|abcdefgh|12300000|00000000 */
+    VECTOR_U32_128_A x2 = _mm_bslli_si128(x, 1);
+    /* x3 = 00000000|abcdef00|00000000|00000000 */
+    VECTOR_U32_128_A x3 = x2 & m1;
+    /* x4 = gh123000|abcdef00|00000000|00000000 */
+    VECTOR_U32_128_A x4 = x1 | x3;
+    /* u = gh123000|abcdef00 */
+    u64 u = zip_128_32_to_16(x4);
+    u = u | 0x80c080c080c080c0;
+    memcpy(writer, &u, 8);
 }
 
 /*==============================================================================
@@ -1370,7 +1411,16 @@ force_inline void ucs2_encode_3bytes_utf8_avx2(VECTOR_U16_256_A y, u8 *writer) {
 
 force_inline void ucs2_encode_2bytes_utf8_avx2(VECTOR_U16_256_A y, u8 *writer) {
     /* abcdefgh|12300000 -> gh123[mmm]|abcdef[mm] */
-    pyyjson_align(16) static const u8 t1[16] = {
+    VECTOR_U8_256_A t1 = {
+            0x80, 0,
+            0x80, 2,
+            0x80, 4,
+            0x80, 6,
+            0x80, 8,
+            0x80, 10,
+            0x80, 12,
+            0x80, 14,
+            //
             0x80, 0,
             0x80, 2,
             0x80, 4,
@@ -1380,9 +1430,9 @@ force_inline void ucs2_encode_2bytes_utf8_avx2(VECTOR_U16_256_A y, u8 *writer) {
             0x80, 12,
             0x80, 14};
     /*y1 = gh123000|00000000 */
-    VECTOR_U16_256_A y1 = _mm256_srli_epi16(y, 6);
+    VECTOR_U8_256_A y1 = _mm256_srli_epi16(y, 6);
     /*y2 = 00000000|abcdefgh */
-    VECTOR_U16_256_A y2 = _mm256_shuffle_epi8(y, _mm256_broadcastsi128_si256(*(const SIMD_128 *)t1));
+    VECTOR_U8_256_A y2 = _mm256_shuffle_epi8(y, t1);
     /*y = gh123000|abcdefgh */
     y = y1 | y2;
     /*y = gh123000|abcdef00 */
@@ -1476,6 +1526,30 @@ force_inline void ucs4_encode_3bytes_utf8_avx2(VECTOR_U32_256_A y, u8 *writer) {
     memcpy(writer + 16, &x4, 8);
 }
 
+force_inline void ucs4_encode_2bytes_utf8_avx2(VECTOR_U32_256_A y, u8 *writer) {
+    /* abcdefgh|12300000|00000000|00000000 -> gh123[mmm]|abcdef[mm] */
+    /* x = abcdefgh|12300000 */
+    VECTOR_U16_128_A x = zip_256_32_to_16(y);
+    VECTOR_U8_128_A t1 = {
+            0x80, 0,
+            0x80, 2,
+            0x80, 4,
+            0x80, 6,
+            0x80, 8,
+            0x80, 10,
+            0x80, 12,
+            0x80, 14};
+    VECTOR_U8_128_A m1 = broadcast_16_128(0x3fff);
+    VECTOR_U8_128_A m2 = broadcast_16_128(0x80c0);
+    /*x1 = gh123000|00000000 */
+    VECTOR_U8_128_A x1 = _mm_srli_epi16(x, 6);
+    /*x2 = 00000000|abcdefgh */
+    VECTOR_U8_128_A x2 = _mm_shuffle_epi8(x, t1);
+    /*x3 = gh123000|abcdefgh */
+    VECTOR_U8_128_A x3 = ((x1 | x2) & m1) | m2;
+    *(VECTOR_U8_128_U *)writer = x3;
+}
+
 #    endif
 
 /*==============================================================================
@@ -1560,6 +1634,17 @@ force_inline u32 cmpneq_16_512(VECTOR_U16_512_A a, VECTOR_U16_512_A b) {
  * AVX512F && AVX512BW only SIMD code
  *============================================================================*/
 #    if __AVX512F__ && __AVX512BW__
+force_inline SIMD_256 zip_512_32_to_16(SIMD_512 z) {
+    /* z = A|B|C|D */
+    SIMD_128 x1, x2, x3, x4;
+    extract_512_four_parts(z, &x1, &x2, &x3, &x4);
+    /* y1 = A|C */
+    SIMD_256 y1 = _mm256_set_m128i(x3, x1);
+    /* y2 = B|D */
+    SIMD_256 y2 = _mm256_set_m128i(x4, x2);
+    return _mm256_packus_epi32(y1, y2);
+}
+
 force_inline void ucs2_encode_3bytes_utf8_avx512(VECTOR_U16_512_A z, u8 *writer) {
     VECTOR_U8_512_A t1 = {
             0x80, 0x80, 0x80, 0x80,
@@ -2220,6 +2305,38 @@ force_inline void ucs4_encode_3bytes_utf8_avx512(VECTOR_U32_512_A z, u8 *writer)
     _mm512_mask_storeu_epi8(writer - 12, 0xffffff000000000, z6);
 }
 
+force_inline void ucs4_encode_2bytes_utf8_avx512(VECTOR_U32_512_A z, u8 *writer) {
+    /* abcdefgh|12300000|00000000|00000000 -> gh123[mmm]|abcdef[mm] */
+    VECTOR_U8_256_A t1 = {
+            0x80, 0,
+            0x80, 2,
+            0x80, 4,
+            0x80, 6,
+            0x80, 8,
+            0x80, 10,
+            0x80, 12,
+            0x80, 14,
+            //
+            0x80, 0,
+            0x80, 2,
+            0x80, 4,
+            0x80, 6,
+            0x80, 8,
+            0x80, 10,
+            0x80, 12,
+            0x80, 14};
+    VECTOR_U8_256_A m1 = broadcast_16_256(0x3fff);
+    VECTOR_U8_256_A m2 = broadcast_16_256(0x80c0);
+    /* y = abcdefgh|12300000 */
+    VECTOR_U16_256_A y = zip_512_32_to_16(z);
+    /* y1 = gh123000|00000000 */
+    VECTOR_U8_256_A y1 = _mm256_srli_epi16(y, 6);
+    /* y2 = 00000000|abcdefgh */
+    VECTOR_U8_256_A y2 = _mm256_shuffle_epi8(y, t1);
+    VECTOR_U8_256_A y3 = ((y1 | y2) & m1) | m2;
+    *(VECTOR_U8_256_U *)writer = y3;
+}
+
 #    endif
 
 /*==============================================================================
@@ -2252,14 +2369,15 @@ force_inline SIMD_HALF_TYPE load_half(const void *src) {
 
 force_inline SIMD_REAL_HALF_TYPE zip_simd_32_to_16(SIMD_TYPE SIMD_VAR) {
 #    if SIMD_BIT_SIZE == 512
-    /* z = A|B|C|D */
-    SIMD_128 x1, x2, x3, x4;
-    extract_512_four_parts(z, &x1, &x2, &x3, &x4);
-    /* y1 = A|C */
-    SIMD_256 y1 = _mm256_set_m128i(x3, x1);
-    /* y2 = B|D */
-    SIMD_256 y2 = _mm256_set_m128i(x4, x2);
-    return _mm256_packus_epi32(y1, y2);
+    // /* z = A|B|C|D */
+    // SIMD_128 x1, x2, x3, x4;
+    // extract_512_four_parts(z, &x1, &x2, &x3, &x4);
+    // /* y1 = A|C */
+    // SIMD_256 y1 = _mm256_set_m128i(x3, x1);
+    // /* y2 = B|D */
+    // SIMD_256 y2 = _mm256_set_m128i(x4, x2);
+    // return _mm256_packus_epi32(y1, y2);
+    return zip_512_32_to_16(z);
 #    elif SIMD_BIT_SIZE == 256
     return zip_256_32_to_16(y);
 #    elif __SSE4_1__
@@ -2278,7 +2396,9 @@ force_inline SIMD_REAL_HALF_TYPE zip_simd_32_to_16(SIMD_TYPE SIMD_VAR) {
     SIMD_128 x4 = simd_or_128(x, x1);
     /* x5 = bbddcc00|dd000000 */
     SIMD_128 x5 = simd_or_128(x2, x3);
-    return (SIMD_REAL_HALF_TYPE)real_extract_first_64_from_128(_mm_unpacklo_epi16(x4, x5));
+    /* x6 = aabbccdd|???????? */
+    SIMD_128 x6 = _mm_unpacklo_epi16(x4, x5);
+    return (SIMD_REAL_HALF_TYPE)real_extract_first_64_from_128(x6);
 #    endif
 }
 

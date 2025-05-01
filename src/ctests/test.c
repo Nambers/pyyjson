@@ -158,6 +158,40 @@ int SIMD_NAME_MODIFIER(test_ucs4_encode_3bytes_utf8)(void) {
 #endif
 }
 
+int SIMD_NAME_MODIFIER(test_ucs4_encode_2bytes_utf8)(void) {
+#if PYYJSON_AARCH
+    return INVALID;
+#else
+#    if __AVX512F__ && __AVX512BW__ && __AVX512VL__
+    GUARDED_SIMD;
+    u32 input[16];
+    u8 output[32];
+    for (int i = 0; i < COUNT_OF(input); ++i) {
+        input[i] = get_random_2bytes_u16();
+    }
+    ucs4_encode_2bytes_utf8_avx512((VECTOR_U16_512_A) * (VECTOR_U16_512_U *)input, output);
+    return check_ucs4_2bytes(input, output, COUNT_OF(input));
+#    elif __AVX2__
+    GUARDED_SIMD;
+    u32 input[8];
+    u8 output[16];
+    for (int i = 0; i < COUNT_OF(input); ++i) {
+        input[i] = get_random_2bytes_u16();
+    }
+    ucs4_encode_2bytes_utf8_avx2((VECTOR_U8_256_A) * (VECTOR_U8_256_U *)input, output);
+    return check_ucs4_2bytes(input, output, COUNT_OF(input));
+#    else
+    u32 input[4];
+    u8 output[8];
+    for (int i = 0; i < COUNT_OF(input); ++i) {
+        input[i] = get_random_2bytes_u16();
+    }
+    ucs4_encode_2bytes_utf8_sse2((VECTOR_U8_128_A) * (VECTOR_U8_128_U *)input, output);
+    return check_ucs4_2bytes(input, output, COUNT_OF(input));
+#    endif
+#endif
+}
+
 int SIMD_NAME_MODIFIER(test_long_elevate_1_2)(void) {
     GUARDED_SIMD;
     for (usize _ = 0; _ < 10; _++) {
