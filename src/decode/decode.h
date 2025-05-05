@@ -130,7 +130,7 @@ typedef struct SpecialCharReadResult {
  
  This requires the string has 4-byte zero padding.
  */
-force_inline bool read_8_to_hex_u16(const u8 *cur, u16 *val);
+// force_inline bool read_8_to_hex_u16(const u8 *cur, u16 *val);
 
 force_inline bool byte_match_2(const void *buf, const void *pat) {
     u16 u1, u2;

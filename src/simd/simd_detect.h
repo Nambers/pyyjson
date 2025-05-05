@@ -5,14 +5,14 @@
 #if PYYJSON_DETECT_SIMD
 
 #    if PYYJSON_X86
-#        if __AVX512F__ && __AVX512BW__ && __AVX512VL__
-#            define SIMD_BIT_SIZE 512
+#        if __AVX512F__ && __AVX512CD__ && __AVX512BW__ && __AVX512VL__ && __AVX512DQ__
+// #            define COMPILE_SIMD_BITS 512
 #            define SIMD_FEATURE_NAME avx512
 #        elif __AVX2__
-#            define SIMD_BIT_SIZE 256
+// #            define COMPILE_SIMD_BITS 256
 #            define SIMD_FEATURE_NAME avx2
 #        else
-#            define SIMD_BIT_SIZE 128
+// #            define COMPILE_SIMD_BITS 128
 #            if __SSE4_2__
 #                define SIMD_FEATURE_NAME sse4_2
 #            else
@@ -33,13 +33,14 @@
 #            define SIMD_256_IU __m256i_u
 #        endif
 #        define SIMD_512 __m512i
-
-#        if (SIMD_BIT_SIZE > 128) || __SSE4_1__
+// x86: PYYJSON_HAS_BLENDV
+#        if __SSE4_1__
 #            define PYYJSON_HAS_BLENDV 1
 #        else
 #            define PYYJSON_HAS_BLENDV 0
 #        endif
-#        if SIMD_BIT_SIZE >= 512
+// x86: WRITE_SUPPORT_MASK_WRITE
+#        if __AVX512F__ && __AVX512CD__ && __AVX512BW__ && __AVX512VL__ && __AVX512DQ__
 #            define WRITE_SUPPORT_MASK_WRITE 1
 #        else
 #            define WRITE_SUPPORT_MASK_WRITE 0
@@ -47,7 +48,7 @@
 #    elif PYYJSON_AARCH
 #        define SIMD_FEATURE_NAME neon
 #        define PYYJSON_HAS_BLENDV 0
-#        define SIMD_BIT_SIZE 128
+// #        define COMPILE_SIMD_BITS 128
 #        define WRITE_SUPPORT_MASK_WRITE 0
 // aarch64 TODO
 #    else

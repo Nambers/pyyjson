@@ -12,8 +12,10 @@
 
 #include "simd/check_mask_wrap.h"
 
+#include "encode_cvt.h"
 #include "simd/readwrite_utils_wrap.h"
 #include "simd/write_utils_wrap.h"
+#include "states.h"
 
 typedef enum EncodeValJumpFlag {
     JumpFlag_Default,
@@ -51,14 +53,6 @@ typedef enum PyFastTypes {
     Unknown,
 } PyFastTypes;
 
-typedef struct UnicodeInfo {
-    Py_ssize_t ascii_size;
-    Py_ssize_t u8_size;
-    Py_ssize_t u16_size;
-    Py_ssize_t u32_size;
-    int cur_ucs_type;
-} UnicodeInfo;
-
 typedef struct EncodeStackVars {
     // cache
     PyObject *key, *val;
@@ -71,103 +65,6 @@ typedef struct EncodeStackVars {
     UnicodeInfo unicode_info;
     bool cur_is_tuple;
 } EncodeStackVars;
-
-force_inline void memorize_ascii_to_ucs4(EncodeUnicodeBufferInfo *unicode_buffer_info, UnicodeInfo *unicode_info) {
-    Py_ssize_t len = unicode_buffer_info->writer.writer_u8 - (u8 *)GET_VEC_ASCII_START(unicode_buffer_info);
-    unicode_info->ascii_size = len;
-    u32 *new_write_ptr = ((u32 *)GET_VEC_COMPACT_START(unicode_buffer_info)) + len;
-    unicode_buffer_info->writer.writer_u32 = new_write_ptr;
-    assert(unicode_info->cur_ucs_type == 0);
-    unicode_info->cur_ucs_type = 4;
-}
-
-force_inline void memorize_ascii_to_ucs2(EncodeUnicodeBufferInfo *unicode_buffer_info, UnicodeInfo *unicode_info) {
-    Py_ssize_t len = unicode_buffer_info->writer.writer_u8 - (u8 *)GET_VEC_ASCII_START(unicode_buffer_info);
-    unicode_info->ascii_size = len;
-    u16 *new_write_ptr = ((u16 *)GET_VEC_COMPACT_START(unicode_buffer_info)) + len;
-    unicode_buffer_info->writer.writer_u16 = new_write_ptr;
-    assert(unicode_info->cur_ucs_type == 0);
-    unicode_info->cur_ucs_type = 2;
-}
-
-force_inline void memorize_ascii_to_ucs1(EncodeUnicodeBufferInfo *unicode_buffer_info, UnicodeInfo *unicode_info) {
-    Py_ssize_t len = unicode_buffer_info->writer.writer_u8 - (u8 *)GET_VEC_ASCII_START(unicode_buffer_info);
-    unicode_info->ascii_size = len;
-    u8 *new_write_ptr = ((u8 *)GET_VEC_COMPACT_START(unicode_buffer_info)) + len;
-    unicode_buffer_info->writer.writer_u8 = new_write_ptr;
-    assert(unicode_info->cur_ucs_type == 0);
-    unicode_info->cur_ucs_type = 1;
-}
-
-force_inline void memorize_ucs1_to_ucs2(EncodeUnicodeBufferInfo *unicode_buffer_info, UnicodeInfo *unicode_info) {
-    Py_ssize_t diff = unicode_buffer_info->writer.writer_u8 - (u8 *)GET_VEC_COMPACT_START(unicode_buffer_info);
-    Py_ssize_t len = diff - unicode_info->ascii_size;
-    assert(len >= 0);
-    unicode_info->u8_size = len;
-    u16 *new_write_ptr = ((u16 *)GET_VEC_COMPACT_START(unicode_buffer_info)) + diff;
-    unicode_buffer_info->writer.writer_u16 = new_write_ptr;
-    assert(unicode_info->cur_ucs_type == 1);
-    unicode_info->cur_ucs_type = 2;
-}
-
-force_inline void memorize_ucs1_to_ucs4(EncodeUnicodeBufferInfo *unicode_buffer_info, UnicodeInfo *unicode_info) {
-    Py_ssize_t diff = unicode_buffer_info->writer.writer_u8 - (u8 *)GET_VEC_COMPACT_START(unicode_buffer_info);
-    Py_ssize_t len = diff - unicode_info->ascii_size;
-    assert(len >= 0);
-    unicode_info->u8_size = len;
-    u32 *new_write_ptr = ((u32 *)GET_VEC_COMPACT_START(unicode_buffer_info)) + diff;
-    unicode_buffer_info->writer.writer_u32 = new_write_ptr;
-    assert(unicode_info->cur_ucs_type == 1);
-    unicode_info->cur_ucs_type = 4;
-}
-
-force_inline void memorize_ucs2_to_ucs4(EncodeUnicodeBufferInfo *unicode_buffer_info, UnicodeInfo *unicode_info) {
-    Py_ssize_t diff = unicode_buffer_info->writer.writer_u16 - (u16 *)GET_VEC_COMPACT_START(unicode_buffer_info);
-    Py_ssize_t len = diff - unicode_info->ascii_size - unicode_info->u8_size;
-    assert(len >= 0);
-    unicode_info->u16_size = len;
-    u32 *new_write_ptr = ((u32 *)GET_VEC_COMPACT_START(unicode_buffer_info)) + diff;
-    unicode_buffer_info->writer.writer_u32 = new_write_ptr;
-    assert(unicode_info->cur_ucs_type == 2);
-    unicode_info->cur_ucs_type = 4;
-}
-
-force_inline void ascii_elevate2(EncodeUnicodeBufferInfo *unicode_buffer_info, UnicodeInfo *unicode_info) {
-    u8 *start = ((u8 *)GET_VEC_ASCII_START(unicode_buffer_info));
-    u16 *write_start = ((u16 *)GET_VEC_COMPACT_START(unicode_buffer_info));
-    SIMD_NAME_MODIFIER(long_back_elevate_1_2)(write_start, start, unicode_info->ascii_size);
-}
-
-force_inline void ascii_elevate4(EncodeUnicodeBufferInfo *unicode_buffer_info, UnicodeInfo *unicode_info) {
-    u8 *start = ((u8 *)GET_VEC_ASCII_START(unicode_buffer_info));
-    u32 *write_start = ((u32 *)GET_VEC_COMPACT_START(unicode_buffer_info));
-    SIMD_NAME_MODIFIER(long_back_elevate_1_4)(write_start, start, unicode_info->ascii_size);
-}
-
-force_inline void ucs1_elevate2(EncodeUnicodeBufferInfo *unicode_buffer_info, UnicodeInfo *unicode_info) {
-    Py_ssize_t offset = unicode_info->ascii_size;
-    u8 *start = ((u8 *)GET_VEC_COMPACT_START(unicode_buffer_info)) + offset;
-    u16 *write_start = ((u16 *)GET_VEC_COMPACT_START(unicode_buffer_info)) + offset;
-    SIMD_NAME_MODIFIER(long_back_elevate_1_2)(write_start, start, unicode_info->u8_size);
-}
-
-force_inline void ucs1_elevate4(EncodeUnicodeBufferInfo *unicode_buffer_info, UnicodeInfo *unicode_info) {
-    Py_ssize_t offset = unicode_info->ascii_size;
-    u8 *start = ((u8 *)GET_VEC_COMPACT_START(unicode_buffer_info)) + offset;
-    u32 *write_start = ((u32 *)GET_VEC_COMPACT_START(unicode_buffer_info)) + offset;
-    SIMD_NAME_MODIFIER(long_back_elevate_1_4)(write_start, start, unicode_info->u8_size);
-}
-
-force_inline void ucs2_elevate4(EncodeUnicodeBufferInfo *unicode_buffer_info, UnicodeInfo *unicode_info) {
-    Py_ssize_t offset = unicode_info->ascii_size + unicode_info->u8_size;
-    u16 *start = ((u16 *)GET_VEC_COMPACT_START(unicode_buffer_info)) + offset;
-    u32 *write_start = ((u32 *)GET_VEC_COMPACT_START(unicode_buffer_info)) + offset;
-    SIMD_NAME_MODIFIER(long_back_elevate_2_4)(write_start, start, unicode_info->u16_size);
-}
-
-force_inline void ascii_elevate1(EncodeUnicodeBufferInfo *unicode_buffer_info, UnicodeInfo *unicode_info) {
-    memmove(GET_VEC_COMPACT_START(unicode_buffer_info), GET_VEC_ASCII_START(unicode_buffer_info), unicode_info->ascii_size);
-}
 
 force_inline bool init_stack_vars(EncodeStackVars *stack_vars, PyObject *in_obj) {
     stack_vars->cur_obj = in_obj;

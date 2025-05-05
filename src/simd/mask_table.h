@@ -44,43 +44,43 @@ force_inline const void *read_head_mask_table_32(Py_ssize_t row) {
     return (const void *)&_HeadmaskTable_8[4 * row][0];
 }
 
-/* Read tail mask of u8. The result has `row` "0xff"s at tail. */
-force_inline const void *read_tail_mask_reversed_table_8(Py_ssize_t row) {
-#if SIMD_BIT_SIZE == 512
-    const int offset = 64;
-#elif SIMD_BIT_SIZE == 256
-    const int offset = 32;
-#else
-    const int offset = 16;
-#endif
-    return (const void *)&_TailmaskTable_8[offset - row][0];
-}
+// /* Read tail mask of u8. The result has `row` "0xff"s at tail. */
+// force_inline const void *read_tail_mask_reversed_table_8(Py_ssize_t row) {
+// #if COMPILE_SIMD_BITS == 512
+//     const int offset = 64;
+// #elif COMPILE_SIMD_BITS == 256
+//     const int offset = 32;
+// #else
+//     const int offset = 16;
+// #endif
+//     return (const void *)&_TailmaskTable_8[offset - row][0];
+// }
 
-/* Read tail mask of u16. The result has `row` "0xffff"s at tail. */
-force_inline const void *read_tail_mask_reversed_table_16(Py_ssize_t row) {
-#if SIMD_BIT_SIZE == 512
-    const int offset = 64;
-#elif SIMD_BIT_SIZE == 256
-    const int offset = 32;
-#else
-    const int offset = 16;
-#endif
-    assert(offset >= 2 * row && row >= 0);
-    return (const void *)&_TailmaskTable_8[offset - 2 * row][0];
-}
+// /* Read tail mask of u16. The result has `row` "0xffff"s at tail. */
+// force_inline const void *read_tail_mask_reversed_table_16(Py_ssize_t row) {
+// #if COMPILE_SIMD_BITS == 512
+//     const int offset = 64;
+// #elif COMPILE_SIMD_BITS == 256
+//     const int offset = 32;
+// #else
+//     const int offset = 16;
+// #endif
+//     assert(offset >= 2 * row && row >= 0);
+//     return (const void *)&_TailmaskTable_8[offset - 2 * row][0];
+// }
 
-/* Read tail mask of u32. The result has `row` "0xffffffff"s at tail. */
-force_inline const void *read_tail_mask_reversed_table_32(Py_ssize_t row) {
-#if SIMD_BIT_SIZE == 512
-    const int offset = 64;
-#elif SIMD_BIT_SIZE == 256
-    const int offset = 32;
-#else
-    const int offset = 16;
-#endif
-    assert(offset >= 4 * row && row >= 0);
-    return (const void *)&_TailmaskTable_8[4 * row][0];
-}
+// /* Read tail mask of u32. The result has `row` "0xffffffff"s at tail. */
+// force_inline const void *read_tail_mask_reversed_table_32(Py_ssize_t row) {
+// #if COMPILE_SIMD_BITS == 512
+//     const int offset = 64;
+// #elif COMPILE_SIMD_BITS == 256
+//     const int offset = 32;
+// #else
+//     const int offset = 16;
+// #endif
+//     assert(offset >= 4 * row && row >= 0);
+//     return (const void *)&_TailmaskTable_8[4 * row][0];
+// }
 
 force_inline const void *read_rshift_mask_table(int row) {
     return (const void *)&_RShiftMaskTable[row][0];

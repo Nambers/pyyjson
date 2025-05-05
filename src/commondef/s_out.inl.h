@@ -1,0 +1,12 @@
+#undef testz
+#undef to_bitmask
+#undef rshift_u32
+#undef rshift_u16
+#undef cvt_u8_to_u32
+#undef cvt_u8_to_u16
+#undef cvt_u16_to_u32
+#undef setzero
+#undef broadcast_u32
+#undef broadcast_u16
+#undef broadcast_u8
+#undef SIMD_BITS_DOUBLE

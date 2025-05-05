@@ -6,26 +6,26 @@
 #define DIGI_IS_EXP PYYJSON_CONCAT2(digi_is_exp, COMPILE_READ_UCS_LEVEL)
 #define DIGI_IS_SIGN PYYJSON_CONCAT2(digi_is_sign, COMPILE_READ_UCS_LEVEL)
 #define DIGI_IS_FP PYYJSON_CONCAT2(digi_is_fp, COMPILE_READ_UCS_LEVEL)
-#define READ_INF_OR_NAN PYYJSON_CONCAT2(read_inf_or_nan, COMPILE_READ_UCS_LEVEL)
+// #define read_inf_or_nan PYYJSON_CONCAT2(read_inf_or_nan, COMPILE_READ_UCS_LEVEL)
 
 /////////////////
-force_inline bool DIGI_IS_DIGIT(_FROM_TYPE d) {
+force_inline bool DIGI_IS_DIGIT(_src_t d) {
     return d <= U8MAX && _digi_is_digit((u8)d);
 }
 
-force_inline bool DIGI_IS_DIGIT_OR_FP(_FROM_TYPE d) {
+force_inline bool DIGI_IS_DIGIT_OR_FP(_src_t d) {
     return d <= U8MAX && _digi_is_digit_or_fp((u8)d);
 }
 
-force_inline bool DIGI_IS_EXP(_FROM_TYPE d) {
+force_inline bool DIGI_IS_EXP(_src_t d) {
     return d <= U8MAX && _digi_is_exp((u8)d);
 }
 
-force_inline bool DIGI_IS_SIGN(_FROM_TYPE d) {
+force_inline bool DIGI_IS_SIGN(_src_t d) {
     return d <= U8MAX && _digi_is_sign((u8)d);
 }
 
-force_inline bool DIGI_IS_FP(_FROM_TYPE d) {
+force_inline bool DIGI_IS_FP(_src_t d) {
     return d <= U8MAX && _digi_is_fp((u8)d);
 }
 
@@ -34,14 +34,14 @@ force_inline bool DIGI_IS_FP(_FROM_TYPE d) {
 #    define BIGINT_SET_BUF PYYJSON_CONCAT2(bigint_set_buf, COMPILE_READ_UCS_LEVEL)
 
 ////////////////
-force_inline bool DIGI_IS_NONZERO(_FROM_TYPE d) {
+force_inline bool DIGI_IS_NONZERO(_src_t d) {
     return d <= U8MAX && _digi_is_nonzero((u8)d);
 }
 
 /** Set a bigint with floating point number string. */
 static force_noinline void BIGINT_SET_BUF(
         bigint *big, u64 sig, i32 *exp,
-        const _FROM_TYPE *sig_cut, const _FROM_TYPE *sig_end, const _FROM_TYPE *dot_pos) {
+        const _src_t *sig_cut, const _src_t *sig_end, const _src_t *dot_pos) {
 
     if (unlikely(!sig_cut)) {
         /* no digit cut, set significant part only */
@@ -50,8 +50,8 @@ static force_noinline void BIGINT_SET_BUF(
 
     } else {
         /* some digits were cut, read them from 'sig_cut' to 'sig_end' */
-        const _FROM_TYPE *hdr = sig_cut;
-        const _FROM_TYPE *cur = hdr;
+        const _src_t *hdr = sig_cut;
+        const _src_t *cur = hdr;
         u32 len = 0;
         u64 val = 0;
         bool dig_big_cut = false;
@@ -103,7 +103,7 @@ static force_noinline void BIGINT_SET_BUF(
     number is infinite, the return value is based on flag.
  3. This function (with inline attribute) may generate a lot of instructions.
  */
-force_inline PyObject *READ_NUMBER(const _FROM_TYPE **ptr, const _FROM_TYPE *buffer_end) {
+force_inline PyObject *READ_NUMBER(const _src_t **ptr, const _src_t *buffer_end) {
 #    define return_err(_end, _msg)                                                  \
         do {                                                                        \
             PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, _end - hdr); \
@@ -146,9 +146,9 @@ force_inline PyObject *READ_NUMBER(const _FROM_TYPE **ptr, const _FROM_TYPE *buf
             return_f64_bin(F64_RAW_INF); \
         } while (false)
 
-    const _FROM_TYPE *sig_cut = NULL; /* significant part cutting position for long number */
-    const _FROM_TYPE *sig_end = NULL; /* significant part ending position */
-    const _FROM_TYPE *dot_pos = NULL; /* decimal point position */
+    const _src_t *sig_cut = NULL; /* significant part cutting position for long number */
+    const _src_t *sig_end = NULL; /* significant part ending position */
+    const _src_t *dot_pos = NULL; /* decimal point position */
 
     u64 sig = 0; /* significant part of the number */
     i32 exp = 0; /* exponent part of the number */
@@ -157,11 +157,11 @@ force_inline PyObject *READ_NUMBER(const _FROM_TYPE **ptr, const _FROM_TYPE *buf
     i64 exp_sig = 0;       /* temporary exponent number from significant part */
     i64 exp_lit = 0;       /* temporary exponent number from exponent literal part */
     u64 num;               /* temporary number for reading */
-    const _FROM_TYPE *tmp; /* temporary cursor for reading */
+    const _src_t *tmp; /* temporary cursor for reading */
 
-    const _FROM_TYPE *hdr = *ptr;
-    const _FROM_TYPE *cur = *ptr;
-    const _FROM_TYPE **end = ptr;
+    const _src_t *hdr = *ptr;
+    const _src_t *cur = *ptr;
+    const _src_t **end = ptr;
     bool sign;
 
     /* read number as raw string if has `YYJSON_READ_NUMBER_AS_RAW` flag */
@@ -175,7 +175,7 @@ force_inline PyObject *READ_NUMBER(const _FROM_TYPE **ptr, const _FROM_TYPE *buf
     /* begin with a leading zero or non-digit */
     if (unlikely(!DIGI_IS_NONZERO(*cur))) { /* 0 or non-digit char */
         if (unlikely(*cur != '0')) {        /* non-digit char */
-            PyObject *number_obj = READ_INF_OR_NAN(sign, &cur, buffer_end);
+            PyObject *number_obj = read_inf_or_nan(sign, &cur, buffer_end);
             if (likely(number_obj)) {
                 *end = cur;
                 return number_obj;
@@ -715,7 +715,7 @@ digi_finish:
  This is a fallback function if the custom number reader is disabled.
  This function use libc's strtod() to read floating-point number.
  */
-force_inline PyObject *READ_NUMBER(const _FROM_TYPE **ptr, const _FROM_TYPE *buffer_end) {
+force_inline PyObject *READ_NUMBER(const _src_t **ptr, const _src_t *buffer_end) {
 
 #    define return_err(_end, _msg)                                                  \
         do {                                                                        \
@@ -760,10 +760,10 @@ force_inline PyObject *READ_NUMBER(const _FROM_TYPE **ptr, const _FROM_TYPE *buf
         } while (false)
 
     u64 sig, num;
-    const _FROM_TYPE *hdr = *ptr;
-    const _FROM_TYPE *cur = *ptr;
-    const _FROM_TYPE **end = ptr;
-    const _FROM_TYPE *dot = NULL;
+    const _src_t *hdr = *ptr;
+    const _src_t *cur = *ptr;
+    const _src_t **end = ptr;
+    const _src_t *dot = NULL;
     bool sign;
 
     sign = (*hdr == '-');
@@ -773,7 +773,7 @@ force_inline PyObject *READ_NUMBER(const _FROM_TYPE **ptr, const _FROM_TYPE *buf
     /* read first digit, check leading zero */
     if (unlikely(!DIGI_IS_DIGIT(*cur))) {
         // if (has_read_flag(ALLOW_INF_AND_NAN)) {
-        PyObject *number_obj = READ_INF_OR_NAN(sign, &cur, buffer_end);
+        PyObject *number_obj = read_inf_or_nan(sign, &cur, buffer_end);
         if (likely(number_obj)) {
             *end = cur;
             return number_obj;
@@ -941,7 +941,7 @@ read_double:
 
 #endif /* !PYYJSON_HAS_IEEE_754 */
 
-#undef READ_INF_OR_NAN
+// #undef read_inf_or_nan
 #undef DIGI_IS_FP
 #undef DIGI_IS_SIGN
 #undef DIGI_IS_EXP

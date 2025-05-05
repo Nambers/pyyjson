@@ -1,7 +1,10 @@
 #ifndef ENCODE_UNICODE_IMPL_WRAP_H
 #define ENCODE_UNICODE_IMPL_WRAP_H
 
-
+#include "simd/simd_detect.h"
+#include "simd/simd_impl.h"
+//
+#include "simd/compile_feature_check.h"
 #define COMPILE_INDENT_LEVEL 0
 
 #define COMPILE_READ_UCS_LEVEL 1
@@ -123,5 +126,6 @@
 
 #undef COMPILE_INDENT_LEVEL
 
+#undef COMPILE_SIMD_BITS
 
 #endif // ENCODE_UNICODE_IMPL_WRAP_H

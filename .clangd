@@ -1,0 +1,2 @@
+CompileFlags:
+  Add: [-DPYYJSON_CLANGD_DUMMY]

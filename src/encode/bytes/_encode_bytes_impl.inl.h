@@ -52,7 +52,7 @@ force_inline bool BYTES_BUFFER_APPEND_LONG(EncodeUTF8BufferInfo *utf8_buffer_inf
     WRITE_INDENT_RETURN_IF_FAIL(utf8_buffer_info, cur_nested_depth, is_in_obj, TAIL_PADDING);
 
     if (pylong_is_zero(val)) {
-        // _TARGET_TYPE *writer = utf8_buffer_info->writer;
+        // _dst_t *writer = utf8_buffer_info->writer;
         *utf8_buffer_info->writer++ = '0';
         *utf8_buffer_info->writer++ = ',';
         utf8_buffer_info->writer += 2;
@@ -124,10 +124,10 @@ force_inline bool BYTES_BUFFER_APPEND_KEY(PyObject *val, EncodeUTF8BufferInfo *r
 #endif
     return true;
     //     RETURN_ON_UNLIKELY_ERR(!UNICODE_BUFFER_RESERVE(unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 5 + 6 * len + TAIL_PADDING));
-    //     WRITE_UNICODE_INDENT(&_WRITER(unicode_buffer_info), cur_nested_depth);
+    //     write_unicode_indent(&_WRITER(unicode_buffer_info), cur_nested_depth);
     //     *_WRITER(unicode_buffer_info)++ = '"';
-    //     WRITE_UNICODE_IMPL(unicode_buffer_info, (_FROM_TYPE *)get_unicode_data(key), len);
-    //     _TARGET_TYPE *writer = _WRITER(unicode_buffer_info);
+    //     WRITE_UNICODE_IMPL(unicode_buffer_info, (_src_t *)get_unicode_data(key), len);
+    //     _dst_t *writer = _WRITER(unicode_buffer_info);
     //     *writer++ = '"';
     //     *writer++ = ':';
     // #if COMPILE_INDENT_LEVEL > 0

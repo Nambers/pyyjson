@@ -1,9 +1,13 @@
 #define XXH_INLINE_ALL
 #include "decode.h"
 
+#include "decode_str_common.h"
 #include "pyyjson.h"
+#include "simd/cvt.h"
+#include "simd/mask_table.h"
 #include "simd/memcmp.h"
 #include "simd/memcpy.h"
+#include "simd/simd_impl.h"
 #include "tls.h"
 #include "xxhash.h"
 #include <assert.h>
@@ -467,12 +471,18 @@ force_inline u32 read_b4_unicode(u32 uni) {
 #include "simd/check_mask_wrap.h"
 
 #include "simd/downgrade_wrap.h"
-
+//
+#include "decode/str/str.h"
+//
 #include "decode_float_wrap.inl.c"
 
 #include "simd/write_utils_wrap.h"
 
 #include "simd/readwrite_utils_wrap.h"
+//
+#include "simd/long_cvt.h"
+//
+#include "simd/compile_feature_check.h"
 
 #define COMPILE_UCS_LEVEL 0
 #include "decode_str.inl.c"
@@ -491,6 +501,8 @@ force_inline u32 read_b4_unicode(u32 uni) {
 #undef COMPILE_UCS_LEVEL
 
 #include "decode_bytes.inl.c"
+
+#undef COMPILE_SIMD_BITS
 
 static int invalid_arg_checked = 0;
 

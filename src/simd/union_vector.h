@@ -1,104 +1,104 @@
 #ifndef PYYJSON_UNION_VECTOR_H
 #define PYYJSON_UNION_VECTOR_H
-#include "simd_impl.h"
+#include "vector_types.h"
 
 typedef union {
-    VECTOR_U8_128_A x[2];
-    VECTOR_U8_256_A y;
-} UnionVectorA_U8_128_x2;
+    vector_a_u8_128 x[2];
+    vector_a_u8_256 y;
+} unionvector_a_u8_128_x2;
 
 typedef union {
-    VECTOR_U16_128_A x[2];
-    VECTOR_U16_256_A y;
-} UnionVectorA_U16_128_x2;
+    vector_a_u16_128 x[2];
+    vector_a_u16_256 y;
+} unionvector_a_u16_128_x2;
 
 typedef union {
-    VECTOR_U32_128_A x[2];
-    VECTOR_U32_256_A y;
-} UnionVectorA_U32_128_x2;
+    vector_a_u32_128 x[2];
+    vector_a_u32_256 y;
+} unionvector_a_u32_128_x2;
 
 typedef union {
-    VECTOR_U8_128_A x[4];
-    VECTOR_U8_256_A y[2];
-    VECTOR_U8_512_A z;
-} UnionVectorA_U8_128_x4;
+    vector_a_u8_128 x[4];
+    vector_a_u8_256 y[2];
+    vector_a_u8_512 z;
+} unionvector_a_u8_128_x4;
 
 typedef union {
-    VECTOR_U16_128_A x[4];
-    VECTOR_U16_256_A y[2];
-    VECTOR_U16_512_A z;
-} UnionVectorA_U16_128_x4;
+    vector_a_u16_128 x[4];
+    vector_a_u16_256 y[2];
+    vector_a_u16_512 z;
+} unionvector_a_u16_128_x4;
 
 typedef union {
-    VECTOR_U32_128_A x[4];
-    VECTOR_U32_256_A y[2];
-    VECTOR_U32_512_A z;
-} UnionVectorA_U32_128_x4;
+    vector_a_u32_128 x[4];
+    vector_a_u32_256 y[2];
+    vector_a_u32_512 z;
+} unionvector_a_u32_128_x4;
 
 typedef union {
-    VECTOR_U8_256_A x[2];
-    VECTOR_U8_512_A y;
-} UnionVectorA_U8_256_x2;
+    vector_a_u8_256 x[2];
+    vector_a_u8_512 y;
+} unionvector_a_u8_256_x2;
 
 typedef union {
-    VECTOR_U16_256_A x[2];
-    VECTOR_U16_512_A y;
-} UnionVectorA_U16_256_x2;
+    vector_a_u16_256 x[2];
+    vector_a_u16_512 y;
+} unionvector_a_u16_256_x2;
 
 typedef union {
-    VECTOR_U32_256_A x[2];
-    VECTOR_U32_512_A y;
-} UnionVectorA_U32_256_x2;
+    vector_a_u32_256 x[2];
+    vector_a_u32_512 y;
+} unionvector_a_u32_256_x2;
 
 typedef union {
-    VECTOR_U8_256_A x[4];
-    VECTOR_U8_512_A y[2];
-    VECTOR_U8_1024_A z;
-} UnionVectorA_U8_256_x4;
+    vector_a_u8_256 x[4];
+    vector_a_u8_512 y[2];
+    vector_a_u8_1024 z;
+} unionvector_a_u8_256_x4;
 
 typedef union {
-    VECTOR_U16_256_A x[4];
-    VECTOR_U16_512_A y[2];
-    VECTOR_U16_1024_A z;
-} UnionVectorA_U16_256_x4;
+    vector_a_u16_256 x[4];
+    vector_a_u16_512 y[2];
+    vector_a_u16_1024 z;
+} unionvector_a_u16_256_x4;
 
 typedef union {
-    VECTOR_U32_256_A x[4];
-    VECTOR_U32_512_A y[2];
-    VECTOR_U32_1024_A z;
-} UnionVectorA_U32_256_x4;
+    vector_a_u32_256 x[4];
+    vector_a_u32_512 y[2];
+    vector_a_u32_1024 z;
+} unionvector_a_u32_256_x4;
 
 typedef union {
-    VECTOR_U8_512_A x[2];
-    VECTOR_U8_1024_A y;
-} UnionVectorA_U8_512_x2;
+    vector_a_u8_512 x[2];
+    vector_a_u8_1024 y;
+} unionvector_a_u8_512_x2;
 
 typedef union {
-    VECTOR_U16_512_A x[2];
-    VECTOR_U16_1024_A y;
-} UnionVectorA_U16_512_x2;
+    vector_a_u16_512 x[2];
+    vector_a_u16_1024 y;
+} unionvector_a_u16_512_x2;
 
 typedef union {
-    VECTOR_U32_512_A x[2];
-    VECTOR_U32_1024_A y;
-} UnionVectorA_U32_512_x2;
+    vector_a_u32_512 x[2];
+    vector_a_u32_1024 y;
+} unionvector_a_u32_512_x2;
 
 typedef union {
-    VECTOR_U8_512_A x[4];
-    VECTOR_U8_1024_A y[2];
-    VECTOR_U8_2048_A z;
-} UnionVectorA_U8_512_x4;
+    vector_a_u8_512 x[4];
+    vector_a_u8_1024 y[2];
+    vector_a_u8_2048 z;
+} unionvector_a_u8_512_x4;
 
 typedef union {
-    VECTOR_U16_512_A x[4];
-    VECTOR_U16_1024_A y[2];
-    VECTOR_U16_2048_A z;
-} UnionVectorA_U16_512_x4;
+    vector_a_u16_512 x[4];
+    vector_a_u16_1024 y[2];
+    vector_a_u16_2048 z;
+} unionvector_a_u16_512_x4;
 
 typedef union {
-    VECTOR_U32_512_A x[4];
-    VECTOR_U32_1024_A y[2];
-    VECTOR_U32_2048_A z;
-} UnionVectorA_U32_512_x4;
+    vector_a_u32_512 x[4];
+    vector_a_u32_1024 y[2];
+    vector_a_u32_2048 z;
+} unionvector_a_u32_512_x4;
 
 #endif // PYYJSON_UNION_VECTOR_H

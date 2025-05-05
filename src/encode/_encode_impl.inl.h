@@ -1,3 +1,12 @@
+#ifdef PYYJSON_CLANGD_DUMMY
+#    ifndef COMPILE_UCS_LEVEL
+#        define COMPILE_UCS_LEVEL 0
+#    endif
+#    ifndef COMPILE_INDENT_LEVEL
+#        define COMPILE_INDENT_LEVEL 2
+#    endif
+#endif
+
 #ifndef COMPILE_UCS_LEVEL
 #    error "COMPILE_UCS_LEVEL is not defined"
 #endif
@@ -13,14 +22,18 @@
 #    define COMPILE_READ_UCS_LEVEL COMPILE_UCS_LEVEL
 #    define COMPILE_WRITE_UCS_LEVEL COMPILE_UCS_LEVEL
 #endif
-
-#include "commondef/iw_in.inl.h"
 #include "unicode/indent_wrap.h"
+//
+#include "commondef/iw_in.inl.h"
+//
+#include "commondef/w_out.inl.h"
+//
+#include "commondef/sw_in.inl.h"
 
 
-#define WRITE_INDENT_RETURN_IF_FAIL(_unicode_buffer_info_, _cur_nested_depth_, _is_in_obj_, _additional_reserve_count_)                 \
-    do {                                                                                                                                \
-        if (unlikely(!UNICODE_INDENT_WRITER(_unicode_buffer_info_, _cur_nested_depth_, _is_in_obj_, _additional_reserve_count_))) return false; \
+#define WRITE_INDENT_RETURN_IF_FAIL(_unicode_buffer_info_, _cur_nested_depth_, _is_in_obj_, _additional_reserve_count_)                         \
+    do {                                                                                                                                        \
+        if (unlikely(!unicode_indent_writer(_unicode_buffer_info_, _cur_nested_depth_, _is_in_obj_, _additional_reserve_count_))) return false; \
     } while (0)
 
 
@@ -203,7 +216,7 @@ force_inline bool UNICODE_BUFFER_APPEND_LONG(EncodeUnicodeBufferInfo *unicode_bu
     WRITE_INDENT_RETURN_IF_FAIL(unicode_buffer_info, cur_nested_depth, is_in_obj, TAIL_PADDING);
 
     if (pylong_is_zero(val)) {
-        _TARGET_TYPE *writer = _WRITER(unicode_buffer_info);
+        _dst_t *writer = _WRITER(unicode_buffer_info);
         *writer++ = '0';
         *writer++ = ',';
         _WRITER(unicode_buffer_info) += 2;
@@ -235,8 +248,8 @@ force_inline bool UNICODE_BUFFER_APPEND_LONG(EncodeUnicodeBufferInfo *unicode_bu
 
 #define WRITE_UNICODE_FALSE PYYJSON_CONCAT3(write_unicode_false, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline void WRITE_UNICODE_FALSE(_TARGET_TYPE **writer_addr) {
-    _TARGET_TYPE *writer = *writer_addr;
+force_inline void WRITE_UNICODE_FALSE(_dst_t **writer_addr) {
+    _dst_t *writer = *writer_addr;
     //   6,12,24
     //-> 8,16,24/32 (64)
     //-> 8,12,24 (32)
@@ -246,7 +259,7 @@ force_inline void WRITE_UNICODE_FALSE(_TARGET_TYPE **writer_addr) {
     *writer++ = 's';
     *writer++ = 'e';
     *writer++ = ',';
-    _TARGET_TYPE *writer2 = writer;
+    _dst_t *writer2 = writer;
 #if COMPILE_UCS_LEVEL == 1
     *writer2++ = 0;
     *writer2++ = 0;
@@ -274,9 +287,9 @@ force_inline bool UNICODE_BUFFER_APPEND_FALSE(EncodeUnicodeBufferInfo *unicode_b
 
 #define WRITE_UNICODE_TRUE PYYJSON_CONCAT3(write_unicode_true, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline void WRITE_UNICODE_TRUE(_TARGET_TYPE **writer_addr) {
-    _TARGET_TYPE *writer = *writer_addr;
-    _TARGET_TYPE *writer2 = writer;
+force_inline void WRITE_UNICODE_TRUE(_dst_t **writer_addr) {
+    _dst_t *writer = *writer_addr;
+    _dst_t *writer2 = writer;
     //   5,10,20
     //-> 8,16,24/32 (64)
     //-> 8,12,20 (32)
@@ -317,9 +330,9 @@ force_inline bool UNICODE_BUFFER_APPEND_TRUE(EncodeUnicodeBufferInfo *unicode_bu
 
 #define WRITE_UNICODE_NULL PYYJSON_CONCAT3(write_unicode_null, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline void WRITE_UNICODE_NULL(_TARGET_TYPE **writer_addr) {
-    _TARGET_TYPE *writer = *writer_addr;
-    _TARGET_TYPE *writer2 = writer;
+force_inline void WRITE_UNICODE_NULL(_dst_t **writer_addr) {
+    _dst_t *writer = *writer_addr;
+    _dst_t *writer2 = writer;
     //   5,10,20
     //-> 8,16,24/32 (64)
     //-> 8,12,20 (32)
@@ -371,8 +384,8 @@ force_inline bool UNICODE_BUFFER_APPEND_FLOAT(EncodeUnicodeBufferInfo *unicode_b
 
 #define WRITE_UNICODE_EMPTY_ARR PYYJSON_CONCAT3(write_unicode_empty_arr, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline void WRITE_UNICODE_EMPTY_ARR(_TARGET_TYPE **writer_addr) {
-    _TARGET_TYPE *writer = *writer_addr;
+force_inline void WRITE_UNICODE_EMPTY_ARR(_dst_t **writer_addr) {
+    _dst_t *writer = *writer_addr;
     //   3,6,12
     //-> 4,8,16 (64)
     //-> 4,8,12 (32)
@@ -395,7 +408,7 @@ force_inline bool UNICODE_BUFFER_APPEND_EMPTY_ARR(EncodeUnicodeBufferInfo *unico
 
 #define WRITE_UNICODE_ARR_BEGIN PYYJSON_CONCAT3(write_unicode_arr_begin, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline void WRITE_UNICODE_ARR_BEGIN(_TARGET_TYPE **writer_addr) {
+force_inline void WRITE_UNICODE_ARR_BEGIN(_dst_t **writer_addr) {
     *(*writer_addr)++ = '[';
 }
 
@@ -409,8 +422,8 @@ force_inline bool UNICODE_BUFFER_APPEND_ARR_BEGIN(EncodeUnicodeBufferInfo *unico
 
 #define WRITE_UNICODE_EMPTY_OBJ PYYJSON_CONCAT3(write_unicode_empty_obj, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline void WRITE_UNICODE_EMPTY_OBJ(_TARGET_TYPE **writer_addr) {
-    _TARGET_TYPE *writer = *writer_addr;
+force_inline void WRITE_UNICODE_EMPTY_OBJ(_dst_t **writer_addr) {
+    _dst_t *writer = *writer_addr;
     //   3,6,12
     //-> 4,8,16 (64)
     //-> 4,8,12 (32)
@@ -433,7 +446,7 @@ force_inline bool UNICODE_BUFFER_APPEND_EMPTY_OBJ(EncodeUnicodeBufferInfo *unico
 
 #define WRITE_UNICODE_OBJ_BEGIN PYYJSON_CONCAT3(write_unicode_obj_begin, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline void WRITE_UNICODE_OBJ_BEGIN(_TARGET_TYPE **writer_addr) {
+force_inline void WRITE_UNICODE_OBJ_BEGIN(_dst_t **writer_addr) {
     *(*writer_addr)++ = '{';
 }
 
@@ -447,8 +460,8 @@ force_inline bool UNICODE_BUFFER_APPEND_OBJ_BEGIN(EncodeUnicodeBufferInfo *unico
 
 #define WRITE_UNICODE_OBJ_END PYYJSON_CONCAT3(write_unicode_obj_end, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline void WRITE_UNICODE_OBJ_END(_TARGET_TYPE **writer_addr) {
-    _TARGET_TYPE *writer = *writer_addr;
+force_inline void WRITE_UNICODE_OBJ_END(_dst_t **writer_addr) {
+    _dst_t *writer = *writer_addr;
     *writer++ = '}';
     *writer++ = ',';
     *writer_addr = writer;
@@ -467,8 +480,8 @@ force_inline bool UNICODE_BUFFER_APPEND_OBJ_END(EncodeUnicodeBufferInfo *unicode
 
 #define WRITE_UNICODE_ARR_END PYYJSON_CONCAT3(write_unicode_arr_end, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
-force_inline void WRITE_UNICODE_ARR_END(_TARGET_TYPE **writer_addr) {
-    _TARGET_TYPE *writer = *writer_addr;
+force_inline void WRITE_UNICODE_ARR_END(_dst_t **writer_addr) {
+    _dst_t *writer = *writer_addr;
     *writer++ = ']';
     *writer++ = ',';
     *writer_addr = writer;

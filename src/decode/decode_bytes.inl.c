@@ -259,7 +259,7 @@ copy_escape_ucs1:
                 src++;
                 break;
             case 'u':
-                if (unlikely(!read_8_to_hex_u16(++src, &hi))) {
+                if (unlikely(!read_to_hex_u8(++src, &hi))) {
                     return_err(src - 2, "invalid escaped sequence in string");
                 }
                 src += 4;
@@ -299,7 +299,7 @@ copy_escape_ucs1:
                     if (unlikely(!byte_match_2(src, "\\u"))) {
                         return_err(src, "no low surrogate in string");
                     }
-                    if (unlikely(!read_8_to_hex_u16(src + 2, &lo))) {
+                    if (unlikely(!read_to_hex_u8(src + 2, &lo))) {
                         return_err(src, "invalid escaped sequence in string");
                     }
                     if (unlikely((lo & 0xFC00) != 0xDC00)) {
@@ -652,7 +652,7 @@ copy_escape_ucs2:
                 src++;
                 break;
             case 'u':
-                if (unlikely(!read_8_to_hex_u16(++src, &hi))) {
+                if (unlikely(!read_to_hex_u8(++src, &hi))) {
                     return_err(src - 2, "invalid escaped sequence in string");
                 }
                 src += 4;
@@ -680,7 +680,7 @@ copy_escape_ucs2:
                     if (unlikely(!byte_match_2(src, "\\u"))) {
                         return_err(src, "no low surrogate in string");
                     }
-                    if (unlikely(!read_8_to_hex_u16(src + 2, &lo))) {
+                    if (unlikely(!read_to_hex_u8(src + 2, &lo))) {
                         return_err(src, "invalid escaped sequence in string");
                     }
                     if (unlikely((lo & 0xFC00) != 0xDC00)) {
@@ -870,7 +870,7 @@ copy_escape_ucs4:
                 src++;
                 break;
             case 'u':
-                if (unlikely(!read_8_to_hex_u16(++src, &hi))) {
+                if (unlikely(!read_to_hex_u8(++src, &hi))) {
                     return_err(src - 2, "invalid escaped sequence in string");
                 }
                 src += 4;
@@ -898,7 +898,7 @@ copy_escape_ucs4:
                     if (unlikely(!byte_match_2(src, "\\u"))) {
                         return_err(src, "no low surrogate in string");
                     }
-                    if (unlikely(!read_8_to_hex_u16(src + 2, &lo))) {
+                    if (unlikely(!read_to_hex_u8(src + 2, &lo))) {
                         return_err(src, "invalid escaped sequence in string");
                     }
                     if (unlikely((lo & 0xFC00) != 0xDC00)) {
@@ -1121,7 +1121,7 @@ static force_noinline PyObject *read_root_single_bytes(const u8 *dat, usize len)
         goto fail_string;
     }
     if (*cur == 't') {
-        if (likely(_read_true_1(&cur, end))) {
+        if (likely(_read_true_u8(&cur, end))) {
             Py_Immortal_IncRef(Py_True);
             ret = Py_True;
             goto single_end;
@@ -1129,7 +1129,7 @@ static force_noinline PyObject *read_root_single_bytes(const u8 *dat, usize len)
         goto fail_literal_true;
     }
     if (*cur == 'f') {
-        if (likely(_read_false_1(&cur, end))) {
+        if (likely(_read_false_u8(&cur, end))) {
             Py_Immortal_IncRef(Py_False);
             ret = Py_False;
             goto single_end;
@@ -1137,19 +1137,19 @@ static force_noinline PyObject *read_root_single_bytes(const u8 *dat, usize len)
         goto fail_literal_false;
     }
     if (*cur == 'n') {
-        if (likely(_read_null_1(&cur, end))) {
+        if (likely(_read_null_u8(&cur, end))) {
             Py_Immortal_IncRef(Py_None);
             ret = Py_None;
             goto single_end;
         }
-        if (_read_nan_1(&cur, end)) {
+        if (_read_nan_u8(&cur, end)) {
             ret = PyFloat_FromDouble(fabs(Py_NAN));
             if (likely(ret)) goto single_end;
         }
         goto fail_literal_null;
     }
     {
-        ret = read_inf_or_nan_1(false, &cur, end);
+        ret = read_inf_or_nan_u8(false, &cur, end);
         if (likely(ret)) goto single_end;
     }
     goto fail_character;

@@ -1,3 +1,4 @@
+#undef MAKE_RW_NAME
 #undef ELEVATE_128_DST_T
 #undef ELEVATE_128_SRC_T
 #undef VECTOR_ELEVATE_128

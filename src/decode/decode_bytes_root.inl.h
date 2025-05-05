@@ -4,6 +4,10 @@
  *   DECODE_READ_PRETTY, true/false
  */
 
+#include "pyyjson.h"
+
+#define bytes_fast_skip_spaces PYYJSON_CONCAT2(fast_skip_spaces_u8, COMPILE_SIMD_BITS)
+
 #define SKIP_CONSECUTIVE_SPACES(_u8ptr)   \
     do {                                  \
         do {                              \
@@ -60,7 +64,7 @@ arr_val_begin:
     if (*cur == ' ') {
         // cur++;
         // if (*cur == ' ')
-        fast_skip_spaces_1(&cur, end);
+        bytes_fast_skip_spaces(&cur, end);
     }
 // #    if PYYJSON_IS_REAL_GCC
 //     while (true) REPEAT_CALL_16({
@@ -101,25 +105,25 @@ arr_val_begin:
         goto fail_string;
     }
     if (*cur == 't') {
-        if (likely(_read_true_1(&cur, end) && pyyjson_decode_true(decode_obj_stack_info))) {
+        if (likely(_read_true_u8(&cur, end) && pyyjson_decode_true(decode_obj_stack_info))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
         }
         goto fail_literal_true;
     }
     if (*cur == 'f') {
-        if (likely(_read_false_1(&cur, end) && pyyjson_decode_false(decode_obj_stack_info))) {
+        if (likely(_read_false_u8(&cur, end) && pyyjson_decode_false(decode_obj_stack_info))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
         }
         goto fail_literal_false;
     }
     if (*cur == 'n') {
-        if (likely(_read_null_1(&cur, end) && pyyjson_decode_null(decode_obj_stack_info))) {
+        if (likely(_read_null_u8(&cur, end) && pyyjson_decode_null(decode_obj_stack_info))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
         }
-        if (likely(_read_nan_1(&cur, end) && pyyjson_decode_nan(decode_obj_stack_info, false))) {
+        if (likely(_read_nan_u8(&cur, end) && pyyjson_decode_nan(decode_obj_stack_info, false))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
         }
@@ -144,7 +148,7 @@ arr_val_begin:
         goto arr_val_begin;
     }
     if ((*cur == 'i' || *cur == 'I' || *cur == 'N')) {
-        PyObject *number_obj = read_inf_or_nan_1(false, &cur, end);
+        PyObject *number_obj = read_inf_or_nan_u8(false, &cur, end);
         if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
@@ -174,7 +178,7 @@ arr_val_end:
     if (char_is_space(*cur)) {
         // unlikely case, we expect a "," or "]" but not found right after the value
         cur++;
-        if (*cur == ' ') fast_skip_spaces_1(&cur, end);
+        if (*cur == ' ') bytes_fast_skip_spaces(&cur, end);
         if (char_is_space(*cur)) {
             SKIP_CONSECUTIVE_SPACES(cur);
         }
@@ -211,7 +215,7 @@ obj_key_begin:
     if (*cur == ' ') {
         // cur++;
         // if (*cur == ' ')
-        fast_skip_spaces_1(&cur, end);
+        bytes_fast_skip_spaces(&cur, end);
     }
 // #if PYYJSON_IS_REAL_GCC
 //     while (true) REPEAT_CALL_16({
@@ -263,7 +267,7 @@ obj_key_end:
     if (char_is_space(*cur)) {
         // unlikely case, we expect a colon here
         cur++;
-        if (*cur == ' ') fast_skip_spaces_1(&cur, end);
+        if (*cur == ' ') bytes_fast_skip_spaces(&cur, end);
         if (char_is_space(*cur)) {
             SKIP_CONSECUTIVE_SPACES(cur);
         }
@@ -298,25 +302,25 @@ obj_val_begin:
         goto arr_begin;
     }
     if (*cur == 't') {
-        if (likely(_read_true_1(&cur, end) && pyyjson_decode_true(decode_obj_stack_info))) {
+        if (likely(_read_true_u8(&cur, end) && pyyjson_decode_true(decode_obj_stack_info))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
         }
         goto fail_literal_true;
     }
     if (*cur == 'f') {
-        if (likely(_read_false_1(&cur, end) && pyyjson_decode_false(decode_obj_stack_info))) {
+        if (likely(_read_false_u8(&cur, end) && pyyjson_decode_false(decode_obj_stack_info))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
         }
         goto fail_literal_false;
     }
     if (*cur == 'n') {
-        if (likely(_read_null_1(&cur, end) && pyyjson_decode_null(decode_obj_stack_info))) {
+        if (likely(_read_null_u8(&cur, end) && pyyjson_decode_null(decode_obj_stack_info))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
         }
-        if (likely(_read_nan_1(&cur, end) && pyyjson_decode_nan(decode_obj_stack_info, false))) {
+        if (likely(_read_nan_u8(&cur, end) && pyyjson_decode_nan(decode_obj_stack_info, false))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
         }
@@ -329,7 +333,7 @@ obj_val_begin:
         //   the ": " or ":" is read out, this is an unlikely case
         cur++;
 #if DECODE_READ_PRETTY
-        if (*cur == ' ') fast_skip_spaces_1(&cur, end);
+        if (*cur == ' ') bytes_fast_skip_spaces(&cur, end);
 #endif
         if (char_is_space(*cur)) {
             // handle unlikely cases
@@ -339,7 +343,7 @@ obj_val_begin:
         goto obj_val_begin;
     }
     if ((*cur == 'i' || *cur == 'I' || *cur == 'N')) {
-        PyObject *number_obj = read_inf_or_nan_1(false, &cur, end);
+        PyObject *number_obj = read_inf_or_nan_u8(false, &cur, end);
         if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;
@@ -370,7 +374,7 @@ obj_val_end:
     if (char_is_space(*cur)) {
         // unlikely case
         cur++;
-        if (*cur == ' ') fast_skip_spaces_1(&cur, end);
+        if (*cur == ' ') bytes_fast_skip_spaces(&cur, end);
         if (char_is_space(*cur)) {
             SKIP_CONSECUTIVE_SPACES(cur);
         }
@@ -399,7 +403,7 @@ obj_end:
 doc_end:
     /* check invalid contents after json document */
     if (unlikely(cur < end)) {
-        if (*cur == ' ') fast_skip_spaces_1(&cur, end);
+        if (*cur == ' ') bytes_fast_skip_spaces(&cur, end);
         if (char_is_space(*cur)) {
             SKIP_CONSECUTIVE_SPACES(cur);
         }
@@ -495,3 +499,4 @@ failed_cleanup:
 }
 
 #undef SKIP_CONSECUTIVE_SPACES
+#undef bytes_fast_skip_spaces

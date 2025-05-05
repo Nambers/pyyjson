@@ -5,6 +5,14 @@
 
 #include "pyyjson.h"
 
+typedef struct UnicodeInfo {
+    Py_ssize_t ascii_size;
+    Py_ssize_t u8_size;
+    Py_ssize_t u16_size;
+    Py_ssize_t u32_size;
+    int cur_ucs_type;
+} UnicodeInfo;
+
 typedef struct EncodeUnicodeBufferInfo {
     union {
         u8 *writer_u8;

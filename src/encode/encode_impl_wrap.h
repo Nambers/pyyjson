@@ -1,7 +1,7 @@
 #ifndef ENCODE_IMPL_WRAP_H
 #define ENCODE_IMPL_WRAP_H
 
-
+#include "simd/compile_feature_check.h"
 #define COMPILE_INDENT_LEVEL 0
 
 #define COMPILE_UCS_LEVEL 4
@@ -61,6 +61,6 @@
 #undef COMPILE_UCS_LEVEL
 
 #undef COMPILE_INDENT_LEVEL
-
+#undef COMPILE_SIMD_BITS
 
 #endif // ENCODE_IMPL_WRAP_H

@@ -170,6 +170,7 @@ set(SRC_WITH_SIMD
 set(SRC_TEST
     src/ctests/tools.c
     src/ctests/main.c
+    src/float/tables.c
 )
 
 set(SRC_TEST_WITH_SIMD

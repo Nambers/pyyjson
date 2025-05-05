@@ -1,6 +1,28 @@
 #include "test.h"
 #include "simd/simd_detect.h"
 #include "tools.h"
+//
+#include "simd/compile_feature_check.h"
+
+
+#if BUILD_MULTI_LIB && PYYJSON_X86
+#    if COMPILE_SIMD_BITS == 512
+#        define GUARDED_SIMD                         \
+            do {                                     \
+                if (!_SupportAVX512) return SKIPPED; \
+            } while (0)
+#    elif COMPILE_SIMD_BITS == 256
+#        define GUARDED_SIMD                       \
+            do {                                   \
+                if (!_SupportAVX2) return SKIPPED; \
+            } while (0)
+#    else
+#        define GUARDED_SIMD ((void)0)
+#    endif
+#else
+#    define GUARDED_SIMD ((void)0)
+#endif
+
 
 int SIMD_NAME_MODIFIER(test_elevate_1_2_to_128)(void) {
 #if PYYJSON_AARCH
@@ -72,14 +94,14 @@ int SIMD_NAME_MODIFIER(test_ucs2_encode_3bytes_utf8)(void) {
 #if PYYJSON_AARCH
     return INVALID;
 #else
-#    if __AVX512F__ && __AVX512BW__ && __AVX512VL__
+#    if __AVX512F__ && __AVX512CD__ && __AVX512BW__ && __AVX512VL__ && __AVX512DQ__
     GUARDED_SIMD;
     u16 input[32];
     u8 output[96];
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = get_random_3bytes_u16();
     }
-    ucs2_encode_3bytes_utf8_avx512((VECTOR_U16_512_A) * (VECTOR_U16_512_U *)input, output);
+    ucs2_encode_3bytes_utf8_avx512((vector_a_u16_512) * (vector_u_u16_512 *)input, output);
     return check_ucs2_3bytes(input, output, COUNT_OF(input));
 #    elif __AVX2__
     GUARDED_SIMD;
@@ -88,7 +110,7 @@ int SIMD_NAME_MODIFIER(test_ucs2_encode_3bytes_utf8)(void) {
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = get_random_3bytes_u16();
     }
-    ucs2_encode_3bytes_utf8_avx2((VECTOR_U8_256_A) * (VECTOR_U8_256_U *)input, output);
+    ucs2_encode_3bytes_utf8_avx2((vector_a_u8_256) * (vector_u_u8_256 *)input, output);
     return check_ucs2_3bytes(input, output, COUNT_OF(input));
 #    else
     return INVALID;
@@ -100,14 +122,14 @@ int SIMD_NAME_MODIFIER(test_ucs2_encode_2bytes_utf8)(void) {
 #if PYYJSON_AARCH
     return INVALID;
 #else
-#    if __AVX512F__ && __AVX512BW__ && __AVX512VL__
+#    if __AVX512F__ && __AVX512CD__ && __AVX512BW__ && __AVX512VL__ && __AVX512DQ__
     GUARDED_SIMD;
     u16 input[32];
     u8 output[64];
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = get_random_2bytes_u16();
     }
-    ucs2_encode_2bytes_utf8_avx512((VECTOR_U16_512_A) * (VECTOR_U16_512_U *)input, output);
+    ucs2_encode_2bytes_utf8_avx512((vector_a_u16_512) * (vector_u_u16_512 *)input, output);
     return check_ucs2_2bytes(input, output, COUNT_OF(input));
 #    elif __AVX2__
     GUARDED_SIMD;
@@ -116,7 +138,7 @@ int SIMD_NAME_MODIFIER(test_ucs2_encode_2bytes_utf8)(void) {
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = get_random_2bytes_u16();
     }
-    ucs2_encode_2bytes_utf8_avx2((VECTOR_U8_256_A) * (VECTOR_U8_256_U *)input, output);
+    ucs2_encode_2bytes_utf8_avx2((vector_a_u8_256) * (vector_u_u8_256 *)input, output);
     return check_ucs2_2bytes(input, output, COUNT_OF(input));
 #    else
     u16 input[8];
@@ -124,7 +146,7 @@ int SIMD_NAME_MODIFIER(test_ucs2_encode_2bytes_utf8)(void) {
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = get_random_2bytes_u16();
     }
-    ucs2_encode_2bytes_utf8_sse2((VECTOR_U8_128_A) * (VECTOR_U8_128_U *)input, output);
+    ucs2_encode_2bytes_utf8_sse2((vector_a_u8_128) * (vector_u_u8_128 *)input, output);
     return check_ucs2_2bytes(input, output, COUNT_OF(input));
 #    endif
 #endif
@@ -134,14 +156,14 @@ int SIMD_NAME_MODIFIER(test_ucs4_encode_3bytes_utf8)(void) {
 #if PYYJSON_AARCH
     return INVALID;
 #else
-#    if __AVX512F__ && __AVX512BW__ && __AVX512VL__
+#    if __AVX512F__ && __AVX512CD__ && __AVX512BW__ && __AVX512VL__ && __AVX512DQ__
     GUARDED_SIMD;
     u32 input[16];
     u8 output[48];
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = get_random_3bytes_u16();
     }
-    ucs4_encode_3bytes_utf8_avx512((VECTOR_U32_512_A) * (VECTOR_U32_512_U *)input, output);
+    ucs4_encode_3bytes_utf8_avx512((vector_a_u32_512) * (vector_u_u32_512 *)input, output);
     return check_ucs4_3bytes(input, output, COUNT_OF(input));
 #    elif __AVX2__
     GUARDED_SIMD;
@@ -150,7 +172,7 @@ int SIMD_NAME_MODIFIER(test_ucs4_encode_3bytes_utf8)(void) {
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = get_random_3bytes_u16();
     }
-    ucs4_encode_3bytes_utf8_avx2((VECTOR_U8_256_A) * (VECTOR_U8_256_U *)input, output);
+    ucs4_encode_3bytes_utf8_avx2((vector_a_u8_256) * (vector_u_u8_256 *)input, output);
     return check_ucs4_3bytes(input, output, COUNT_OF(input));
 #    else
     return INVALID;
@@ -162,14 +184,14 @@ int SIMD_NAME_MODIFIER(test_ucs4_encode_2bytes_utf8)(void) {
 #if PYYJSON_AARCH
     return INVALID;
 #else
-#    if __AVX512F__ && __AVX512BW__ && __AVX512VL__
+#    if __AVX512F__ && __AVX512CD__ && __AVX512BW__ && __AVX512VL__ && __AVX512DQ__
     GUARDED_SIMD;
     u32 input[16];
     u8 output[32];
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = get_random_2bytes_u16();
     }
-    ucs4_encode_2bytes_utf8_avx512((VECTOR_U16_512_A) * (VECTOR_U16_512_U *)input, output);
+    ucs4_encode_2bytes_utf8_avx512((vector_a_u16_512) * (vector_u_u16_512 *)input, output);
     return check_ucs4_2bytes(input, output, COUNT_OF(input));
 #    elif __AVX2__
     GUARDED_SIMD;
@@ -178,7 +200,7 @@ int SIMD_NAME_MODIFIER(test_ucs4_encode_2bytes_utf8)(void) {
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = get_random_2bytes_u16();
     }
-    ucs4_encode_2bytes_utf8_avx2((VECTOR_U8_256_A) * (VECTOR_U8_256_U *)input, output);
+    ucs4_encode_2bytes_utf8_avx2((vector_a_u8_256) * (vector_u_u8_256 *)input, output);
     return check_ucs4_2bytes(input, output, COUNT_OF(input));
 #    else
     u32 input[4];
@@ -186,7 +208,7 @@ int SIMD_NAME_MODIFIER(test_ucs4_encode_2bytes_utf8)(void) {
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = get_random_2bytes_u16();
     }
-    ucs4_encode_2bytes_utf8_sse2((VECTOR_U8_128_A) * (VECTOR_U8_128_U *)input, output);
+    ucs4_encode_2bytes_utf8_sse2((vector_a_u8_128) * (vector_u_u8_128 *)input, output);
     return check_ucs4_2bytes(input, output, COUNT_OF(input));
 #    endif
 #endif

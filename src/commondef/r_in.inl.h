@@ -1,97 +1,49 @@
-#include "pyyjson.h"
-#include "r_out.inl.h"
-#include "simd/union_vector.h"
+#ifdef PYYJSON_CLANGD_DUMMY
+#    include "pyyjson.h"
+#    ifndef COMPILE_READ_UCS_LEVEL
+#        define COMPILE_READ_UCS_LEVEL 1
+#    endif
+#endif
+
 /*
  * Macros IN
  */
 #if COMPILE_READ_UCS_LEVEL == 4
-#    define _FROM_TYPE u32
+#    define _src_t u32
 #    define READ_BIT_SIZE 32
 #    define READ_BIT_SIZEx2 64
 #    define READ_BIT_SIZEx4 128
 #    define READ_BIT_SIZEx8 256
-#    define READ_512_MASK_TYPE u16
+#    define AVX512_BITMASK_TYPE u16
 #elif COMPILE_READ_UCS_LEVEL == 2
-#    define _FROM_TYPE u16
+#    define _src_t u16
 #    define READ_BIT_SIZE 16
 #    define READ_BIT_SIZEx2 32
 #    define READ_BIT_SIZEx4 64
 #    define READ_BIT_SIZEx8 128
-#    define READ_512_MASK_TYPE u32
+#    define AVX512_BITMASK_TYPE u32
 #elif COMPILE_READ_UCS_LEVEL == 1
-#    define _FROM_TYPE u8
+#    define _src_t u8
 #    define READ_BIT_SIZE 8
 #    define READ_BIT_SIZEx2 16
 #    define READ_BIT_SIZEx4 32
 #    define READ_BIT_SIZEx8 64
-#    define READ_512_MASK_TYPE u64
+#    define AVX512_BITMASK_TYPE u64
 #else
 #    error "COMPILE_READ_UCS_LEVEL must be 1, 2 or 4"
 #endif
 
-#define READ_BATCH_COUNT (SIMD_BIT_SIZE / 8 / sizeof(_FROM_TYPE))
-#define READ_UNSIGNED_BIT_NAME PYYJSON_SIMPLE_CONCAT2(U, READ_BIT_SIZE)
-#define _VEC_A_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, SIMD_BIT_SIZE, A)
-#define _VEC_U_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, SIMD_BIT_SIZE, U)
-#define SET_ALL PYYJSON_CONCAT3(broadcast, READ_BIT_SIZE, SIMD_BIT_SIZE)
-#define LOAD_A(_x) PYYJSON_CONCAT3(load, SIMD_BIT_SIZE, aligned)((const _VEC_A_ *)(_x))
-#define LOAD_U(_x) PYYJSON_CONCAT2(load, SIMD_BIT_SIZE)((const _VEC_U_ *)(_x))
-#if PYYJSON_X86 && SIMD_BIT_SIZE == 512
-#    define VECTOR_MASK_TYPE READ_512_MASK_TYPE
-#else
-#    define VECTOR_MASK_TYPE _VEC_A_
-#endif
+#define READ_UNSIGNED_BIT_NAME PYYJSON_SIMPLE_CONCAT2(u, READ_BIT_SIZE)
+#define READ_UNSIGNED_BIT_NAME_UPPER PYYJSON_SIMPLE_CONCAT2(U, READ_BIT_SIZE)
 
-#if SIMD_BIT_SIZE == 512
-#    define _VECx2_A_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 1024, A)
-#    define _VECx4_A_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 2048, A)
-#    define _VECx2_U_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 1024, U)
-#    define _VECx4_U_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 2048, U)
-#    define _VEC_half_A_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 256, A)
-#    define _VEC_half_U_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 256, U)
-#    define _VEC_quad_A_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 128, A)
-#    define _VEC_quad_U_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 128, U)
-#elif SIMD_BIT_SIZE == 256
-#    define _VECx2_A_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 512, A)
-#    define _VECx4_A_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 1024, A)
-#    define _VECx2_U_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 512, U)
-#    define _VECx4_U_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 1024, U)
-#    define _VEC_half_A_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 128, A)
-#    define _VEC_half_U_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 128, U)
-#    define _VEC_quad_A_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 64, A)
-#    define _VEC_quad_U_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 64, U)
-#else
-#    define _VECx2_A_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 256, A)
-#    define _VECx4_A_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 512, A)
-#    define _VECx2_U_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 256, U)
-#    define _VECx4_U_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 512, U)
-#    define _VEC_half_A_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 64, A)
-#    define _VEC_half_U_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 64, U)
-#    define _VEC_quad_A_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 32, A)
-#    define _VEC_quad_U_ PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 32, U)
-#endif
+#define cmpeq_2chars PYYJSON_CONCAT2(cmpeq_2chars, READ_UNSIGNED_BIT_NAME)
 
-#define UNIONVECx2 PYYJSON_CONCAT4(UnionVectorA, READ_UNSIGNED_BIT_NAME, SIMD_BIT_SIZE, x2)
-#define UNIONVECx4 PYYJSON_CONCAT4(UnionVectorA, READ_UNSIGNED_BIT_NAME, SIMD_BIT_SIZE, x4)
-
-//
-#define CHECK_ESCAPE_IMPL_GET_MASK PYYJSON_CONCAT2(check_escape_impl_get_mask, COMPILE_READ_UCS_LEVEL)
-force_inline VECTOR_MASK_TYPE CHECK_ESCAPE_IMPL_GET_MASK(const _FROM_TYPE *restrict src, _VEC_A_ *restrict _out_vec);
-//
-#define CHECK_MASK_AND_GET_DONE_COUNT PYYJSON_CONCAT2(check_mask_and_get_done_count, COMPILE_READ_UCS_LEVEL)
-force_inline void CHECK_MASK_AND_GET_DONE_COUNT(_VEC_A_ vec, bool *out_checked, usize *out_done_count);
-//
-#define CHECK_MASK_AND_GET_DONE_COUNTx2 PYYJSON_CONCAT2(check_mask_and_get_done_countx2, COMPILE_READ_UCS_LEVEL)
-force_inline void CHECK_MASK_AND_GET_DONE_COUNTx2(_VECx2_A_ vec, bool *out_checked, usize *out_done_count);
-//
-#define CHECK_MASK_AND_GET_DONE_COUNTx4 PYYJSON_CONCAT2(check_mask_and_get_done_countx4, COMPILE_READ_UCS_LEVEL)
-force_inline void CHECK_MASK_AND_GET_DONE_COUNTx4(_VECx4_A_ vec, bool *out_checked, usize *out_done_count);
-//
-#define CHECK_MASK_128_SRC_T PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 128, A)
-#if SIMD_BIT_SIZE == 512
-#    define CHECK_MASK_128_SRC_MASK_T __mmask16
-#else
-#    define CHECK_MASK_128_SRC_MASK_T CHECK_MASK_128_SRC_T
-#endif
-#define CHECK_MASK_AND_GET_DONE_COUNT_128_WITH_MASK PYYJSON_CONCAT2(check_mask_and_get_done_count_128, COMPILE_READ_UCS_LEVEL)
-force_inline void CHECK_MASK_AND_GET_DONE_COUNT_128_WITH_MASK(CHECK_MASK_128_SRC_T vec, bool *out_checked, usize *out_done_count, CHECK_MASK_128_SRC_MASK_T *optional_mask);
+#define DecodeSrcInfo PYYJSON_CONCAT2(DecodeSrcInfo, READ_UNSIGNED_BIT_NAME)
+#define verify_escape_hex PYYJSON_CONCAT2(verify_escape_hex, READ_UNSIGNED_BIT_NAME)
+#define read_to_hex PYYJSON_CONCAT2(read_to_hex, READ_UNSIGNED_BIT_NAME)
+#define _read_true PYYJSON_CONCAT2(_read_true, READ_UNSIGNED_BIT_NAME)
+#define _read_false PYYJSON_CONCAT2(_read_false, READ_UNSIGNED_BIT_NAME)
+#define _read_null PYYJSON_CONCAT2(_read_null, READ_UNSIGNED_BIT_NAME)
+#define _read_inf PYYJSON_CONCAT2(_read_inf, READ_UNSIGNED_BIT_NAME)
+#define _read_nan PYYJSON_CONCAT2(_read_nan, READ_UNSIGNED_BIT_NAME)
+#define read_inf_or_nan PYYJSON_CONCAT2(read_inf_or_nan, READ_UNSIGNED_BIT_NAME)

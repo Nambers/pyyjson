@@ -1,17 +1,13 @@
+#undef _CONTROL_SEQ_TABLE
 #undef WRITE_UNICODE_F64
 #undef WRITE_UNICODE_U64
 #undef UNICODE_BUFFER_RESERVE
-#undef _WVEC_half_U_
-#undef _WVEC_half_A_
-#undef _WVECx4_U_
-#undef _WVECx2_U_
-#undef _WVECx4_A_
-#undef _WVECx2_A_
-#undef _WVEC_U_
-#undef _WVEC_A_
+
+// #undef _WVEC_U_
+// #undef _WVEC_A_
 #undef WRITE_UNSIGNED_BIT_NAME
 #undef WRITE_BATCH_COUNT
 #undef WRITE_BIT_SIZE
-#undef _TARGET_TYPE
+#undef _dst_t
 #undef _WRITER
-#undef READ_512_MASK_TYPE
+// #undef AVX512_BITMASK_TYPE

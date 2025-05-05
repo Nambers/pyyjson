@@ -53,7 +53,14 @@ function(add_avx512_compile_option TARGET)
     endif()
 
     check_co_type(${CO_TYPE})
-    target_compile_options(${TARGET} ${CO_TYPE} $<$<C_COMPILER_ID:MSVC>:/arch:AVX512> $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>,$<C_COMPILER_ID:Intel>>:-mavx512f> $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>,$<C_COMPILER_ID:Intel>>:-mavx512bw> $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>,$<C_COMPILER_ID:Intel>>:-mavx512vl>)
+    # Modern architecture except Knights Landing, Knights Mill
+    target_compile_options(${TARGET} ${CO_TYPE}
+    $<$<C_COMPILER_ID:MSVC>:/arch:AVX512>
+    $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>,$<C_COMPILER_ID:Intel>>:-mavx512f>
+    $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>,$<C_COMPILER_ID:Intel>>:-mavx512cd>
+    $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>,$<C_COMPILER_ID:Intel>>:-mavx512bw>
+    $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>,$<C_COMPILER_ID:Intel>>:-mavx512vl>
+    $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>,$<C_COMPILER_ID:Intel>>:-mavx512dq>)
 endfunction(add_avx512_compile_option TARGET)
 
 function(add_asan_compile_option TARGET)

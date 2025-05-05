@@ -5,24 +5,6 @@
 
 /* Helper macros. */
 
-#if BUILD_MULTI_LIB && PYYJSON_X86
-#    if SIMD_BIT_SIZE == 512
-#        define GUARDED_SIMD                         \
-            do {                                     \
-                if (!_SupportAVX512) return SKIPPED; \
-            } while (0)
-#    elif SIMD_BIT_SIZE == 256
-#        define GUARDED_SIMD                       \
-            do {                                   \
-                if (!_SupportAVX2) return SKIPPED; \
-            } while (0)
-#    else
-#        define GUARDED_SIMD ((void)0)
-#    endif
-#else
-#    define GUARDED_SIMD ((void)0)
-#endif
-
 #define TEST_STRINGIZE_EX(_x) #_x
 #define TEST_STRINGIZE(_x) TEST_STRINGIZE_EX(_x)
 

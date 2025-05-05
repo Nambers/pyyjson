@@ -17,7 +17,7 @@ force_inline bool __memcmp_neq_short(u8 **x_addr, u8 **y_addr, usize *size_addr,
  * Return non-zero if not equal (be compatible with memcmp().) */
 force_inline int pyyjson_memcmp_neq_le64(u8 *x, u8 *y, usize size) {
     assert(size <= 64);
-#if SIMD_BIT_SIZE == 512
+#if COMPILE_SIMD_BITS == 512
     if (size == 64) {
         return memcmp(x, y, 64) ? 1 : 0;
     }
@@ -26,7 +26,7 @@ force_inline int pyyjson_memcmp_neq_le64(u8 *x, u8 *y, usize size) {
         if (memcmp(x, y, 32)) return 1;
         x += 32;
         y += 32;
-#if SIMD_BIT_SIZE < 512
+#if COMPILE_SIMD_BITS < 512
         if (size == 64) return memcmp(x, y, 32) ? 1 : 0;
 #endif
         size -= 32;

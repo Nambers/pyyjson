@@ -293,9 +293,9 @@ PyObject *pyyjson_print_current_features(PyObject *self, PyObject *args) {
 #    endif
 #else
 #    if PYYJSON_X86
-#        if SIMD_BIT_SIZE == 512
+#        if COMPILE_SIMD_BITS == 512
     printf("SIMD: AVX512; MultiLib: False\n");
-#        elif SIMD_BIT_SIZE == 256
+#        elif COMPILE_SIMD_BITS == 256
     printf("SIMD: AVX2; MultiLib: False\n");
 // #    elif __SSE4_2__
 //     printf("SIMD: SSE4.2; MultiLib: False\n");
@@ -344,9 +344,9 @@ PyObject *pyyjson_get_current_features(PyObject *self, PyObject *args) {
 #    if PYYJSON_X86
     PyDict_SetItemString(ret, "MultiLib", PyBool_FromLong(false));
 
-#        if SIMD_BIT_SIZE == 512
+#        if COMPILE_SIMD_BITS == 512
     PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("AVX512"));
-#        elif SIMD_BIT_SIZE == 256
+#        elif COMPILE_SIMD_BITS == 256
     PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("AVX2"));
 // #    elif __SSE4_2__
 //     PyDict_SetItemString(ret, "SIMD", PyUnicode_FromString("SSE4.2"));
