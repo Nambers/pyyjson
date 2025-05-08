@@ -2,9 +2,6 @@
 #define PYYJSON_ENCODE_INDENT_WRITER_H
 
 
-#undef COMPILE_WRITE_UCS_LEVEL
-#undef COMPILE_INDENT_LEVEL
-
 #define COMPILE_INDENT_LEVEL 0
 #define COMPILE_WRITE_UCS_LEVEL 1
 #include "_indent.inl.h"

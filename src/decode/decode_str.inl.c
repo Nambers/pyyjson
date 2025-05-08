@@ -200,7 +200,7 @@ force_inline bool UCS_BELOW_4_DIRTY(DECODE_UNICODE_INFO *decode_unicode_info) {
 force_inline void COPY_WITH_ELEVATE_TO_2(DECODE_UNICODE_INFO *decode_unicode_info) {
 #if COMPILE_UCS_LEVEL < 2
     assert(decode_unicode_info->ucs1_len > 0);
-    SIMD_NAME_MODIFIER(long_back_elevate_1_2)((u16 *)decode_unicode_info->write_head, (u8 *)decode_unicode_info->write_head, decode_unicode_info->ucs1_len);
+    SIMD_NAME_MODIFIER(long_back_cvt_noinline_u8_u16)((u16 *)decode_unicode_info->write_head, (u8 *)decode_unicode_info->write_head, decode_unicode_info->ucs1_len);
 #else
     assert(false);
     Py_UNREACHABLE();
@@ -211,14 +211,14 @@ force_inline void COPY_WITH_ELEVATE_TO_4(DECODE_UNICODE_INFO *decode_unicode_inf
 #if COMPILE_UCS_LEVEL < 2
     if (decode_unicode_info->ucs2_len > 0) {
         u16 *head_u16 = (u16 *)decode_unicode_info->write_head + decode_unicode_info->ucs1_len;
-        SIMD_NAME_MODIFIER(long_back_elevate_2_4)(((u32 *)decode_unicode_info->write_head) + decode_unicode_info->ucs1_len, head_u16, decode_unicode_info->ucs2_len);
+        SIMD_NAME_MODIFIER(long_back_cvt_noinline_u16_u32)(((u32 *)decode_unicode_info->write_head) + decode_unicode_info->ucs1_len, head_u16, decode_unicode_info->ucs2_len);
     }
     if (decode_unicode_info->ucs1_len > 0) {
-        SIMD_NAME_MODIFIER(long_back_elevate_1_4)((u32 *)decode_unicode_info->write_head, (u8 *)decode_unicode_info->write_head, decode_unicode_info->ucs1_len);
+        SIMD_NAME_MODIFIER(long_back_cvt_noinline_u8_u32)((u32 *)decode_unicode_info->write_head, (u8 *)decode_unicode_info->write_head, decode_unicode_info->ucs1_len);
     }
 #elif COMPILE_UCS_LEVEL == 2
     assert(decode_unicode_info->ucs2_len > 0);
-    SIMD_NAME_MODIFIER(long_back_elevate_2_4)((u32 *)decode_unicode_info->write_head, (u16 *)decode_unicode_info->write_head, decode_unicode_info->ucs2_len);
+    SIMD_NAME_MODIFIER(long_back_cvt_noinline_u16_u32)((u32 *)decode_unicode_info->write_head, (u16 *)decode_unicode_info->write_head, decode_unicode_info->ucs2_len);
 #else
     assert(false);
     Py_UNREACHABLE();

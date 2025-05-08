@@ -226,7 +226,7 @@ int SIMD_NAME_MODIFIER(test_long_elevate_1_2)(void) {
         // initialize random content
         fill_random_buffer(buffer + random_u8_start_index, out_u16_length);
         // find target func
-        uintptr_t _func = find_extension_symbol(TEST_STRINGIZE(SIMD_NAME_MODIFIER(long_back_elevate_1_2)));
+        uintptr_t _func = find_extension_symbol(TEST_STRINGIZE(SIMD_NAME_MODIFIER(long_back_cvt_noinline_u8_u16)));
         if (!_func) return FAILED;
         typedef void (*TestFuncType)(u16 *, u8 *, Py_ssize_t);
         TestFuncType func = (TestFuncType)_func;
