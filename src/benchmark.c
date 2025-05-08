@@ -241,7 +241,7 @@ PyObject *inspect_pyunicode(PyObject *self, PyObject *args, PyObject *kwargs) {
     PyTuple_SET_ITEM(ret, 0, t1);
     PyTuple_SET_ITEM(ret, 1, t2);
     PyTuple_SET_ITEM(ret, 2, t3);
-    PyTuple_SET_ITEM(ret, 3, t3);
+    PyTuple_SET_ITEM(ret, 3, t4);
     return ret;
 
 fail:;
