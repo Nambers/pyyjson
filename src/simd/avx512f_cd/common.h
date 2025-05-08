@@ -8,6 +8,7 @@
 #include "simd/vector_types.h"
 
 #define cmpeq_bitmask_u32_512(_a_, _b_) ((u16)_mm512_cmpeq_epi32_mask((_a_), (_b_)))
+#define cmpneq_bitmask_u32_512(_a_, _b_) ((u16)_mm512_cmpneq_epi32_mask((_a_), (_b_)))
 
 #define unsigned_cmple_bitmask_u32_512(_a_, _b_) ((u16)_mm512_cmple_epu32_mask((_a_), (_b_)))
 

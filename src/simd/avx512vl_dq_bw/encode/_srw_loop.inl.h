@@ -66,7 +66,7 @@ force_inline void encode_unicode_loop4(_dst_t **dst_addr, const _src_t **src_add
             cvt_to_dst(dst + READ_BATCH_COUNT * i, union_vec.x[i]);
             escape_union_vec.x[i] = get_escape_bitmask(union_vec.x[i]);
         }
-        if (likely(0 != (escape_union_vec.x[0] | escape_union_vec.x[1] | escape_union_vec.x[2] | escape_union_vec.x[3]))) {
+        if (likely(0 == (escape_union_vec.x[0] | escape_union_vec.x[1] | escape_union_vec.x[2] | escape_union_vec.x[3]))) {
             src += 4 * READ_BATCH_COUNT;
             dst += 4 * READ_BATCH_COUNT;
             len -= 4 * READ_BATCH_COUNT;

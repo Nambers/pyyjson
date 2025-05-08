@@ -35,14 +35,10 @@ force_inline usize joined4_escape_bitmask_to_done_count(AVX512_BITMASK_TYPE bitm
 #endif
 #define TOTALBITCOUNT (64 / COMPILE_READ_UCS_LEVEL)
     assert(bitmask1 | bitmask2 | bitmask3 | bitmask4);
-    usize d1 = TZBITS(bitmask1);
-    usize d2 = TZBITS(bitmask2);
-    usize d3 = TZBITS(bitmask3);
-    usize d4 = TZBITS(bitmask4);
-    if (bitmask1) return TOTALBITCOUNT * 0 + d1;
-    if (bitmask2) return TOTALBITCOUNT * 1 + d2;
-    if (bitmask3) return TOTALBITCOUNT * 2 + d3;
-    return TOTALBITCOUNT * 3 + d4;
+    if (bitmask1) return TOTALBITCOUNT * 0 + TZBITS(bitmask1);
+    if (bitmask2) return TOTALBITCOUNT * 1 + TZBITS(bitmask2);
+    if (bitmask3) return TOTALBITCOUNT * 2 + TZBITS(bitmask3);
+    return TOTALBITCOUNT * 3 + TZBITS(bitmask4);
 #undef TOTALBITCOUNT
 #undef TZBITS
 }

@@ -112,6 +112,7 @@
 #define joined4_escape_bitmask_to_done_count MAKE_SR_NAME(joined4_escape_bitmask_to_done_count)
 //
 #define cmpeq_bitmask MAKE_SR_NAME(cmpeq_bitmask)
+#define cmpneq_bitmask MAKE_SR_NAME(cmpneq_bitmask)
 //
 #define unsigned_cmple_bitmask MAKE_SR_NAME(unsigned_cmple_bitmask)
 //
@@ -128,6 +129,6 @@
 #define checkmax MAKE_SR_NAME(checkmax)
 //
 #ifdef COMPILE_UCS_LEVEL
-#define __check_vector_max_char_internal MAKE_S_UCS_NAME(__check_vector_max_char_internal)
+#    define __check_vector_max_char_internal MAKE_S_UCS_NAME(__check_vector_max_char_internal)
 #    define check_vector_max_char MAKE_S_UCS_NAME(check_vector_max_char)
 #endif

@@ -7,6 +7,7 @@
 #undef high_mask
 #undef unsigned_cmplt_bitmask
 #undef unsigned_cmple_bitmask
+#undef cmpneq_bitmask
 #undef cmpeq_bitmask
 #undef joined4_escape_bitmask_to_done_count
 #undef escape_bitmask_to_done_count

@@ -7,7 +7,7 @@
 #    include "simd/mask_table.h"
 #    include "simd/simd_impl.h"
 #    ifndef COMPILE_SIMD_BITS
-#        define COMPILE_SIMD_BITS 256
+#        define COMPILE_SIMD_BITS 512
 #    endif
 #endif
 
@@ -559,7 +559,7 @@ force_inline void READ_STR_IN_LOOP(
     vector_a vec = *(vector_u *)decode_src_info->src;
 #if COMPILE_SIMD_BITS == 512
     AVX512_BITMASK_TYPE check_mask = get_escape_bitmask(vec);
-    bool checked = check_mask != 0;
+    bool checked = check_mask == 0;
 #else
     vector_a check_mask = get_escape_mask(vec);
     bool checked = testz(check_mask);
