@@ -15,8 +15,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <threads.h>
-//
-#include "decode_utils_wrap.inl.c"
 
 extern thread_local u8 pyyjson_string_buffer[PYYJSON_STRING_BUFFER_SIZE];
 
@@ -468,17 +466,10 @@ force_inline u32 read_b4_unicode(u32 uni) {
 #endif
 }
 
-#include "simd/check_mask_wrap.h"
-
-#include "simd/downgrade_wrap.h"
-//
 #include "decode/str/str.h"
 //
 #include "decode_float_wrap.inl.c"
 
-#include "simd/write_utils_wrap.h"
-
-#include "simd/readwrite_utils_wrap.h"
 //
 #include "simd/long_cvt.h"
 //

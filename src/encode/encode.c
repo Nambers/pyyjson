@@ -10,11 +10,7 @@
 #include "unicode/indent_wrap.h"
 #include "unicode/reserve_wrap.h"
 
-#include "simd/check_mask_wrap.h"
-
 #include "encode_cvt.h"
-#include "simd/readwrite_utils_wrap.h"
-#include "simd/write_utils_wrap.h"
 #include "states.h"
 
 typedef enum EncodeValJumpFlag {
@@ -210,7 +206,7 @@ force_inline bool bytes_buffer_reserve(EncodeUTF8BufferInfo *utf8_buffer_info, P
  *      COMPILE_READ_UCS_LEVEL, value: 1, 2, or 4.
  *      COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4.
  */
-#include "encode_simd_utils_wrap.h"
+// #include "encode_simd_utils_wrap.h"
 
 /* 
  * Some functions for writing the unicode buffer, like writing key, writing value str.
