@@ -7,7 +7,7 @@
 
 #include "compile_context/w_in.inl.h"
 
-#define _ELEVATE_FROM_U8_NUM_BUFFER PYYJSON_CONCAT2(_elevate_u8_copy, COMPILE_WRITE_UCS_LEVEL)
+#define _ELEVATE_FROM_U8_NUM_BUFFER MAKE_W_NAME(_elevate_u8_copy)
 /*
  * (PRIVATE)
  * Convert the u8 buffer to the buffer.
@@ -57,7 +57,7 @@ force_inline void _ELEVATE_FROM_U8_NUM_BUFFER(_dst_t **writer_addr, u8 *buffer, 
  * Write a u64 number to the buffer.
  * The space (32 * sizeof(_dst_t)) must be reserved before calling this function.
  */
-force_inline void WRITE_UNICODE_U64(_dst_t **writer_addr, u64 val, usize sign) {
+force_inline void u64_to_unicode(_dst_t **writer_addr, u64 val, usize sign) {
     assert(sign <= 1);
 #if COMPILE_WRITE_UCS_LEVEL == 1
     u8 *buffer = *writer_addr; //_WRITER(unicode_buffer_info);
@@ -81,7 +81,7 @@ force_inline void WRITE_UNICODE_U64(_dst_t **writer_addr, u64 val, usize sign) {
  * Write a f64 number to the buffer.
  * The space (32 * sizeof(_dst_t)) must be reserved before calling this function.
  */
-force_inline void WRITE_UNICODE_F64(_dst_t **writer_addr, u64 val_u64_repr) {
+force_inline void f64_to_unicode(_dst_t **writer_addr, u64 val_u64_repr) {
 #if COMPILE_WRITE_UCS_LEVEL == 1
     u8 *buffer = *writer_addr; //_WRITER(unicode_buffer_info);
 #else
@@ -100,5 +100,5 @@ force_inline void WRITE_UNICODE_F64(_dst_t **writer_addr, u64 val_u64_repr) {
 
 #include "compile_context/w_out.inl.h"
 
-#undef UNICODE_BUFFER_RESERVE
+#undef unicode_buffer_reserve
 #undef _ELEVATE_FROM_U8_NUM_BUFFER

@@ -16,7 +16,7 @@
 
 #include "compile_context/srw_in.inl.h"
 
-extern _dst_t _CONTROL_SEQ_TABLE[(_Slash + 1) * 8];
+extern _dst_t ControlEscapeTable[(_Slash + 1) * 8];
 extern Py_ssize_t _ControlJump[_Slash + 1];
 
 force_inline void encode_unicode_loop(_dst_t **dst_addr, const _src_t **src_addr, usize *len_addr) {
@@ -39,7 +39,7 @@ force_inline void encode_unicode_loop(_dst_t **dst_addr, const _src_t **src_addr
             assert(escape_unicode == _Quote || escape_unicode == _Slash || escape_unicode < ControlMax);
             dst += done_count;
             len -= done_count + 1;
-            memcpy(dst, &_CONTROL_SEQ_TABLE[escape_unicode * 8], 8 * sizeof(_dst_t));
+            memcpy(dst, &ControlEscapeTable[escape_unicode * 8], 8 * sizeof(_dst_t));
             dst += _ControlJump[escape_unicode];
         }
     }
@@ -78,7 +78,7 @@ force_inline void encode_unicode_loop4(_dst_t **dst_addr, const _src_t **src_add
             assert(escape_unicode == _Quote || escape_unicode == _Slash || escape_unicode < ControlMax);
             dst += done_count;
             len -= done_count + 1;
-            memcpy(dst, &_CONTROL_SEQ_TABLE[escape_unicode * 8], 8 * sizeof(_dst_t));
+            memcpy(dst, &ControlEscapeTable[escape_unicode * 8], 8 * sizeof(_dst_t));
             dst += _ControlJump[escape_unicode];
         }
     }

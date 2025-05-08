@@ -1,52 +1,44 @@
-#undef check_vector_max_char
-#undef __check_vector_max_char_internal
-#undef checkmax
-#undef fast_skip_spaces
-#undef maskz_loadu
-#undef low_mask
-#undef high_mask
-#undef unsigned_cmplt_bitmask
-#undef unsigned_cmple_bitmask
-#undef cmpneq_bitmask
-#undef cmpeq_bitmask
-#undef joined4_escape_bitmask_to_done_count
-#undef escape_bitmask_to_done_count
-#undef get_escape_bitmask
-#undef cmpeq
-#undef signed_cmpgt
-#undef signed_cmplt
-#undef unsigned_saturate_minus
-#undef broadcast
-#undef joined4_escape_mask_to_done_count
-#undef escape_mask_to_done_count
-#undef escape_mask_to_bitmask
-#undef get_escape_mask
-#undef CHECK_MASK_AND_GET_DONE_COUNT_128_WITH_MASK
-#undef CHECK_MASK_128_SRC_MASK_T
-#undef CHECK_MASK_128_SRC_T
-#undef CHECK_MASK_AND_GET_DONE_COUNTx4
-#undef CHECK_MASK_AND_GET_DONE_COUNTx2
-#undef CHECK_MASK_AND_GET_DONE_COUNT
-#undef CHECK_ESCAPE_IMPL_GET_MASK
+#undef PYYJSON_COMPILE_CONTEXT_SR
 //
-#undef UNIONVECx4
-#undef UNIONVECx2
-#undef CHECK_ESCAPE_LT512_USE_SIGNED_SATURATED_MINUS
-#undef _VEC_quad_U_
-#undef _VEC_quad_A_
-#undef _VEC_half_U_
-#undef _VEC_half_A_
-#undef _VECx4_U_
-#undef _VECx2_U_
-#undef _VECx4_A_
-#undef _VECx2_A_
-#undef VECTOR_MASK_TYPE
-// #undef LOAD_U
-// #undef LOAD_A
-// #undef SET_ALL
-#undef vector_u
-#undef vector_a
-#undef READ_BATCH_COUNT
-#undef __UCS_NAME
 #include "r_out.inl.h"
 #include "s_out.inl.h"
+//
+#undef READ_BATCH_COUNT
+//
+#undef MAKE_SR_NAME
+//
+#undef __UCS_NAME
+#undef MAKE_S_UCS_NAME
+//
+#undef vector_a
+#undef vector_u
+//
+#undef CHECK_ESCAPE_LT512_USE_SIGNED_SATURATED_MINUS
+//
+#undef unionvector_a_x4
+#undef unionvector_u_x4
+//
+#undef get_escape_mask
+#undef escape_mask_to_bitmask
+#undef escape_mask_to_done_count
+#undef joined4_escape_mask_to_done_count
+#undef broadcast
+#undef unsigned_saturate_minus
+#undef signed_cmplt
+#undef signed_cmpgt
+#undef cmpeq
+#undef get_escape_bitmask
+#undef escape_bitmask_to_done_count
+#undef joined4_escape_bitmask_to_done_count
+#undef cmpeq_bitmask
+#undef cmpneq_bitmask
+#undef unsigned_cmple_bitmask
+#undef unsigned_cmplt_bitmask
+#undef high_mask
+#undef low_mask
+#undef maskz_loadu
+#undef fast_skip_spaces
+#undef checkmax
+//
+#undef __check_vector_max_char_internal
+#undef check_vector_max_char

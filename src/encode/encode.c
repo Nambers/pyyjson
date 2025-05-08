@@ -190,7 +190,7 @@ force_inline void init_pybytes(PyObject *in_new_bytes, usize final_len) {
 }
 
 force_inline bool bytes_buffer_reserve(EncodeUTF8BufferInfo *utf8_buffer_info, Py_ssize_t target_size) {
-    return unicode_buffer_reserve_1(PYYJSON_CAST(EncodeUnicodeBufferInfo *, utf8_buffer_info), target_size);
+    return unicode_buffer_reserve_u8(PYYJSON_CAST(EncodeUnicodeBufferInfo *, utf8_buffer_info), target_size);
 }
 
 /* 

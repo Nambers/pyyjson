@@ -46,12 +46,11 @@
 #define DO_SPECIAL PYYJSON_CONCAT2(do_special, COMPILE_UCS_LEVEL)
 #define PROCESS_ESCAPE PYYJSON_CONCAT2(process_escape, COMPILE_UCS_LEVEL)
 #define DECODE_LOOP_DONE_MAKE_STRING PYYJSON_CONCAT2(decode_loop_done_make_string, COMPILE_UCS_LEVEL)
-// #define CHECK_ESCAPE_IMPL_GET_MASK PYYJSON_CONCAT2(check_escape_impl_get_mask, COMPILE_READ_UCS_LEVEL)
 #define GET_DONE_COUNT_FROM_MASK PYYJSON_CONCAT2(get_done_count_from_mask, COMPILE_READ_UCS_LEVEL)
 // #define WRITE_SIMD_IMPL_TARGET2 PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, 2)
-#define WRITE_SIMD_IMPL_TARGET2 PYYJSON_CONCAT5(cvt_to, dst, READ_UNSIGNED_BIT_NAME, u16, COMPILE_SIMD_BITS)
+#define WRITE_SIMD_IMPL_TARGET2 PYYJSON_CONCAT5(cvt_to, dst, _src_t, u16, COMPILE_SIMD_BITS)
 // #define WRITE_SIMD_IMPL_TARGET4 PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, 4)
-#define WRITE_SIMD_IMPL_TARGET4 PYYJSON_CONCAT5(cvt_to, dst, READ_UNSIGNED_BIT_NAME, u32, COMPILE_SIMD_BITS)
+#define WRITE_SIMD_IMPL_TARGET4 PYYJSON_CONCAT5(cvt_to, dst, _src_t, u32, COMPILE_SIMD_BITS)
 #define UCS_BELOW_2_DIRTY PYYJSON_CONCAT2(ucs_below_2_dirty, COMPILE_UCS_LEVEL)
 #define UCS_BELOW_4_DIRTY PYYJSON_CONCAT2(ucs_below_4_dirty, COMPILE_UCS_LEVEL)
 #define COPY_WITH_ELEVATE_TO_2 PYYJSON_CONCAT2(copy_with_elevate_to_2, COMPILE_UCS_LEVEL)
@@ -558,13 +557,12 @@ force_inline void READ_STR_IN_LOOP(
         bool need_check_max_char) {
     vector_a vec = *(vector_u *)decode_src_info->src;
 #if COMPILE_SIMD_BITS == 512
-    AVX512_BITMASK_TYPE check_mask = get_escape_bitmask(vec);
+    avx512_bitmask_t check_mask = get_escape_bitmask(vec);
     bool checked = check_mask == 0;
 #else
     vector_a check_mask = get_escape_mask(vec);
     bool checked = testz(check_mask);
 #endif
-    // SIMD_MASK_TYPE check_mask = CHECK_ESCAPE_IMPL_GET_MASK(decode_src_info->src, &vec);
     if (do_copy) {                               // compile time determined
         if (write_as > COMPILE_READ_UCS_LEVEL) { // compile time determined
 
@@ -654,7 +652,7 @@ force_inline PyObject *DECODE_LOOP_DONE_MAKE_STRING(
                 // downgrade_string_4_2(decode_src_info->src_start, copy_count, (u16 *)decode_unicode_info->write_head);
             } else
 #    endif
-                PYYJSON_CONCAT5(long, cvt, READ_UNSIGNED_BIT_NAME, u8, COMPILE_SIMD_BITS)((u8 *)decode_unicode_info->write_head, decode_src_info->src_start, copy_count);
+                PYYJSON_CONCAT5(long, cvt, _src_t, u8, COMPILE_SIMD_BITS)((u8 *)decode_unicode_info->write_head, decode_src_info->src_start, copy_count);
             // #    define DOWNGRADER PYYJSON_CONCAT3(downgrade_string, COMPILE_UCS_LEVEL, 1)
             //                 DOWNGRADER(decode_src_info->src_start, copy_count, (u8 *)decode_unicode_info->write_head);
             // #    undef DOWNGRADER
@@ -693,7 +691,7 @@ force_inline PyObject *DECODE_LOOP_DONE_MAKE_STRING(
 #if COMPILE_UCS_LEVEL > 1
             // downgrade insitu
             Py_ssize_t copy_count = UNICODE_DECODE_GET_COPY_COUNT(decode_unicode_info);
-            PYYJSON_CONCAT5(long, cvt, READ_UNSIGNED_BIT_NAME, u8, COMPILE_SIMD_BITS)((u8 *)decode_unicode_info->write_head, decode_unicode_info->write_head, copy_count);
+            PYYJSON_CONCAT5(long, cvt, _src_t, u8, COMPILE_SIMD_BITS)((u8 *)decode_unicode_info->write_head, decode_unicode_info->write_head, copy_count);
             // #    define DOWNGRADER PYYJSON_CONCAT3(downgrade_string, COMPILE_READ_UCS_LEVEL, 1)
             //             DOWNGRADER(decode_unicode_info->write_head, copy_count, (u8 *)decode_unicode_info->write_head);
             // #    undef DOWNGRADER
@@ -732,7 +730,7 @@ force_inline void PROCESS_TAIL_COPY(
         // #    define TAIL_WRITER PYYJSON_CONCAT3(tail_write_simd_impl, COMPILE_READ_UCS_LEVEL, 2)
         assert(decode_unicode_info->unicode_ucs2);
         u16 *dst = decode_unicode_info->unicode_ucs2;
-        PYYJSON_CONCAT5(trailing_copy_with, cvt, READ_UNSIGNED_BIT_NAME, u16, COMPILE_SIMD_BITS)(&dst, decode_src_info->src, really_write_count);
+        PYYJSON_CONCAT5(trailing_copy_with, cvt, _src_t, u16, COMPILE_SIMD_BITS)(&dst, decode_src_info->src, really_write_count);
         // TAIL_WRITER(decode_src_info->src, decode_unicode_info->unicode_ucs2, really_write_count);
         // decode_unicode_info->unicode_ucs2 += really_write_count;
         // #    undef TAIL_WRITER
@@ -743,7 +741,7 @@ force_inline void PROCESS_TAIL_COPY(
 
     assert(decode_unicode_info->unicode_ucs4);
     u32 *dst = decode_unicode_info->unicode_ucs4;
-    PYYJSON_CONCAT5(trailing_copy_with, cvt, READ_UNSIGNED_BIT_NAME, u32, COMPILE_SIMD_BITS)(&dst, decode_src_info->src, really_write_count);
+    PYYJSON_CONCAT5(trailing_copy_with, cvt, _src_t, u32, COMPILE_SIMD_BITS)(&dst, decode_src_info->src, really_write_count);
     // TAIL_WRITER(decode_src_info->src, decode_unicode_info->unicode_ucs4, really_write_count);
     // decode_unicode_info->unicode_ucs4 += really_write_count;
     // #undef TAIL_WRITER
@@ -760,7 +758,7 @@ force_inline void READ_STR_TAIL(
     // load use maskz
     // #    define _MASKZ_LOADU PYYJSON_SIMPLE_CONCAT2(_mm512_maskz_loadu_epi, READ_BIT_SIZE)
     u64 rw_mask;
-    AVX512_BITMASK_TYPE tail_mask;
+    avx512_bitmask_t tail_mask;
     rw_mask = len_to_maskz(decode_src_info->src_end - decode_src_info->src);
     // rw_mask = ((u64)1 << (usize)(decode_src_info->src_end - decode_src_info->src)) - 1;
     SIMD_512 vec = maskz_loadu(rw_mask, (const void *)decode_src_info->src);
@@ -812,7 +810,6 @@ force_inline void READ_STR_TAIL(
     const _src_t *simd_load_head = decode_src_info->src_end - READ_BATCH_COUNT;
     vec = *(const vector_u *)simd_load_head;
     vector_a check_mask = get_escape_mask(vec);
-    // SIMD_MASK_TYPE check_mask = CHECK_ESCAPE_IMPL_GET_MASK(simd_load_head, &vec);
     Py_ssize_t invalid_head_count = decode_src_info->src - simd_load_head;
     vector_a tail_mask;
     // process `check_mask`, removing the invalid head content
@@ -1609,12 +1606,6 @@ static force_noinline PyObject *PYYJSON_DECODE_STR(PyUnicodeObject *in_unicode) 
 
 #undef CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512
 #undef READ_NUMBER
-// #undef read_inf_or_nan
-// #undef _read_nan
-// #undef _read_inf
-// #undef _read_null
-// #undef _read_false
-// #undef _read_true
 #undef CHECK_AND_RESERVE_STR_BUFFER
 #undef COPY_WITH_ELEVATE_TO_4
 #undef COPY_WITH_ELEVATE_TO_2
@@ -1623,14 +1614,11 @@ static force_noinline PyObject *PYYJSON_DECODE_STR(PyUnicodeObject *in_unicode) 
 #undef WRITE_SIMD_IMPL_TARGET4
 #undef WRITE_SIMD_IMPL_TARGET2
 #undef GET_DONE_COUNT_FROM_MASK
-// #undef CHECK_ESCAPE_IMPL_GET_MASK
 #undef DECODE_LOOP_DONE_MAKE_STRING
 #undef PROCESS_ESCAPE
 #undef DO_SPECIAL
 #undef DECODE_ESCAPE_UNICODE
-// #undef verify_escape_hex
 #undef UPDATE_WRITE_TYPE
-// #undef check_vector_max_char
 #undef MOVE_WRITER
 #undef GET_CUR_WRITER
 #undef GET_UCS4_WRITER

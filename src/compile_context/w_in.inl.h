@@ -1,40 +1,42 @@
-#include "unicode/unicode_buffer.h"
+#ifndef PYYJSON_COMPILE_CONTEXT_W
+#define PYYJSON_COMPILE_CONTEXT_W
+
+// fake include and definition to deceive clangd
+#ifdef PYYJSON_CLANGD_DUMMY
+#    include "pyyjson.h"
+#    ifndef COMPILE_WRITE_UCS_LEVEL
+#        define COMPILE_WRITE_UCS_LEVEL 1
+#    endif
+#endif
 
 /*
- * Macros IN
+ * Basic definitions.
  */
 #if COMPILE_WRITE_UCS_LEVEL == 4
-#    define _WRITER U32_WRITER
-#    define _dst_t u32
 #    define WRITE_BIT_SIZE 32
-// #    define AVX512_BITMASK_TYPE u16
+#    define _WRITER U32_WRITER
 #elif COMPILE_WRITE_UCS_LEVEL == 2
-#    define _WRITER U16_WRITER
-#    define _dst_t u16
 #    define WRITE_BIT_SIZE 16
-// #    define AVX512_BITMASK_TYPE u32
+#    define _WRITER U16_WRITER
 #elif COMPILE_WRITE_UCS_LEVEL == 1
-#    define _WRITER U8_WRITER
-#    define _dst_t u8
 #    define WRITE_BIT_SIZE 8
-// #    define AVX512_BITMASK_TYPE u64
+#    define _WRITER U8_WRITER
 #else
 #    error "COMPILE_WRITE_UCS_LEVEL must be 1, 2 or 4"
 #endif
 
-#define WRITE_BATCH_COUNT (COMPILE_SIMD_BITS / 8 / sizeof(_dst_t))
-#define WRITE_UNSIGNED_BIT_NAME PYYJSON_SIMPLE_CONCAT2(u, WRITE_BIT_SIZE)
-// #define _WVEC_A_ PYYJSON_CONCAT4(VECTOR, WRITE_UNSIGNED_BIT_NAME, COMPILE_SIMD_BITS, A)
-// #define _WVEC_U_ PYYJSON_CONCAT4(VECTOR, WRITE_UNSIGNED_BIT_NAME, COMPILE_SIMD_BITS, U)
+// The destination type.
+#define _dst_t PYYJSON_SIMPLE_CONCAT2(u, WRITE_BIT_SIZE)
+
+// Name creation macro.
+#define MAKE_W_NAME(_x_) PYYJSON_CONCAT2(_x_, _dst_t)
 
 /*
- * Reserve space for the unicode buffer.
+ * Names using W context.
  */
-#define UNICODE_BUFFER_RESERVE PYYJSON_CONCAT2(unicode_buffer_reserve, COMPILE_WRITE_UCS_LEVEL)
+#define unicode_buffer_reserve MAKE_W_NAME(unicode_buffer_reserve)
+#define u64_to_unicode MAKE_W_NAME(u64_to_unicode)
+#define f64_to_unicode MAKE_W_NAME(f64_to_unicode)
+#define ControlEscapeTable MAKE_W_NAME(ControlEscapeTable)
 
-force_inline bool UNICODE_BUFFER_RESERVE(EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t size);
-
-#define WRITE_UNICODE_U64 PYYJSON_CONCAT2(write_unicode_u64, COMPILE_WRITE_UCS_LEVEL)
-#define WRITE_UNICODE_F64 PYYJSON_CONCAT2(write_unicode_f64, COMPILE_WRITE_UCS_LEVEL)
-//
-#define _CONTROL_SEQ_TABLE PYYJSON_CONCAT2(_ControlSeqTable, COMPILE_WRITE_UCS_LEVEL)
+#endif // PYYJSON_COMPILE_CONTEXT_W

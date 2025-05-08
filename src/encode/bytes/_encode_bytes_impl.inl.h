@@ -39,7 +39,7 @@
 force_inline bool BYTES_INDENT_WRITER(EncodeUTF8BufferInfo *utf8_buffer_info, Py_ssize_t cur_nested_depth, bool is_in_obj, usize additional_reserve_count) {
     if (!is_in_obj && COMPILE_INDENT_LEVEL != 0) {
         RETURN_ON_UNLIKELY_ERR(!bytes_buffer_reserve(utf8_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + additional_reserve_count));
-        PYYJSON_CONCAT3(write_unicode_indent, COMPILE_INDENT_LEVEL, 1)(&utf8_buffer_info->writer, cur_nested_depth);
+        PYYJSON_CONCAT3(write_unicode_indent, __IDENT_NAME, u8)(&utf8_buffer_info->writer, cur_nested_depth);
     } else {
         RETURN_ON_UNLIKELY_ERR(!bytes_buffer_reserve(utf8_buffer_info, additional_reserve_count));
     }
@@ -123,7 +123,7 @@ force_inline bool BYTES_BUFFER_APPEND_KEY(PyObject *val, EncodeUTF8BufferInfo *r
     *utf8_buffer_info->writer = 0;
 #endif
     return true;
-    //     RETURN_ON_UNLIKELY_ERR(!UNICODE_BUFFER_RESERVE(unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 5 + 6 * len + TAIL_PADDING));
+    //     RETURN_ON_UNLIKELY_ERR(!unicode_buffer_reserve(unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 5 + 6 * len + TAIL_PADDING));
     //     write_unicode_indent(&_WRITER(unicode_buffer_info), cur_nested_depth);
     //     *_WRITER(unicode_buffer_info)++ = '"';
     //     WRITE_UNICODE_IMPL(unicode_buffer_info, (_src_t *)get_unicode_data(key), len);

@@ -11,7 +11,7 @@ extern int _PyUnicode_CheckConsistency(PyObject *op, int check_content);
 #endif
 
 
-force_noinline bool unicode_buffer_reserve(EncodeUnicodeBufferInfo *unicode_buffer_info, void *target_ptr) {
+force_noinline bool _unicode_buffer_reserve(EncodeUnicodeBufferInfo *unicode_buffer_info, void *target_ptr) {
     const usize u8_diff = VEC_MEM_U8_DIFF(unicode_buffer_info->head, target_ptr);
     assert(u8_diff >= 0);
     usize target_size = VEC_MEM_U8_DIFF(unicode_buffer_info->head, unicode_buffer_info->end);

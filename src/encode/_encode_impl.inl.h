@@ -22,12 +22,8 @@
 #    define COMPILE_READ_UCS_LEVEL COMPILE_UCS_LEVEL
 #    define COMPILE_WRITE_UCS_LEVEL COMPILE_UCS_LEVEL
 #endif
-#include "unicode/indent_wrap.h"
 //
 #include "compile_context/iw_in.inl.h"
-//
-#include "compile_context/w_out.inl.h"
-//
 #include "compile_context/sw_in.inl.h"
 
 
@@ -239,7 +235,7 @@ force_inline bool UNICODE_BUFFER_APPEND_LONG(EncodeUnicodeBufferInfo *unicode_bu
             v = -v2;
             sign = 1;
         }
-        WRITE_UNICODE_U64(&_WRITER(unicode_buffer_info), v, sign);
+        u64_to_unicode(&_WRITER(unicode_buffer_info), v, sign);
         *_WRITER(unicode_buffer_info)++ = ',';
     }
     assert(check_unicode_writer_valid(unicode_buffer_info));
@@ -377,7 +373,7 @@ force_inline bool UNICODE_BUFFER_APPEND_FLOAT(EncodeUnicodeBufferInfo *unicode_b
     WRITE_INDENT_RETURN_IF_FAIL(unicode_buffer_info, cur_nested_depth, is_in_obj, TAIL_PADDING);
     double v = PyFloat_AS_DOUBLE(val);
     u64 raw = *PYYJSON_CAST(u64 *, &v); //(u64 *)&v;
-    WRITE_UNICODE_F64(&_WRITER(unicode_buffer_info), raw);
+    f64_to_unicode(&_WRITER(unicode_buffer_info), raw);
     *_WRITER(unicode_buffer_info)++ = ',';
     return true;
 }
@@ -949,6 +945,7 @@ fail_keytype:;
 }
 
 #include "compile_context/iw_out.inl.h"
+#include "compile_context/sw_out.inl.h"
 
 #undef PYYJSON_DUMPS_OBJ
 #undef ENCODE_PROCESS_VAL

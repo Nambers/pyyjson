@@ -29,7 +29,7 @@ force_inline void encode_one_special_ucs1(u8 **writer_addr, u8 unicode) {
         *writer++ = (unicode & 0x3f) | 0x80;
     } else {
         assert(unicode < ControlMax || unicode == _Quote || unicode == _Slash);
-        memcpy(writer, &_ControlSeqTable_1[unicode * 8], 8);
+        memcpy(writer, &ControlEscapeTable_u8[unicode * 8], 8);
         writer += _ControlJump[unicode];
     }
 
@@ -44,7 +44,7 @@ force_inline void encode_one_ucs1(u8 **writer_addr, u8 unicode) {
     encode_one_special_ucs1(writer_addr, unicode);
 }
 
-force_inline void check_ascii_in_ucs1_and_get_done_countx4(UNIONVECx4 vec, bool *out_checked, usize *out_done_count) {
+force_inline void check_ascii_in_ucs1_and_get_done_countx4(unionvector_a vec, bool *out_checked, usize *out_done_count) {
     vector_a t1 = SET_ALL(_Quote);
     vector_a t2 = SET_ALL(_Slash);
     vector_a t3 = SET_ALL(ControlMax);
@@ -73,7 +73,7 @@ force_inline void check_ascii_in_ucs1_and_get_done_countx4(UNIONVECx4 vec, bool 
              _mm512_cmplt_epu8_mask(vec.x[3], t3) |
              _mm512_movepi8_mask(vec.x[3]);
 #else
-    UNIONVECx4 m;
+    unionvector_a m;
     vector_a r;
     m.x[0] = (vec.x[0] == t1) | (vec.x[0] == t2) | (vec.x[0] < t3) | (vec.x[0] & t4);
     m.x[1] = (vec.x[1] == t1) | (vec.x[1] == t2) | (vec.x[1] < t3) | (vec.x[1] & t4);
@@ -132,7 +132,7 @@ force_inline bool ascii_in_ucs1_encode_loop4(u8 **dst_addr, const u8 **src_addr,
     const u8 *src = *src_addr;
     usize len = *len_addr;
 
-    UNIONVECx4 vec;
+    unionvector_a vec;
 
     // read
     vec.x[0] = *(const vector_u *)(src + READ_BATCH_COUNT * 0);
@@ -386,7 +386,7 @@ force_inline void bytes_write_ucs1(u8 **writer_addr, const u8 *src, usize len) {
 #define COMPILE_WRITE_UCS_LEVEL 1
 #include "compile_context/w_in.inl.h"
 
-force_inline void check_ascii_in_ucs2_and_get_done_countx4(UNIONVECx4 vec, bool *out_checked, usize *out_done_count) {
+force_inline void check_ascii_in_ucs2_and_get_done_countx4(unionvector_a vec, bool *out_checked, usize *out_done_count) {
     vector_a t1 = SET_ALL(_Quote);
     vector_a t2 = SET_ALL(_Slash);
     vector_a t3 = SET_ALL(ControlMax);
@@ -415,7 +415,7 @@ force_inline void check_ascii_in_ucs2_and_get_done_countx4(UNIONVECx4 vec, bool 
              _mm512_cmplt_epu16_mask(vec.x[3], t3) |
              _mm512_cmpge_epu16_mask(vec.x[3], t4);
 #else
-    UNIONVECx4 m;
+    unionvector_a m;
     vector_a r;
     m.x[0] = (vec.x[0] == t1) | (vec.x[0] == t2) | (vec.x[0] < t3) | (vec.x[0] >= t4);
     m.x[1] = (vec.x[1] == t1) | (vec.x[1] == t2) | (vec.x[1] < t3) | (vec.x[1] >= t4);
@@ -474,7 +474,7 @@ force_inline bool ascii_in_ucs2_encode_loop4(u8 **dst_addr, const u16 **src_addr
     const u16 *src = *src_addr;
     usize len = *len_addr;
 
-    UNIONVECx4 vec;
+    unionvector_a vec;
 
     // read
     vec.x[0] = *(const vector_u *)(src + READ_BATCH_COUNT * 0);
@@ -686,7 +686,7 @@ force_inline bool encode_one_ucs2(u8 **writer_addr, u16 unicode) {
             *(*writer_addr)++ = unicode;
         } else {
             u8 *writer = *writer_addr;
-            memcpy(writer, &_ControlSeqTable_1[unicode * 8], 8);
+            memcpy(writer, &ControlEscapeTable_u8[unicode * 8], 8);
             writer += _ControlJump[unicode];
             *writer_addr = writer;
         }
@@ -753,7 +753,7 @@ restart:;
             if (likely(!is_escaped)) {
                 goto restart_ascii;
             }
-            memcpy(writer, &_ControlSeqTable_1[cur_unicode * 8], 8);
+            memcpy(writer, &ControlEscapeTable_u8[cur_unicode * 8], 8);
             writer += _ControlJump[cur_unicode];
             src++;
             len--;
@@ -800,7 +800,7 @@ restart_ascii:;
         src += done_count;
         u16 unicode = *src++;
         if (unlikely(unicode < 128)) {
-            memcpy(writer, &_ControlSeqTable_1[unicode * 8], 8);
+            memcpy(writer, &ControlEscapeTable_u8[unicode * 8], 8);
             writer += _ControlJump[unicode];
         } else {
             encode_one_ucs2(&writer, unicode);
@@ -860,7 +860,7 @@ restart_3bytes:;
                 if (unicode >= ControlMax && unicode != _Quote && unicode != _Slash) {
                     goto restart_ascii;
                 } else {
-                    memcpy(writer, &_ControlSeqTable_1[unicode * 8], 8);
+                    memcpy(writer, &ControlEscapeTable_u8[unicode * 8], 8);
                     writer += _ControlJump[unicode];
                     src++;
                     len--;

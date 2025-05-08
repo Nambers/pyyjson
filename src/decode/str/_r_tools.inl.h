@@ -99,8 +99,8 @@ force_inline bool _read_null(const _src_t **restrict ptr, const _src_t *restrict
 
 /** Read 'Infinity' literal (ignoring case). */
 force_inline bool _read_inf(const _src_t **ptr, const _src_t *end) {
-#define read_inf_vector PYYJSON_CONCAT4(vector, a, READ_UNSIGNED_BIT_NAME, READ_BIT_SIZEx8)
-#define read_inf_vector_u PYYJSON_CONCAT4(vector, u, READ_UNSIGNED_BIT_NAME, READ_BIT_SIZEx8)
+#define read_inf_vector PYYJSON_CONCAT4(vector, a, _src_t, READ_BIT_SIZEx8)
+#define read_inf_vector_u PYYJSON_CONCAT4(vector, u, _src_t, READ_BIT_SIZEx8)
     if (unlikely(end < *ptr + 8)) {
         return false;
     }
@@ -128,8 +128,8 @@ force_inline bool _read_inf(const _src_t **ptr, const _src_t *end) {
 
 /** Read 'NaN' literal (ignoring case). */
 force_inline bool _read_nan(const _src_t **restrict ptr, const _src_t *restrict end) {
-#define read_nan_vector PYYJSON_CONCAT4(vector, a, READ_UNSIGNED_BIT_NAME, READ_BIT_SIZEx4)
-#define read_nan_vector_u PYYJSON_CONCAT4(vector, u, READ_UNSIGNED_BIT_NAME, READ_BIT_SIZEx4)
+#define read_nan_vector PYYJSON_CONCAT4(vector, a, _src_t, READ_BIT_SIZEx4)
+#define read_nan_vector_u PYYJSON_CONCAT4(vector, u, _src_t, READ_BIT_SIZEx4)
     if (unlikely(end < *ptr + 3)) {
         return false;
     }

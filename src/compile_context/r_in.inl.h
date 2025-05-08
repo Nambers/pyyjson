@@ -1,3 +1,7 @@
+#ifndef PYYJSON_COMPILE_CONTEXT_R
+#define PYYJSON_COMPILE_CONTEXT_R
+
+// fake include and definition to deceive clangd
 #ifdef PYYJSON_CLANGD_DUMMY
 #    include "pyyjson.h"
 #    ifndef COMPILE_READ_UCS_LEVEL
@@ -6,44 +10,51 @@
 #endif
 
 /*
- * Macros IN
+ * Basic definitions.
  */
 #if COMPILE_READ_UCS_LEVEL == 4
-#    define _src_t u32
 #    define READ_BIT_SIZE 32
 #    define READ_BIT_SIZEx2 64
 #    define READ_BIT_SIZEx4 128
 #    define READ_BIT_SIZEx8 256
-#    define AVX512_BITMASK_TYPE u16
+#    define AVX512BITMASK_SIZE 16
 #elif COMPILE_READ_UCS_LEVEL == 2
-#    define _src_t u16
 #    define READ_BIT_SIZE 16
 #    define READ_BIT_SIZEx2 32
 #    define READ_BIT_SIZEx4 64
 #    define READ_BIT_SIZEx8 128
-#    define AVX512_BITMASK_TYPE u32
+#    define AVX512BITMASK_SIZE 32
 #elif COMPILE_READ_UCS_LEVEL == 1
-#    define _src_t u8
 #    define READ_BIT_SIZE 8
 #    define READ_BIT_SIZEx2 16
 #    define READ_BIT_SIZEx4 32
 #    define READ_BIT_SIZEx8 64
-#    define AVX512_BITMASK_TYPE u64
+#    define AVX512BITMASK_SIZE 64
 #else
 #    error "COMPILE_READ_UCS_LEVEL must be 1, 2 or 4"
 #endif
 
-#define READ_UNSIGNED_BIT_NAME PYYJSON_SIMPLE_CONCAT2(u, READ_BIT_SIZE)
-#define READ_UNSIGNED_BIT_NAME_UPPER PYYJSON_SIMPLE_CONCAT2(U, READ_BIT_SIZE)
+// The source type.
+#define _src_t PYYJSON_SIMPLE_CONCAT2(u, READ_BIT_SIZE)
 
-#define cmpeq_2chars PYYJSON_CONCAT2(cmpeq_2chars, READ_UNSIGNED_BIT_NAME)
+// Other type definitions.
+#define avx512_bitmask_t PYYJSON_SIMPLE_CONCAT2(u, AVX512BITMASK_SIZE)
 
-#define DecodeSrcInfo PYYJSON_CONCAT2(DecodeSrcInfo, READ_UNSIGNED_BIT_NAME)
-#define verify_escape_hex PYYJSON_CONCAT2(verify_escape_hex, READ_UNSIGNED_BIT_NAME)
-#define read_to_hex PYYJSON_CONCAT2(read_to_hex, READ_UNSIGNED_BIT_NAME)
-#define _read_true PYYJSON_CONCAT2(_read_true, READ_UNSIGNED_BIT_NAME)
-#define _read_false PYYJSON_CONCAT2(_read_false, READ_UNSIGNED_BIT_NAME)
-#define _read_null PYYJSON_CONCAT2(_read_null, READ_UNSIGNED_BIT_NAME)
-#define _read_inf PYYJSON_CONCAT2(_read_inf, READ_UNSIGNED_BIT_NAME)
-#define _read_nan PYYJSON_CONCAT2(_read_nan, READ_UNSIGNED_BIT_NAME)
-#define read_inf_or_nan PYYJSON_CONCAT2(read_inf_or_nan, READ_UNSIGNED_BIT_NAME)
+// Name creation macro.
+#define MAKE_R_NAME(_x_) PYYJSON_CONCAT2(_x_, _src_t)
+
+/*
+ * Names using R context.
+ */
+#define cmpeq_2chars MAKE_R_NAME(cmpeq_2chars)
+#define DecodeSrcInfo MAKE_R_NAME(DecodeSrcInfo)
+#define verify_escape_hex MAKE_R_NAME(verify_escape_hex)
+#define read_to_hex MAKE_R_NAME(read_to_hex)
+#define _read_true MAKE_R_NAME(_read_true)
+#define _read_false MAKE_R_NAME(_read_false)
+#define _read_null MAKE_R_NAME(_read_null)
+#define _read_inf MAKE_R_NAME(_read_inf)
+#define _read_nan MAKE_R_NAME(_read_nan)
+#define read_inf_or_nan MAKE_R_NAME(read_inf_or_nan)
+
+#endif // PYYJSON_COMPILE_CONTEXT_R

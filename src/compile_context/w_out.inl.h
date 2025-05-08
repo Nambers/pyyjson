@@ -1,13 +1,13 @@
-#undef _CONTROL_SEQ_TABLE
-#undef WRITE_UNICODE_F64
-#undef WRITE_UNICODE_U64
-#undef UNICODE_BUFFER_RESERVE
-
-// #undef _WVEC_U_
-// #undef _WVEC_A_
-#undef WRITE_UNSIGNED_BIT_NAME
-#undef WRITE_BATCH_COUNT
+#undef PYYJSON_COMPILE_CONTEXT_W
+//
 #undef WRITE_BIT_SIZE
-#undef _dst_t
 #undef _WRITER
-// #undef AVX512_BITMASK_TYPE
+//
+#undef _dst_t
+//
+#undef MAKE_W_NAME
+//
+#undef unicode_buffer_reserve
+#undef u64_to_unicode
+#undef f64_to_unicode
+#undef ControlEscapeTable

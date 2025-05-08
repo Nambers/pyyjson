@@ -15,7 +15,7 @@
 
 #include "compile_context/srw_in.inl.h"
 
-extern _dst_t _CONTROL_SEQ_TABLE[(_Slash + 1) * 8];
+extern _dst_t ControlEscapeTable[(_Slash + 1) * 8];
 extern Py_ssize_t _ControlJump[_Slash + 1];
 
 force_inline void trailing_copy_with_cvt(_dst_t **dst_addr, const _src_t *src, usize len) {
@@ -33,7 +33,7 @@ force_inline void encode_trailing_copy_with_cvt(_dst_t **dst_addr, const _src_t 
     vector_a vec;
     usize maskz = len_to_maskz(len);
     vec = maskz_loadu(maskz, src);
-    AVX512_BITMASK_TYPE bitmask = get_escape_bitmask(vec);
+    avx512_bitmask_t bitmask = get_escape_bitmask(vec);
     bitmask = bitmask & maskz;
 restart:;
     cvt_to_dst(dst, vec);
@@ -47,7 +47,7 @@ restart:;
         _src_t escape_unicode = *escape_pos;
         assert(escape_unicode == _Quote || escape_unicode == _Slash || escape_unicode < ControlMax);
         dst += done_count;
-        memcpy(dst, &_CONTROL_SEQ_TABLE[escape_unicode * 8], 8 * sizeof(_dst_t));
+        memcpy(dst, &ControlEscapeTable[escape_unicode * 8], 8 * sizeof(_dst_t));
         dst += _ControlJump[escape_unicode];
         if (len) {
             // no need to compute bitmask again

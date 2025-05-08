@@ -14,7 +14,7 @@
 
 #include "compile_context/srw_in.inl.h"
 extern Py_ssize_t _ControlJump[_Slash + 1];
-extern _dst_t _CONTROL_SEQ_TABLE[(_Slash + 1) * 8];
+extern _dst_t ControlEscapeTable[(_Slash + 1) * 8];
 
 force_inline void trailing_copy_with_cvt(_dst_t **dst_addr, const _src_t *src, usize copy_len) {
     _dst_t *dst = *dst_addr;
@@ -48,7 +48,7 @@ restart:;
         copy_len -= real_done_count + 1;
         usize unicode = *escape_ptr;
         assert(unicode < ControlMax || unicode == _Slash || unicode == _Quote);
-        memcpy(dst, _CONTROL_SEQ_TABLE + unicode * 8, 8 * sizeof(_dst_t));
+        memcpy(dst, ControlEscapeTable + unicode * 8, 8 * sizeof(_dst_t));
         dst += _ControlJump[unicode];
         if (copy_len) goto restart;
     }

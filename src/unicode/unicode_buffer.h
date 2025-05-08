@@ -35,7 +35,7 @@ typedef struct EncodeUnicodeBufferInfo {
 #define VEC_END(_unicode_buffer_info_) ((_unicode_buffer_info_)->end)
 
 
-force_noinline bool unicode_buffer_reserve(EncodeUnicodeBufferInfo *unicode_buffer_info, void *target_ptr);
+force_noinline bool _unicode_buffer_reserve(EncodeUnicodeBufferInfo *unicode_buffer_info, void *target_ptr);
 
 
 force_noinline void init_pyunicode(void *, Py_ssize_t size, int kind);

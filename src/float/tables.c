@@ -747,7 +747,7 @@ const u8 hex_conv_table[256] = {
 #define CONTROL_SEQ_ESCAPE_FULL_ZERO_REPEAT32 CONTROL_SEQ_ESCAPE_FULL_ZERO_REPEAT16, CONTROL_SEQ_ESCAPE_FULL_ZERO_REPEAT16
 
 
-const u8 _ControlSeqTable_1[(_Slash + 1) * 8] = {
+const u8 ControlEscapeTable_u8[(_Slash + 1) * 8] = {
         CONTROL_SEQ_ESCAPE_PREFIX, '0', '0', CONTROL_SEQ_ESCAPE_SUFFIX,  // 0
         CONTROL_SEQ_ESCAPE_PREFIX, '0', '1', CONTROL_SEQ_ESCAPE_SUFFIX,  // 1
         CONTROL_SEQ_ESCAPE_PREFIX, '0', '2', CONTROL_SEQ_ESCAPE_SUFFIX,  // 2
@@ -790,7 +790,7 @@ const u8 _ControlSeqTable_1[(_Slash + 1) * 8] = {
 };
 
 
-const u16 _ControlSeqTable_2[(_Slash + 1) * 8] = {
+const u16 ControlEscapeTable_u16[(_Slash + 1) * 8] = {
         CONTROL_SEQ_ESCAPE_PREFIX, '0', '0', CONTROL_SEQ_ESCAPE_SUFFIX,  // 0
         CONTROL_SEQ_ESCAPE_PREFIX, '0', '1', CONTROL_SEQ_ESCAPE_SUFFIX,  // 1
         CONTROL_SEQ_ESCAPE_PREFIX, '0', '2', CONTROL_SEQ_ESCAPE_SUFFIX,  // 2
@@ -833,7 +833,7 @@ const u16 _ControlSeqTable_2[(_Slash + 1) * 8] = {
 };
 
 
-const u32 _ControlSeqTable_4[(_Slash + 1) * 8] = {
+const u32 ControlEscapeTable_u32[(_Slash + 1) * 8] = {
         CONTROL_SEQ_ESCAPE_PREFIX, '0', '0', CONTROL_SEQ_ESCAPE_SUFFIX,  // 0
         CONTROL_SEQ_ESCAPE_PREFIX, '0', '1', CONTROL_SEQ_ESCAPE_SUFFIX,  // 1
         CONTROL_SEQ_ESCAPE_PREFIX, '0', '2', CONTROL_SEQ_ESCAPE_SUFFIX,  // 2

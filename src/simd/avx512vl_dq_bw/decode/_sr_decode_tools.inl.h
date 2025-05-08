@@ -18,7 +18,7 @@ force_inline void fast_skip_spaces(const _src_t **cur_addr, const _src_t *end) {
 loop:;
     if (likely(cur < final_batch)) {
         vector_a vec = *(const vector_u *)cur;
-        AVX512_BITMASK_TYPE bitmask = cmpneq_bitmask(vec, template);
+        avx512_bitmask_t bitmask = cmpneq_bitmask(vec, template);
         if (!bitmask) {
             cur += READ_BATCH_COUNT;
             goto loop;

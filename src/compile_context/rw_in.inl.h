@@ -1,34 +1,12 @@
+#ifndef PYYJSON_COMPILE_CONTEXT_RW
+#define PYYJSON_COMPILE_CONTEXT_RW
+
+// Include sub contexts.
 #include "r_in.inl.h"
 #include "w_in.inl.h"
 
-#if COMPILE_READ_UCS_LEVEL == 1 && COMPILE_WRITE_UCS_LEVEL == 4
-#    define SIMD_SUB_TYPE SIMD_128
-#    define WR_DIV 4
-#elif COMPILE_READ_UCS_LEVEL == COMPILE_WRITE_UCS_LEVEL
-#    define SIMD_SUB_TYPE SIMD_TYPE
-#    define WR_DIV 1
-#else
-#    define SIMD_SUB_TYPE SIMD_HALF_TYPE
-#    define WR_DIV 2
-#endif
 
-//
-#define VECTOR_ELEVATE4 PYYJSON_CONCAT3(vector_elevate4, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
-// #if WR_DIV == 2
-// force_inline _WVECx4_A_ VECTOR_ELEVATE4(_VECx2_A_ src_vec);
-// #elif WR_DIV == 4
-// force_inline _WVECx4_A_ VECTOR_ELEVATE4(vector_a src_vec);
-// #endif
+// Name creation macro.
+#define MAKE_RW_NAME(_x_) PYYJSON_CONCAT3(_x_, _src_t, _dst_t)
 
-//
-#define VECTOR_ELEVATE_128 PYYJSON_CONCAT3(vector_elevate_128, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)
-#define ELEVATE_128_SRC_T PYYJSON_CONCAT4(VECTOR, READ_UNSIGNED_BIT_NAME, 128, A)
-// #if WR_DIV == 2
-// #    define ELEVATE_128_DST_T PYYJSON_CONCAT4(VECTOR, WRITE_UNSIGNED_BIT_NAME, 256, A)
-// force_inline ELEVATE_128_DST_T VECTOR_ELEVATE_128(ELEVATE_128_SRC_T src_vec);
-// #elif WR_DIV == 4
-// #    define ELEVATE_128_DST_T PYYJSON_CONCAT4(VECTOR, WRITE_UNSIGNED_BIT_NAME, 512, A)
-// force_inline ELEVATE_128_DST_T VECTOR_ELEVATE_128(ELEVATE_128_SRC_T src_vec);
-// #endif
-
-#define MAKE_RW_NAME(_x_) PYYJSON_CONCAT3(_x_, READ_UNSIGNED_BIT_NAME, WRITE_UNSIGNED_BIT_NAME)
+#endif // PYYJSON_COMPILE_CONTEXT_RW

@@ -1,9 +1,6 @@
-#undef MAKE_RW_NAME
-#undef ELEVATE_128_DST_T
-#undef ELEVATE_128_SRC_T
-#undef VECTOR_ELEVATE_128
-#undef VECTOR_ELEVATE4
-#undef SIMD_SUB_TYPE
-#undef WR_DIV
+#undef PYYJSON_COMPILE_CONTEXT_RW
+//
 #include "r_out.inl.h"
 #include "w_out.inl.h"
+//
+#undef MAKE_RW_NAME
