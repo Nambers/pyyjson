@@ -216,6 +216,14 @@ force_inline bool BYTES_BUFFER_APPEND_OBJ_END(EncodeUTF8BufferInfo *utf8_buffer_
     return true;
 }
 
+typedef enum EncodeBytesValJumpFlag {
+    BytesJumpFlag_Default,
+    BytesJumpFlag_ArrValBegin,
+    BytesJumpFlag_DictPairBegin,
+    BytesJumpFlag_TupleValBegin,
+    BytesJumpFlag_Fail,
+} EncodeBytesValJumpFlag;
+
 force_inline EncodeBytesValJumpFlag ENCODE_PROCESS_BYTES_VAL(
         EncodeUTF8BufferInfo *utf8_buffer_info, PyObject *val,
         EncodeUTF8StackVars *stack_vars, bool is_in_obj) {

@@ -1,3 +1,8 @@
+#ifdef PYYJSON_CLANGD_DUMMY
+#    include "encode/encode_shared.h"
+#    include "unicode/unicode_buffer.h"
+#endif
+
 #include "compile_context/iw_in.inl.h"
 
 force_inline void write_unicode_indent(_dst_t **writer_addr, Py_ssize_t _cur_nested_depth) {

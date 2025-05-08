@@ -1,8 +1,10 @@
 #ifdef PYYJSON_CLANGD_DUMMY
 #    include "encode_shared.h"
+#    include "encode_unicode_impl_wrap.h"
 #    include "simd/simd_detect.h"
 #    include "simd/simd_impl.h"
-#    include "unicode/indent_wrap.h"
+#    include "encode/indent_writer.h"
+#    include "unicode/unicode_buffer.h"
 #    ifndef COMPILE_READ_UCS_LEVEL
 #        define COMPILE_READ_UCS_LEVEL 1
 #    endif

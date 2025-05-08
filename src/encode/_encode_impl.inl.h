@@ -1,4 +1,7 @@
 #ifdef PYYJSON_CLANGD_DUMMY
+#    include "pyyjson.h"
+#    include "states.h"
+#    include "unicode/unicode_buffer.h"
 #    ifndef COMPILE_UCS_LEVEL
 #        define COMPILE_UCS_LEVEL 0
 #    endif

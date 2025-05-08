@@ -144,6 +144,57 @@ force_inline int pydict_next(PyObject *op, Py_ssize_t *ppos, PyObject **pkey,
 #endif
 }
 
+typedef enum PyFastTypes {
+    T_Unicode,
+    T_Long,
+    T_False,
+    T_True,
+    T_None,
+    T_Float,
+    T_List,
+    T_Dict,
+    T_Tuple,
+    Unknown,
+} PyFastTypes;
+#if PY_MINOR_VERSION >= 13
+// _PyNone_Type is hidden in Python 3.13
+extern PyTypeObject *PyNone_Type;
+#else
+#    define PyNone_Type &_PyNone_Type
+#endif
+#if PY_MINOR_VERSION >= 13
+extern PyTypeObject *PyNone_Type;
+#endif
+
+/* Get the value type as fast as possible. */
+force_inline PyFastTypes fast_type_check(PyObject *val) {
+    PyTypeObject *type = Py_TYPE(val);
+    if (type == &PyUnicode_Type) {
+        return T_Unicode;
+    } else if (type == &PyLong_Type) {
+        return T_Long;
+    } else if (type == &PyBool_Type) {
+        if (val == Py_False) {
+            return T_False;
+        } else {
+            assert(val == Py_True);
+            return T_True;
+        }
+    } else if (type == PyNone_Type) {
+        return T_None;
+    } else if (type == &PyFloat_Type) {
+        return T_Float;
+    } else if (type == &PyList_Type) {
+        return T_List;
+    } else if (type == &PyDict_Type) {
+        return T_Dict;
+    } else if (type == &PyTuple_Type) {
+        return T_Tuple;
+    } else {
+        return Unknown;
+    }
+}
+
 /*==============================================================================
  * Writer
  *============================================================================*/
