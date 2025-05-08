@@ -18,7 +18,7 @@
 #    define COMPILE_READ_UCS_LEVEL COMPILE_UCS_LEVEL
 #endif
 //
-#include "commondef/sr_in.inl.h"
+#include "compile_context/sr_in.inl.h"
 
 #define PYYJSON_DECODE_STR PYYJSON_CONCAT2(pyyjson_decode_str, COMPILE_UCS_LEVEL)
 #define SHOULD_READ_PRETTY PYYJSON_CONCAT2(should_read_pretty, COMPILE_UCS_LEVEL)
@@ -1652,4 +1652,4 @@ static force_noinline PyObject *PYYJSON_DECODE_STR(PyUnicodeObject *in_unicode) 
 #undef PYYJSON_DECODE_STR
 //
 #undef COMPILE_READ_UCS_LEVEL
-#include "commondef/sr_out.inl.h"
+#include "compile_context/sr_out.inl.h"

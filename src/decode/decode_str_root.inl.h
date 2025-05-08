@@ -8,7 +8,7 @@
 #    ifndef COMPILE_READ_UCS_LEVEL
 #        define COMPILE_READ_UCS_LEVEL 1
 #    endif
-#    include "commondef/sr_in.inl.h"
+#    include "compile_context/sr_in.inl.h"
 #endif
 /*
  * Required macros:

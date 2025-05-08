@@ -7,7 +7,7 @@
 #include "simd/sse2/common.h"
 //
 #define COMPILE_SIMD_BITS 128
-#include "commondef/sr_in.inl.h"
+#include "compile_context/sr_in.inl.h"
 #include "simd/mask_table.h"
 
 force_inline vector_a get_escape_mask(vector_a x) {
@@ -67,5 +67,5 @@ force_inline vector_a low_mask(vector_a x, u8 count) {
     return x & *mask_ptr;
 }
 
-#include "commondef/sr_out.inl.h"
+#include "compile_context/sr_out.inl.h"
 #undef COMPILE_SIMD_BITS

@@ -5,7 +5,7 @@
 #    error "COMPILE_WRITE_UCS_LEVEL is not defined"
 #endif
 
-#include "commondef/w_in.inl.h"
+#include "compile_context/w_in.inl.h"
 
 #define _ELEVATE_FROM_U8_NUM_BUFFER PYYJSON_CONCAT2(_elevate_u8_copy, COMPILE_WRITE_UCS_LEVEL)
 /*
@@ -98,7 +98,7 @@ force_inline void WRITE_UNICODE_F64(_dst_t **writer_addr, u64 val_u64_repr) {
 #endif
 }
 
-#include "commondef/w_out.inl.h"
+#include "compile_context/w_out.inl.h"
 
 #undef UNICODE_BUFFER_RESERVE
 #undef _ELEVATE_FROM_U8_NUM_BUFFER

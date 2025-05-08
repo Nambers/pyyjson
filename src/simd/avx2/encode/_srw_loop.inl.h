@@ -14,7 +14,7 @@
 //
 #define COMPILE_SIMD_BITS 256
 
-#include "commondef/srw_in.inl.h"
+#include "compile_context/srw_in.inl.h"
 
 extern _dst_t _CONTROL_SEQ_TABLE[(_Slash + 1) * 8];
 extern Py_ssize_t _ControlJump[_Slash + 1];
@@ -94,5 +94,5 @@ force_inline void encode_unicode_impl(_dst_t **dst_addr, const _src_t *src, usiz
     encode_trailing_copy_with_cvt(dst_addr, src, len);
 }
 
-#include "commondef/srw_out.inl.h"
+#include "compile_context/srw_out.inl.h"
 #undef COMPILE_SIMD_BITS

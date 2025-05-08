@@ -14,7 +14,7 @@
 #else
 #    define COMPILE_READ_UCS_LEVEL COMPILE_UCS_LEVEL
 #endif
-#include "commondef/sr_in.inl.h"
+#include "compile_context/sr_in.inl.h"
 
 force_inline bool __check_vector_max_char_internal(vector_a vec, ReadStrState *read_state, u32 lowerbound_minus1, int string_type) {
     bool ret = checkmax(vec, lowerbound_minus1);
@@ -78,4 +78,4 @@ force_inline void check_vector_max_char(
 }
 
 #undef COMPILE_READ_UCS_LEVEL
-#include "commondef/sr_out.inl.h"
+#include "compile_context/sr_out.inl.h"

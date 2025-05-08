@@ -14,7 +14,7 @@
 //
 #define COMPILE_SIMD_BITS 256
 
-#include "commondef/srw_in.inl.h"
+#include "compile_context/srw_in.inl.h"
 
 force_inline void trailing_copy_with_cvt(_dst_t **dst_addr, const _src_t *src, usize len) {
     // use 128-bits trailing impl
@@ -43,4 +43,4 @@ force_inline void encode_trailing_copy_with_cvt(_dst_t **dst_addr, const _src_t 
 }
 
 #undef COMPILE_SIMD_BITS
-#include "commondef/srw_out.inl.h"
+#include "compile_context/srw_out.inl.h"

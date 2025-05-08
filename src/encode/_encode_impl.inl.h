@@ -24,11 +24,11 @@
 #endif
 #include "unicode/indent_wrap.h"
 //
-#include "commondef/iw_in.inl.h"
+#include "compile_context/iw_in.inl.h"
 //
-#include "commondef/w_out.inl.h"
+#include "compile_context/w_out.inl.h"
 //
-#include "commondef/sw_in.inl.h"
+#include "compile_context/sw_in.inl.h"
 
 
 #define WRITE_INDENT_RETURN_IF_FAIL(_unicode_buffer_info_, _cur_nested_depth_, _is_in_obj_, _additional_reserve_count_)                         \
@@ -948,7 +948,7 @@ fail_keytype:;
     goto fail;
 }
 
-#include "commondef/iw_out.inl.h"
+#include "compile_context/iw_out.inl.h"
 
 #undef PYYJSON_DUMPS_OBJ
 #undef ENCODE_PROCESS_VAL

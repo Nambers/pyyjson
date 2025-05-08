@@ -7,7 +7,7 @@
 #include "simd/avx512vl_dq_bw/common.h"
 //
 #define COMPILE_SIMD_BITS 512
-#include "commondef/sr_in.inl.h"
+#include "compile_context/sr_in.inl.h"
 
 force_inline AVX512_BITMASK_TYPE get_escape_bitmask(vector_a x) {
     AVX512_BITMASK_TYPE bitmask_1 = cmpeq_bitmask(x, broadcast(_Slash));
@@ -43,5 +43,5 @@ force_inline usize joined4_escape_bitmask_to_done_count(AVX512_BITMASK_TYPE bitm
 #undef TZBITS
 }
 
-#include "commondef/sr_out.inl.h"
+#include "compile_context/sr_out.inl.h"
 #undef COMPILE_SIMD_BITS

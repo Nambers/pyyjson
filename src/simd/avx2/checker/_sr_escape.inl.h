@@ -7,7 +7,7 @@
 #include "simd/avx2/common.h"
 //
 #define COMPILE_SIMD_BITS 256
-#include "commondef/sr_in.inl.h"
+#include "compile_context/sr_in.inl.h"
 
 force_inline vector_a get_escape_mask(vector_a x) {
     vector_a t1 = broadcast(_Slash);
@@ -57,5 +57,5 @@ force_inline usize joined4_escape_mask_to_done_count(vector_a mask1,
     return 64 / COMPILE_READ_UCS_LEVEL + u64_tz_bits(bitmask[1]) / COMPILE_READ_UCS_LEVEL;
 }
 
-#include "commondef/sr_out.inl.h"
+#include "compile_context/sr_out.inl.h"
 #undef COMPILE_SIMD_BITS

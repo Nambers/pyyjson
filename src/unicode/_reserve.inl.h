@@ -1,4 +1,4 @@
-#include "commondef/w_in.inl.h"
+#include "compile_context/w_in.inl.h"
 
 // #include "include/reserve.h"
 
@@ -11,4 +11,4 @@ force_inline bool UNICODE_BUFFER_RESERVE(EncodeUnicodeBufferInfo *unicode_buffer
     return true;
 }
 
-#include "commondef/w_out.inl.h"
+#include "compile_context/w_out.inl.h"

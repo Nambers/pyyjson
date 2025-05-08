@@ -8,7 +8,7 @@
 #endif
 
 #define COMPILE_SIMD_BITS 512
-#include "commondef/sr_in.inl.h"
+#include "compile_context/sr_in.inl.h"
 
 force_inline void fast_skip_spaces(const _src_t **cur_addr, const _src_t *end) {
     const vector_a template = broadcast(' ');
@@ -38,5 +38,5 @@ loop:;
     assert(*cur != ' ');
 }
 
-#include "commondef/sr_out.inl.h"
+#include "compile_context/sr_out.inl.h"
 #undef COMPILE_SIMD_BITS

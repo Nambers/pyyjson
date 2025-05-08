@@ -17,16 +17,16 @@
 #    endif
 #endif
 
-#include "commondef/iw_in.inl.h"
-#include "commondef/rw_in.inl.h"
+#include "compile_context/iw_in.inl.h"
+#include "compile_context/rw_in.inl.h"
 
 
 /* Macro IN */
-#include "commondef/iw_in.inl.h"
+#include "compile_context/iw_in.inl.h"
 //
-#include "commondef/w_out.inl.h"
+#include "compile_context/w_out.inl.h"
 //
-#include "commondef/srw_in.inl.h"
+#include "compile_context/srw_in.inl.h"
 
 
 #if COMPILE_READ_UCS_LEVEL > 1
@@ -81,5 +81,5 @@ force_inline
     return true;
 }
 
-#include "commondef/iw_out.inl.h"
-#include "commondef/srw_out.inl.h"
+#include "compile_context/iw_out.inl.h"
+#include "compile_context/srw_out.inl.h"

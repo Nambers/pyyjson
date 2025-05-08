@@ -14,7 +14,7 @@
 #        define COMPILE_SIMD_BITS 256
 #    endif
 #endif
-#include "commondef/srw_in.inl.h"
+#include "compile_context/srw_in.inl.h"
 
 force_inline void MAKE_SRW_NAME(__small_back_cvt)(_dst_t **dst_addr, const _src_t **src_addr, usize count, usize max_power2) {
     assert((max_power2 & (max_power2 - 1)) == 0);
@@ -110,4 +110,4 @@ force_inline void long_cvt(_dst_t *dst, const _src_t *src, usize count) {
     }
 }
 
-#include "commondef/srw_out.inl.h"
+#include "compile_context/srw_out.inl.h"

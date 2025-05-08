@@ -19,7 +19,7 @@ done:;
 /* UCS1 src. */
 
 #define COMPILE_READ_UCS_LEVEL 1
-#include "commondef/r_in.inl.h"
+#include "compile_context/r_in.inl.h"
 
 force_inline void encode_one_special_ucs1(u8 **writer_addr, u8 unicode) {
     u8 *writer = *writer_addr;
@@ -377,14 +377,14 @@ force_inline void bytes_write_ucs1(u8 **writer_addr, const u8 *src, usize len) {
 #undef CAN_LOOP4
 }
 
-#include "commondef/r_out.inl.h"
+#include "compile_context/r_out.inl.h"
 #undef COMPILE_READ_UCS_LEVEL
 
 /* UCS2 src. */
 #define COMPILE_READ_UCS_LEVEL 2
-#include "commondef/r_in.inl.h"
+#include "compile_context/r_in.inl.h"
 #define COMPILE_WRITE_UCS_LEVEL 1
-#include "commondef/w_in.inl.h"
+#include "compile_context/w_in.inl.h"
 
 force_inline void check_ascii_in_ucs2_and_get_done_countx4(UNIONVECx4 vec, bool *out_checked, usize *out_done_count) {
     vector_a t1 = SET_ALL(_Quote);
@@ -1013,19 +1013,19 @@ force_inline bool bytes_write_ucs2(u8 **writer_addr, const u16 *src, usize len) 
 #undef CAN_LOOP4
 }
 
-#include "commondef/w_out.inl.h"
+#include "compile_context/w_out.inl.h"
 #undef COMPILE_WRITE_UCS_LEVEL
-#include "commondef/r_out.inl.h"
+#include "compile_context/r_out.inl.h"
 #undef COMPILE_READ_UCS_LEVEL
 
 /* UCS4 src. */
 #define COMPILE_READ_UCS_LEVEL 4
-#include "commondef/r_in.inl.h"
+#include "compile_context/r_in.inl.h"
 
 force_inline void bytes_write_ucs4(u8 **writer_addr, const u32 *src, usize len) {
 }
 
-#include "commondef/r_out.inl.h"
+#include "compile_context/r_out.inl.h"
 #undef COMPILE_READ_UCS_LEVEL
 
 #endif // PYYJSON_ENCODE_UTF8_H

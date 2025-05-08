@@ -1,4 +1,4 @@
-#include "commondef/iw_in.inl.h"
+#include "compile_context/iw_in.inl.h"
 #define unicode_indent_writer PYYJSON_CONCAT3(unicode_indent_writer, COMPILE_INDENT_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 #define write_unicode_indent PYYJSON_CONCAT3(write_unicode_indent, COMPILE_INDENT_LEVEL, COMPILE_WRITE_UCS_LEVEL)
 
@@ -31,4 +31,4 @@ force_inline bool unicode_indent_writer(EncodeUnicodeBufferInfo *unicode_buffer_
 
 #undef write_unicode_indent
 #undef unicode_indent_writer
-#include "commondef/iw_out.inl.h"
+#include "compile_context/iw_out.inl.h"

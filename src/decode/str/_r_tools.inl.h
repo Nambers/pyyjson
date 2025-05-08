@@ -6,7 +6,7 @@
 #    endif
 #endif
 
-#include "commondef/r_in.inl.h"
+#include "compile_context/r_in.inl.h"
 
 typedef struct DecodeSrcInfo {
     const _src_t *src;
@@ -162,4 +162,4 @@ force_inline PyObject *read_inf_or_nan(bool sign, const _src_t **ptr, const _src
     return NULL;
 }
 
-#include "commondef/r_out.inl.h"
+#include "compile_context/r_out.inl.h"

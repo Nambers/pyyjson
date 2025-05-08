@@ -12,7 +12,7 @@
 //
 #define COMPILE_SIMD_BITS 128
 
-#include "commondef/srw_in.inl.h"
+#include "compile_context/srw_in.inl.h"
 extern Py_ssize_t _ControlJump[_Slash + 1];
 extern _dst_t _CONTROL_SEQ_TABLE[(_Slash + 1) * 8];
 
@@ -56,4 +56,4 @@ restart:;
 }
 
 #undef COMPILE_SIMD_BITS
-#include "commondef/srw_out.inl.h"
+#include "compile_context/srw_out.inl.h"
