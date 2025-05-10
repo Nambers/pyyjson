@@ -39,5 +39,8 @@
 #define rshift_u32 MAKE_S_NAME(rshift_u32)
 #define to_bitmask MAKE_S_NAME(to_bitmask)
 #define testz MAKE_S_NAME(testz)
+#define bytes_write_ucs1_trailing MAKE_S_NAME(bytes_write_ucs1_trailing)
+#define bytes_write_ucs2_trailing MAKE_S_NAME(bytes_write_ucs2_trailing)
+#define bytes_write_ucs4_trailing MAKE_S_NAME(bytes_write_ucs4_trailing)
 
 #endif // PYYJSON_COMPILE_CONTEXT_S

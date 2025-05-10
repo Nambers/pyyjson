@@ -23,8 +23,6 @@
 #define PYYJSON_DECODE_STR PYYJSON_CONCAT2(pyyjson_decode_str, COMPILE_UCS_LEVEL)
 #define SHOULD_READ_PRETTY PYYJSON_CONCAT2(should_read_pretty, COMPILE_UCS_LEVEL)
 #define READ_STR PYYJSON_CONCAT2(read_str, COMPILE_UCS_LEVEL)
-// #define cmpeq_2chars PYYJSON_CONCAT2(cmp_2_chars_eq, COMPILE_UCS_LEVEL)
-// #define fast_skip_spaces PYYJSON_CONCAT2(fast_skip_spaces, COMPILE_UCS_LEVEL)
 #define READ_ROOT_PRETTY PYYJSON_CONCAT2(read_root_pretty, COMPILE_UCS_LEVEL)
 #define READ_ROOT_MINIFY PYYJSON_CONCAT2(read_root_minify, COMPILE_UCS_LEVEL)
 #define READ_ROOT_SINGLE PYYJSON_CONCAT2(read_root_single, COMPILE_UCS_LEVEL)
@@ -39,38 +37,23 @@
 #define GET_UCS4_WRITER PYYJSON_CONCAT2(get_ucs4_writer, COMPILE_UCS_LEVEL)
 #define GET_CUR_WRITER PYYJSON_CONCAT2(get_cur_writer, COMPILE_UCS_LEVEL)
 #define MOVE_WRITER PYYJSON_CONCAT2(move_writer, COMPILE_UCS_LEVEL)
-// #define check_vector_max_char PYYJSON_CONCAT2(check_max_char_in_loop, COMPILE_UCS_LEVEL)
 #define UPDATE_WRITE_TYPE PYYJSON_CONCAT2(update_write_type, COMPILE_UCS_LEVEL)
-// #define verify_escape_hex PYYJSON_CONCAT2(verify_escape_hex, COMPILE_UCS_LEVEL)
 #define DECODE_ESCAPE_UNICODE PYYJSON_CONCAT2(decode_escape_unicode, COMPILE_UCS_LEVEL)
 #define DO_SPECIAL PYYJSON_CONCAT2(do_special, COMPILE_UCS_LEVEL)
 #define PROCESS_ESCAPE PYYJSON_CONCAT2(process_escape, COMPILE_UCS_LEVEL)
 #define DECODE_LOOP_DONE_MAKE_STRING PYYJSON_CONCAT2(decode_loop_done_make_string, COMPILE_UCS_LEVEL)
 #define GET_DONE_COUNT_FROM_MASK PYYJSON_CONCAT2(get_done_count_from_mask, COMPILE_READ_UCS_LEVEL)
-// #define WRITE_SIMD_IMPL_TARGET2 PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, 2)
 #define WRITE_SIMD_IMPL_TARGET2 PYYJSON_CONCAT5(cvt_to, dst, _src_t, u16, COMPILE_SIMD_BITS)
-// #define WRITE_SIMD_IMPL_TARGET4 PYYJSON_CONCAT3(write_simd_impl, COMPILE_READ_UCS_LEVEL, 4)
 #define WRITE_SIMD_IMPL_TARGET4 PYYJSON_CONCAT5(cvt_to, dst, _src_t, u32, COMPILE_SIMD_BITS)
 #define UCS_BELOW_2_DIRTY PYYJSON_CONCAT2(ucs_below_2_dirty, COMPILE_UCS_LEVEL)
 #define UCS_BELOW_4_DIRTY PYYJSON_CONCAT2(ucs_below_4_dirty, COMPILE_UCS_LEVEL)
 #define COPY_WITH_ELEVATE_TO_2 PYYJSON_CONCAT2(copy_with_elevate_to_2, COMPILE_UCS_LEVEL)
 #define COPY_WITH_ELEVATE_TO_4 PYYJSON_CONCAT2(copy_with_elevate_to_4, COMPILE_UCS_LEVEL)
 #define CHECK_AND_RESERVE_STR_BUFFER PYYJSON_CONCAT2(check_and_reserve_str_buffer, COMPILE_UCS_LEVEL)
-// #define _read_true PYYJSON_CONCAT2(_read_true, COMPILE_READ_UCS_LEVEL)
-// #define _read_false PYYJSON_CONCAT2(_read_false, COMPILE_READ_UCS_LEVEL)
-// #define _read_null PYYJSON_CONCAT2(_read_null, COMPILE_READ_UCS_LEVEL)
-// #define _read_inf PYYJSON_CONCAT2(_read_inf, COMPILE_READ_UCS_LEVEL)
-// #define _read_nan PYYJSON_CONCAT2(_read_nan, COMPILE_READ_UCS_LEVEL)
-// #define read_inf_or_nan PYYJSON_CONCAT2(read_inf_or_nan, COMPILE_READ_UCS_LEVEL)
-#define READ_NUMBER PYYJSON_CONCAT2(read_number, COMPILE_READ_UCS_LEVEL)
-#define CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512 PYYJSON_CONCAT2(check_escape_tail_impl_get_mask_512, COMPILE_READ_UCS_LEVEL)
+#define READ_NUMBER MAKE_R_NAME(read_number)
 
 
 force_inline u32 GET_DONE_COUNT_FROM_MASK(SIMD_MASK_TYPE mask);
-#if COMPILE_READ_UCS_LEVEL <= 2
-// force_inline void WRITE_SIMD_IMPL_TARGET2(u16 *dst, SIMD_TYPE vec);
-#endif
-// force_inline void WRITE_SIMD_IMPL_TARGET4(u32 *dst, SIMD_TYPE vec);
 
 typedef struct DECODE_UNICODE_INFO {
     void *write_head;
@@ -764,7 +747,6 @@ force_inline void READ_STR_TAIL(
     SIMD_512 vec = maskz_loadu(rw_mask, (const void *)decode_src_info->src);
     // #    undef _MASKZ_LOADU
     tail_mask = get_escape_bitmask(vec) & rw_mask;
-    // tail_mask = CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512(z, rw_mask);
     if (likely(tail_mask)) {
         // u32 done_count = GET_DONE_COUNT_FROM_MASK(tail_mask);
         usize done_count = escape_bitmask_to_done_count(tail_mask);
@@ -1604,7 +1586,6 @@ static force_noinline PyObject *PYYJSON_DECODE_STR(PyUnicodeObject *in_unicode) 
     return ret;
 }
 
-#undef CHECK_ESCAPE_TAIL_IMPL_GET_MASK_512
 #undef READ_NUMBER
 #undef CHECK_AND_RESERVE_STR_BUFFER
 #undef COPY_WITH_ELEVATE_TO_4

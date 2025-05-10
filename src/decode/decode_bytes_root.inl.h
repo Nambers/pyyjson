@@ -89,7 +89,7 @@ arr_val_begin:
         goto arr_begin;
     }
     if (char_is_number(*cur)) {
-        PyObject *number_obj = read_number_1(&cur, end);
+        PyObject *number_obj = read_number_u8(&cur, end);
         if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto arr_val_end;
@@ -286,7 +286,7 @@ obj_val_begin:
         goto fail_string;
     }
     if (char_is_number(*cur)) {
-        PyObject *number_obj = read_number_1(&cur, end);
+        PyObject *number_obj = read_number_u8(&cur, end);
         if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
             goto obj_val_end;

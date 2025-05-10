@@ -40,5 +40,8 @@
 #undef fast_skip_spaces
 #undef checkmax
 //
+#undef testz_escape_mask
+#undef escape_anymask_to_done_count
+//
 #undef __check_vector_max_char_internal
 #undef check_vector_max_char

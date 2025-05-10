@@ -6,18 +6,21 @@
 
 #    if PYYJSON_X86
 #        if __AVX512F__ && __AVX512CD__ && __AVX512BW__ && __AVX512VL__ && __AVX512DQ__
-// #            define COMPILE_SIMD_BITS 512
 #            define SIMD_FEATURE_NAME avx512
+#            define SUPPORT_SIMD_512BITS 1
+#            define SUPPORT_SIMD_256BITS 1
 #        elif __AVX2__
-// #            define COMPILE_SIMD_BITS 256
 #            define SIMD_FEATURE_NAME avx2
+#            define SUPPORT_SIMD_512BITS 0
+#            define SUPPORT_SIMD_256BITS 1
 #        else
-// #            define COMPILE_SIMD_BITS 128
 #            if __SSE4_2__
 #                define SIMD_FEATURE_NAME sse4_2
 #            else
 #                define SIMD_FEATURE_NAME sse2
 #            endif
+#            define SUPPORT_SIMD_512BITS 0
+#            define SUPPORT_SIMD_256BITS 0
 #        endif
 
 #        define SIMD_128 __m128i

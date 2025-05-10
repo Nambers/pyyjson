@@ -1101,7 +1101,7 @@ static force_noinline PyObject *read_root_single_bytes(const u8 *dat, usize len)
     PyObject *ret = NULL;
 
     if (char_is_number(*cur)) {
-        ret = read_number_1(&cur, end);
+        ret = read_number_u8(&cur, end);
         if (likely(ret)) goto single_end;
         goto fail_number;
     }

@@ -64,6 +64,15 @@
 #define fast_skip_spaces MAKE_SR_NAME(fast_skip_spaces)
 #define checkmax MAKE_SR_NAME(checkmax)
 
+//
+#if COMPILE_SIMD_BITS == 512
+#    define testz_escape_mask(_x_) ((_x_) == 0)
+#    define escape_anymask_to_done_count escape_bitmask_to_done_count
+#else
+#    define testz_escape_mask testz
+#    define escape_anymask_to_done_count escape_mask_to_done_count
+#endif
+
 #ifdef COMPILE_UCS_LEVEL
 #    define __check_vector_max_char_internal MAKE_S_UCS_NAME(__check_vector_max_char_internal)
 #    define check_vector_max_char MAKE_S_UCS_NAME(check_vector_max_char)

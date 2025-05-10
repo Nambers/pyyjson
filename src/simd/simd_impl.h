@@ -15,7 +15,10 @@
 #    include "avx2/full.h"
 #endif
 #if __AVX__
-#    include "avx/common.h"
+#    include "avx/full.h"
+#endif
+#if __SSE4_1__
+#    include "sse4.1/full.h"
 #endif
 #if __SSSE3__
 #    include "ssse3/full.h"
@@ -251,7 +254,6 @@ force_inline SIMD_128 unpack_hi_64_128(SIMD_128 a, SIMD_128 b) {
 force_inline SIMD_128 cmpeq0_8_128(SIMD_128 a) {
     return _mm_cmpeq_epi8(a, setzero_128());
 }
-
 
 force_inline SIMD_128 cmpeq_8_128(SIMD_128 a, SIMD_128 b) {
     return _mm_cmpeq_epi8(a, b);
@@ -581,9 +583,9 @@ force_inline void ucs4_encode_3bytes_utf8_ssse3(vector_a_u32_128 x, u8 *writer) 
  * SSE4.1 only SIMD code
  *============================================================================*/
 #    if __SSE4_1__
-force_inline SIMD_128 blendv_128(SIMD_128 blend, SIMD_128 x, SIMD_128 mask) {
-    return _mm_blendv_epi8(blend, x, mask);
-}
+// force_inline SIMD_128 blendv_128(SIMD_128 blend, SIMD_128 x, SIMD_128 mask) {
+//     return _mm_blendv_epi8(blend, x, mask);
+// }
 
 /*
  * Write a tail to `addr` using blendv, keeping its head content.

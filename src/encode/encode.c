@@ -171,7 +171,7 @@ force_inline bool bytes_buffer_reserve(EncodeUTF8BufferInfo *utf8_buffer_info, P
  */
 #include "encode_impl_wrap.h"
 
-// #include "bytes/encode_utf8.h"
+#include "bytes/encode_utf8.h"
 
 /* 
  * Top-level encode functions for encoding container types tp bytes.

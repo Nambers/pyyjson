@@ -15,3 +15,6 @@
 #undef rshift_u32
 #undef to_bitmask
 #undef testz
+#undef bytes_write_ucs1_trailing
+#undef bytes_write_ucs2_trailing
+#undef bytes_write_ucs4_trailing

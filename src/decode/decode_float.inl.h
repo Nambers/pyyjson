@@ -1,12 +1,11 @@
 #include "decode_float_utils.h"
 
-#define READ_NUMBER PYYJSON_CONCAT2(read_number, COMPILE_READ_UCS_LEVEL)
-#define DIGI_IS_DIGIT PYYJSON_CONCAT2(digi_is_digit, COMPILE_READ_UCS_LEVEL)
-#define DIGI_IS_DIGIT_OR_FP PYYJSON_CONCAT2(digi_is_digit_or_fp, COMPILE_READ_UCS_LEVEL)
-#define DIGI_IS_EXP PYYJSON_CONCAT2(digi_is_exp, COMPILE_READ_UCS_LEVEL)
-#define DIGI_IS_SIGN PYYJSON_CONCAT2(digi_is_sign, COMPILE_READ_UCS_LEVEL)
-#define DIGI_IS_FP PYYJSON_CONCAT2(digi_is_fp, COMPILE_READ_UCS_LEVEL)
-// #define read_inf_or_nan PYYJSON_CONCAT2(read_inf_or_nan, COMPILE_READ_UCS_LEVEL)
+#define READ_NUMBER MAKE_R_NAME(read_number)
+#define DIGI_IS_DIGIT MAKE_R_NAME(digi_is_digit)
+#define DIGI_IS_DIGIT_OR_FP MAKE_R_NAME(digi_is_digit_or_fp)
+#define DIGI_IS_EXP MAKE_R_NAME(digi_is_exp)
+#define DIGI_IS_SIGN MAKE_R_NAME(digi_is_sign)
+#define DIGI_IS_FP MAKE_R_NAME(digi_is_fp)
 
 /////////////////
 force_inline bool DIGI_IS_DIGIT(_src_t d) {
@@ -30,8 +29,8 @@ force_inline bool DIGI_IS_FP(_src_t d) {
 }
 
 #if PYYJSON_HAS_IEEE_754
-#    define DIGI_IS_NONZERO PYYJSON_CONCAT2(digi_is_nonzero, COMPILE_READ_UCS_LEVEL)
-#    define BIGINT_SET_BUF PYYJSON_CONCAT2(bigint_set_buf, COMPILE_READ_UCS_LEVEL)
+#    define DIGI_IS_NONZERO MAKE_R_NAME(digi_is_nonzero)
+#    define BIGINT_SET_BUF MAKE_R_NAME(bigint_set_buf)
 
 ////////////////
 force_inline bool DIGI_IS_NONZERO(_src_t d) {
@@ -153,10 +152,10 @@ force_inline PyObject *READ_NUMBER(const _src_t **ptr, const _src_t *buffer_end)
     u64 sig = 0; /* significant part of the number */
     i32 exp = 0; /* exponent part of the number */
 
-    bool exp_sign;         /* temporary exponent sign from literal part */
-    i64 exp_sig = 0;       /* temporary exponent number from significant part */
-    i64 exp_lit = 0;       /* temporary exponent number from exponent literal part */
-    u64 num;               /* temporary number for reading */
+    bool exp_sign;     /* temporary exponent sign from literal part */
+    i64 exp_sig = 0;   /* temporary exponent number from significant part */
+    i64 exp_lit = 0;   /* temporary exponent number from exponent literal part */
+    u64 num;           /* temporary number for reading */
     const _src_t *tmp; /* temporary cursor for reading */
 
     const _src_t *hdr = *ptr;

@@ -1,6 +1,6 @@
-#if __AVX512F__ && __AVX512CD__ && __AVX512VL__ && __AVX512DQ__ && __AVX512BW__
+#if SUPPORT_SIMD_512BITS
 #    define COMPILE_SIMD_BITS 512
-#elif __AVX2__
+#elif SUPPORT_SIMD_256BITS
 #    define COMPILE_SIMD_BITS 256
 #else
 #    define COMPILE_SIMD_BITS 128
