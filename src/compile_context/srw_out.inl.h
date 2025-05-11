@@ -9,6 +9,7 @@
 #undef trailing_copy_with_cvt
 #undef encode_trailing_copy_with_cvt
 #undef cvt_to_dst
+#undef cvt_to_dst_blendhigh
 #undef encode_unicode_loop
 #undef encode_unicode_loop4
 #undef encode_unicode_impl

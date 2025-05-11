@@ -719,11 +719,11 @@ force_inline usize size_align_up(usize size, usize align) {
 /*
  * Split tail length into multi parts.
  */
-force_inline void split_tail_len_two_parts(Py_ssize_t tail_len, Py_ssize_t check_count, Py_ssize_t *restrict part1, Py_ssize_t *restrict part2) {
+force_inline void split_tail_len_two_parts(usize tail_len, usize check_count, usize *restrict part1, usize *restrict part2) {
     assert(tail_len > 0 && tail_len < check_count);
     assert(check_count / 2 * 2 == check_count);
-    const Py_ssize_t check_half = check_count / 2;
-    Py_ssize_t p1, p2;
+    const usize check_half = check_count / 2;
+    usize p1, p2;
     p2 = tail_len > check_half ? check_half : tail_len;
     p1 = tail_len - p2;
     assert(p1 >= 0 && p2 >= 0);
@@ -733,12 +733,12 @@ force_inline void split_tail_len_two_parts(Py_ssize_t tail_len, Py_ssize_t check
     *part1 = p1;
 }
 
-force_inline void split_tail_len_four_parts(Py_ssize_t tail_len, Py_ssize_t check_count, Py_ssize_t *restrict part1, Py_ssize_t *restrict part2, Py_ssize_t *restrict part3, Py_ssize_t *restrict part4) {
+force_inline void split_tail_len_four_parts(usize tail_len, usize check_count, usize *restrict part1, usize *restrict part2, usize *restrict part3, usize *restrict part4) {
     assert(tail_len > 0 && tail_len < check_count);
     assert(check_count / 4 * 4 == check_count);
-    const Py_ssize_t orig_tail_len = tail_len;
-    const Py_ssize_t check_quad = check_count / 4;
-    Py_ssize_t p1, p2, p3, p4;
+    const usize orig_tail_len = tail_len;
+    const usize check_quad = check_count / 4;
+    usize p1, p2, p3, p4;
     p4 = tail_len > check_quad ? check_quad : tail_len;
     tail_len -= p4;
     p3 = tail_len > check_quad ? check_quad : tail_len;
@@ -754,6 +754,71 @@ force_inline void split_tail_len_four_parts(Py_ssize_t tail_len, Py_ssize_t chec
     *part2 = p2;
     *part1 = p1;
 }
+
+/* Get tail length at specific part.*/
+force_inline usize get_tail_len_parts_by_index(usize tail_len, usize batch_count, usize parts, usize index) {
+    usize small_batch = batch_count / parts;
+    assert(batch_count == small_batch * parts);
+    usize ret = PYYJSON_MIN(tail_len, (index + 1) * small_batch);
+    ret = PYYJSON_MAX(ret, index * small_batch);
+    ret -= index * small_batch;
+    return ret;
+}
+
+#define BLEND_HIGH_WRITER_2PARTS(_dst_, _u_vec_t_, _batch_size_, _len_, _blendv_func_, _get_high_mask_func_, _expr0_, _expr1_)                 \
+    _u_vec_t_ *uvec = PYYJSON_CAST(_u_vec_t_ *, _dst_);                                                                                        \
+    assert(_len_ > 0);                                                                                                                         \
+    usize batch_half = (_batch_size_) / 2;                                                                                                     \
+    usize batch_index = (_len_ - 1) / batch_half;                                                                                              \
+    switch (batch_index) {                                                                                                                     \
+        case 0: {                                                                                                                              \
+            *(uvec + 1) = _blendv_func_(*(uvec + 1), (_expr1_), _get_high_mask_func_(get_tail_len_parts_by_index(_len_, _batch_size_, 2, 0))); \
+            break;                                                                                                                             \
+        }                                                                                                                                      \
+        case 1: {                                                                                                                              \
+            *(uvec + 0) = _blendv_func_(*(uvec + 0), (_expr0_), _get_high_mask_func_(get_tail_len_parts_by_index(_len_, _batch_size_, 2, 1))); \
+            *(uvec + 1) = (_expr1_);                                                                                                           \
+            break;                                                                                                                             \
+        }                                                                                                                                      \
+        default: {                                                                                                                             \
+            assert(false);                                                                                                                     \
+            Py_UNREACHABLE();                                                                                                                  \
+        }                                                                                                                                      \
+    }
+
+#define BLEND_HIGH_WRITER_4PARTS(_dst_, _u_vec_t_, _batch_size_, _len_, _blendv_func_, _get_high_mask_func_, _expr0_, _expr1_, _expr2_, _expr3_) \
+    _u_vec_t_ *uvec = PYYJSON_CAST(_u_vec_t_ *, _dst_);                                                                                          \
+    assert(_len_ > 0);                                                                                                                           \
+    usize batch_quarter = (_batch_size_) / 4;                                                                                                    \
+    usize batch_index = (_len_ - 1) / batch_quarter;                                                                                             \
+    switch (batch_index) {                                                                                                                       \
+        case 0: {                                                                                                                                \
+            *(uvec + 3) = _blendv_func_(*(uvec + 3), (_expr3_), _get_high_mask_func_(get_tail_len_parts_by_index(_len_, _batch_size_, 4, 0)));   \
+            break;                                                                                                                               \
+        }                                                                                                                                        \
+        case 1: {                                                                                                                                \
+            *(uvec + 2) = _blendv_func_(*(uvec + 2), (_expr2_), _get_high_mask_func_(get_tail_len_parts_by_index(_len_, _batch_size_, 4, 1)));   \
+            *(uvec + 3) = (_expr3_);                                                                                                             \
+            break;                                                                                                                               \
+        }                                                                                                                                        \
+        case 2: {                                                                                                                                \
+            *(uvec + 1) = _blendv_func_(*(uvec + 1), (_expr1_), _get_high_mask_func_(get_tail_len_parts_by_index(_len_, _batch_size_, 4, 2)));   \
+            *(uvec + 2) = (_expr2_);                                                                                                             \
+            *(uvec + 3) = (_expr3_);                                                                                                             \
+            break;                                                                                                                               \
+        }                                                                                                                                        \
+        case 3: {                                                                                                                                \
+            *(uvec + 0) = _blendv_func_(*(uvec + 0), (_expr0_), _get_high_mask_func_(get_tail_len_parts_by_index(_len_, _batch_size_, 4, 3)));   \
+            *(uvec + 1) = (_expr1_);                                                                                                             \
+            *(uvec + 2) = (_expr2_);                                                                                                             \
+            *(uvec + 3) = (_expr3_);                                                                                                             \
+            break;                                                                                                                               \
+        }                                                                                                                                        \
+        default: {                                                                                                                               \
+            assert(false);                                                                                                                       \
+            Py_UNREACHABLE();                                                                                                                    \
+        }                                                                                                                                        \
+    }
 
 /* typedefs */
 typedef PyObject *pyyjson_cache_type;

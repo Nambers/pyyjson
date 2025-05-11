@@ -10,6 +10,7 @@
 #define trailing_copy_with_cvt MAKE_SRW_NAME(trailing_copy_with_cvt)
 #define encode_trailing_copy_with_cvt MAKE_SRW_NAME(encode_trailing_copy_with_cvt)
 #define cvt_to_dst MAKE_SRW_NAME(cvt_to_dst)
+#define cvt_to_dst_blendhigh MAKE_SRW_NAME(cvt_to_dst_blendhigh)
 #define encode_unicode_loop MAKE_SRW_NAME(encode_unicode_loop)
 #define encode_unicode_loop4 MAKE_SRW_NAME(encode_unicode_loop4)
 #define encode_unicode_impl MAKE_SRW_NAME(encode_unicode_impl)

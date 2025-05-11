@@ -58,4 +58,12 @@ force_inline vector_a_u8_256 cvt_u16_to_u8_512(vector_a_u16_512 z) {
     return _mm256_packus_epi16(y1, y2);
 }
 
+force_inline u64 get_low_bitmask_512(usize len) {
+    return (1ULL << len) - 1;
+}
+
+force_inline u64 get_high_bitmask_512(usize len) {
+    return ~get_low_bitmask_512(64 - len);
+}
+
 #endif // PYYJSON_SIMD_AVX512FCD_COMMON_H
