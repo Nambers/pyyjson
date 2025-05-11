@@ -24,6 +24,8 @@
 #define broadcast_u16_512(_x_) (_mm512_set1_epi16((u16)(_x_)))
 #define broadcast_u32_512(_x_) (_mm512_set1_epi32((u32)(_x_)))
 
+#define rshift_u32_512 _mm512_srli_epi32
+
 force_inline u64 len_to_maskz(usize len) {
     return (1ULL << len) - 1;
 }

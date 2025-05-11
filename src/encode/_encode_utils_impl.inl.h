@@ -8,6 +8,7 @@
 #include "compile_context/w_in.inl.h"
 
 #define _ELEVATE_FROM_U8_NUM_BUFFER MAKE_W_NAME(_elevate_u8_copy)
+
 /*
  * (PRIVATE)
  * Convert the u8 buffer to the buffer.
@@ -27,20 +28,23 @@ force_inline void _ELEVATE_FROM_U8_NUM_BUFFER(_dst_t **writer_addr, u8 *buffer, 
     // 2 -> 4:
     // always load 128 (16 bytes), and write 128/256/512.
 #    if COMPILE_SIMD_BITS == 512 && COMPILE_WRITE_UCS_LEVEL == 2
-    SIMD_256 y;
-    SIMD_512 z;
-    y = load_256((const void *)buffer);
-    z = elevate_1_2_to_512(y);
-    write_512((void *)writer, z); // processed 32, done
+    // SIMD_256 y;
+    // SIMD_512 z;
+    // y = load_256((const void *)buffer);
+    // z = cvt_u8_to_u16_512(y);
+    // *(vector_u_u16_512*)writer = z;
+    *(vector_u_u16_512 *)writer = cvt_u8_to_u16_512(*(vector_u_u8_256 *)buffer);
+    // write_512((void *)writer, z); // processed 32, done
     writer += len;
 #    else // COMPILE_SIMD_BITS != 512 || COMPILE_WRITE_UCS_LEVEL == 4
     const Py_ssize_t per_write_count = COMPILE_SIMD_BITS / 8 / COMPILE_WRITE_UCS_LEVEL;
     _dst_t *writer2 = writer;
     u8 *buffer_end = buffer + len;
-#        define ELEVATOR PYYJSON_CONCAT4(elevate_1, COMPILE_WRITE_UCS_LEVEL, to, COMPILE_SIMD_BITS)
+#        define ELEVATOR PYYJSON_CONCAT3(cvt_u8_to, _dst_t, COMPILE_SIMD_BITS)
 #        define WRITER PYYJSON_CONCAT2(write, COMPILE_SIMD_BITS)
     while (buffer < buffer_end) {
-        WRITER((void *)writer2, ELEVATOR(load_128((const void *)buffer)));
+        *(PYYJSON_CONCAT2(vector_u_u32, COMPILE_SIMD_BITS) *)writer2 = ELEVATOR(*(const vector_u_u8_128 *)buffer);
+        // WRITER((void *)writer2, ELEVATOR(load_128((const void *)buffer)));
         writer2 += per_write_count;
         buffer += per_write_count;
     }

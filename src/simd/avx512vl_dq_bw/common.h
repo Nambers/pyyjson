@@ -25,6 +25,8 @@
 
 #define shuffle_512 _mm512_shuffle_epi8
 
+#define rshift_u16_512 _mm512_srli_epi16
+
 force_inline vector_a_u16_512 cvt_u8_to_u16_512(vector_a_u8_256 y) {
     return _mm512_cvtepu8_epi16(y);
 }

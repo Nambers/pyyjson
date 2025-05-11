@@ -8,5 +8,6 @@
 #include "decode.h"
 #include "encode.h"
 #include "trailing.h"
+#include "utf8.h"
 
 #endif // PYYJSON_SIMD_AVX512VLDQBW_FULL_H

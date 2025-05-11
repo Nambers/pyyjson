@@ -1,5 +1,6 @@
 #include "test.h"
 #include "simd/simd_detect.h"
+#include "simd/vector_types.h"
 #include "tools.h"
 //
 #include "simd/compile_feature_check.h"
@@ -37,7 +38,7 @@ int SIMD_NAME_MODIFIER(test_elevate_1_2_to_128)(void) {
         RANDOM_FILL(input);
         GARBAGE_FILL(dst);
         //
-        write_128(dst, elevate_1_2_to_128(load_128(input)));
+        *(vector_u_u16_128 *)dst = cvt_u8_to_u16_128(*(vector_u_u8_128 *)input);
         for (usize i = 0; i < COUNT_OF(dst); i++) {
             CHECK(dst[i] == input[i]);
         }
@@ -59,7 +60,7 @@ int SIMD_NAME_MODIFIER(test_elevate_1_4_to_128)(void) {
         RANDOM_FILL(input);
         GARBAGE_FILL(dst);
         //
-        write_128(dst, elevate_1_4_to_128(load_128(input)));
+        *(vector_u_u32_128 *)dst = cvt_u8_to_u32_128(*(vector_u_u8_128 *)input);
         for (usize i = 0; i < COUNT_OF(dst); i++) {
             CHECK(dst[i] == input[i]);
         }
@@ -81,7 +82,7 @@ int SIMD_NAME_MODIFIER(test_elevate_2_4_to_128)(void) {
         RANDOM_FILL(input);
         GARBAGE_FILL(dst);
         //
-        write_128(dst, elevate_2_4_to_128(load_128(input)));
+        *(vector_u_u32_128 *)dst = cvt_u16_to_u32_128(*(vector_u_u16_128 *)input);
         for (usize i = 0; i < COUNT_OF(dst); i++) {
             CHECK(dst[i] == input[i]);
         }

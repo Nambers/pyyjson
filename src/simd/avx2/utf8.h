@@ -83,14 +83,14 @@ force_inline void ucs2_encode_3bytes_utf8_avx2(vector_a_u16_256 y, u8 *writer) {
     vector_a_u32_256 y5 = _mm256_srli_epi32(y1, 12);
     vector_a_u32_256 y6 = _mm256_srli_epi32(y2, 12);
     /* y7,y8 = 00000000|00000000|abcdefgh */
-    vector_a_u8_256 y7 = _mm256_shuffle_epi8(y1, t1);
-    vector_a_u8_256 y8 = _mm256_shuffle_epi8(y2, t1);
+    vector_a_u8_256 y7 = shuffle_256(y1, t1);
+    vector_a_u8_256 y8 = shuffle_256(y2, t1);
     /* y9,y10 = 00000000|gh123456|00000000 */
-    vector_a_u8_256 y9 = _mm256_shuffle_epi8(y3, t2);
-    vector_a_u8_256 y10 = _mm256_shuffle_epi8(y4, t2);
+    vector_a_u8_256 y9 = shuffle_256(y3, t2);
+    vector_a_u8_256 y10 = shuffle_256(y4, t2);
     /* y11,y12 = 56780000|00000000|00000000 */
-    vector_a_u8_256 y11 = _mm256_shuffle_epi8(y5, t3);
-    vector_a_u8_256 y12 = _mm256_shuffle_epi8(y6, t3);
+    vector_a_u8_256 y11 = shuffle_256(y5, t3);
+    vector_a_u8_256 y12 = shuffle_256(y6, t3);
     //
     vector_a_u8_256 y13 = ((y7 | y9 | y11) & m1) | m2;
     vector_a_u8_256 y14 = ((y8 | y10 | y12) & m1) | m2;
@@ -132,9 +132,9 @@ force_inline void ucs2_encode_2bytes_utf8_avx2(vector_a_u16_256 y, u8 *writer) {
             0x80, 12,
             0x80, 14};
     /*y1 = gh123000|00000000 */
-    vector_a_u8_256 y1 = _mm256_srli_epi16(y, 6);
+    vector_a_u8_256 y1 = rshift_u16_256(y, 6);
     /*y2 = 00000000|abcdefgh */
-    vector_a_u8_256 y2 = _mm256_shuffle_epi8(y, t1);
+    vector_a_u8_256 y2 = shuffle_256(y, t1);
     /*y = gh123000|abcdefgh */
     y = y1 | y2;
     /*y = gh123000|abcdef00 */
@@ -211,11 +211,11 @@ force_inline void ucs4_encode_3bytes_utf8_avx2(vector_a_u32_256 y, u8 *writer) {
     /* y2 = 56780000|00000000|00000000|00000000 */
     vector_a_u32_256 y2 = _mm256_srli_epi32(y, 12);
     /* y3 = 00000000|00000000|abcdefgh */
-    vector_a_u8_256 y3 = _mm256_shuffle_epi8(y, t1);
+    vector_a_u8_256 y3 = shuffle_256(y, t1);
     /* y4 = 00000000|gh123456|00000000 */
-    vector_a_u8_256 y4 = _mm256_shuffle_epi8(y1, t2);
+    vector_a_u8_256 y4 = shuffle_256(y1, t2);
     /* y5 = 56780000|00000000|00000000 */
-    vector_a_u8_256 y5 = _mm256_shuffle_epi8(y2, t3);
+    vector_a_u8_256 y5 = shuffle_256(y2, t3);
     vector_a_u8_256 y6 = ((y3 | y4 | y5) & m1) | m2;
     //
     vector_a_u8_128 x1 = _mm256_extracti128_si256(y6, 0);

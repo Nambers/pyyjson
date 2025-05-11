@@ -1,0 +1,353 @@
+#ifndef PYYJSON_SIMD_AVX512VLDQBW_UTF8_H
+#define PYYJSON_SIMD_AVX512VLDQBW_UTF8_H
+
+#include "common.h"
+#include "simd/avx/common.h"
+#include "simd/avx2/common.h"
+
+force_inline void ucs2_encode_2bytes_utf8_avx512(vector_a_u16_512 z, u8 *writer) {
+    /* abcdefgh|12300000 -> gh123[mmm]|abcdef[mm] */
+    vector_a_u8_128 t1 = {
+            0x80, 0,
+            0x80, 2,
+            0x80, 4,
+            0x80, 6,
+            0x80, 8,
+            0x80, 10,
+            0x80, 12,
+            0x80, 14};
+    /*z1 = gh123000|00000000 */
+    vector_a_u16_512 z1 = rshift_u16_512(z, 6);
+    /*z2 = 00000000|abcdefgh */
+    vector_a_u16_512 z2 = shuffle_512(z, _mm512_broadcast_i32x4(t1));
+    /*z = gh123000|abcdefgh */
+    z = z1 | z2;
+    /*z = gh123000|abcdef00 */
+    z = z & broadcast_u16_512(0x3fff);
+    /*z = gh123[mmm]|abcdef[mm] */
+    z = z | broadcast_u16_512(0x80c0);
+    *(vector_u_u16_512 *)writer = z;
+}
+
+force_inline void ucs2_encode_3bytes_utf8_avx512(vector_a_u16_512 z, u8 *writer) {
+    vector_a_u8_512 t1 = {
+            0x80, 0x80, 0x80, 0x80,
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            //
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            0x80, 0x80, 0x80, 0x80,
+            //
+            0x80, 0x80, 0x80, 0x80,
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            //
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            0x80, 0x80, 0x80, 0x80};
+    vector_a_u8_512 t2 = {
+            0x80, 0x80, 0x80, 0x80,
+            0x80, 0, 0x80,
+            0x80, 4, 0x80,
+            0x80, 8, 0x80,
+            0x80, 12, 0x80,
+            //
+            0x80, 0, 0x80,
+            0x80, 4, 0x80,
+            0x80, 8, 0x80,
+            0x80, 12, 0x80,
+            0x80, 0x80, 0x80, 0x80,
+            //
+            0x80, 0x80, 0x80, 0x80,
+            0x80, 0, 0x80,
+            0x80, 4, 0x80,
+            0x80, 8, 0x80,
+            0x80, 12, 0x80,
+            //
+            0x80, 0, 0x80,
+            0x80, 4, 0x80,
+            0x80, 8, 0x80,
+            0x80, 12, 0x80,
+            0x80, 0x80, 0x80, 0x80};
+    vector_a_u8_512 t3 = {
+            0x80, 0x80, 0x80, 0x80,
+            0, 0x80, 0x80,
+            4, 0x80, 0x80,
+            8, 0x80, 0x80,
+            12, 0x80, 0x80,
+            //
+            0, 0x80, 0x80,
+            4, 0x80, 0x80,
+            8, 0x80, 0x80,
+            12, 0x80, 0x80,
+            0x80, 0x80, 0x80, 0x80,
+            //
+            0x80, 0x80, 0x80, 0x80,
+            0, 0x80, 0x80,
+            4, 0x80, 0x80,
+            8, 0x80, 0x80,
+            12, 0x80, 0x80,
+            //
+            0, 0x80, 0x80,
+            4, 0x80, 0x80,
+            8, 0x80, 0x80,
+            12, 0x80, 0x80,
+            0x80, 0x80, 0x80, 0x80};
+    vector_a_u8_512 m1 = {
+            0xff, 0xff, 0xff, 0xff,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            //
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0xff, 0xff, 0xff,
+            //
+            0xff, 0xff, 0xff, 0xff,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            //
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0xff, 0xff, 0xff};
+    vector_a_u8_512 m2 = {
+            0, 0, 0, 0,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            //
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0, 0, 0, 0,
+            //
+            0, 0, 0, 0,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            //
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0, 0, 0, 0};
+    vector_a_u32_512 z1 = cvt_u16_to_u32_512(_mm512_extracti64x4_epi64(z, 0));
+    vector_a_u32_512 z2 = cvt_u16_to_u32_512(_mm512_extracti64x4_epi64(z, 1));
+    /* z3,z4 = gh123456|78000000 */
+    vector_a_u16_512 z3 = rshift_u32_512(z1, 6);
+    vector_a_u16_512 z4 = rshift_u32_512(z2, 6);
+    /* z5,z6 = 56780000|00000000 */
+    vector_a_u16_512 z5 = rshift_u32_512(z1, 12);
+    vector_a_u16_512 z6 = rshift_u32_512(z2, 12);
+    /* z7,z8 = 00000000|00000000|abcdefgh */
+    vector_a_u8_512 z7 = shuffle_512(z1, t1);
+    vector_a_u8_512 z8 = shuffle_512(z2, t1);
+    /* z9,z10 = 00000000|gh123456|00000000 */
+    vector_a_u8_512 z9 = shuffle_512(z3, t2);
+    vector_a_u8_512 z10 = shuffle_512(z4, t2);
+    /* z11,z12 = 56780000|00000000|00000000 */
+    vector_a_u8_512 z11 = shuffle_512(z5, t3);
+    vector_a_u8_512 z12 = shuffle_512(z6, t3);
+    //
+    vector_a_u8_512 z13 = ((z7 | z9 | z11) & m1) | m2;
+    vector_a_u8_512 z14 = ((z8 | z10 | z12) & m1) | m2;
+    // [0, 24)
+    _mm512_mask_storeu_epi32(writer - 4, 0x7e, z13);
+    // [48, 72)
+    _mm512_mask_storeu_epi32(writer + 44, 0x7e, z14);
+    // [24, 48)
+    _mm512_mask_storeu_epi32(writer - 12, 0x7e00, z13);
+    // [72, 96)
+    _mm512_mask_storeu_epi32(writer + 36, 0x7e00, z14);
+}
+
+force_inline void ucs4_encode_3bytes_utf8_avx512(vector_a_u32_512 z, u8 *writer) {
+    /* abcdefgh|12345678|00000000|00000000 -> 5678[mmmm]|gh1234[mm]|abcdef[mm] */
+    vector_a_u8_512 t1 = {
+            0x80, 0x80, 0x80, 0x80,
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            //
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            0x80, 0x80, 0x80, 0x80,
+            //
+            0x80, 0x80, 0x80, 0x80,
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            //
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            0x80, 0x80, 0x80, 0x80};
+    vector_a_u8_512 t2 = {
+            0x80, 0x80, 0x80, 0x80,
+            0x80, 0, 0x80,
+            0x80, 4, 0x80,
+            0x80, 8, 0x80,
+            0x80, 12, 0x80,
+            //
+            0x80, 0, 0x80,
+            0x80, 4, 0x80,
+            0x80, 8, 0x80,
+            0x80, 12, 0x80,
+            0x80, 0x80, 0x80, 0x80,
+            //
+            0x80, 0x80, 0x80, 0x80,
+            0x80, 0, 0x80,
+            0x80, 4, 0x80,
+            0x80, 8, 0x80,
+            0x80, 12, 0x80,
+            //
+            0x80, 0, 0x80,
+            0x80, 4, 0x80,
+            0x80, 8, 0x80,
+            0x80, 12, 0x80,
+            0x80, 0x80, 0x80, 0x80};
+    vector_a_u8_512 t3 = {
+            0x80, 0x80, 0x80, 0x80,
+            0, 0x80, 0x80,
+            4, 0x80, 0x80,
+            8, 0x80, 0x80,
+            12, 0x80, 0x80,
+            //
+            0, 0x80, 0x80,
+            4, 0x80, 0x80,
+            8, 0x80, 0x80,
+            12, 0x80, 0x80,
+            0x80, 0x80, 0x80, 0x80,
+            //
+            0x80, 0x80, 0x80, 0x80,
+            0, 0x80, 0x80,
+            4, 0x80, 0x80,
+            8, 0x80, 0x80,
+            12, 0x80, 0x80,
+            //
+            0, 0x80, 0x80,
+            4, 0x80, 0x80,
+            8, 0x80, 0x80,
+            12, 0x80, 0x80,
+            0x80, 0x80, 0x80, 0x80};
+    vector_a_u8_512 m1 = {
+            0xff, 0xff, 0xff, 0xff,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            //
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0xff, 0xff, 0xff,
+            //
+            0xff, 0xff, 0xff, 0xff,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            //
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0xff, 0xff, 0xff};
+    vector_a_u8_512 m2 = {
+            0, 0, 0, 0,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            //
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0, 0, 0, 0,
+            //
+            0, 0, 0, 0,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            //
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0, 0, 0, 0};
+    /* z1 = gh123456|78000000|00000000|00000000 */
+    vector_a_u32_512 z1 = rshift_u32_512(z, 6);
+    /* z2 = 56780000|00000000|00000000|00000000 */
+    vector_a_u32_512 z2 = rshift_u32_512(z, 12);
+    /* z3 = 00000000|00000000|abcdefgh */
+    vector_a_u8_512 z3 = shuffle_512(z, t1);
+    /* z4 = 00000000|gh123456|00000000 */
+    vector_a_u8_512 z4 = shuffle_512(z1, t2);
+    /* z5 = 56780000|00000000|00000000 */
+    vector_a_u8_512 z5 = shuffle_512(z2, t3);
+    vector_a_u8_512 z6 = ((z3 | z4 | z5) & m1) | m2;
+    _mm512_mask_storeu_epi8(writer - 4, 0xffffff0, z6);
+    _mm512_mask_storeu_epi8(writer - 12, 0xffffff000000000, z6);
+}
+
+force_inline void ucs4_encode_2bytes_utf8_avx512(vector_a_u32_512 z, u8 *writer) {
+    /* abcdefgh|12300000|00000000|00000000 -> gh123[mmm]|abcdef[mm] */
+    vector_a_u8_256 t1 = {
+            0x80, 0,
+            0x80, 2,
+            0x80, 4,
+            0x80, 6,
+            0x80, 8,
+            0x80, 10,
+            0x80, 12,
+            0x80, 14,
+            //
+            0x80, 0,
+            0x80, 2,
+            0x80, 4,
+            0x80, 6,
+            0x80, 8,
+            0x80, 10,
+            0x80, 12,
+            0x80, 14};
+    vector_a_u8_256 m1 = broadcast_u16_256(0x3fff);
+    vector_a_u8_256 m2 = broadcast_u16_256(0x80c0);
+    /* y = abcdefgh|12300000 */
+    vector_a_u16_256 y = cvt_u32_to_u16_512(z);
+    /* y1 = gh123000|00000000 */
+    vector_a_u8_256 y1 = rshift_u16_256(y, 6);
+    /* y2 = 00000000|abcdefgh */
+    vector_a_u8_256 y2 = shuffle_256(y, t1);
+    vector_a_u8_256 y3 = ((y1 | y2) & m1) | m2;
+    *(vector_u_u8_256 *)writer = y3;
+}
+
+
+#endif // PYYJSON_SIMD_AVX512VLDQBW_UTF8_H

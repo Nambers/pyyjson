@@ -28,6 +28,9 @@
 #define unsigned_saturate_minus_u8_256 _mm256_subs_epu8
 #define unsigned_saturate_minus_u16_256 _mm256_subs_epu16
 
+#define rshift_u16_256 _mm256_srli_epi16
+#define rshift_u32_256 _mm256_srli_epi32
+
 /* Create mask from the highest bit in each 8-bit element. */
 force_inline u32 to_bitmask_256(SIMD_256 a) {
     return (u32)_mm256_movemask_epi8(a);
