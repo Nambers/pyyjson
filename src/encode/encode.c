@@ -220,8 +220,7 @@ force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {
             break;
         }
         default: {
-            Py_UNREACHABLE();
-            assert(false);
+            PYYJSON_UNREACHABLE();
         }
     }
     if (unlikely(!success)) {
@@ -404,8 +403,7 @@ dumps_container:;
             break;
         }
         default: {
-            Py_UNREACHABLE();
-            assert(false);
+            PYYJSON_UNREACHABLE();
         }
     }
 

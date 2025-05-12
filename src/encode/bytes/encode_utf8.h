@@ -532,8 +532,7 @@ force_inline bool _3bytes_in_ucs2_encode_loop(u8 **dst_addr, const u16 **src_add
 #    elif __SSSE3__
     ucs2_encode_3bytes_utf8_ssse3(vec, dst);
 #    else
-    assert(false);
-    Py_UNREACHABLE();
+    PYYJSON_UNREACHABLE();
 #    endif
 #else
     // TODO

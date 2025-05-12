@@ -13,8 +13,8 @@
 #endif
 #define extract_low_u32_from_128(_x_) ((u32)_mm_cvtsi128_si32(_x_))
 
-#define byte_rshift_128(_x_, _bytes_) (_mm_bsrli_si128((_x_), (_bytes_)))
-#define byte_lshift_128(_x_, _bytes_) (_mm_bslli_si128((_x_), (_bytes_)))
+#define byte_rshift_128 _mm_bsrli_si128
+#define byte_lshift_128 _mm_bslli_si128
 
 #define rshift_u16_128 _mm_srli_epi16
 #define rshift_u32_128 _mm_srli_epi32
@@ -225,11 +225,10 @@ force_inline SIMD_128 runtime_byte_rshift_128(SIMD_128 x, int imm8) {
             break;
         }
         default: {
-            Py_UNREACHABLE();
-            assert(false);
+            PYYJSON_UNREACHABLE();
         }
     }
-    Py_UNREACHABLE();
+    PYYJSON_UNREACHABLE();
     return x;
 #endif
 }

@@ -9,9 +9,14 @@
 #include "simd/sse2/common.h"
 //
 #define COMPILE_READ_UCS_LEVEL 1
+#define COMPILE_WRITE_UCS_LEVEL 1
 #define COMPILE_SIMD_BITS 128
-#include "compile_context/sr_in.inl.h"
+#include "compile_context/srw_in.inl.h"
 
+/* 
+ * Encode UCS1 trailing to utf-8.
+ * Only consider vector in ASCII range, because most of 2-bytes utf-8 code points cannot be presented by UCS1 string.
+ */
 force_inline void bytes_write_ucs1_trailing_128(u8 **writer_addr, const u8 *src, usize len) {
     assert(len && len < (READ_BATCH_COUNT));
     const u8 *src_end = src + len;
@@ -23,7 +28,7 @@ force_inline void bytes_write_ucs1_trailing_128(u8 **writer_addr, const u8 *src,
     vector_a t2 = broadcast(_Slash);
     vector_a t3 = broadcast(ControlMax);
     vector_a t4 = broadcast(0x80);
-    vector_a m0 = (vec == t1) | (vec == t2) | (vec < t3) | (vec & t4);
+    vector_a m0 = (vec == t1) | (vec == t2) | unsigned_saturate_minus(t3, vec) | (vec & t4);
 restart:;
     vector_a x, m;
     int shift;
@@ -47,8 +52,9 @@ restart:;
     return;
 }
 
-#include "compile_context/sr_out.inl.h"
+#include "compile_context/srw_out.inl.h"
 #undef COMPILE_SIMD_BITS
+#undef COMPILE_WRITE_UCS_LEVEL
 #undef COMPILE_READ_UCS_LEVEL
 
 #endif // PYYJSON_SIMD_SSE2_ENCODE_BYTES_UCS1_H

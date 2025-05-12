@@ -78,8 +78,7 @@ force_noinline void init_pyunicode(void *head, Py_ssize_t size, int kind) {
         is_sharing = sizeof(wchar_t) == 4;
 #endif
     } else {
-        assert(false);
-        Py_UNREACHABLE();
+        PYYJSON_UNREACHABLE();
     }
     if (kind) {
         unicode->utf8 = NULL;

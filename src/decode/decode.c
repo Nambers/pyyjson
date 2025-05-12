@@ -207,8 +207,7 @@ force_inline PyObject *make_string(const u8 *unicode_str, Py_ssize_t len, int ty
             break;
         }
         default:
-            assert(false);
-            Py_UNREACHABLE();
+            PYYJSON_UNREACHABLE();
     }
 
     bool should_cache = (is_key && real_len && likely(real_len <= 64));
@@ -537,8 +536,7 @@ PyObject *SIMD_NAME_MODIFIER(pyyjson_Decode)(PyObject *self, PyObject *args, PyO
             }
             default: {
                 ret = NULL;
-                assert(false);
-                Py_UNREACHABLE();
+                PYYJSON_UNREACHABLE();
             }
         }
         goto done;

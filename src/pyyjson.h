@@ -189,7 +189,11 @@
 #define REPEAT_64(x) REPEAT_32(x) REPEAT_32(x)
 
 #define PYYJSON_CAST(type, expr) ((type)(expr))
-
+#ifdef NDEBUG
+#    define PYYJSON_UNREACHABLE() Py_UNREACHABLE()
+#else
+#    define PYYJSON_UNREACHABLE() assert(false)
+#endif
 /*==============================================================================
  * Macros
  *============================================================================*/
@@ -763,8 +767,7 @@ force_inline usize get_tail_len_parts_by_index(usize tail_len, usize batch_count
             break;                                                                                                                             \
         }                                                                                                                                      \
         default: {                                                                                                                             \
-            assert(false);                                                                                                                     \
-            Py_UNREACHABLE();                                                                                                                  \
+            PYYJSON_UNREACHABLE();                                                                                                                  \
         }                                                                                                                                      \
     }
 
@@ -797,8 +800,7 @@ force_inline usize get_tail_len_parts_by_index(usize tail_len, usize batch_count
             break;                                                                                                                               \
         }                                                                                                                                        \
         default: {                                                                                                                               \
-            assert(false);                                                                                                                       \
-            Py_UNREACHABLE();                                                                                                                    \
+            PYYJSON_UNREACHABLE();                                                                                                                    \
         }                                                                                                                                        \
     }
 

@@ -344,8 +344,7 @@ copy_escape_ucs1:
         // *dst++ = *src++;
         /* modified END */
     }
-    assert(false);
-    Py_UNREACHABLE();
+    PYYJSON_UNREACHABLE();
 
     /* modified BEGIN */
 copy_ascii_ucs1:
@@ -725,8 +724,7 @@ copy_escape_ucs2:
         // *dst++ = *src++;
         /* modified END */
     }
-    assert(false);
-    Py_UNREACHABLE();
+    PYYJSON_UNREACHABLE();
 
     /* modified BEGIN */
 copy_ascii_ucs2:
@@ -939,8 +937,7 @@ copy_escape_ucs4:
         // *dst++ = *src++;
         /* modified END */
     }
-    assert(false);
-    Py_UNREACHABLE();
+    PYYJSON_UNREACHABLE();
 
     /* modified BEGIN */
 copy_ascii_ucs4:

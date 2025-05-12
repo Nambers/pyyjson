@@ -106,8 +106,7 @@ force_inline bool UNICODE_BUFFER_APPEND_KEY(PyObject *key, EncodeUnicodeBufferIn
                     break;
                 }
                 default: {
-                    assert(false);
-                    Py_UNREACHABLE();
+                    PYYJSON_UNREACHABLE();
                 }
             }
             break;
@@ -128,15 +127,13 @@ force_inline bool UNICODE_BUFFER_APPEND_KEY(PyObject *key, EncodeUnicodeBufferIn
                     break;
                 }
                 default: {
-                    assert(false);
-                    Py_UNREACHABLE();
+                    PYYJSON_UNREACHABLE();
                 }
             }
             break;
         }
         default: {
-            assert(false);
-            Py_UNREACHABLE();
+            PYYJSON_UNREACHABLE();
         }
     }
     return true;
@@ -171,8 +168,7 @@ force_inline bool UNICODE_BUFFER_APPEND_STR(PyObject *val, EncodeUnicodeBufferIn
                     break;
                 }
                 default: {
-                    assert(false);
-                    Py_UNREACHABLE();
+                    PYYJSON_UNREACHABLE();
                 }
             }
             break;
@@ -193,15 +189,13 @@ force_inline bool UNICODE_BUFFER_APPEND_STR(PyObject *val, EncodeUnicodeBufferIn
                     break;
                 }
                 default: {
-                    assert(false);
-                    Py_UNREACHABLE();
+                    PYYJSON_UNREACHABLE();
                 }
             }
             break;
         }
         default: {
-            assert(false);
-            Py_UNREACHABLE();
+            PYYJSON_UNREACHABLE();
         }
     }
     return true;
@@ -708,7 +702,7 @@ PYYJSON_DUMPS_OBJ(
         goto arr_val_begin;
     }
 
-    Py_UNREACHABLE();
+    PYYJSON_UNREACHABLE();
 #else
     switch (encode_call_flag) {
         case CallFlag_ArrVal: {
@@ -730,11 +724,11 @@ PYYJSON_DUMPS_OBJ(
             break;
         }
         default: {
-            Py_UNREACHABLE();
+            PYYJSON_UNREACHABLE();
             break;
         }
     }
-    Py_UNREACHABLE();
+    PYYJSON_UNREACHABLE();
 #endif
 
 dict_pair_begin:;
@@ -798,7 +792,7 @@ dict_pair_begin:;
             }
 #endif
             default: {
-                Py_UNREACHABLE();
+                PYYJSON_UNREACHABLE();
             }
         }
         goto dict_pair_begin;
@@ -830,7 +824,7 @@ dict_pair_begin:;
         }
     }
 
-    Py_UNREACHABLE();
+    PYYJSON_UNREACHABLE();
 
 arr_val_begin:;
     assert(_stack_vars.cur_list_size != 0);
@@ -878,7 +872,7 @@ arr_val_begin:;
             }
 #endif
             default: {
-                Py_UNREACHABLE();
+                PYYJSON_UNREACHABLE();
             }
         }
         //
@@ -910,7 +904,7 @@ arr_val_begin:;
             goto arr_val_begin;
         }
     }
-    Py_UNREACHABLE();
+    PYYJSON_UNREACHABLE();
 
 success:;
     assert(_stack_vars.cur_nested_depth == 0);

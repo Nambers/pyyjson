@@ -71,8 +71,7 @@ force_inline void check_vector_max_char(
 #endif
         // below are unreachable
         default: {
-            assert(false);
-            Py_UNREACHABLE();
+            PYYJSON_UNREACHABLE();
         }
     }
 }

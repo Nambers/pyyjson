@@ -111,8 +111,7 @@ force_inline void DECODE_UNICODE_WRITE_ONE_CHAR(
         *decode_unicode_info->unicode_ucs4++ = val;
         return;
     }
-    assert(false);
-    Py_UNREACHABLE();
+    PYYJSON_UNREACHABLE();
 }
 
 force_inline u16 *GET_UCS2_WRITER(DECODE_UNICODE_INFO *decode_unicode_info) {
@@ -151,8 +150,7 @@ force_inline void MOVE_WRITER(DECODE_UNICODE_INFO *decode_unicode_info, int writ
         decode_unicode_info->unicode_ucs4 += len;
         return;
     }
-    assert(false);
-    Py_UNREACHABLE();
+    PYYJSON_UNREACHABLE();
 }
 
 force_inline bool UCS_BELOW_2_DIRTY(DECODE_UNICODE_INFO *decode_unicode_info) {
@@ -180,8 +178,7 @@ force_inline void COPY_WITH_ELEVATE_TO_2(DECODE_UNICODE_INFO *decode_unicode_inf
     assert(decode_unicode_info->ucs1_len > 0);
     SIMD_NAME_MODIFIER(long_back_cvt_noinline_u8_u16)((u16 *)decode_unicode_info->write_head, (u8 *)decode_unicode_info->write_head, decode_unicode_info->ucs1_len);
 #else
-    assert(false);
-    Py_UNREACHABLE();
+    PYYJSON_UNREACHABLE();
 #endif
 }
 
@@ -198,8 +195,7 @@ force_inline void COPY_WITH_ELEVATE_TO_4(DECODE_UNICODE_INFO *decode_unicode_inf
     assert(decode_unicode_info->ucs2_len > 0);
     SIMD_NAME_MODIFIER(long_back_cvt_noinline_u16_u32)((u32 *)decode_unicode_info->write_head, (u16 *)decode_unicode_info->write_head, decode_unicode_info->ucs2_len);
 #else
-    assert(false);
-    Py_UNREACHABLE();
+    PYYJSON_UNREACHABLE();
 #endif
 }
 
@@ -238,8 +234,7 @@ force_inline void UPDATE_WRITE_TYPE(DECODE_UNICODE_INFO *restrict decode_unicode
         return;
     }
 #endif
-    assert(false);
-    Py_UNREACHABLE();
+    PYYJSON_UNREACHABLE();
 }
 
 // force_inline bool verify_escape_hex(DecodeSrcInfo *decode_src_info, int offset) {
@@ -349,8 +344,7 @@ force_inline SpecialCharReadResult DO_SPECIAL(DecodeSrcInfo *restrict decode_src
         result.flag = StrInvalid;
         return result;
     } else {
-        assert(false);
-        Py_UNREACHABLE();
+        PYYJSON_UNREACHABLE();
     }
 }
 
@@ -494,8 +488,7 @@ force_inline void READ_STR_IN_LOOP(
                 assert(decode_unicode_info->unicode_ucs2);
                 WRITE_SIMD_IMPL_TARGET2(GET_UCS2_WRITER(decode_unicode_info), vec);
 #else
-                assert(false);
-                Py_UNREACHABLE();
+                PYYJSON_UNREACHABLE();
 #endif
             } else {
                 assert(write_as == 4);
@@ -573,8 +566,7 @@ force_inline PyObject *DECODE_LOOP_DONE_MAKE_STRING(
                 PYYJSON_CONCAT5(long, cvt, _src_t, u8, COMPILE_SIMD_BITS)((u8 *)decode_unicode_info->write_head, decode_src_info->src_start, copy_count);
             return make_string((const u8 *)decode_unicode_info->write_head, copy_count, max_char_type, is_key);
 #else
-            assert(false);
-            Py_UNREACHABLE();
+            PYYJSON_UNREACHABLE();
             return NULL;
 #endif
         }
@@ -608,8 +600,7 @@ force_inline PyObject *DECODE_LOOP_DONE_MAKE_STRING(
             return make_string((const u8 *)decode_unicode_info->write_head, decode_unicode_info->unicode_ucs1 - (u8 *)decode_unicode_info->write_head, 1, is_key);
 #endif
         } else {
-            assert(false);
-            Py_UNREACHABLE();
+            PYYJSON_UNREACHABLE();
             return NULL;
         }
     }
@@ -803,8 +794,7 @@ static force_noinline PyObject *READ_STR(
 #elif COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_UCS4
     goto loop_4_f_t;
 #endif
-    assert(false);
-    Py_UNREACHABLE();
+    PYYJSON_UNREACHABLE();
 
 // three immediate numbers:
 // write_as = max(_read_state.max_char_type, COMPILE_READ_UCS_LEVEL)

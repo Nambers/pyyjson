@@ -17,8 +17,7 @@
 force_inline void _ELEVATE_FROM_U8_NUM_BUFFER(_dst_t **writer_addr, u8 *buffer, Py_ssize_t len) {
     _dst_t *writer = *writer_addr;
 #if COMPILE_WRITE_UCS_LEVEL == 1
-    Py_UNREACHABLE();
-    assert(false);
+    PYYJSON_UNREACHABLE();
 #else // COMPILE_WRITE_UCS_LEVEL != 1
     assert(len >= 0 && len <= 32);
     // there are two cases: 1 -> 2 or 1 -> 4

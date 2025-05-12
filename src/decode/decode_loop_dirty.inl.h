@@ -45,8 +45,7 @@ if (_read_state.need_copy) {
         }
 #endif
         default: {
-            assert(false);
-            Py_UNREACHABLE();
+            PYYJSON_UNREACHABLE();
         }
     }
 } else {
@@ -82,8 +81,7 @@ if (_read_state.need_copy) {
         }
 #endif
         default: {
-            assert(false);
-            Py_UNREACHABLE();
+            PYYJSON_UNREACHABLE();
         }
     }
 }
