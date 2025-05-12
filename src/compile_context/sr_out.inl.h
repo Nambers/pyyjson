@@ -18,6 +18,7 @@
 #undef unionvector_a_x4
 #undef unionvector_u_x4
 //
+#undef get_bitmask_from
 #undef get_escape_mask
 #undef escape_mask_to_bitmask
 #undef escape_mask_to_done_count

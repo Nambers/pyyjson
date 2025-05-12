@@ -118,13 +118,6 @@ force_inline void cvt_to_dst_blendhigh_u8_u16_256(u16 *dst, vector_a_u8_256 y, u
     x1 = extract_128_from_256(y, 0);
     x2 = extract_128_from_256(y, 1);
     BLEND_HIGH_WRITER_2PARTS(dst, vector_u_u16_256, 256 / 8 / sizeof(u8), len, blendv_256, get_high_mask_u16_256, cvt_u8_to_u16_256(x1), cvt_u8_to_u16_256(x2));
-    // usize part1, part2;
-    // vector_u_u16_256 *d1, *d2;
-    // d1 = PYYJSON_CAST(vector_u_u16_256 *, dst + 0);
-    // d2 = PYYJSON_CAST(vector_u_u16_256 *, dst + 16);
-    // split_tail_len_two_parts(len, 256 / 8 / sizeof(u8), &part1, &part2);
-    // if (part1) *d1 = blendv_256(*d1, cvt_u8_to_u16_256(extract_128_from_256(y, 0)), get_high_mask_u8_256(part1));
-    // *d2 = blendv_256(*d2, cvt_u8_to_u16_256(extract_128_from_256(y, 1)), get_high_mask(part2));
 #endif
 }
 
@@ -147,45 +140,6 @@ force_inline void cvt_to_dst_blendhigh_u8_u32_256(u32 *dst, vector_a_u8_256 y, u
 #    undef _EXPR1_
 #    undef _EXPR2_
 #    undef _EXPR3_
-    // usize part1, part2, part3, part4;
-    // const usize batch_quarter = 256 / 8 / sizeof(u8) / 4;
-    // split_tail_len_four_parts(len, 256 / 8 / sizeof(u8), &part1, &part2, &part3, &part4);
-    // vector_u_u32_256 *uvec;
-    // uvec = PYYJSON_CAST(vector_u_u32_256 *, dst);
-    // assert(len > 0);
-    // usize batch_index = (len - 1) / batch_quarter;
-    // switch (batch_index) {
-    //     case 0: {
-    //         *(uvec + 3) = blendv_256(*(uvec + 3), cvt_u8_to_u32_256(byte_rshift_128(x2, 8)), get_high_mask_u32_256(part4));
-    //         break;
-    //     }
-
-    //     case 1: {
-    //         *(uvec + 2) = blendv_256(*(uvec + 2), cvt_u8_to_u32_256(x2), get_high_mask_u32_256(part3));
-    //         *(uvec + 3) = cvt_u8_to_u32_256(byte_rshift_128(x2, 8));
-    //         break;
-    //     }
-
-    //     case 2: {
-    //         *(uvec + 1) = blendv_256(*(uvec + 1), cvt_u8_to_u32_256(byte_rshift_128(x1, 8)), get_high_mask_u32_256(part2));
-    //         *(uvec + 2) = cvt_u8_to_u32_256(x2);
-    //         *(uvec + 3) = cvt_u8_to_u32_256(byte_rshift_128(x2, 8));
-    //         break;
-    //     }
-
-    //     case 3: {
-    //         *(uvec + 0) = blendv_256(*(uvec + 0), cvt_u8_to_u32_256(x1), get_high_mask_u32_256(part1));
-    //         *(uvec + 1) = cvt_u8_to_u32_256(byte_rshift_128(x1, 8));
-    //         *(uvec + 2) = cvt_u8_to_u32_256(x2);
-    //         *(uvec + 3) = cvt_u8_to_u32_256(byte_rshift_128(x2, 8));
-    //         break;
-    //     }
-    // }
-
-    // *(vector_u_u32_256 *)(dst + 0) = cvt_u8_to_u32_256(x1);
-    // *(vector_u_u32_256 *)(dst + 8) = cvt_u8_to_u32_256(byte_rshift_128(x1, 8));
-    // *(vector_u_u32_256 *)(dst + 16) = cvt_u8_to_u32_256(x2);
-    // *(vector_u_u32_256 *)(dst + 24) = cvt_u8_to_u32_256(byte_rshift_128(x2, 8));
 #endif
 }
 

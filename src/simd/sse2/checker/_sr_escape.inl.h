@@ -29,10 +29,10 @@ force_inline vector_a get_escape_mask(vector_a x) {
 force_inline u16 escape_mask_to_bitmask(vector_a mask) {
 #if CHECK_ESCAPE_LT512_USE_SIGNED_SATURATED_MINUS
     mask = cmpeq(mask, setzero());
-    u16 bitmask = to_bitmask(mask);
+    u16 bitmask = get_bitmask_from_u8(mask);
     bitmask = ~bitmask;
 #else
-    u32 bitmask = to_bitmask(mask);
+    u32 bitmask = get_bitmask_from_u8(mask);
 #endif
     return bitmask;
 }

@@ -17,6 +17,7 @@
 
 /* ASCII src. */
 force_inline void bytes_write_ascii(u8 **writer_addr, const u8 *src, usize len) {
+    // reuse the unicode encode loop.
     encode_unicode_loop4(writer_addr, &src, &len);
     encode_unicode_loop(writer_addr, &src, &len);
     if (!len) return;
@@ -59,22 +60,22 @@ force_inline void check_ascii_in_ucs1_and_get_done_countx4(unionvector_a_x4 vec,
 
     u64 r;
 
-    m.x[0] = _mm512_cmpeq_epi8_mask(vec.x[0], t1) |
-             _mm512_cmpeq_epi8_mask(vec.x[0], t2) |
-             _mm512_cmplt_epu8_mask(vec.x[0], t3) |
-             _mm512_movepi8_mask(vec.x[0]);
-    m.x[1] = _mm512_cmpeq_epi8_mask(vec.x[1], t1) |
-             _mm512_cmpeq_epi8_mask(vec.x[1], t2) |
-             _mm512_cmplt_epu8_mask(vec.x[1], t3) |
-             _mm512_movepi8_mask(vec.x[1]);
-    m.x[2] = _mm512_cmpeq_epi8_mask(vec.x[2], t1) |
-             _mm512_cmpeq_epi8_mask(vec.x[2], t2) |
-             _mm512_cmplt_epu8_mask(vec.x[2], t3) |
-             _mm512_movepi8_mask(vec.x[2]);
-    m.x[3] = _mm512_cmpeq_epi8_mask(vec.x[3], t1) |
-             _mm512_cmpeq_epi8_mask(vec.x[3], t2) |
-             _mm512_cmplt_epu8_mask(vec.x[3], t3) |
-             _mm512_movepi8_mask(vec.x[3]);
+    m.x[0] = cmpeq_bitmask(vec.x[0], t1) |
+             cmpeq_bitmask(vec.x[0], t2) |
+             unsigned_cmplt_bitmask(vec.x[0], t3) |
+             get_bitmask_from(vec.x[0]);
+    m.x[1] = cmpeq_bitmask(vec.x[1], t1) |
+             cmpeq_bitmask(vec.x[1], t2) |
+             unsigned_cmplt_bitmask(vec.x[1], t3) |
+             get_bitmask_from(vec.x[1]);
+    m.x[2] = cmpeq_bitmask(vec.x[2], t1) |
+             cmpeq_bitmask(vec.x[2], t2) |
+             unsigned_cmplt_bitmask(vec.x[2], t3) |
+             get_bitmask_from(vec.x[2]);
+    m.x[3] = cmpeq_bitmask(vec.x[3], t1) |
+             cmpeq_bitmask(vec.x[3], t2) |
+             unsigned_cmplt_bitmask(vec.x[3], t3) |
+             get_bitmask_from(vec.x[3]);
 #else
     unionvector_a_x4 m;
     vector_a r;
@@ -112,16 +113,15 @@ force_inline void check_ascii_in_ucs1_and_get_done_count(vector_a vec, bool *out
 #if PYYJSON_X86 && COMPILE_SIMD_BITS == 512
     u64 m;
 
-    m = _mm512_cmpeq_epi8_mask(vec, t1) |
-        _mm512_cmpeq_epi8_mask(vec, t2) |
-        _mm512_cmplt_epu8_mask(vec, t3) |
-        _mm512_movepi8_mask(vec);
-    bool checked = m == 0;
+    m = cmpeq_bitmask(vec, t1) |
+        cmpeq_bitmask(vec, t2) |
+        unsigned_cmplt_bitmask(vec, t3) |
+        get_bitmask_from(vec);
 #else
     vector_a m;
     m = (vec == t1) | (vec == t2) | (vec < t3) | (vec & t4);
-    bool checked = testz(m);
 #endif
+    bool checked = testz_escape_mask(m);
     *out_checked = checked;
     if (!checked) {
         *out_done_count = escape_anymask_to_done_count(m);

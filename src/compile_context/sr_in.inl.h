@@ -42,6 +42,8 @@
  */
 #define unionvector_a_x4 PYYJSON_CONCAT2(MAKE_SR_NAME(unionvector_a), x4)
 #define unionvector_u_x4 PYYJSON_CONCAT2(MAKE_SR_NAME(unionvector_u), x4)
+//
+#define get_bitmask_from MAKE_SR_NAME(get_bitmask_from)
 #define get_escape_mask MAKE_SR_NAME(get_escape_mask)
 #define escape_mask_to_bitmask MAKE_SR_NAME(escape_mask_to_bitmask)
 #define escape_mask_to_done_count MAKE_SR_NAME(escape_mask_to_done_count)

@@ -21,7 +21,7 @@
 
 #define setzero_128 _mm_setzero_si128
 
-#define to_bitmask_128(_x_) ((u16)_mm_movemask_epi8(_x_))
+#define get_bitmask_from_u8_128(_x_) ((u16)_mm_movemask_epi8(_x_))
 
 force_inline vector_a_u8_128 broadcast_u8_128(u8 v) {
     return _mm_set1_epi8((i8)v);

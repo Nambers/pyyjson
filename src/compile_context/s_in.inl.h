@@ -37,7 +37,7 @@
 #define cvt_u8_to_u32 MAKE_S_NAME(cvt_u8_to_u32)
 #define rshift_u16 MAKE_S_NAME(rshift_u16)
 #define rshift_u32 MAKE_S_NAME(rshift_u32)
-#define to_bitmask MAKE_S_NAME(to_bitmask)
+#define get_bitmask_from_u8 MAKE_S_NAME(get_bitmask_from_u8)
 #define testz MAKE_S_NAME(testz)
 #define bytes_write_ucs1_trailing MAKE_S_NAME(bytes_write_ucs1_trailing)
 #define bytes_write_ucs2_trailing MAKE_S_NAME(bytes_write_ucs2_trailing)

@@ -32,7 +32,7 @@
 #define rshift_u32_256 _mm256_srli_epi32
 
 /* Create mask from the highest bit in each 8-bit element. */
-force_inline u32 to_bitmask_256(SIMD_256 a) {
+force_inline u32 get_bitmask_from_u8_256(SIMD_256 a) {
     return (u32)_mm256_movemask_epi8(a);
 }
 

@@ -1,2 +1,4 @@
 CompileFlags:
   Add: [-DPYYJSON_CLANGD_DUMMY]
+Diagnostics:
+  Suppress: -Wundefined-internal
