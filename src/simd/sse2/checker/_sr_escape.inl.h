@@ -41,6 +41,10 @@ force_inline usize escape_mask_to_done_count(vector_a mask) {
     return u32_tz_bits(escape_mask_to_bitmask(mask)) / COMPILE_READ_UCS_LEVEL;
 }
 
+force_inline usize escape_mask_to_done_count_no_eq0(vector_a mask) {
+    return u32_tz_bits(get_bitmask_from_u8(mask)) / COMPILE_READ_UCS_LEVEL;
+}
+
 force_inline usize joined4_escape_mask_to_done_count(vector_a mask1,
                                                      vector_a mask2,
                                                      vector_a mask3,

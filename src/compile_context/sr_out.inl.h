@@ -22,6 +22,7 @@
 #undef get_escape_mask
 #undef escape_mask_to_bitmask
 #undef escape_mask_to_done_count
+#undef escape_mask_to_done_count_no_eq0
 #undef joined4_escape_mask_to_done_count
 #undef broadcast
 #undef unsigned_saturate_minus

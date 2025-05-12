@@ -47,6 +47,7 @@
 #define get_escape_mask MAKE_SR_NAME(get_escape_mask)
 #define escape_mask_to_bitmask MAKE_SR_NAME(escape_mask_to_bitmask)
 #define escape_mask_to_done_count MAKE_SR_NAME(escape_mask_to_done_count)
+#define escape_mask_to_done_count_no_eq0 MAKE_SR_NAME(escape_mask_to_done_count_no_eq0)
 #define joined4_escape_mask_to_done_count MAKE_SR_NAME(joined4_escape_mask_to_done_count)
 #define broadcast MAKE_SR_NAME(broadcast)
 #define unsigned_saturate_minus MAKE_SR_NAME(unsigned_saturate_minus)
