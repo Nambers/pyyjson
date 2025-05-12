@@ -875,7 +875,7 @@ const u32 ControlEscapeTable_u32[(_Slash + 1) * 8] = {
         '\\', '\\'                                                       // 92
 };
 
-Py_ssize_t _ControlJump[_Slash + 1] = {
+const Py_ssize_t _ControlJump[_Slash + 1] = {
         6, 6, 6, 6, 6, 6, 6, 6, 2, 2, 2, 6, 2, 2, 6, 6, // 0-15
         6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, // 16-31
         0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 32-47

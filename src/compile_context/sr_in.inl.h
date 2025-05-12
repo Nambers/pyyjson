@@ -50,7 +50,9 @@
 #define joined4_escape_mask_to_done_count MAKE_SR_NAME(joined4_escape_mask_to_done_count)
 #define broadcast MAKE_SR_NAME(broadcast)
 #define unsigned_saturate_minus MAKE_SR_NAME(unsigned_saturate_minus)
+// signed_cmplt availability: SSE2
 #define signed_cmplt MAKE_SR_NAME(signed_cmplt)
+// signed_cmpgt availability: SSE2, AVX2
 #define signed_cmpgt MAKE_SR_NAME(signed_cmpgt)
 #define cmpeq MAKE_SR_NAME(cmpeq)
 #define get_escape_bitmask MAKE_SR_NAME(get_escape_bitmask)
@@ -60,6 +62,7 @@
 #define cmpneq_bitmask MAKE_SR_NAME(cmpneq_bitmask)
 #define unsigned_cmple_bitmask MAKE_SR_NAME(unsigned_cmple_bitmask)
 #define unsigned_cmplt_bitmask MAKE_SR_NAME(unsigned_cmplt_bitmask)
+#define unsigned_cmpge_bitmask MAKE_SR_NAME(unsigned_cmpge_bitmask)
 #define get_high_mask MAKE_SR_NAME(get_high_mask)
 #define high_mask MAKE_SR_NAME(high_mask)
 #define get_low_mask MAKE_SR_NAME(get_low_mask)

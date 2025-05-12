@@ -35,6 +35,7 @@
 #undef cmpneq_bitmask
 #undef unsigned_cmple_bitmask
 #undef unsigned_cmplt_bitmask
+#undef unsigned_cmpge_bitmask
 #undef get_high_mask
 #undef high_mask
 #undef get_low_mask

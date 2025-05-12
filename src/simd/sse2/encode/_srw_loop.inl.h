@@ -15,8 +15,8 @@
 
 #include "compile_context/srw_in.inl.h"
 
-extern _dst_t ControlEscapeTable[(_Slash + 1) * 8];
-extern Py_ssize_t _ControlJump[_Slash + 1];
+extern const _dst_t ControlEscapeTable[(_Slash + 1) * 8];
+extern const Py_ssize_t _ControlJump[_Slash + 1];
 
 force_inline void encode_unicode_loop4(_dst_t **dst_addr, const _src_t **src_addr, usize *len_addr) {
     register usize len = *len_addr;

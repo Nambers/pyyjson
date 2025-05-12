@@ -14,6 +14,8 @@
 
 #define unsigned_cmplt_bitmask_u32_512(_a_, _b_) ((u16)_mm512_cmplt_epu32_mask((_a_), (_b_)))
 
+#define unsigned_cmpge_bitmask_u32_512(_a_, _b_) ((u16)_mm512_cmpge_epu32_mask((_a_), (_b_)))
+
 #define maskz_loadu_u32_512 _mm512_maskz_loadu_epi32
 #define maskz_loadu_u64_512 _mm512_maskz_loadu_epi64
 

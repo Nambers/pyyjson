@@ -1,5 +1,11 @@
 #ifndef PYYJSON_ENCODE_UTF8_H
 #define PYYJSON_ENCODE_UTF8_H
+#ifdef PYYJSON_CLANGD_DUMMY
+#    ifndef COMPILE_CONTEXT_DECODE
+#        define COMPILE_CONTEXT_DECODE
+#    endif
+#endif
+#include "encode/encode_utf8_shared.h"
 #include "pyyjson.h"
 #include "simd/simd_impl.h"
 #include "simd/union_vector.h"
@@ -25,29 +31,6 @@ force_inline void bytes_write_ascii(u8 **writer_addr, const u8 *src, usize len) 
 }
 
 /* UCS1 src. */
-force_inline void encode_one_special_ucs1(u8 **writer_addr, u8 unicode) {
-    u8 *writer = *writer_addr;
-
-    if (unicode >= 128) {
-        *writer++ = (unicode >> 6) | 0xc0;
-        *writer++ = (unicode & 0x3f) | 0x80;
-    } else {
-        assert(unicode < ControlMax || unicode == _Quote || unicode == _Slash);
-        memcpy(writer, &ControlEscapeTable_u8[unicode * 8], 8);
-        writer += _ControlJump[unicode];
-    }
-
-    *writer_addr = writer;
-}
-
-force_inline void encode_one_ucs1(u8 **writer_addr, u8 unicode) {
-    if (unicode < 128 && unicode >= ControlMax && unicode != _Quote && unicode != _Slash) {
-        *(*writer_addr)++ = unicode;
-        return;
-    }
-    encode_one_special_ucs1(writer_addr, unicode);
-}
-
 force_inline void check_ascii_in_ucs1_and_get_done_countx4(unionvector_a_x4 vec, bool *out_checked, usize *out_done_count) {
     vector_a t1 = broadcast(_Quote);
     vector_a t2 = broadcast(_Slash);
@@ -76,13 +59,21 @@ force_inline void check_ascii_in_ucs1_and_get_done_countx4(unionvector_a_x4 vec,
              cmpeq_bitmask(vec.x[3], t2) |
              unsigned_cmplt_bitmask(vec.x[3], t3) |
              get_bitmask_from(vec.x[3]);
+#elif PYYJSON_X86
+    // see CHECK_ESCAPE_LT512_USE_SIGNED_SATURATED_MINUS
+    unionvector_a_x4 m;
+    vector_a r;
+    m.x[0] = (vec.x[0] == t1) | (vec.x[0] == t2) | unsigned_saturate_minus(t3, vec.x[0]) | (vec.x[0] & t4);
+    m.x[1] = (vec.x[1] == t1) | (vec.x[1] == t2) | unsigned_saturate_minus(t3, vec.x[1]) | (vec.x[1] & t4);
+    m.x[2] = (vec.x[2] == t1) | (vec.x[2] == t2) | unsigned_saturate_minus(t3, vec.x[2]) | (vec.x[2] & t4);
+    m.x[3] = (vec.x[3] == t1) | (vec.x[3] == t2) | unsigned_saturate_minus(t3, vec.x[3]) | (vec.x[3] & t4);
 #else
     unionvector_a_x4 m;
     vector_a r;
-    m.x[0] = (vec.x[0] == t1) | (vec.x[0] == t2) | (vec.x[0] < t3) | (vec.x[0] & t4);
-    m.x[1] = (vec.x[1] == t1) | (vec.x[1] == t2) | (vec.x[1] < t3) | (vec.x[1] & t4);
-    m.x[2] = (vec.x[2] == t1) | (vec.x[2] == t2) | (vec.x[2] < t3) | (vec.x[2] & t4);
-    m.x[3] = (vec.x[3] == t1) | (vec.x[3] == t2) | (vec.x[3] < t3) | (vec.x[3] & t4);
+    m.x[0] = (vec.x[0] == t1) | (vec.x[0] == t2) | (vec.x[0] < t3) | (vec.x[0] >= t4);
+    m.x[1] = (vec.x[1] == t1) | (vec.x[1] == t2) | (vec.x[1] < t3) | (vec.x[1] >= t4);
+    m.x[2] = (vec.x[2] == t1) | (vec.x[2] == t2) | (vec.x[2] < t3) | (vec.x[2] >= t4);
+    m.x[3] = (vec.x[3] == t1) | (vec.x[3] == t2) | (vec.x[3] < t3) | (vec.x[3] >= t4);
 #endif
 
     r = m.x[0] | m.x[1];
@@ -117,9 +108,13 @@ force_inline void check_ascii_in_ucs1_and_get_done_count(vector_a vec, bool *out
         cmpeq_bitmask(vec, t2) |
         unsigned_cmplt_bitmask(vec, t3) |
         get_bitmask_from(vec);
+#elif PYYJSON_X86
+    // see CHECK_ESCAPE_LT512_USE_SIGNED_SATURATED_MINUS
+    vector_a m;
+    m = (vec == t1) | (vec == t2) | unsigned_saturate_minus(t3, vec) | (vec & t4);
 #else
     vector_a m;
-    m = (vec == t1) | (vec == t2) | (vec < t3) | (vec & t4);
+    m = (vec == t1) | (vec == t2) | (vec < t3) | (vec >= t4);
 #endif
     bool checked = testz_escape_mask(m);
     *out_checked = checked;
@@ -263,22 +258,30 @@ force_inline void check_ascii_in_ucs2_and_get_done_countx4(unionvector_a_x4 vec,
 
     u32 r;
 
-    m.x[0] = _mm512_cmpeq_epi16_mask(vec.x[0], t1) |
-             _mm512_cmpeq_epi16_mask(vec.x[0], t2) |
-             _mm512_cmplt_epu16_mask(vec.x[0], t3) |
-             _mm512_cmpge_epu16_mask(vec.x[0], t4);
-    m.x[1] = _mm512_cmpeq_epi16_mask(vec.x[1], t1) |
-             _mm512_cmpeq_epi16_mask(vec.x[1], t2) |
-             _mm512_cmplt_epu16_mask(vec.x[1], t3) |
-             _mm512_cmpge_epu16_mask(vec.x[1], t4);
-    m.x[2] = _mm512_cmpeq_epi16_mask(vec.x[2], t1) |
-             _mm512_cmpeq_epi16_mask(vec.x[2], t2) |
-             _mm512_cmplt_epu16_mask(vec.x[2], t3) |
-             _mm512_cmpge_epu16_mask(vec.x[2], t4);
-    m.x[3] = _mm512_cmpeq_epi16_mask(vec.x[3], t1) |
-             _mm512_cmpeq_epi16_mask(vec.x[3], t2) |
-             _mm512_cmplt_epu16_mask(vec.x[3], t3) |
-             _mm512_cmpge_epu16_mask(vec.x[3], t4);
+    m.x[0] = cmpeq_bitmask(vec.x[0], t1) |
+             cmpeq_bitmask(vec.x[0], t2) |
+             unsigned_cmplt_bitmask(vec.x[0], t3) |
+             unsigned_cmpge_bitmask(vec.x[0], t4);
+    m.x[1] = cmpeq_bitmask(vec.x[1], t1) |
+             cmpeq_bitmask(vec.x[1], t2) |
+             unsigned_cmplt_bitmask(vec.x[1], t3) |
+             unsigned_cmpge_bitmask(vec.x[1], t4);
+    m.x[2] = cmpeq_bitmask(vec.x[2], t1) |
+             cmpeq_bitmask(vec.x[2], t2) |
+             unsigned_cmplt_bitmask(vec.x[2], t3) |
+             unsigned_cmpge_bitmask(vec.x[2], t4);
+    m.x[3] = cmpeq_bitmask(vec.x[3], t1) |
+             cmpeq_bitmask(vec.x[3], t2) |
+             unsigned_cmplt_bitmask(vec.x[3], t3) |
+             unsigned_cmpge_bitmask(vec.x[3], t4);
+#elif PYYJSON_X86
+    // see CHECK_ESCAPE_LT512_USE_SIGNED_SATURATED_MINUS
+    unionvector_a_x4 m;
+    vector_a r;
+    m.x[0] = (vec.x[0] == t1) | (vec.x[0] == t2) | unsigned_saturate_minus(t3, vec.x[0]) | unsigned_saturate_minus(vec.x[0], broadcast(0x7f));
+    m.x[1] = (vec.x[1] == t1) | (vec.x[1] == t2) | unsigned_saturate_minus(t3, vec.x[1]) | unsigned_saturate_minus(vec.x[1], broadcast(0x7f));
+    m.x[2] = (vec.x[2] == t1) | (vec.x[2] == t2) | unsigned_saturate_minus(t3, vec.x[2]) | unsigned_saturate_minus(vec.x[2], broadcast(0x7f));
+    m.x[3] = (vec.x[3] == t1) | (vec.x[3] == t2) | unsigned_saturate_minus(t3, vec.x[3]) | unsigned_saturate_minus(vec.x[3], broadcast(0x7f));
 #else
     unionvector_a_x4 m;
     vector_a r;
@@ -316,10 +319,14 @@ force_inline void check_ascii_in_ucs2_and_get_done_count(vector_a vec, bool *out
 #if PYYJSON_X86 && COMPILE_SIMD_BITS == 512
     u32 m;
 
-    m = _mm512_cmpeq_epi16_mask(vec, t1) |
-        _mm512_cmpeq_epi16_mask(vec, t2) |
-        _mm512_cmplt_epu16_mask(vec, t3) |
-        _mm512_cmpge_epu16_mask(vec, t4);
+    m = cmpeq_bitmask(vec, t1) |
+        cmpeq_bitmask(vec, t2) |
+        unsigned_cmplt_bitmask(vec, t3) |
+        unsigned_cmpge_bitmask(vec, t4);
+#elif PYYJSON_X86
+    // see CHECK_ESCAPE_LT512_USE_SIGNED_SATURATED_MINUS
+    vector_a m;
+    m = (vec == t1) | (vec == t2) | unsigned_saturate_minus(t3, vec) | unsigned_saturate_minus(vec, broadcast(0x7f));
 #else
     vector_a m;
     m = (vec == t1) | (vec == t2) | (vec < t3) | (vec >= t4);
@@ -352,10 +359,6 @@ force_inline bool ascii_in_ucs2_encode_loop4(u8 **dst_addr, const u16 **src_addr
     cvt_to_dst(dst + READ_BATCH_COUNT * 1, vec.x[1]);
     cvt_to_dst(dst + READ_BATCH_COUNT * 2, vec.x[2]);
     cvt_to_dst(dst + READ_BATCH_COUNT * 3, vec.x[3]);
-    // *(_WVEC_half_U_ *)(dst + READ_BATCH_COUNT * 0) = (_WVEC_half_U_)zip_simd_16_to_8(vec.x[0]);
-    // *(_WVEC_half_U_ *)(dst + READ_BATCH_COUNT * 1) = (_WVEC_half_U_)zip_simd_16_to_8(vec.x[1]);
-    // *(_WVEC_half_U_ *)(dst + READ_BATCH_COUNT * 2) = (_WVEC_half_U_)zip_simd_16_to_8(vec.x[2]);
-    // *(_WVEC_half_U_ *)(dst + READ_BATCH_COUNT * 3) = (_WVEC_half_U_)zip_simd_16_to_8(vec.x[3]);
 
     // check
     bool checked;
@@ -391,7 +394,6 @@ force_inline bool ascii_in_ucs2_encode_loop(u8 **dst_addr, const u16 **src_addr,
 
     // write
     cvt_to_dst(dst, vec);
-    // *(_WVEC_half_U_ *)dst = (_WVEC_half_U_)zip_simd_16_to_8(vec);
 
     // check
     bool checked;
@@ -419,7 +421,11 @@ force_inline void check_2bytes_in_ucs2_and_get_done_count(vector_a vec, bool *ou
     vector_a t2 = broadcast(0x800);
 #if PYYJSON_X86 && COMPILE_SIMD_BITS == 512
     u32 m;
-    m = _mm512_cmplt_epu16_mask(vec, t1) | _mm512_cmpge_epu16_mask(vec, t2);
+    m = unsigned_cmplt_bitmask(vec, t1) | unsigned_cmpge_bitmask(vec, t2);
+#elif PYYJSON_X86
+    // see CHECK_ESCAPE_LT512_USE_SIGNED_SATURATED_MINUS
+    vector_a m;
+    m = unsigned_saturate_minus(t1, vec) | unsigned_saturate_minus(vec, broadcast(0x7ff));
 #else
     vector_a m;
     m = (vec < t1) | (vec >= t2);
@@ -486,9 +492,13 @@ force_inline void check_3bytes_in_ucs2_and_get_done_count(vector_a vec, bool *ou
 #if PYYJSON_X86 && COMPILE_SIMD_BITS == 512
     u32 m;
 
-    m = _mm512_cmplt_epu16_mask(vec, t1) |
-        _mm512_cmpge_epi16_mask(vec, t2) |
-        _mm512_cmple_epu16_mask(vec, t3);
+    m = unsigned_cmplt_bitmask(vec, t1) |
+        (unsigned_cmpge_bitmask(vec, t2) &
+         unsigned_cmple_bitmask(vec, t3));
+#elif PYYJSON_X86
+    // see CHECK_ESCAPE_LT512_USE_SIGNED_SATURATED_MINUS
+    vector_a m;
+    m = unsigned_saturate_minus(t1, vec) | (signed_cmpgt(vec, broadcast(0xd7ff)) & signed_cmpgt(broadcast(0xe000), vec)); // use 2 signed_cmpgt to do unsigned range check
 #else
     vector_a m;
     m = (vec < t1) | ((vec >= t2) & (vec <= t3));
@@ -515,9 +525,9 @@ force_inline bool _3bytes_in_ucs2_encode_loop(u8 **dst_addr, const u16 **src_add
 
     // write
 #if PYYJSON_X86
-#    if COMPILE_SIMD_BITS == 512
+#    if SUPPORT_SIMD_512BITS
     ucs2_encode_3bytes_utf8_avx512(vec, dst);
-#    elif COMPILE_SIMD_BITS == 256
+#    elif SUPPORT_SIMD_256BITS
     ucs2_encode_3bytes_utf8_avx2(vec, dst);
 #    elif __SSSE3__
     ucs2_encode_3bytes_utf8_ssse3(vec, dst);
@@ -548,47 +558,6 @@ force_inline bool _3bytes_in_ucs2_encode_loop(u8 **dst_addr, const u16 **src_add
     *src_addr = src;
     *len_addr = len;
     return checked;
-}
-
-force_inline bool encode_one_ucs2(u8 **writer_addr, u16 unicode) {
-    if (unicode < 128) {
-        if (unicode >= ControlMax && unicode != _Slash && unicode != _Quote) {
-            *(*writer_addr)++ = unicode;
-        } else {
-            u8 *writer = *writer_addr;
-            memcpy(writer, &ControlEscapeTable_u8[unicode * 8], 8);
-            writer += _ControlJump[unicode];
-            *writer_addr = writer;
-        }
-    } else if (unicode < 0x800) {
-        // 2 bytes
-        u8 *writer = *writer_addr;
-        *writer++ = (unicode >> 6) | 0xc0;
-        *writer++ = (unicode & 0x3f) | 0x80;
-        *writer_addr = writer;
-    } else {
-        // 3 bytes
-        if (unlikely(unicode >= 0xd800 && unicode <= 0xdfff)) {
-            PyErr_SetString(JSONEncodeError, "Cannot encode unicode character in range [0xd800, 0xdfff] to utf-8");
-            return false;
-        }
-        u8 *writer = *writer_addr;
-        *writer++ = (unicode >> 12) | 0xe0;
-        *writer++ = ((unicode & 0xfc0) >> 6) | 0x80;
-        *writer++ = (unicode & 0x3f) | 0x80;
-        *writer_addr = writer;
-    }
-    return true;
-}
-
-force_inline int ucs2_get_type(u16 unicode, bool *is_escaped) {
-    if (unicode < 128) {
-        *is_escaped = !(unicode >= ControlMax && unicode != _Slash && unicode != _Quote);
-        return 1;
-    } else if (unicode < 0x800) {
-        return 2;
-    }
-    return 3;
 }
 
 force_inline bool bytes_write_ucs2(u8 **writer_addr, const u16 *src, usize len) {
