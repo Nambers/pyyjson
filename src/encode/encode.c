@@ -1,3 +1,5 @@
+#define COMPILE_CONTEXT_ENCODE
+
 #include "encode_shared.h"
 #include "simd/cvt.h"
 #include "simd/memcpy.h"

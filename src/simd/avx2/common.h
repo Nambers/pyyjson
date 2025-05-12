@@ -58,14 +58,14 @@ force_inline vector_a_u8_64 cvt_u32_to_u8_256(vector_a_u32_256 y) {
 }
 
 force_inline vector_a_u16_128 cvt_u32_to_u16_256(vector_a_u32_256 y) {
-    vector_a_u32_128 x_low = _mm256_extracti128_si256(y, 0);
-    vector_a_u32_128 x_high = _mm256_extracti128_si256(y, 1);
+    vector_a_u32_128 x_low = extract_128_from_256(y, 0);
+    vector_a_u32_128 x_high = extract_128_from_256(y, 1);
     return _mm_packus_epi32(x_low, x_high);
 }
 
 force_inline vector_a_u8_128 cvt_u16_to_u8_256(vector_a_u16_256 y) {
-    vector_a_u16_128 x_low = _mm256_extracti128_si256(y, 0);
-    vector_a_u16_128 x_high = _mm256_extracti128_si256(y, 1);
+    vector_a_u16_128 x_low = extract_128_from_256(y, 0);
+    vector_a_u16_128 x_high = extract_128_from_256(y, 1);
     return _mm_packus_epi16(x_low, x_high);
 }
 

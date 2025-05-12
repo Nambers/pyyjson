@@ -9,9 +9,7 @@
 
 #define alignr_128(_x1_, _x2_, _imm_) (_mm_alignr_epi8((_x2_), (_x1_), (_imm_)))
 
-force_inline SIMD_128 shuffle_128(SIMD_128 x, SIMD_128 shuffle) {
-    return _mm_shuffle_epi8(x, shuffle);
-}
+#define shuffle_128 _mm_shuffle_epi8
 
 
 #endif // PYYJSON_SIMD_SSSE3_COMMON_H

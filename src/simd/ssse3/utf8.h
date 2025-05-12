@@ -97,9 +97,9 @@ force_inline void ucs4_encode_3bytes_utf8_ssse3(vector_a_u32_128 x, u8 *writer) 
             0, 0, 0, 0};
     vector_a_u32_128 x1 = rshift_u32_128(x, 6);
     vector_a_u32_128 x2 = rshift_u32_128(x, 12);
-    vector_a_u8_128 x3 = _mm_shuffle_epi8(x, t1);
-    vector_a_u8_128 x4 = _mm_shuffle_epi8(x1, t2);
-    vector_a_u8_128 x5 = _mm_shuffle_epi8(x2, t3);
+    vector_a_u8_128 x3 = shuffle_128(x, t1);
+    vector_a_u8_128 x4 = shuffle_128(x1, t2);
+    vector_a_u8_128 x5 = shuffle_128(x2, t3);
     vector_a_u8_128 x6 = ((x3 | x4 | x5) & m1) | m2;
     *(vector_u_u8_128 *)writer = x6;
 }

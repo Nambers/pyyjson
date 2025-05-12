@@ -1,3 +1,5 @@
+#define COMPILE_CONTEXT_DECODE
+
 #define XXH_INLINE_ALL
 #include "decode.h"
 
