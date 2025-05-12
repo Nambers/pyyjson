@@ -28,37 +28,5 @@ force_inline void trailing_copy_with_cvt(_dst_t **dst_addr, const _src_t *src, u
     *dst_addr = dst;
 }
 
-force_inline void encode_trailing_copy_with_cvt(_dst_t **dst_addr, const _src_t *src, usize len) {
-    _dst_t *dst = *dst_addr;
-    vector_a vec;
-    usize maskz = len_to_maskz(len);
-    vec = maskz_loadu(maskz, src);
-    avx512_bitmask_t bitmask = get_escape_bitmask(vec);
-    bitmask = bitmask & maskz;
-restart:;
-    cvt_to_dst(dst, vec);
-    if (likely(!bitmask)) {
-        dst += len;
-    } else {
-        u32 done_count = escape_bitmask_to_done_count(bitmask);
-        const _src_t *escape_pos = src + done_count;
-        src += done_count + 1;
-        len -= done_count + 1;
-        _src_t escape_unicode = *escape_pos;
-        assert(escape_unicode == _Quote || escape_unicode == _Slash || escape_unicode < ControlMax);
-        dst += done_count;
-        memcpy(dst, &ControlEscapeTable[escape_unicode * 8], 8 * sizeof(_dst_t));
-        dst += _ControlJump[escape_unicode];
-        if (len) {
-            // no need to compute bitmask again
-            bitmask = bitmask >> (done_count + 1);
-            vec = maskz_loadu(len_to_maskz(len), src);
-            goto restart;
-        }
-    }
-
-    *dst_addr = dst;
-}
-
 #undef COMPILE_SIMD_BITS
 #include "compile_context/srw_out.inl.h"

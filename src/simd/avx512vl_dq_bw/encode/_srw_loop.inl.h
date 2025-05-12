@@ -19,35 +19,6 @@
 extern _dst_t ControlEscapeTable[(_Slash + 1) * 8];
 extern Py_ssize_t _ControlJump[_Slash + 1];
 
-force_inline void encode_unicode_loop(_dst_t **dst_addr, const _src_t **src_addr, usize *len_addr) {
-    register usize len = *len_addr;
-    register const _src_t *src = *src_addr;
-    register _dst_t *dst = *dst_addr;
-    while (len >= READ_BATCH_COUNT) {
-        vector_a x = *(vector_u *)src;
-        avx512_bitmask_t escape_mask = get_escape_bitmask(x);
-        cvt_to_dst(dst, x);
-        if (likely(!escape_mask)) {
-            src += READ_BATCH_COUNT;
-            dst += READ_BATCH_COUNT;
-            len -= READ_BATCH_COUNT;
-        } else {
-            u32 done_count = escape_bitmask_to_done_count(escape_mask);
-            const _src_t *escape_pos = src + done_count;
-            src += done_count + 1;
-            _src_t escape_unicode = *escape_pos;
-            assert(escape_unicode == _Quote || escape_unicode == _Slash || escape_unicode < ControlMax);
-            dst += done_count;
-            len -= done_count + 1;
-            memcpy(dst, &ControlEscapeTable[escape_unicode * 8], 8 * sizeof(_dst_t));
-            dst += _ControlJump[escape_unicode];
-        }
-    }
-    *len_addr = len;
-    *src_addr = src;
-    *dst_addr = dst;
-}
-
 force_inline void encode_unicode_loop4(_dst_t **dst_addr, const _src_t **src_addr, usize *len_addr) {
     register usize len = *len_addr;
     register const _src_t *src = *src_addr;
@@ -84,6 +55,67 @@ force_inline void encode_unicode_loop4(_dst_t **dst_addr, const _src_t **src_add
     }
     *len_addr = len;
     *src_addr = src;
+    *dst_addr = dst;
+}
+
+force_inline void encode_unicode_loop(_dst_t **dst_addr, const _src_t **src_addr, usize *len_addr) {
+    register usize len = *len_addr;
+    register const _src_t *src = *src_addr;
+    register _dst_t *dst = *dst_addr;
+    while (len >= READ_BATCH_COUNT) {
+        vector_a x = *(vector_u *)src;
+        avx512_bitmask_t escape_mask = get_escape_bitmask(x);
+        cvt_to_dst(dst, x);
+        if (likely(!escape_mask)) {
+            src += READ_BATCH_COUNT;
+            dst += READ_BATCH_COUNT;
+            len -= READ_BATCH_COUNT;
+        } else {
+            u32 done_count = escape_bitmask_to_done_count(escape_mask);
+            const _src_t *escape_pos = src + done_count;
+            src += done_count + 1;
+            _src_t escape_unicode = *escape_pos;
+            assert(escape_unicode == _Quote || escape_unicode == _Slash || escape_unicode < ControlMax);
+            dst += done_count;
+            len -= done_count + 1;
+            memcpy(dst, &ControlEscapeTable[escape_unicode * 8], 8 * sizeof(_dst_t));
+            dst += _ControlJump[escape_unicode];
+        }
+    }
+    *len_addr = len;
+    *src_addr = src;
+    *dst_addr = dst;
+}
+
+force_inline void encode_trailing_copy_with_cvt(_dst_t **dst_addr, const _src_t *src, usize len) {
+    _dst_t *dst = *dst_addr;
+    vector_a vec;
+    usize maskz = len_to_maskz(len);
+    vec = maskz_loadu(maskz, src);
+    avx512_bitmask_t bitmask = get_escape_bitmask(vec);
+    bitmask = bitmask & maskz;
+restart:;
+    cvt_to_dst(dst, vec);
+    if (likely(!bitmask)) {
+        dst += len;
+    } else {
+        u32 done_count = escape_bitmask_to_done_count(bitmask);
+        const _src_t *escape_pos = src + done_count;
+        src += done_count + 1;
+        len -= done_count + 1;
+        _src_t escape_unicode = *escape_pos;
+        assert(escape_unicode == _Quote || escape_unicode == _Slash || escape_unicode < ControlMax);
+        dst += done_count;
+        memcpy(dst, &ControlEscapeTable[escape_unicode * 8], 8 * sizeof(_dst_t));
+        dst += _ControlJump[escape_unicode];
+        if (len) {
+            // no need to compute bitmask again
+            bitmask = bitmask >> (done_count + 1);
+            vec = maskz_loadu(len_to_maskz(len), src);
+            goto restart;
+        }
+    }
+
     *dst_addr = dst;
 }
 

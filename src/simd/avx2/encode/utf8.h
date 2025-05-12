@@ -1,5 +1,5 @@
-#ifndef PYYJSON_SIMD_AVX2_UTF8_H
-#define PYYJSON_SIMD_AVX2_UTF8_H
+#ifndef PYYJSON_SIMD_AVX2_ENCODE_UTF8_H
+#define PYYJSON_SIMD_AVX2_ENCODE_UTF8_H
 
 #ifndef __AVX2__
 #    error "AVX2 is required for this file"
@@ -254,4 +254,4 @@ force_inline void ucs4_encode_2bytes_utf8_avx2(vector_a_u32_256 y, u8 *writer) {
     *(vector_u_u8_128 *)writer = x3;
 }
 
-#endif
+#endif // PYYJSON_SIMD_AVX2_ENCODE_UTF8_H
