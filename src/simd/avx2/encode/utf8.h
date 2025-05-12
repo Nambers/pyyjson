@@ -7,8 +7,8 @@
 #include "simd/simd_detect.h"
 #include "simd/vector_types.h"
 //
-#include "cvt.h"
 #include "simd/avx2/common.h"
+#include "simd/avx2/cvt.h"
 #include "simd/sse2/common.h"
 #include "simd/ssse3/common.h"
 

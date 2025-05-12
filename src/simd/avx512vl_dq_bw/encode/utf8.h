@@ -1,9 +1,9 @@
 #ifndef PYYJSON_SIMD_AVX512VLDQBW_UTF8_H
 #define PYYJSON_SIMD_AVX512VLDQBW_UTF8_H
 
-#include "common.h"
 #include "simd/avx/common.h"
 #include "simd/avx2/common.h"
+#include "simd/avx512vl_dq_bw/common.h"
 
 force_inline void ucs2_encode_2bytes_utf8_avx512(vector_a_u16_512 z, u8 *writer) {
     /* abcdefgh|12300000 -> gh123[mmm]|abcdef[mm] */

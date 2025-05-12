@@ -63,10 +63,6 @@ restart:;
     }
     assert(dst > dst_old);
     *dst_addr = dst;
-    // use 128-bits trailing impl
-    // PYYJSON_CONCAT5(encode_unicode, loop, _src_t, _dst_t, 128)(dst_addr, &src, &len);
-    // if (!len) return;
-    // PYYJSON_CONCAT5(encode_trailing_copy_with, cvt, _src_t, _dst_t, 128)(dst_addr, src, len);
 }
 
 #undef COMPILE_SIMD_BITS

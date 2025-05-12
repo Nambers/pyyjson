@@ -1,3 +1,5 @@
+#define COMPILE_CONTEXT_ENCODE
+#define COMPILE_CONTEXT_DECODE
 #include "test.h"
 #include "simd/simd_detect.h"
 #include "simd/vector_types.h"

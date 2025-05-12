@@ -1,6 +1,7 @@
 #ifndef PYYJSON_SIMD_AVX512VLDQBW_ENCODE_H
 #define PYYJSON_SIMD_AVX512VLDQBW_ENCODE_H
 
+#include "encode/utf8.h"
 #include "trailing.h"
 
 
