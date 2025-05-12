@@ -14,6 +14,38 @@
             }
         },
         {
+            "name": "(gdb) Launch clang",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/.nix-pyenv-llvm/debugLLVM/bin/llc",
+            "args": [
+                "-O3",
+                "pyyjson.ll"
+            ],
+            "sourceFileMap": {
+                "/build": "${workspaceFolder}/debug_source"
+            },
+            "stopAtEntry": true,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "enable gdb pretty printing",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "set disassembly flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "miDebuggerArgs": "-x ${workspaceFolder}/dev_tools/.gdbinit",
+        },
+        {
             "name": "(gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
