@@ -4,7 +4,8 @@
 #include "tools.h"
 //
 #include "simd/compile_feature_check.h"
-
+//
+#include "compile_context/s_in.inl.h"
 
 #if BUILD_MULTI_LIB && PYYJSON_X86
 #    if COMPILE_SIMD_BITS == 512
@@ -25,42 +26,72 @@
 #endif
 
 
-int SIMD_NAME_MODIFIER(test_elevate_1_2_to_128)(void) {
+int SIMD_NAME_MODIFIER(test_cvt_u8_to_u16)(void) {
 #if PYYJSON_AARCH
     return INVALID;
-#else
+#elif PYYJSON_X86
+#    if COMPILE_SIMD_BITS == 512
     GUARDED_SIMD;
+    u8 input[32];
+    u16 dst[32];
+#    elif COMPILE_SIMD_BITS == 256
+    GUARDED_SIMD;
+    u8 input[16];
+    u16 dst[16];
+#    else
     u8 input[16];
     u16 dst[8];
+#    endif
+#endif
     usize loop_count = 16;
     for (usize _ = 0; _ < loop_count; _++) {
         //
         RANDOM_FILL(input);
         GARBAGE_FILL(dst);
-        //
-        *(vector_u_u16_128 *)dst = cvt_u8_to_u16_128(*(vector_u_u8_128 *)input);
+//
+#if COMPILE_SIMD_BITS == 512
+        *(vector_u_u16_512 *)dst = cvt_u8_to_u16(*(vector_u_u8_256 *)input);
+#elif COMPILE_SIMD_BITS == 256
+        *(vector_u_u16_256 *)dst = cvt_u8_to_u16(*(vector_u_u8_128 *)input);
+#else
+        *(vector_u_u16_128 *)dst = cvt_u8_to_u16(*(vector_u_u8_128 *)input);
+#endif
         for (usize i = 0; i < COUNT_OF(dst); i++) {
             CHECK(dst[i] == input[i]);
         }
     }
     return PASSED;
-#endif
 }
 
-int SIMD_NAME_MODIFIER(test_elevate_1_4_to_128)(void) {
+int SIMD_NAME_MODIFIER(test_cvt_u8_to_u32)(void) {
 #if PYYJSON_AARCH
     return INVALID;
-#else
+#elif PYYJSON_X86
+#    if COMPILE_SIMD_BITS == 512
     GUARDED_SIMD;
     u8 input[16];
+    u32 dst[16];
+#    elif COMPILE_SIMD_BITS == 256
+    GUARDED_SIMD;
+    u8 input[16];
+    u32 dst[8];
+#    else
+    u8 input[16];
     u32 dst[4];
+#    endif
     usize loop_count = 16;
     for (usize _ = 0; _ < loop_count; _++) {
         //
         RANDOM_FILL(input);
         GARBAGE_FILL(dst);
         //
-        *(vector_u_u32_128 *)dst = cvt_u8_to_u32_128(*(vector_u_u8_128 *)input);
+#    if COMPILE_SIMD_BITS == 512
+        *(vector_u_u32_512 *)dst = cvt_u8_to_u32(*(vector_u_u8_128 *)input);
+#    elif COMPILE_SIMD_BITS == 256
+        *(vector_u_u32_256 *)dst = cvt_u8_to_u32(*(vector_u_u8_128 *)input);
+#    else
+        *(vector_u_u32_128 *)dst = cvt_u8_to_u32(*(vector_u_u8_128 *)input);
+#    endif
         for (usize i = 0; i < COUNT_OF(dst); i++) {
             CHECK(dst[i] == input[i]);
         }
@@ -69,20 +100,37 @@ int SIMD_NAME_MODIFIER(test_elevate_1_4_to_128)(void) {
 #endif
 }
 
-int SIMD_NAME_MODIFIER(test_elevate_2_4_to_128)(void) {
+int SIMD_NAME_MODIFIER(test_cvt_u16_to_u32)(void) {
 #if PYYJSON_AARCH
     return INVALID;
-#else
+#elif PYYJSON_X86
+
+#    if COMPILE_SIMD_BITS == 512
+    GUARDED_SIMD;
+    u16 input[16];
+    u32 dst[16];
+#    elif COMPILE_SIMD_BITS == 256
     GUARDED_SIMD;
     u16 input[8];
+    u32 dst[8];
+#    else
+    u16 input[8];
     u32 dst[4];
+#    endif
+
     usize loop_count = 16;
     for (usize _ = 0; _ < loop_count; _++) {
         //
         RANDOM_FILL(input);
         GARBAGE_FILL(dst);
         //
-        *(vector_u_u32_128 *)dst = cvt_u16_to_u32_128(*(vector_u_u16_128 *)input);
+#    if COMPILE_SIMD_BITS == 512
+        *(vector_u_u32_512 *)dst = cvt_u16_to_u32(*(vector_u_u16_256 *)input);
+#    elif COMPILE_SIMD_BITS == 256
+        *(vector_u_u32_256 *)dst = cvt_u16_to_u32(*(vector_u_u16_128 *)input);
+#    else
+        *(vector_u_u32_128 *)dst = cvt_u16_to_u32(*(vector_u_u16_128 *)input);
+#    endif
         for (usize i = 0; i < COUNT_OF(dst); i++) {
             CHECK(dst[i] == input[i]);
         }

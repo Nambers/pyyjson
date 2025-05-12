@@ -107,9 +107,9 @@ bool run_c_tests(void) {
     TestCounter counter;
     ZERO_FILL(counter);
 
-    RUN_TESTS(test_elevate_1_2_to_128);
-    RUN_TESTS(test_elevate_1_4_to_128);
-    RUN_TESTS(test_elevate_2_4_to_128);
+    RUN_TESTS(test_cvt_u8_to_u16);
+    RUN_TESTS(test_cvt_u8_to_u32);
+    RUN_TESTS(test_cvt_u16_to_u32);
     RUN_TESTS(test_ucs2_encode_3bytes_utf8);
     RUN_TESTS(test_ucs2_encode_2bytes_utf8);
     RUN_TESTS(test_ucs4_encode_3bytes_utf8);

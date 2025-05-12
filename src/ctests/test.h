@@ -90,9 +90,9 @@ force_inline u32 get_random_4bytes_u32(void) {
 
 /* Declare tests. */
 
-DECLARE_TEST(test_elevate_1_2_to_128)
-DECLARE_TEST(test_elevate_1_4_to_128)
-DECLARE_TEST(test_elevate_2_4_to_128)
+DECLARE_TEST(test_cvt_u8_to_u16)
+DECLARE_TEST(test_cvt_u8_to_u32)
+DECLARE_TEST(test_cvt_u16_to_u32)
 DECLARE_TEST(test_ucs2_encode_3bytes_utf8)
 DECLARE_TEST(test_ucs2_encode_2bytes_utf8)
 DECLARE_TEST(test_ucs4_encode_3bytes_utf8)
