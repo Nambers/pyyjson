@@ -161,7 +161,7 @@ force_inline bool testz2_128(SIMD_128 a, SIMD_128 b) {
  */
 force_inline SIMD_128 runtime_byte_rshift_128(SIMD_128 x, int imm8) {
 #if __SSSE3__
-    return _mm_shuffle_epi8(x, *(SIMD_128 *)read_rshift_mask_table(imm8));
+    return _mm_shuffle_epi8(x, *(SIMD_128 *)byte_rshift_mask_table(imm8));
 #else
     switch (imm8) {
         case 1: {

@@ -5,8 +5,8 @@
  */
 
 #include "pyyjson.h"
-
-#define bytes_fast_skip_spaces PYYJSON_CONCAT2(fast_skip_spaces_u8, COMPILE_SIMD_BITS)
+//
+#include "compile_context/s_in.inl.h"
 
 #define SKIP_CONSECUTIVE_SPACES(_u8ptr)   \
     do {                                  \
@@ -64,7 +64,7 @@ arr_val_begin:
     if (*cur == ' ') {
         // cur++;
         // if (*cur == ' ')
-        bytes_fast_skip_spaces(&cur, end);
+        fast_skip_spaces_u8(&cur, end);
     }
 // #    if PYYJSON_IS_REAL_GCC
 //     while (true) REPEAT_CALL_16({
@@ -178,7 +178,7 @@ arr_val_end:
     if (char_is_space(*cur)) {
         // unlikely case, we expect a "," or "]" but not found right after the value
         cur++;
-        if (*cur == ' ') bytes_fast_skip_spaces(&cur, end);
+        if (*cur == ' ') fast_skip_spaces_u8(&cur, end);
         if (char_is_space(*cur)) {
             SKIP_CONSECUTIVE_SPACES(cur);
         }
@@ -215,7 +215,7 @@ obj_key_begin:
     if (*cur == ' ') {
         // cur++;
         // if (*cur == ' ')
-        bytes_fast_skip_spaces(&cur, end);
+        fast_skip_spaces_u8(&cur, end);
     }
 // #if PYYJSON_IS_REAL_GCC
 //     while (true) REPEAT_CALL_16({
@@ -267,7 +267,7 @@ obj_key_end:
     if (char_is_space(*cur)) {
         // unlikely case, we expect a colon here
         cur++;
-        if (*cur == ' ') bytes_fast_skip_spaces(&cur, end);
+        if (*cur == ' ') fast_skip_spaces_u8(&cur, end);
         if (char_is_space(*cur)) {
             SKIP_CONSECUTIVE_SPACES(cur);
         }
@@ -333,7 +333,7 @@ obj_val_begin:
         //   the ": " or ":" is read out, this is an unlikely case
         cur++;
 #if DECODE_READ_PRETTY
-        if (*cur == ' ') bytes_fast_skip_spaces(&cur, end);
+        if (*cur == ' ') fast_skip_spaces_u8(&cur, end);
 #endif
         if (char_is_space(*cur)) {
             // handle unlikely cases
@@ -374,7 +374,7 @@ obj_val_end:
     if (char_is_space(*cur)) {
         // unlikely case
         cur++;
-        if (*cur == ' ') bytes_fast_skip_spaces(&cur, end);
+        if (*cur == ' ') fast_skip_spaces_u8(&cur, end);
         if (char_is_space(*cur)) {
             SKIP_CONSECUTIVE_SPACES(cur);
         }
@@ -403,7 +403,7 @@ obj_end:
 doc_end:
     /* check invalid contents after json document */
     if (unlikely(cur < end)) {
-        if (*cur == ' ') bytes_fast_skip_spaces(&cur, end);
+        if (*cur == ' ') fast_skip_spaces_u8(&cur, end);
         if (char_is_space(*cur)) {
             SKIP_CONSECUTIVE_SPACES(cur);
         }
@@ -499,4 +499,4 @@ failed_cleanup:
 }
 
 #undef SKIP_CONSECUTIVE_SPACES
-#undef bytes_fast_skip_spaces
+#include "compile_context/s_out.inl.h"

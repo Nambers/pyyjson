@@ -3,7 +3,7 @@
 
 // fake include and definition to deceive clangd
 #ifdef PYYJSON_CLANGD_DUMMY
-#include "pyyjson.h"
+#    include "pyyjson.h"
 #    ifndef COMPILE_SIMD_BITS
 #        define COMPILE_SIMD_BITS 256
 #    endif
@@ -42,5 +42,7 @@
 #define bytes_write_ucs1_trailing MAKE_S_NAME(bytes_write_ucs1_trailing)
 #define bytes_write_ucs2_trailing MAKE_S_NAME(bytes_write_ucs2_trailing)
 #define bytes_write_ucs4_trailing MAKE_S_NAME(bytes_write_ucs4_trailing)
-
+#define fast_skip_spaces_u8 MAKE_S_NAME(fast_skip_spaces_u8)
+#define fast_skip_spaces_u16 MAKE_S_NAME(fast_skip_spaces_u16)
+#define fast_skip_spaces_u32 MAKE_S_NAME(fast_skip_spaces_u32)
 #endif // PYYJSON_COMPILE_CONTEXT_S

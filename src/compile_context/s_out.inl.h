@@ -18,3 +18,6 @@
 #undef bytes_write_ucs1_trailing
 #undef bytes_write_ucs2_trailing
 #undef bytes_write_ucs4_trailing
+#undef fast_skip_spaces_u8
+#undef fast_skip_spaces_u16
+#undef fast_skip_spaces_u32

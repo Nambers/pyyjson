@@ -940,7 +940,6 @@ read_double:
 
 #endif /* !PYYJSON_HAS_IEEE_754 */
 
-// #undef read_inf_or_nan
 #undef DIGI_IS_FP
 #undef DIGI_IS_SIGN
 #undef DIGI_IS_EXP

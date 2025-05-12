@@ -82,7 +82,7 @@ force_inline const void *read_head_mask_table_32(Py_ssize_t row) {
 //     return (const void *)&_TailmaskTable_8[4 * row][0];
 // }
 
-force_inline const void *read_rshift_mask_table(int row) {
+force_inline const void *byte_rshift_mask_table(int row) {
     return (const void *)&_RShiftMaskTable[row][0];
 }
 

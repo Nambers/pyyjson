@@ -482,11 +482,10 @@ force_inline void READ_STR_IN_LOOP(
     vector_a vec = *(vector_u *)decode_src_info->src;
 #if COMPILE_SIMD_BITS == 512
     avx512_bitmask_t check_mask = get_escape_bitmask(vec);
-    bool checked = check_mask == 0;
 #else
     vector_a check_mask = get_escape_mask(vec);
-    bool checked = testz(check_mask);
 #endif
+    bool checked = testz_escape_mask(check_mask);
     if (do_copy) {                               // compile time determined
         if (write_as > COMPILE_READ_UCS_LEVEL) { // compile time determined
 
@@ -572,11 +571,6 @@ force_inline PyObject *DECODE_LOOP_DONE_MAKE_STRING(
             } else
 #    endif
                 PYYJSON_CONCAT5(long, cvt, _src_t, u8, COMPILE_SIMD_BITS)((u8 *)decode_unicode_info->write_head, decode_src_info->src_start, copy_count);
-            // #    define DOWNGRADER PYYJSON_CONCAT3(downgrade_string, COMPILE_UCS_LEVEL, 1)
-            //                 DOWNGRADER(decode_src_info->src_start, copy_count, (u8 *)decode_unicode_info->write_head);
-            // #    undef DOWNGRADER
-            // DOWNGRADE_STRING((const void *)decode_src_info->src_start, copy_count, max_char_type, (_src_t *)decode_unicode_info->write_head);
-            // create unicode from the writer.
             return make_string((const u8 *)decode_unicode_info->write_head, copy_count, max_char_type, is_key);
 #else
             assert(false);
@@ -596,8 +590,6 @@ force_inline PyObject *DECODE_LOOP_DONE_MAKE_STRING(
             // downgrade insitu
             Py_ssize_t copy_count = UNICODE_DECODE_GET_COPY_COUNT(decode_unicode_info);
             PYYJSON_CONCAT2(long_cvt_u32_u16, COMPILE_SIMD_BITS)((u16 *)decode_unicode_info->write_head, decode_unicode_info->write_head, copy_count);
-            // downgrade_string_4_2(decode_unicode_info->write_head, copy_count, (u16 *)decode_unicode_info->write_head);
-            // DOWNGRADE_STRING((const void *)decode_unicode_info->write_head, copy_count, 2, (_src_t *)decode_unicode_info->write_head);
             return make_string((const u8 *)decode_unicode_info->write_head, copy_count, 2, is_key);
 #else
             if (UCS_BELOW_2_DIRTY(decode_unicode_info)) {
@@ -611,10 +603,6 @@ force_inline PyObject *DECODE_LOOP_DONE_MAKE_STRING(
             // downgrade insitu
             Py_ssize_t copy_count = UNICODE_DECODE_GET_COPY_COUNT(decode_unicode_info);
             PYYJSON_CONCAT5(long, cvt, _src_t, u8, COMPILE_SIMD_BITS)((u8 *)decode_unicode_info->write_head, decode_unicode_info->write_head, copy_count);
-            // #    define DOWNGRADER PYYJSON_CONCAT3(downgrade_string, COMPILE_READ_UCS_LEVEL, 1)
-            //             DOWNGRADER(decode_unicode_info->write_head, copy_count, (u8 *)decode_unicode_info->write_head);
-            // #    undef DOWNGRADER
-            // DOWNGRADE_STRING((const void *)decode_unicode_info->write_head, copy_count, 1, (_src_t *)decode_unicode_info->write_head);
             return make_string((const u8 *)decode_unicode_info->write_head, copy_count, 1, is_key);
 #else
             return make_string((const u8 *)decode_unicode_info->write_head, decode_unicode_info->unicode_ucs1 - (u8 *)decode_unicode_info->write_head, 1, is_key);
@@ -1455,23 +1443,6 @@ static force_noinline PyObject *PYYJSON_DECODE_STR(PyUnicodeObject *in_unicode) 
 
     /* read json document */
     if (likely(*buffer <= U8MAX && char_is_container(*buffer))) {
-        //     bool should_read_pretty = false;
-        //     if (end - buffer > 3) {
-        //         // check if can use pretty read
-        //         _src_t second, third;
-        //         second = buffer[1];
-        //         third = buffer[2];
-        //         if (second == '\n' || third == '\n') {
-        //             should_read_pretty = true;
-        //             goto start_doc_read;
-        //         }
-        //         if (second <= U8MAX && third <= U8MAX && char_is_space(second) && char_is_space(third)) {
-        //             should_read_pretty = true;
-        //             goto start_doc_read;
-        //         }
-        //     }
-        // //
-        // start_doc_read:;
         if (SHOULD_READ_PRETTY(buffer, end)) {
             ret = READ_ROOT_PRETTY(buffer, end - buffer);
         } else {
