@@ -1,7 +1,6 @@
 #ifndef PYYJSON_MEMCPY_H
 #define PYYJSON_MEMCPY_H
 
-#include "pymacro.h"
 #include "pyyjson.h"
 
 

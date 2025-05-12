@@ -1,6 +1,5 @@
 #ifdef PYYJSON_CLANGD_DUMMY
 #    include "decode/str/str.h"
-#    include "decode_str_common.h"
 #    include "pyyjson.h"
 #    include "simd/cvt.h"
 #    include "simd/long_cvt.h"
@@ -42,7 +41,6 @@
 #define DO_SPECIAL PYYJSON_CONCAT2(do_special, COMPILE_UCS_LEVEL)
 #define PROCESS_ESCAPE PYYJSON_CONCAT2(process_escape, COMPILE_UCS_LEVEL)
 #define DECODE_LOOP_DONE_MAKE_STRING PYYJSON_CONCAT2(decode_loop_done_make_string, COMPILE_UCS_LEVEL)
-#define GET_DONE_COUNT_FROM_MASK PYYJSON_CONCAT2(get_done_count_from_mask, COMPILE_READ_UCS_LEVEL)
 #define WRITE_SIMD_IMPL_TARGET2 PYYJSON_CONCAT5(cvt_to, dst, _src_t, u16, COMPILE_SIMD_BITS)
 #define WRITE_SIMD_IMPL_TARGET4 PYYJSON_CONCAT5(cvt_to, dst, _src_t, u32, COMPILE_SIMD_BITS)
 #define UCS_BELOW_2_DIRTY PYYJSON_CONCAT2(ucs_below_2_dirty, COMPILE_UCS_LEVEL)
@@ -51,9 +49,6 @@
 #define COPY_WITH_ELEVATE_TO_4 PYYJSON_CONCAT2(copy_with_elevate_to_4, COMPILE_UCS_LEVEL)
 #define CHECK_AND_RESERVE_STR_BUFFER PYYJSON_CONCAT2(check_and_reserve_str_buffer, COMPILE_UCS_LEVEL)
 #define READ_NUMBER MAKE_R_NAME(read_number)
-
-
-force_inline u32 GET_DONE_COUNT_FROM_MASK(SIMD_MASK_TYPE mask);
 
 typedef struct DECODE_UNICODE_INFO {
     void *write_head;
@@ -207,60 +202,6 @@ force_inline void COPY_WITH_ELEVATE_TO_4(DECODE_UNICODE_INFO *decode_unicode_inf
     Py_UNREACHABLE();
 #endif
 }
-
-// force_inline void check_vector_max_char(
-//         SIMD_TYPE vec,
-//         ReadStrState *restrict read_state,
-//         bool need_mask, /* known at compile time */
-//         Py_ssize_t index /* only used when need_mask */) {
-// #if COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_ASCII
-//     return;
-// #endif
-//     if (read_state->max_char_type == PYYJSON_STRING_TYPE_UCS4) {
-//         assert(false); // logic error
-//     }
-//     if (need_mask) {
-// #define LOAD_HEAD_MASK PYYJSON_CONCAT2(read_head_mask_table, READ_BIT_SIZE)
-//         // need a mask
-//         const void *mask_addr = LOAD_HEAD_MASK(index);
-//         vec = SIMD_AND(load_simd(mask_addr), vec);
-// #undef LOAD_HEAD_MASK
-//     }
-// #define CHECKER PYYJSON_SIMPLE_CONCAT3(_ucs, COMPILE_READ_UCS_LEVEL, _checkmax)
-//     switch (read_state->max_char_type) {
-//         case PYYJSON_STRING_TYPE_ASCII: {
-// #if COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_UCS4
-//             CHECKER(vec, read_state, 0xffff, PYYJSON_STRING_TYPE_UCS4) &&
-// #endif
-// #if COMPILE_UCS_LEVEL >= PYYJSON_STRING_TYPE_UCS2
-//                     CHECKER(vec, read_state, 0xff, PYYJSON_STRING_TYPE_UCS2) &&
-// #endif
-//                     CHECKER(vec, read_state, 0x7f, PYYJSON_STRING_TYPE_LATIN1);
-//             break;
-//         }
-// #if COMPILE_UCS_LEVEL > PYYJSON_STRING_TYPE_LATIN1
-//         case PYYJSON_STRING_TYPE_LATIN1: {
-// #    if COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_UCS4
-//             CHECKER(vec, read_state, 0xffff, PYYJSON_STRING_TYPE_UCS4) &&
-// #    endif
-//                     CHECKER(vec, read_state, 0xff, PYYJSON_STRING_TYPE_UCS2);
-//             break;
-//         }
-// #endif
-// #if COMPILE_UCS_LEVEL > PYYJSON_STRING_TYPE_UCS2
-//         case PYYJSON_STRING_TYPE_UCS2: {
-//             CHECKER(vec, read_state, 0xffff, PYYJSON_STRING_TYPE_UCS4);
-//             break;
-//         }
-// #endif
-//         // below are unreachable
-//         default: {
-//             assert(false);
-//             Py_UNREACHABLE();
-//         }
-//     }
-// #undef CHECKER
-// }
 
 force_inline void UPDATE_WRITE_TYPE(DECODE_UNICODE_INFO *restrict decode_unicode_info, int write_as, int new_write_as) {
     assert(new_write_as > write_as);
@@ -581,12 +522,7 @@ force_inline void READ_STR_IN_LOOP(
         // this is not an *unlikely* case
         // for example, for short keys less than 16 bytes,
         // `QUOTE` will be found and `check_mask_zero` returns false
-#if COMPILE_SIMD_BITS == 512
-        usize done_count = escape_bitmask_to_done_count(check_mask);
-#else
-        usize done_count = escape_mask_to_done_count(check_mask);
-#endif
-        // u32 done_count = GET_DONE_COUNT_FROM_MASK(check_mask);
+        usize done_count = escape_anymask_to_done_count(check_mask);
         decode_src_info->src += done_count;
         MOVE_WRITER(decode_unicode_info, write_as, done_count);
         SpecialCharReadResult escape_result = DO_SPECIAL(decode_src_info);
@@ -748,7 +684,6 @@ force_inline void READ_STR_TAIL(
     // #    undef _MASKZ_LOADU
     tail_mask = get_escape_bitmask(vec) & rw_mask;
     if (likely(tail_mask)) {
-        // u32 done_count = GET_DONE_COUNT_FROM_MASK(tail_mask);
         usize done_count = escape_bitmask_to_done_count(tail_mask);
         if (do_copy && done_count) {
             PROCESS_TAIL_COPY(write_as, (Py_ssize_t)done_count, decode_src_info, decode_unicode_info);
@@ -783,7 +718,6 @@ force_inline void READ_STR_TAIL(
         read_state->scan_flag = StrInvalid;
     }
 #else
-    static_assert(sizeof(SIMD_MASK_TYPE) == sizeof(SIMD_TYPE), "sizeof(SIMD_MASK_TYPE) == sizeof(SIMD_TYPE)");
     // load backward
     assert(decode_src_info->src + READ_BATCH_COUNT > decode_src_info->src_end);
     vector_a vec;
@@ -1305,42 +1239,6 @@ fail:;
     return NULL;
 }
 
-// force_inline bool cmpeq_2chars(const _src_t *cur, const _src_t *_template, const _src_t *end) {
-//     return cur + 2 <= end && 0 == memcmp((const void *)cur, (const void *)_template, 2 * sizeof(_src_t));
-// }
-
-// force_inline void fast_skip_spaces(const _src_t **cur_addr, const _src_t *end) {
-// #define SET1 PYYJSON_CONCAT3(broadcast, READ_BIT_SIZE, COMPILE_SIMD_BITS)
-//     const vector_a template = broadcast(' ');
-// #undef SET1
-//     const _src_t *cur = *cur_addr;
-//     assert(*cur == ' ');
-// loop:;
-//     if (likely(cur + READ_BATCH_COUNT < end)) {
-//         vector_a vec = *(const vector_u *)cur;
-// #define CMPNEQ PYYJSON_CONCAT3(cmpneq, READ_BIT_SIZE, COMPILE_SIMD_BITS)
-//         SIMD_MASK_TYPE m = CMPNEQ(vec, template);
-// #undef CMPNEQ
-//         if (check_mask_zero(m)) {
-//             cur += READ_BATCH_COUNT;
-//             goto loop;
-//         } else {
-//             u32 done_count = GET_DONE_COUNT_FROM_MASK(m);
-//             cur += done_count;
-//         }
-//     } else {
-//         static _src_t _t[2] = {' ', ' '};
-//         while (true) REPEAT_CALL_16({
-//             if (cmpeq_2chars(cur, _t, end)) cur += 2;
-//             else
-//                 break;
-//         })
-//         if (*cur == ' ') cur++;
-//     }
-//     *cur_addr = cur;
-//     assert(*cur != ' ');
-// }
-
 force_inline bool CHECK_AND_RESERVE_STR_BUFFER(Py_ssize_t len, _src_t **buffer_head_addr, bool *need_dealloc) {
     // consider the max length of the buffer we need
     // assume that each string has an escape of ucs4, we need buffer with size
@@ -1594,7 +1492,6 @@ static force_noinline PyObject *PYYJSON_DECODE_STR(PyUnicodeObject *in_unicode) 
 #undef UCS_BELOW_2_DIRTY
 #undef WRITE_SIMD_IMPL_TARGET4
 #undef WRITE_SIMD_IMPL_TARGET2
-#undef GET_DONE_COUNT_FROM_MASK
 #undef DECODE_LOOP_DONE_MAKE_STRING
 #undef PROCESS_ESCAPE
 #undef DO_SPECIAL

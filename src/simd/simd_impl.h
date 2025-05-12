@@ -5,40 +5,27 @@
 #include "simd/simd_detect.h"
 #include "vector_types.h"
 //
-#if __AVX512F__ && __AVX512CD__
-#    include "avx512f_cd/full.h"
-#endif
-#if __AVX512VL__ && __AVX512DQ__ && __AVX512BW__
-#    include "avx512vl_dq_bw/full.h"
-#endif
-#if __AVX2__
-#    include "avx2/full.h"
-#endif
-#if __AVX__
-#    include "avx/full.h"
-#endif
-#if __SSE4_1__
-#    include "sse4.1/full.h"
-#endif
-#if __SSSE3__
-#    include "ssse3/full.h"
-#endif
-#include "sse2/full.h"
 
 #if PYYJSON_X86
-#    if COMPILE_SIMD_BITS == 512
-#        define SIMD_VAR z
-#        define SIMD_TYPE __m512i
-#        define SIMD_MASK_TYPE u64
-#    elif COMPILE_SIMD_BITS == 256
-#        define SIMD_VAR y
-#        define SIMD_TYPE __m256i
-#        define SIMD_MASK_TYPE SIMD_TYPE
-#    else
-#        define SIMD_VAR x
-#        define SIMD_TYPE __m128i
-#        define SIMD_MASK_TYPE SIMD_TYPE
+#    if __AVX512VL__ && __AVX512DQ__ && __AVX512BW__
+#        include "avx512vl_dq_bw/full.h"
 #    endif
+#    if __AVX512F__ && __AVX512CD__
+#        include "avx512f_cd/full.h"
+#    endif
+#    if __AVX2__
+#        include "avx2/full.h"
+#    endif
+#    if __AVX__
+#        include "avx/full.h"
+#    endif
+#    if __SSE4_1__
+#        include "sse4.1/full.h"
+#    endif
+#    if __SSSE3__
+#        include "ssse3/full.h"
+#    endif
+#    include "sse2/full.h"
 
 
 #elif PYYJSON_AARCH
