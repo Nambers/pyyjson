@@ -10,10 +10,6 @@
 #include "simd/simd_impl.h"
 #include "simd/union_vector.h"
 //
-#include "writers/write_bytes_ucs1.h"
-#include "writers/write_bytes_ucs2.h"
-#include "writers/write_bytes_ucs4.h"
-//
 #include "simd/compile_feature_check.h"
 /* write to u8, COMPILE_WRITE_UCS_LEVEL is always 1.*/
 #define COMPILE_WRITE_UCS_LEVEL 1
@@ -455,7 +451,7 @@ force_inline bool _2bytes_in_ucs2_encode_loop(u8 **dst_addr, const u16 **src_add
 #    if COMPILE_SIMD_BITS == 512
     ucs2_encode_2bytes_utf8_avx512(vec, dst);
 #    elif COMPILE_SIMD_BITS == 256
-    ucs2_encode_2bytes_utf8_avx2(vec, dst);
+    ucs2_encode_2bytes_utf8_avx2(dst, vec);
 #    else
     ucs2_encode_2bytes_utf8_sse2(vec, dst);
 #    endif
@@ -528,7 +524,7 @@ force_inline bool _3bytes_in_ucs2_encode_loop(u8 **dst_addr, const u16 **src_add
 #    if SUPPORT_SIMD_512BITS
     ucs2_encode_3bytes_utf8_avx512(vec, dst);
 #    elif SUPPORT_SIMD_256BITS
-    ucs2_encode_3bytes_utf8_avx2(vec, dst);
+    ucs2_encode_3bytes_utf8_avx2(dst, vec);
 #    elif __SSSE3__
     ucs2_encode_3bytes_utf8_ssse3(vec, dst);
 #    else

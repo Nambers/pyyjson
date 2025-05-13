@@ -64,23 +64,21 @@ force_inline usize joined4_escape_mask_to_done_count(vector_a mask1,
     return 64 / COMPILE_READ_UCS_LEVEL + u64_tz_bits(bitmask[1]) / COMPILE_READ_UCS_LEVEL;
 }
 
-force_inline vector_a get_high_mask(u8 count) {
+force_inline vector_a get_high_mask(usize count) {
     const vector_a *mask_ptr = read_tail_mask_table_8(32 - count * sizeof(_src_t));
     return *mask_ptr;
 }
 
-force_inline vector_a high_mask(vector_a x, u8 count) {
-    // const vector_a *mask_ptr = read_tail_mask_table_8(32 - count * sizeof(_src_t));
+force_inline vector_a high_mask(vector_a x, usize count) {
     return x & get_high_mask(count);
 }
 
-force_inline vector_a get_low_mask(u8 count) {
+force_inline vector_a get_low_mask(usize count) {
     const vector_a *mask_ptr = read_head_mask_table_8(count * sizeof(_src_t));
     return *mask_ptr;
 }
 
-force_inline vector_a low_mask(vector_a x, u8 count) {
-    // const vector_a *mask_ptr = read_head_mask_table_8(count * sizeof(_src_t));
+force_inline vector_a low_mask(vector_a x, usize count) {
     return x & get_low_mask(count);
 }
 

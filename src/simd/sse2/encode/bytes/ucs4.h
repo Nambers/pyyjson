@@ -160,7 +160,7 @@ _2bytes:;
 #if __SSSE3__
 _3bytes:;
     {
-        const vector_a m_not_3bytes = signed_cmpgt(broadcast(0x800), vec) | (signed_cmpgt(vec, broadcast(0xd7ff)) & signed_cmpgt(broadcast(0xe000), vec));
+        const vector_a m_not_3bytes = signed_cmpgt(broadcast(0x800), vec) | (signed_cmpgt(vec, broadcast(0xd7ff)) & signed_cmpgt(broadcast(0xe000), vec)) | signed_cmpgt(vec, broadcast(0xffff));
         m = high_mask(m_not_3bytes, len);
         shift = sizeof(u32) * (READ_BATCH_COUNT - len);
         tail_vec = runtime_byte_rshift_128(vec, shift);
@@ -176,7 +176,7 @@ _3bytes:;
             src = last_batch_start + done_count + 1;
             writer += real_done_count * 3;
             len = READ_BATCH_COUNT - done_count - 1;
-            if (escape_unicode >= 0x800 && (escape_unicode <= 0xd7ff || escape_unicode >= 0xe000)) {
+            if (escape_unicode >= 0x800 && escape_unicode <= 0xffff && (escape_unicode <= 0xd7ff || escape_unicode >= 0xe000)) {
                 PYYJSON_UNREACHABLE();
             } else {
                 if (unlikely(!encode_one_ucs4(&writer, escape_unicode))) return false;

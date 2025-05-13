@@ -4,6 +4,10 @@
 #include "simd/avx/common.h"
 #include "simd/avx2/common.h"
 #include "simd/avx512vl_dq_bw/common.h"
+//
+#include "bytes/ucs1.h"
+#include "bytes/ucs2.h"
+#include "bytes/ucs4.h"
 
 force_inline void ucs2_encode_2bytes_utf8_avx512(vector_a_u16_512 z, u8 *writer) {
     /* abcdefgh|12300000 -> gh123[mmm]|abcdef[mm] */

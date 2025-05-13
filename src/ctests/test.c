@@ -161,7 +161,7 @@ int SIMD_NAME_MODIFIER(test_ucs2_encode_3bytes_utf8)(void) {
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = get_random_3bytes_u16();
     }
-    ucs2_encode_3bytes_utf8_avx2((vector_a_u8_256) * (vector_u_u8_256 *)input, output);
+    ucs2_encode_3bytes_utf8_avx2(output, (vector_a_u8_256) * (vector_u_u8_256 *)input);
     return check_ucs2_3bytes(input, output, COUNT_OF(input));
 #    else
     return INVALID;
@@ -189,7 +189,7 @@ int SIMD_NAME_MODIFIER(test_ucs2_encode_2bytes_utf8)(void) {
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = get_random_2bytes_u16();
     }
-    ucs2_encode_2bytes_utf8_avx2((vector_a_u8_256) * (vector_u_u8_256 *)input, output);
+    ucs2_encode_2bytes_utf8_avx2(output, (vector_a_u8_256) * (vector_u_u8_256 *)input);
     return check_ucs2_2bytes(input, output, COUNT_OF(input));
 #    else
     u16 input[8];
@@ -223,7 +223,7 @@ int SIMD_NAME_MODIFIER(test_ucs4_encode_3bytes_utf8)(void) {
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = get_random_3bytes_u16();
     }
-    ucs4_encode_3bytes_utf8_avx2((vector_a_u8_256) * (vector_u_u8_256 *)input, output);
+    ucs4_encode_3bytes_utf8_avx2(output, (vector_a_u8_256) * (vector_u_u8_256 *)input);
     return check_ucs4_3bytes(input, output, COUNT_OF(input));
 #    else
     return INVALID;
@@ -251,7 +251,7 @@ int SIMD_NAME_MODIFIER(test_ucs4_encode_2bytes_utf8)(void) {
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = get_random_2bytes_u16();
     }
-    ucs4_encode_2bytes_utf8_avx2((vector_a_u8_256) * (vector_u_u8_256 *)input, output);
+    ucs4_encode_2bytes_utf8_avx2(output, (vector_a_u8_256) * (vector_u_u8_256 *)input);
     return check_ucs4_2bytes(input, output, COUNT_OF(input));
 #    else
     u32 input[4];

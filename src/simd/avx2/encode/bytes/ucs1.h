@@ -1,16 +1,17 @@
-#ifndef PYYJSON_SIMD_SSE2_ENCODE_BYTES_UCS1_H
-#define PYYJSON_SIMD_SSE2_ENCODE_BYTES_UCS1_H
+#ifndef PYYJSON_SIMD_AVX2_ENCODE_BYTES_UCS1_H
+#define PYYJSON_SIMD_AVX2_ENCODE_BYTES_UCS1_H
 
 #include "simd/simd_detect.h"
 #include "simd/vector_types.h"
 //
 #include "encode/encode_utf8_shared.h"
-#include "simd/sse2/checker.h"
-#include "simd/sse2/common.h"
+#include "simd/avx2/checker.h"
+#include "simd/avx2/common.h"
+#include "simd/avx2/cvt.h"
 //
 #define COMPILE_READ_UCS_LEVEL 1
 #define COMPILE_WRITE_UCS_LEVEL 1
-#define COMPILE_SIMD_BITS 128
+#define COMPILE_SIMD_BITS 256
 #include "compile_context/srw_in.inl.h"
 
 /* 
@@ -18,7 +19,7 @@
  * Only consider vector in ASCII range,
  * because most of 2-bytes utf-8 code points cannot be presented by UCS1.
  */
-force_inline void bytes_write_ucs1_trailing_128(u8 **writer_addr, const u8 *src, usize len) {
+force_inline void bytes_write_ucs1_trailing_256(u8 **writer_addr, const u8 *src, usize len) {
     assert(len && len < READ_BATCH_COUNT);
     // constants
     const u8 *src_end = src + len;
@@ -28,22 +29,23 @@ force_inline void bytes_write_ucs1_trailing_128(u8 **writer_addr, const u8 *src,
     //
     u8 *writer = *writer_addr;
 restart:;
-    vector_a x, m;
-    int shift;
-    shift = PYYJSON_CAST(int, READ_BATCH_COUNT - len);
-    x = runtime_byte_rshift_128(vec, shift);
-    m = runtime_byte_rshift_128(m0, shift);
-    *(vector_u *)writer = x;
+    vector_a m = high_mask(m0, len);
+    cvt_to_dst_blendhigh(writer + len - READ_BATCH_COUNT, vec, len);
     if (likely(testz(m))) {
         writer += len;
     } else {
         usize done_count = escape_mask_to_done_count_no_eq0(m);
-        assert(done_count < len);
-        len -= done_count + 1;
-        writer += done_count;
-        src += done_count;
-        u8 unicode = *src++;
-        encode_one_special_ucs1(&writer, unicode);
+        assert(done_count >= READ_BATCH_COUNT - len);
+        usize real_done_count = done_count - (READ_BATCH_COUNT - len);
+        len = READ_BATCH_COUNT - done_count - 1;
+        writer += real_done_count;
+        src = last_batch_start + done_count + 1;
+        u8 unicode = last_batch_start[done_count];
+        if (unicode >= ControlMax && unicode < 0x80 && unicode != _Slash && unicode != _Quote) {
+            PYYJSON_UNREACHABLE();
+        } else {
+            encode_one_special_ucs1(&writer, unicode);
+        }
         if (len) goto restart;
     }
     *writer_addr = writer;
@@ -54,4 +56,4 @@ restart:;
 #undef COMPILE_WRITE_UCS_LEVEL
 #undef COMPILE_READ_UCS_LEVEL
 
-#endif // PYYJSON_SIMD_SSE2_ENCODE_BYTES_UCS1_H
+#endif // PYYJSON_SIMD_AVX2_ENCODE_BYTES_UCS1_H

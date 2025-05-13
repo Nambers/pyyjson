@@ -6,7 +6,8 @@
 //
 #include "common.h"
 #include "simd/avx/cvt.h"
-#include "simd/sse2/common.h"
+#include "simd/sse2/checker.h"
+#include "simd/sse4.1/common.h"
 
 force_inline const void *read_tail_mask_table_8(Py_ssize_t);
 #if __AVX512F__ && __AVX512CD__
@@ -155,4 +156,21 @@ force_inline void cvt_to_dst_blendhigh_u16_u32_256(u32 *dst, vector_a_u16_256 y,
 #endif
 }
 
+// cvt down (blend high)
+force_inline void cvt_to_dst_blendhigh_u16_u8_256(u8 *dst, vector_a_u16_256 y, usize len) {
+    vector_u_u8_128 *uvec = (vector_u_u8_128 *)dst;
+    *uvec = blendv_128(*uvec, cvt_u16_to_u8_256(y), get_high_mask_u8_128(len));
+}
+
+force_inline void cvt_to_dst_blendhigh_u32_u8_256(u8 *dst, vector_a_u32_256 y, usize len) {
+    vector_a_u8_64 x = cvt_u32_to_u8_256(y);
+    u64 w, w0;
+    memcpy(&w, &x, sizeof(w));
+    memcpy(&w0, dst, sizeof(w0));
+    u64 mask = (1ULL << ((256 / 8 / sizeof(u32) - len) * 8)) - 1;
+    w0 = w0 & mask;
+    w = w & ~mask;
+    w = w | w0;
+    memcpy(dst, &w, sizeof(w));
+}
 #endif // PYYJSON_SIMD_AVX2_CVT_H
