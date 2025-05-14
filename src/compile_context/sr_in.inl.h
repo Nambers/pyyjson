@@ -64,6 +64,8 @@
 #define unsigned_cmple_bitmask MAKE_SR_NAME(unsigned_cmple_bitmask)
 #define unsigned_cmplt_bitmask MAKE_SR_NAME(unsigned_cmplt_bitmask)
 #define unsigned_cmpge_bitmask MAKE_SR_NAME(unsigned_cmpge_bitmask)
+#define unsigned_cmpgt_bitmask MAKE_SR_NAME(unsigned_cmpgt_bitmask)
+#define signed_cmpgt_bitmask MAKE_SR_NAME(signed_cmpgt_bitmask)
 #define get_high_mask MAKE_SR_NAME(get_high_mask)
 #define high_mask MAKE_SR_NAME(high_mask)
 #define get_low_mask MAKE_SR_NAME(get_low_mask)

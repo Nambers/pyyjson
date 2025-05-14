@@ -5,11 +5,189 @@
 #include "simd/vector_types.h"
 //
 #include "encode/encode_utf8_shared.h"
+#include "simd/avx512vl_dq_bw/checker.h"
+#include "simd/avx512vl_dq_bw/common.h"
+#include "simd/avx512vl_dq_bw/cvt.h"
 //
 #define COMPILE_READ_UCS_LEVEL 2
 #define COMPILE_WRITE_UCS_LEVEL 1
 #define COMPILE_SIMD_BITS 512
 #include "compile_context/srw_in.inl.h"
+
+force_inline void ucs2_encode_2bytes_utf8_avx512(u8 *writer, vector_a_u16_512 z) {
+    /* abcdefgh|12300000 -> gh123[mmm]|abcdef[mm] */
+    vector_a_u8_128 t1 = {
+            0x80, 0,
+            0x80, 2,
+            0x80, 4,
+            0x80, 6,
+            0x80, 8,
+            0x80, 10,
+            0x80, 12,
+            0x80, 14};
+    /*z1 = gh123000|00000000 */
+    vector_a_u16_512 z1 = rshift_u16_512(z, 6);
+    /*z2 = 00000000|abcdefgh */
+    vector_a_u16_512 z2 = shuffle_512(z, _mm512_broadcast_i32x4(t1));
+    /*z = gh123000|abcdefgh */
+    z = z1 | z2;
+    /*z = gh123000|abcdef00 */
+    z = z & broadcast_u16_512(0x3fff);
+    /*z = gh123[mmm]|abcdef[mm] */
+    z = z | broadcast_u16_512(0x80c0);
+    *(vector_u_u16_512 *)writer = z;
+}
+
+force_inline void ucs2_encode_3bytes_utf8_avx512(u8 *writer, vector_a_u16_512 z) {
+    vector_a_u8_512 t1 = {
+            0x80, 0x80, 0x80, 0x80,
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            //
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            0x80, 0x80, 0x80, 0x80,
+            //
+            0x80, 0x80, 0x80, 0x80,
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            //
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            0x80, 0x80, 0x80, 0x80};
+    vector_a_u8_512 t2 = {
+            0x80, 0x80, 0x80, 0x80,
+            0x80, 0, 0x80,
+            0x80, 4, 0x80,
+            0x80, 8, 0x80,
+            0x80, 12, 0x80,
+            //
+            0x80, 0, 0x80,
+            0x80, 4, 0x80,
+            0x80, 8, 0x80,
+            0x80, 12, 0x80,
+            0x80, 0x80, 0x80, 0x80,
+            //
+            0x80, 0x80, 0x80, 0x80,
+            0x80, 0, 0x80,
+            0x80, 4, 0x80,
+            0x80, 8, 0x80,
+            0x80, 12, 0x80,
+            //
+            0x80, 0, 0x80,
+            0x80, 4, 0x80,
+            0x80, 8, 0x80,
+            0x80, 12, 0x80,
+            0x80, 0x80, 0x80, 0x80};
+    vector_a_u8_512 t3 = {
+            0x80, 0x80, 0x80, 0x80,
+            0, 0x80, 0x80,
+            4, 0x80, 0x80,
+            8, 0x80, 0x80,
+            12, 0x80, 0x80,
+            //
+            0, 0x80, 0x80,
+            4, 0x80, 0x80,
+            8, 0x80, 0x80,
+            12, 0x80, 0x80,
+            0x80, 0x80, 0x80, 0x80,
+            //
+            0x80, 0x80, 0x80, 0x80,
+            0, 0x80, 0x80,
+            4, 0x80, 0x80,
+            8, 0x80, 0x80,
+            12, 0x80, 0x80,
+            //
+            0, 0x80, 0x80,
+            4, 0x80, 0x80,
+            8, 0x80, 0x80,
+            12, 0x80, 0x80,
+            0x80, 0x80, 0x80, 0x80};
+    vector_a_u8_512 m1 = {
+            0xff, 0xff, 0xff, 0xff,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            //
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0xff, 0xff, 0xff,
+            //
+            0xff, 0xff, 0xff, 0xff,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            //
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0xff, 0xff, 0xff};
+    vector_a_u8_512 m2 = {
+            0, 0, 0, 0,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            //
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0, 0, 0, 0,
+            //
+            0, 0, 0, 0,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            //
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0, 0, 0, 0};
+    vector_a_u32_512 z1 = cvt_u16_to_u32_512(_mm512_extracti64x4_epi64(z, 0));
+    vector_a_u32_512 z2 = cvt_u16_to_u32_512(_mm512_extracti64x4_epi64(z, 1));
+    /* z3,z4 = gh123456|78000000 */
+    vector_a_u16_512 z3 = rshift_u32_512(z1, 6);
+    vector_a_u16_512 z4 = rshift_u32_512(z2, 6);
+    /* z5,z6 = 56780000|00000000 */
+    vector_a_u16_512 z5 = rshift_u32_512(z1, 12);
+    vector_a_u16_512 z6 = rshift_u32_512(z2, 12);
+    /* z7,z8 = 00000000|00000000|abcdefgh */
+    vector_a_u8_512 z7 = shuffle_512(z1, t1);
+    vector_a_u8_512 z8 = shuffle_512(z2, t1);
+    /* z9,z10 = 00000000|gh123456|00000000 */
+    vector_a_u8_512 z9 = shuffle_512(z3, t2);
+    vector_a_u8_512 z10 = shuffle_512(z4, t2);
+    /* z11,z12 = 56780000|00000000|00000000 */
+    vector_a_u8_512 z11 = shuffle_512(z5, t3);
+    vector_a_u8_512 z12 = shuffle_512(z6, t3);
+    //
+    vector_a_u8_512 z13 = ((z7 | z9 | z11) & m1) | m2;
+    vector_a_u8_512 z14 = ((z8 | z10 | z12) & m1) | m2;
+    // [0, 24)
+    _mm512_mask_storeu_epi32(writer - 4, 0x7e, z13);
+    // [48, 72)
+    _mm512_mask_storeu_epi32(writer + 44, 0x7e, z14);
+    // [24, 48)
+    _mm512_mask_storeu_epi32(writer - 12, 0x7e00, z13);
+    // [72, 96)
+    _mm512_mask_storeu_epi32(writer + 36, 0x7e00, z14);
+}
 
 /* 
  * Encode UCS2 trailing to utf-8.
@@ -19,127 +197,148 @@
  *   vector in 3-bytes range
  */
 force_inline bool bytes_write_ucs2_trailing_512(u8 **writer_addr, const u16 *src, usize len) {
-    return false; // TODO
-    //     assert(len && len < READ_BATCH_COUNT);
-    //     // constants
-    //     const u16 *const src_end = src + len;
-    //     const u16 *const last_batch_start = src_end - READ_BATCH_COUNT;
-    //     const vector_a vec = *(const vector_u *)last_batch_start;
-    //     //
-    //     u8 *writer = *writer_addr;
-    // restart:;
-    //     if (len == 1) {
-    //         if (unlikely(!encode_one_ucs2(&writer, *src))) return false;
-    //         goto finished;
-    //     }
-    //     u16 cur_unicode = *src;
-    //     bool is_escaped;
-    //     int unicode_type = ucs2_get_type(cur_unicode, &is_escaped);
-    //     switch (unicode_type) {
-    //         case 1: {
-    //             if (unlikely(is_escaped)) {
-    //                 memcpy(writer, &ControlEscapeTable_u8[cur_unicode * 8], 8);
-    //                 writer += _ControlJump[cur_unicode];
-    //                 src++;
-    //                 len--;
-    //                 if (len) goto restart;
-    //                 goto finished;
-    //             }
-    //             goto ascii;
-    //         }
-    //         case 2: {
-    //             goto _2bytes;
-    //         }
-    //         case 3: {
-    //             goto _3bytes;
-    //         }
-    //         default: {
-    //             PYYJSON_UNREACHABLE();
-    //         }
-    //     }
-    //     PYYJSON_UNREACHABLE();
-    // ascii:;
-    //     {
-    //         const vector_a m_not_ascii = (vec == broadcast(_Quote)) | (vec == broadcast(_Slash)) | signed_cmpgt(broadcast(ControlMax), vec) | signed_cmpgt(vec, broadcast(0x7f));
-    //         vector_a m = high_mask(m_not_ascii, len);
-    //         cvt_to_dst_blendhigh(writer, vec, len);
-    //         if (likely(testz(m))) {
-    //             writer += len;
-    //             goto finished;
-    //         } else {
-    //             usize done_count = escape_mask_to_done_count_no_eq0(m);
-    //             usize real_done_count = done_count - (READ_BATCH_COUNT - len);
-    //             assert(real_done_count < len);
-    //             u16 escape_unicode = last_batch_start[done_count];
-    //             src = last_batch_start + done_count + 1;
-    //             writer += real_done_count;
-    //             len = READ_BATCH_COUNT - done_count - 1;
-    //             if (escape_unicode >= ControlMax && escape_unicode < 0x80 && escape_unicode != _Slash && escape_unicode != _Quote) {
-    //                 PYYJSON_UNREACHABLE();
-    //             } else {
-    //                 if (unlikely(!encode_one_ucs2(&writer, escape_unicode))) return false;
-    //             }
-    //             if (len) goto restart;
-    //             goto finished;
-    //         }
-    //         PYYJSON_UNREACHABLE();
-    //     }
-    // _2bytes:;
-    //     {
-    //         const vector_a m_not_2bytes = signed_cmpgt(broadcast(0x80), vec) | signed_cmpgt(vec, broadcast(0x7ff));
-    //         vector_a m = high_mask(m_not_2bytes, len);
-    //         ucs2_encode_2bytes_utf8_avx2_blendhigh(writer + len * 2 - READ_BATCH_COUNT * 2, vec, len);
-    //         if (likely(testz(m))) {
-    //             writer += len * 2;
-    //             goto finished;
-    //         } else {
-    //             usize done_count = escape_mask_to_done_count_no_eq0(m);
-    //             usize real_done_count = done_count - (READ_BATCH_COUNT - len);
-    //             assert(real_done_count < len);
-    //             u16 escape_unicode = last_batch_start[done_count];
-    //             src = last_batch_start + done_count + 1;
-    //             writer += real_done_count * 2;
-    //             len = READ_BATCH_COUNT - done_count - 1;
-    //             if (escape_unicode >= 0x80 && escape_unicode <= 0x7ff) {
-    //                 PYYJSON_UNREACHABLE();
-    //             } else {
-    //                 if (unlikely(!encode_one_ucs2(&writer, escape_unicode))) return false;
-    //             }
-    //             if (len) goto restart;
-    //             goto finished;
-    //         }
-    //         PYYJSON_UNREACHABLE();
-    //     }
-    // _3bytes:;
-    //     {
-    //         const vector_a m_not_3bytes = unsigned_saturate_minus(broadcast(0x800), vec) | (signed_cmpgt(vec, broadcast(0xd7ff)) & signed_cmpgt(broadcast(0xe000), vec));
-    //         vector_a m = high_mask(m_not_3bytes, len);
-    //         ucs2_encode_3bytes_utf8_avx2_blendhigh(writer + len * 3 - READ_BATCH_COUNT * 3, vec, len);
-    //         if (likely(testz(m))) {
-    //             writer += len * 3;
-    //             goto finished;
-    //         } else {
-    //             // cannot use no_eq0 version
-    //             usize done_count = escape_mask_to_done_count(m);
-    //             usize real_done_count = done_count - (READ_BATCH_COUNT - len);
-    //             assert(real_done_count < len);
-    //             u16 escape_unicode = last_batch_start[done_count];
-    //             src = last_batch_start + done_count + 1;
-    //             writer += real_done_count * 3;
-    //             len = READ_BATCH_COUNT - done_count - 1;
-    //             if (escape_unicode >= 0x800 && (escape_unicode <= 0xd7ff || escape_unicode >= 0xe000)) {
-    //                 PYYJSON_UNREACHABLE();
-    //             } else {
-    //                 if (unlikely(!encode_one_ucs2(&writer, escape_unicode))) return false;
-    //             }
-    //             if (len) goto restart;
-    //             goto finished;
-    //         }
-    //         PYYJSON_UNREACHABLE();
-    //     }
-    // finished:;
-    //     *writer_addr = writer;
-    //     return true;
+    assert(len && len < READ_BATCH_COUNT);
+    //
+    u32 maskz = len_to_maskz(len);
+    vector_a vec = maskz_loadu(maskz, src);
+    u8 *writer = *writer_addr;
+    if (len == 1) {
+        if (unlikely(!encode_one_ucs2(&writer, *src))) return false;
+        goto finished;
+    }
+    u16 cur_unicode = *src;
+    bool is_escaped;
+restart:;
+    int unicode_type = ucs2_get_type(cur_unicode, &is_escaped);
+    switch (unicode_type) {
+        case 1: {
+            if (unlikely(is_escaped)) {
+                memcpy(writer, &ControlEscapeTable_u8[cur_unicode * 8], 8);
+                writer += _ControlJump[cur_unicode];
+                src++;
+                len--;
+                if (len) goto restart;
+                goto finished;
+            }
+            goto ascii;
+        }
+        case 2: {
+            goto _2bytes;
+        }
+        case 3: {
+            goto _3bytes;
+        }
+        default: {
+            PYYJSON_UNREACHABLE();
+        }
+    }
+    PYYJSON_UNREACHABLE();
+ascii:;
+    {
+        avx512_bitmask_t m_not_ascii = cmpeq_bitmask(vec, broadcast(_Quote)) | cmpeq_bitmask(vec, broadcast(_Slash)) | unsigned_cmpgt_bitmask(broadcast(ControlMax), vec) | unsigned_cmpgt_bitmask(vec, broadcast(0x7f));
+        m_not_ascii = m_not_ascii & maskz;
+    __ascii:;
+        cvt_to_dst(writer, vec);
+        if (likely(m_not_ascii == 0)) {
+            writer += len;
+            goto finished;
+        } else {
+            usize done_count = escape_bitmask_to_done_count(m_not_ascii);
+            u16 escape_unicode = src[done_count];
+            src += done_count + 1;
+            len -= done_count + 1;
+            writer += done_count;
+            if (escape_unicode >= ControlMax && escape_unicode < 0x80 && escape_unicode != _Slash && escape_unicode != _Quote) {
+                PYYJSON_UNREACHABLE();
+            } else {
+                if (unlikely(!encode_one_ucs2(&writer, escape_unicode))) return false;
+            }
+            if (len) {
+                maskz = maskz >> (done_count + 1);
+                cur_unicode = *src;
+                vec = maskz_loadu(maskz, src);
+                is_escaped = false;
+                if (escape_unicode >= ControlMax && escape_unicode < 0x80 && escape_unicode != _Slash && escape_unicode != _Quote) {
+                    m_not_ascii = m_not_ascii >> (done_count + 1);
+                    goto __ascii;
+                }
+                goto restart;
+            }
+            goto finished;
+        }
+    }
+_2bytes:;
+    {
+        avx512_bitmask_t m_not_2bytes = unsigned_cmpgt_bitmask(broadcast(0x80), vec) | unsigned_cmpgt_bitmask(vec, broadcast(0x7ff));
+        m_not_2bytes = m_not_2bytes & maskz;
+    __2bytes:;
+        ucs2_encode_2bytes_utf8_avx512(writer, vec);
+        if (likely(m_not_2bytes == 0)) {
+            writer += len * 2;
+            goto finished;
+        } else {
+            usize done_count = escape_bitmask_to_done_count(m_not_2bytes);
+            u16 escape_unicode = src[done_count];
+            src += done_count + 1;
+            len -= done_count + 1;
+            writer += done_count * 2;
+            if (escape_unicode >= 0x80 && escape_unicode <= 0x7ff) {
+                PYYJSON_UNREACHABLE();
+            } else {
+                if (unlikely(!encode_one_ucs2(&writer, escape_unicode))) return false;
+            }
+            if (len) {
+                maskz = maskz >> (done_count + 1);
+                cur_unicode = *src;
+                vec = maskz_loadu(maskz, src);
+                is_escaped = false;
+                if (cur_unicode >= 0x80 && cur_unicode <= 0x7ff) {
+                    m_not_2bytes = m_not_2bytes >> (done_count + 1);
+                    goto __2bytes;
+                }
+                goto restart;
+            }
+            goto finished;
+        }
+    }
+_3bytes:;
+    {
+        avx512_bitmask_t m_not_3bytes = unsigned_cmpgt_bitmask(broadcast(0x800), vec) | (unsigned_cmpgt_bitmask(vec, broadcast(0xd7ff)) & unsigned_cmpgt_bitmask(broadcast(0xe000), vec));
+
+        m_not_3bytes = m_not_3bytes & maskz;
+    __3bytes:;
+        ucs2_encode_3bytes_utf8_avx512(writer, vec);
+        if (likely(m_not_3bytes == 0)) {
+            writer += len * 3;
+            goto finished;
+        } else {
+            usize done_count = escape_bitmask_to_done_count(m_not_3bytes);
+            u16 escape_unicode = src[done_count];
+            src += done_count + 1;
+            len -= done_count + 1;
+            writer += done_count * 3;
+            if (escape_unicode >= 0x800 && !(escape_unicode >= 0xd800 && escape_unicode < 0xe000)) {
+                PYYJSON_UNREACHABLE();
+            } else {
+                if (unlikely(!encode_one_ucs2(&writer, escape_unicode))) return false;
+            }
+            if (len) {
+                maskz = maskz >> (done_count + 1);
+                cur_unicode = *src;
+                vec = maskz_loadu(maskz, src);
+                is_escaped = false;
+                if (cur_unicode >= 0x800 && !(cur_unicode >= 0xd800 && cur_unicode < 0xe000)) {
+                    m_not_3bytes = m_not_3bytes >> (done_count + 1);
+                    goto __3bytes;
+                }
+                goto restart;
+            }
+            goto finished;
+        }
+    }
+finished:;
+    *writer_addr = writer;
+    return true;
 }
 
 #include "compile_context/srw_out.inl.h"

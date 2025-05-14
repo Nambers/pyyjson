@@ -152,7 +152,7 @@ int SIMD_NAME_MODIFIER(test_ucs2_encode_3bytes_utf8)(void) {
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = get_random_3bytes_u16();
     }
-    ucs2_encode_3bytes_utf8_avx512((vector_a_u16_512) * (vector_u_u16_512 *)input, output);
+    ucs2_encode_3bytes_utf8_avx512(output, (vector_a_u16_512) * (vector_u_u16_512 *)input);
     return check_ucs2_3bytes(input, output, COUNT_OF(input));
 #    elif __AVX2__
     GUARDED_SIMD;
@@ -180,7 +180,7 @@ int SIMD_NAME_MODIFIER(test_ucs2_encode_2bytes_utf8)(void) {
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = get_random_2bytes_u16();
     }
-    ucs2_encode_2bytes_utf8_avx512((vector_a_u16_512) * (vector_u_u16_512 *)input, output);
+    ucs2_encode_2bytes_utf8_avx512(output, (vector_a_u16_512) * (vector_u_u16_512 *)input);
     return check_ucs2_2bytes(input, output, COUNT_OF(input));
 #    elif __AVX2__
     GUARDED_SIMD;

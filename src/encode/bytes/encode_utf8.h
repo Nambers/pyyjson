@@ -449,7 +449,7 @@ force_inline bool _2bytes_in_ucs2_encode_loop(u8 **dst_addr, const u16 **src_add
     // write
 #if PYYJSON_X86
 #    if COMPILE_SIMD_BITS == 512
-    ucs2_encode_2bytes_utf8_avx512(vec, dst);
+    ucs2_encode_2bytes_utf8_avx512(dst, vec);
 #    elif COMPILE_SIMD_BITS == 256
     ucs2_encode_2bytes_utf8_avx2(dst, vec);
 #    else
@@ -522,7 +522,7 @@ force_inline bool _3bytes_in_ucs2_encode_loop(u8 **dst_addr, const u16 **src_add
     // write
 #if PYYJSON_X86
 #    if SUPPORT_SIMD_512BITS
-    ucs2_encode_3bytes_utf8_avx512(vec, dst);
+    ucs2_encode_3bytes_utf8_avx512(dst, vec);
 #    elif SUPPORT_SIMD_256BITS
     ucs2_encode_3bytes_utf8_avx2(dst, vec);
 #    elif __SSSE3__
