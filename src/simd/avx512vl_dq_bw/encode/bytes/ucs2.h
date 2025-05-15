@@ -317,7 +317,7 @@ _3bytes:;
             src += done_count + 1;
             len -= done_count + 1;
             writer += done_count * 3;
-            if (escape_unicode >= 0x800 && !(escape_unicode >= 0xd800 && escape_unicode < 0xe000)) {
+            if (escape_unicode >= 0x800 && (escape_unicode <= 0xd7ff || escape_unicode >= 0xe000)) {
                 PYYJSON_UNREACHABLE();
             } else {
                 if (unlikely(!encode_one_ucs2(&writer, escape_unicode))) return false;
@@ -327,7 +327,7 @@ _3bytes:;
                 cur_unicode = *src;
                 vec = maskz_loadu(maskz, src);
                 is_escaped = false;
-                if (cur_unicode >= 0x800 && !(cur_unicode >= 0xd800 && cur_unicode < 0xe000)) {
+                if (cur_unicode >= 0x800 && (cur_unicode <= 0xd7ff || cur_unicode >= 0xe000)) {
                     m_not_3bytes = m_not_3bytes >> (done_count + 1);
                     goto __3bytes;
                 }
