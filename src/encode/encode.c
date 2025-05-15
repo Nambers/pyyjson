@@ -38,29 +38,13 @@ typedef enum EncodeCallFlag {
     CallFlag_Key,
 } EncodeCallFlag;
 
-typedef struct EncodeStackVars {
-    // cache
-    PyObject *key, *val;
-    PyObject *cur_obj;           // = in_obj;
-    Py_ssize_t cur_pos;          // = 0;
-    Py_ssize_t cur_nested_depth; // = 0;
-    Py_ssize_t cur_list_size;
-    // alias thread local buffer
-    EncodeCtnWithIndex *ctn_stack; // = obj_viewer->ctn_stack;
-    UnicodeInfo unicode_info;
-    bool cur_is_tuple;
-} EncodeStackVars;
-
-force_inline bool init_stack_vars(EncodeStackVars *stack_vars, PyObject *in_obj) {
-    stack_vars->cur_obj = in_obj;
-    stack_vars->cur_pos = 0;
-    stack_vars->cur_nested_depth = 0;
-    stack_vars->ctn_stack = get_encode_obj_stack_buffer();
-    if (unlikely(!stack_vars->ctn_stack)) {
+force_inline bool init_encode_ctn_stack(EncodeCtnWithIndex **ctn_stack_addr) {
+    EncodeCtnWithIndex *ctn_stack = get_encode_obj_stack_buffer();
+    *ctn_stack_addr = ctn_stack;
+    if (unlikely(!ctn_stack)) {
         PyErr_NoMemory();
         return false;
     }
-    memset(&stack_vars->unicode_info, 0, sizeof(UnicodeInfo));
     return true;
 }
 
@@ -78,7 +62,6 @@ force_inline bool init_unicode_buffer(EncodeUnicodeBufferInfo *unicode_buffer_in
     }
     return true;
 }
-
 
 typedef struct {
     u8 *writer;
@@ -289,23 +272,37 @@ force_inline PyObject *pyyjson_dumps_single_float(PyObject *val) {
     return unicode;
 }
 
-force_inline PyObject *pyyjson_dumps_single_constant(PyFastTypes py_type) {
+force_inline PyObject *pyyjson_dumps_single_constant(PyFastTypes py_type, PyObject* obj) {
     PyObject *ret;
     switch (py_type) {
-        case T_True: {
-            ret = PyUnicode_New(4, 127);
-            RETURN_ON_UNLIKELY_ERR(!ret);
-            u8 *writer = (u8 *)(((PyASCIIObject *)ret) + 1);
-            strcpy((char *)writer, "true");
+        case T_Bool: {
+            if(obj == Py_False) {
+                ret = PyUnicode_New(5, 127);
+                RETURN_ON_UNLIKELY_ERR(!ret);
+                u8 *writer = (u8 *)(((PyASCIIObject *)ret) + 1);
+                strcpy((char *)writer, "false");
+            } else {
+                ret = PyUnicode_New(4, 127);
+                RETURN_ON_UNLIKELY_ERR(!ret);
+                u8 *writer = (u8 *)(((PyASCIIObject *)ret) + 1);
+                strcpy((char *)writer, "true");
+            }
             break;
         }
-        case T_False: {
-            ret = PyUnicode_New(5, 127);
-            RETURN_ON_UNLIKELY_ERR(!ret);
-            u8 *writer = (u8 *)(((PyASCIIObject *)ret) + 1);
-            strcpy((char *)writer, "false");
-            break;
-        }
+        // case T_True: {
+        //     ret = PyUnicode_New(4, 127);
+        //     RETURN_ON_UNLIKELY_ERR(!ret);
+        //     u8 *writer = (u8 *)(((PyASCIIObject *)ret) + 1);
+        //     strcpy((char *)writer, "true");
+        //     break;
+        // }
+        // case T_False: {
+        //     ret = PyUnicode_New(5, 127);
+        //     RETURN_ON_UNLIKELY_ERR(!ret);
+        //     u8 *writer = (u8 *)(((PyASCIIObject *)ret) + 1);
+        //     strcpy((char *)writer, "false");
+        //     break;
+        // }
         case T_None: {
             ret = PyUnicode_New(4, 127);
             RETURN_ON_UNLIKELY_ERR(!ret);
@@ -373,8 +370,9 @@ PyObject *SIMD_NAME_MODIFIER(pyyjson_Encode)(PyObject *self, PyObject *args, PyO
         case T_Long: {
             goto dumps_long;
         }
-        case T_False:
-        case T_True:
+        case T_Bool:
+        // case T_False:
+        // case T_True:
         case T_None: {
             goto dumps_constant;
         }
@@ -422,7 +420,7 @@ dumps_unicode:;
 dumps_long:;
     return pyyjson_dumps_single_long(obj);
 dumps_constant:;
-    return pyyjson_dumps_single_constant(fast_type);
+    return pyyjson_dumps_single_constant(fast_type, obj);
 dumps_float:;
     return pyyjson_dumps_single_float(obj);
 success:;

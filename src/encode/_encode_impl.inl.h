@@ -511,13 +511,19 @@ force_inline Py_ssize_t GET_UNICODE_BUFFER_FINAL_LEN(EncodeUnicodeBufferInfo *un
 
 force_inline EncodeValJumpFlag ENCODE_PROCESS_VAL(
         EncodeUnicodeBufferInfo *unicode_buffer_info, PyObject *val,
-        EncodeStackVars *stack_vars, bool is_in_obj) {
-#define CTN_SIZE_GROW()                                                               \
-    do {                                                                              \
-        if (unlikely(stack_vars->cur_nested_depth == PYYJSON_ENCODE_MAX_RECURSION)) { \
-            PyErr_SetString(JSONEncodeError, "Too many nested structures");           \
-            return JumpFlag_Fail;                                                     \
-        }                                                                             \
+        PyObject **cur_obj_addr,
+        Py_ssize_t *cur_pos_addr,
+        Py_ssize_t *cur_nested_depth_addr,
+        Py_ssize_t *cur_list_size_addr,
+        EncodeCtnWithIndex *ctn_stack,
+        UnicodeInfo *unicode_info_addr,
+        bool is_in_obj) {
+#define CTN_SIZE_GROW()                                                         \
+    do {                                                                        \
+        if (unlikely(*cur_nested_depth_addr == PYYJSON_ENCODE_MAX_RECURSION)) { \
+            PyErr_SetString(JSONEncodeError, "Too many nested structures");     \
+            return JumpFlag_Fail;                                               \
+        }                                                                       \
     } while (0)
 #define RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(_cond_) \
     do {                                         \
@@ -530,72 +536,81 @@ force_inline EncodeValJumpFlag ENCODE_PROCESS_VAL(
 
     switch (fast_type) {
         case T_Unicode: {
-            RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_STR(val, unicode_buffer_info, &stack_vars->unicode_info, stack_vars->cur_nested_depth, is_in_obj));
+            RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_STR(val, unicode_buffer_info, unicode_info_addr, *cur_nested_depth_addr, is_in_obj));
 #if COMPILE_UCS_LEVEL < 1
-            if (unlikely(stack_vars->unicode_info.cur_ucs_type == 1)) {
+            if (unlikely(unicode_info_addr->cur_ucs_type == 1)) {
                 return is_in_obj ? JumpFlag_Elevate1_ObjVal : JumpFlag_Elevate1_ArrVal;
             }
 #endif
 #if COMPILE_UCS_LEVEL < 2
-            if (unlikely(stack_vars->unicode_info.cur_ucs_type == 2)) {
+            if (unlikely(unicode_info_addr->cur_ucs_type == 2)) {
                 return is_in_obj ? JumpFlag_Elevate2_ObjVal : JumpFlag_Elevate2_ArrVal;
             }
 #endif
 #if COMPILE_UCS_LEVEL < 4
-            if (unlikely(stack_vars->unicode_info.cur_ucs_type == 4)) {
+            if (unlikely(unicode_info_addr->cur_ucs_type == 4)) {
                 return is_in_obj ? JumpFlag_Elevate4_ObjVal : JumpFlag_Elevate4_ArrVal;
             }
 #endif
             break;
         }
         case T_Long: {
-            RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_LONG(unicode_buffer_info, stack_vars->cur_nested_depth, val, is_in_obj));
+            RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_LONG(unicode_buffer_info, *cur_nested_depth_addr, val, is_in_obj));
             break;
         }
-        case T_False: {
-            RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_FALSE(unicode_buffer_info, stack_vars->cur_nested_depth, is_in_obj));
+        case T_Bool: {
+            if (val == Py_False) {
+                RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_FALSE(unicode_buffer_info, *cur_nested_depth_addr, is_in_obj));
+            } else {
+                assert(val == Py_True);
+                RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_TRUE(unicode_buffer_info, *cur_nested_depth_addr, is_in_obj));
+            }
             break;
         }
-        case T_True: {
-            RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_TRUE(unicode_buffer_info, stack_vars->cur_nested_depth, is_in_obj));
-            break;
-        }
+        // case T_False: {
+        //     RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_FALSE(unicode_buffer_info, *cur_nested_depth_addr, is_in_obj));
+        //     break;
+        // }
+        // case T_True: {
+        //     RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_TRUE(unicode_buffer_info, *cur_nested_depth_addr, is_in_obj));
+        //     break;
+        // }
         case T_None: {
-            RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_NULL(unicode_buffer_info, stack_vars->cur_nested_depth, is_in_obj));
+            RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_NULL(unicode_buffer_info, *cur_nested_depth_addr, is_in_obj));
             break;
         }
         case T_Float: {
-            RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_FLOAT(unicode_buffer_info, stack_vars->cur_nested_depth, val, is_in_obj));
+            RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_FLOAT(unicode_buffer_info, *cur_nested_depth_addr, val, is_in_obj));
             break;
         }
         case T_List: {
             Py_ssize_t this_list_size = PyList_GET_SIZE(val);
             if (unlikely(this_list_size == 0)) {
-                RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_EMPTY_ARR(unicode_buffer_info, stack_vars->cur_nested_depth, is_in_obj));
+                RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_EMPTY_ARR(unicode_buffer_info, *cur_nested_depth_addr, is_in_obj));
             } else {
-                RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_ARR_BEGIN(unicode_buffer_info, stack_vars->cur_nested_depth, is_in_obj));
+                RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_ARR_BEGIN(unicode_buffer_info, *cur_nested_depth_addr, is_in_obj));
                 CTN_SIZE_GROW();
-                EncodeCtnWithIndex *cur_write_ctn = stack_vars->ctn_stack + (stack_vars->cur_nested_depth++);
-                cur_write_ctn->ctn = stack_vars->cur_obj;
-                cur_write_ctn->index = stack_vars->cur_pos;
-                stack_vars->cur_obj = val;
-                stack_vars->cur_pos = 0;
-                stack_vars->cur_list_size = this_list_size;
+                EncodeCtnWithIndex *cur_write_ctn = ctn_stack + ((*cur_nested_depth_addr)++);
+                cur_write_ctn->ctn = *cur_obj_addr;
+                cur_write_ctn->index = *cur_pos_addr;
+                *cur_obj_addr = val;
+                *cur_pos_addr = 0;
+                *cur_list_size_addr = this_list_size;
                 return JumpFlag_ArrValBegin;
             }
             break;
         }
         case T_Dict: {
             if (unlikely(PyDict_GET_SIZE(val) == 0)) {
-                RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_EMPTY_OBJ(unicode_buffer_info, stack_vars->cur_nested_depth, is_in_obj));
+                RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_EMPTY_OBJ(unicode_buffer_info, *cur_nested_depth_addr, is_in_obj));
             } else {
-                RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_OBJ_BEGIN(unicode_buffer_info, stack_vars->cur_nested_depth, is_in_obj));
+                RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_OBJ_BEGIN(unicode_buffer_info, *cur_nested_depth_addr, is_in_obj));
                 CTN_SIZE_GROW();
-                EncodeCtnWithIndex *cur_write_ctn = stack_vars->ctn_stack + (stack_vars->cur_nested_depth++);
-                cur_write_ctn->ctn = stack_vars->cur_obj;
-                cur_write_ctn->index = stack_vars->cur_pos;
-                stack_vars->cur_obj = val;
-                stack_vars->cur_pos = 0;
+                EncodeCtnWithIndex *cur_write_ctn = ctn_stack + ((*cur_nested_depth_addr)++);
+                cur_write_ctn->ctn = *cur_obj_addr;
+                cur_write_ctn->index = *cur_pos_addr;
+                *cur_obj_addr = val;
+                *cur_pos_addr = 0;
                 return JumpFlag_DictPairBegin;
             }
             break;
@@ -603,16 +618,16 @@ force_inline EncodeValJumpFlag ENCODE_PROCESS_VAL(
         case T_Tuple: {
             Py_ssize_t this_list_size = PyTuple_Size(val);
             if (unlikely(this_list_size == 0)) {
-                RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_EMPTY_ARR(unicode_buffer_info, stack_vars->cur_nested_depth, is_in_obj));
+                RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_EMPTY_ARR(unicode_buffer_info, *cur_nested_depth_addr, is_in_obj));
             } else {
-                RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_ARR_BEGIN(unicode_buffer_info, stack_vars->cur_nested_depth, is_in_obj));
+                RETURN_JUMP_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_ARR_BEGIN(unicode_buffer_info, *cur_nested_depth_addr, is_in_obj));
                 CTN_SIZE_GROW();
-                EncodeCtnWithIndex *cur_write_ctn = stack_vars->ctn_stack + (stack_vars->cur_nested_depth++);
-                cur_write_ctn->ctn = stack_vars->cur_obj;
-                cur_write_ctn->index = stack_vars->cur_pos;
-                stack_vars->cur_obj = val;
-                stack_vars->cur_pos = 0;
-                stack_vars->cur_list_size = this_list_size;
+                EncodeCtnWithIndex *cur_write_ctn = ctn_stack + ((*cur_nested_depth_addr)++);
+                cur_write_ctn->ctn = *cur_obj_addr;
+                cur_write_ctn->index = *cur_pos_addr;
+                *cur_obj_addr = val;
+                *cur_pos_addr = 0;
+                *cur_list_size_addr = this_list_size;
                 return JumpFlag_TupleValBegin;
             }
             break;
@@ -630,10 +645,14 @@ force_inline EncodeValJumpFlag ENCODE_PROCESS_VAL(
 
 #define PYYJSON_DUMPS_OBJ PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
 
+#define _DUMPS_PASS_PARAMS key, val, cur_obj, cur_pos, cur_nested_depth, cur_list_size, ctn_stack, unicode_info, cur_is_tuple
+
 static force_noinline PyObject *
 PYYJSON_DUMPS_OBJ(
 #if COMPILE_UCS_LEVEL > 0
-        EncodeStackVars _stack_vars,
+        PyObject *key, PyObject *val, PyObject *cur_obj,
+        Py_ssize_t cur_pos, Py_ssize_t cur_nested_depth, Py_ssize_t cur_list_size,
+        EncodeCtnWithIndex *ctn_stack, UnicodeInfo unicode_info, bool cur_is_tuple,
         EncodeUnicodeBufferInfo _unicode_buffer_info,
         EncodeCallFlag encode_call_flag
 #else
@@ -647,58 +666,68 @@ PYYJSON_DUMPS_OBJ(
 
 #if COMPILE_UCS_LEVEL == 0
     EncodeUnicodeBufferInfo _unicode_buffer_info;
-    EncodeStackVars _stack_vars;
-    GOTO_FAIL_ON_UNLIKELY_ERR(!init_unicode_buffer(&_unicode_buffer_info) || !init_stack_vars(&_stack_vars, in_obj));
+    PyObject *key, *val;
+    PyObject *cur_obj = in_obj;
+    Py_ssize_t cur_pos = 0;
+    Py_ssize_t cur_nested_depth = 0;
+    Py_ssize_t cur_list_size;
+    // alias thread local buffer
+    EncodeCtnWithIndex *ctn_stack;
+    UnicodeInfo unicode_info;
+    bool cur_is_tuple;
+    memset(&unicode_info, 0, sizeof(unicode_info));
+    //
+    GOTO_FAIL_ON_UNLIKELY_ERR(!init_unicode_buffer(&_unicode_buffer_info) || !init_encode_ctn_stack(&ctn_stack));
 
     // this is the starting, we don't need an indent before container.
     // so is_in_obj always pass true
-    if (PyDict_CheckExact(_stack_vars.cur_obj)) {
-        if (unlikely(PyDict_GET_SIZE(_stack_vars.cur_obj) == 0)) {
-            bool _c = UNICODE_BUFFER_APPEND_EMPTY_OBJ(&_unicode_buffer_info, _stack_vars.cur_nested_depth, true);
+    if (PyDict_CheckExact(cur_obj)) {
+        if (unlikely(PyDict_GET_SIZE(cur_obj) == 0)) {
+            bool _c = UNICODE_BUFFER_APPEND_EMPTY_OBJ(&_unicode_buffer_info, cur_nested_depth, true);
             assert(_c);
             goto success;
         }
         {
-            bool _c = UNICODE_BUFFER_APPEND_OBJ_BEGIN(&_unicode_buffer_info, _stack_vars.cur_nested_depth, true);
+            bool _c = UNICODE_BUFFER_APPEND_OBJ_BEGIN(&_unicode_buffer_info, cur_nested_depth, true);
             assert(_c);
         }
-        assert(!_stack_vars.cur_nested_depth);
-        _stack_vars.cur_nested_depth = 1;
+        assert(!cur_nested_depth);
+        cur_nested_depth = 1;
         // NOTE: ctn_stack[0] is always invalid
         goto dict_pair_begin;
-    } else if (PyList_CheckExact(_stack_vars.cur_obj)) {
-        _stack_vars.cur_list_size = PyList_GET_SIZE(_stack_vars.cur_obj);
-        if (unlikely(_stack_vars.cur_list_size == 0)) {
-            bool _c = UNICODE_BUFFER_APPEND_EMPTY_ARR(&_unicode_buffer_info, _stack_vars.cur_nested_depth, true);
+    } else if (PyList_CheckExact(cur_obj)) {
+        cur_list_size = PyList_GET_SIZE(cur_obj);
+        if (unlikely(cur_list_size == 0)) {
+            bool _c = UNICODE_BUFFER_APPEND_EMPTY_ARR(&_unicode_buffer_info, cur_nested_depth, true);
             assert(_c);
             goto success;
         }
         {
-            bool _c = UNICODE_BUFFER_APPEND_ARR_BEGIN(&_unicode_buffer_info, _stack_vars.cur_nested_depth, true);
+            bool _c = UNICODE_BUFFER_APPEND_ARR_BEGIN(&_unicode_buffer_info, cur_nested_depth, true);
             assert(_c);
         }
-        assert(!_stack_vars.cur_nested_depth);
-        _stack_vars.cur_nested_depth = 1;
+        assert(!cur_nested_depth);
+        cur_nested_depth = 1;
         // NOTE: ctn_stack[0] is always invalid
-        _stack_vars.cur_is_tuple = false;
+        cur_is_tuple = false;
         goto arr_val_begin;
     } else {
-        if (unlikely(!PyTuple_CheckExact(_stack_vars.cur_obj))) {
+        if (unlikely(!PyTuple_CheckExact(cur_obj))) {
             goto fail_ctntype;
         }
-        _stack_vars.cur_list_size = PyTuple_GET_SIZE(_stack_vars.cur_obj);
-        if (unlikely(_stack_vars.cur_list_size == 0)) {
-            bool _c = UNICODE_BUFFER_APPEND_EMPTY_ARR(&_unicode_buffer_info, _stack_vars.cur_nested_depth, true);
+        cur_list_size = PyTuple_GET_SIZE(cur_obj);
+        if (unlikely(cur_list_size == 0)) {
+            bool _c = UNICODE_BUFFER_APPEND_EMPTY_ARR(&_unicode_buffer_info, cur_nested_depth, true);
             assert(_c);
             goto success;
         }
         {
-            bool _c = UNICODE_BUFFER_APPEND_ARR_BEGIN(&_unicode_buffer_info, _stack_vars.cur_nested_depth, true);
+            bool _c = UNICODE_BUFFER_APPEND_ARR_BEGIN(&_unicode_buffer_info, cur_nested_depth, true);
             assert(_c);
         }
-        assert(!_stack_vars.cur_nested_depth);
-        _stack_vars.cur_nested_depth = 1;
-        _stack_vars.cur_is_tuple = true;
+        assert(!cur_nested_depth);
+        cur_nested_depth = 1;
+        cur_is_tuple = true;
         goto arr_val_begin;
     }
 
@@ -706,11 +735,11 @@ PYYJSON_DUMPS_OBJ(
 #else
     switch (encode_call_flag) {
         case CallFlag_ArrVal: {
-            if (PyList_CheckExact(_stack_vars.cur_obj)) {
-                _stack_vars.cur_is_tuple = false;
+            if (PyList_CheckExact(cur_obj)) {
+                cur_is_tuple = false;
                 goto arr_val_begin;
             } else {
-                _stack_vars.cur_is_tuple = true;
+                cur_is_tuple = true;
                 goto arr_val_begin;
             }
             break;
@@ -732,45 +761,45 @@ PYYJSON_DUMPS_OBJ(
 #endif
 
 dict_pair_begin:;
-    assert(PyDict_GET_SIZE(_stack_vars.cur_obj) != 0);
-    if (pydict_next(_stack_vars.cur_obj, &_stack_vars.cur_pos, &_stack_vars.key, &_stack_vars.val)) {
-        if (unlikely(!PyUnicode_CheckExact(_stack_vars.key))) {
+    assert(PyDict_GET_SIZE(cur_obj) != 0);
+    if (pydict_next(cur_obj, &cur_pos, &key, &val)) {
+        if (unlikely(!PyUnicode_CheckExact(key))) {
             goto fail_keytype;
         }
-        GOTO_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_KEY(_stack_vars.key, &_unicode_buffer_info, &_stack_vars.unicode_info, _stack_vars.cur_nested_depth));
+        GOTO_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_KEY(key, &_unicode_buffer_info, &unicode_info, cur_nested_depth));
         {
 #if COMPILE_UCS_LEVEL < 1
-            if (unlikely(_stack_vars.unicode_info.cur_ucs_type == 1)) {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(_stack_vars, _unicode_buffer_info, CallFlag_Key);
+            if (unlikely(unicode_info.cur_ucs_type == 1)) {
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_Key);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 2
-            if (unlikely(_stack_vars.unicode_info.cur_ucs_type == 2)) {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(_stack_vars, _unicode_buffer_info, CallFlag_Key);
+            if (unlikely(unicode_info.cur_ucs_type == 2)) {
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_Key);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 4
-            if (unlikely(_stack_vars.unicode_info.cur_ucs_type == 4)) {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(_stack_vars, _unicode_buffer_info, CallFlag_Key);
+            if (unlikely(unicode_info.cur_ucs_type == 4)) {
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_Key);
             }
 #endif
         }
     dict_key_done:;
         //
-        EncodeValJumpFlag jump_flag = ENCODE_PROCESS_VAL(&_unicode_buffer_info, _stack_vars.val, &_stack_vars, true);
+        EncodeValJumpFlag jump_flag = ENCODE_PROCESS_VAL(&_unicode_buffer_info, val, &cur_obj, &cur_pos, &cur_nested_depth, &cur_list_size, ctn_stack, &unicode_info, true);
         switch ((jump_flag)) {
             case JumpFlag_Default: {
                 break;
             }
             case JumpFlag_ArrValBegin: {
-                _stack_vars.cur_is_tuple = false;
+                cur_is_tuple = false;
                 goto arr_val_begin;
             }
             case JumpFlag_DictPairBegin: {
                 goto dict_pair_begin;
             }
             case JumpFlag_TupleValBegin: {
-                _stack_vars.cur_is_tuple = true;
+                cur_is_tuple = true;
                 goto arr_val_begin;
             }
             case JumpFlag_Fail: {
@@ -778,17 +807,17 @@ dict_pair_begin:;
             }
 #if COMPILE_UCS_LEVEL < 1
             case JumpFlag_Elevate1_ObjVal: {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(_stack_vars, _unicode_buffer_info, CallFlag_ObjVal);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ObjVal);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 2
             case JumpFlag_Elevate2_ObjVal: {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(_stack_vars, _unicode_buffer_info, CallFlag_ObjVal);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ObjVal);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 4
             case JumpFlag_Elevate4_ObjVal: {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(_stack_vars, _unicode_buffer_info, CallFlag_ObjVal);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ObjVal);
             }
 #endif
             default: {
@@ -798,28 +827,28 @@ dict_pair_begin:;
         goto dict_pair_begin;
     } else {
         // dict end
-        assert(_stack_vars.cur_nested_depth);
-        EncodeCtnWithIndex *last_pos = _stack_vars.ctn_stack + (--_stack_vars.cur_nested_depth);
+        assert(cur_nested_depth);
+        EncodeCtnWithIndex *last_pos = ctn_stack + (--cur_nested_depth);
 
-        GOTO_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_OBJ_END(&_unicode_buffer_info, _stack_vars.cur_nested_depth));
-        if (unlikely(_stack_vars.cur_nested_depth == 0)) {
+        GOTO_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_OBJ_END(&_unicode_buffer_info, cur_nested_depth));
+        if (unlikely(cur_nested_depth == 0)) {
             goto success;
         }
 
         // update cur_obj and cur_pos
-        _stack_vars.cur_obj = last_pos->ctn;
-        _stack_vars.cur_pos = last_pos->index;
+        cur_obj = last_pos->ctn;
+        cur_pos = last_pos->index;
 
-        if (PyDict_CheckExact(_stack_vars.cur_obj)) {
+        if (PyDict_CheckExact(cur_obj)) {
             goto dict_pair_begin;
-        } else if (PyList_CheckExact(_stack_vars.cur_obj)) {
-            _stack_vars.cur_list_size = PyList_GET_SIZE(_stack_vars.cur_obj);
-            _stack_vars.cur_is_tuple = false;
+        } else if (PyList_CheckExact(cur_obj)) {
+            cur_list_size = PyList_GET_SIZE(cur_obj);
+            cur_is_tuple = false;
             goto arr_val_begin;
         } else {
-            assert(PyTuple_CheckExact(_stack_vars.cur_obj));
-            _stack_vars.cur_list_size = PyTuple_GET_SIZE(_stack_vars.cur_obj);
-            _stack_vars.cur_is_tuple = true;
+            assert(PyTuple_CheckExact(cur_obj));
+            cur_list_size = PyTuple_GET_SIZE(cur_obj);
+            cur_is_tuple = true;
             goto arr_val_begin;
         }
     }
@@ -827,30 +856,30 @@ dict_pair_begin:;
     PYYJSON_UNREACHABLE();
 
 arr_val_begin:;
-    assert(_stack_vars.cur_list_size != 0);
+    assert(cur_list_size != 0);
 
-    if (_stack_vars.cur_pos < _stack_vars.cur_list_size) {
-        if (likely(!_stack_vars.cur_is_tuple)) {
-            _stack_vars.val = PyList_GET_ITEM(_stack_vars.cur_obj, _stack_vars.cur_pos);
+    if (cur_pos < cur_list_size) {
+        if (likely(!cur_is_tuple)) {
+            val = PyList_GET_ITEM(cur_obj, cur_pos);
         } else {
-            _stack_vars.val = PyTuple_GET_ITEM(_stack_vars.cur_obj, _stack_vars.cur_pos);
+            val = PyTuple_GET_ITEM(cur_obj, cur_pos);
         }
-        _stack_vars.cur_pos++;
+        cur_pos++;
         //
-        EncodeValJumpFlag jump_flag = ENCODE_PROCESS_VAL(&_unicode_buffer_info, _stack_vars.val, &_stack_vars, false);
+        EncodeValJumpFlag jump_flag = ENCODE_PROCESS_VAL(&_unicode_buffer_info, val, &cur_obj, &cur_pos, &cur_nested_depth, &cur_list_size, ctn_stack, &unicode_info, false);
         switch ((jump_flag)) {
             case JumpFlag_Default: {
                 break;
             }
             case JumpFlag_ArrValBegin: {
-                _stack_vars.cur_is_tuple = false;
+                cur_is_tuple = false;
                 goto arr_val_begin;
             }
             case JumpFlag_DictPairBegin: {
                 goto dict_pair_begin;
             }
             case JumpFlag_TupleValBegin: {
-                _stack_vars.cur_is_tuple = true;
+                cur_is_tuple = true;
                 goto arr_val_begin;
             }
             case JumpFlag_Fail: {
@@ -858,17 +887,17 @@ arr_val_begin:;
             }
 #if COMPILE_UCS_LEVEL < 1
             case JumpFlag_Elevate1_ArrVal: {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(_stack_vars, _unicode_buffer_info, CallFlag_ArrVal);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ArrVal);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 2
             case JumpFlag_Elevate2_ArrVal: {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(_stack_vars, _unicode_buffer_info, CallFlag_ArrVal);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ArrVal);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 4
             case JumpFlag_Elevate4_ArrVal: {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(_stack_vars, _unicode_buffer_info, CallFlag_ArrVal);
+                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ArrVal);
             }
 #endif
             default: {
@@ -879,51 +908,51 @@ arr_val_begin:;
         goto arr_val_begin;
     } else {
         // list end
-        assert(_stack_vars.cur_nested_depth);
-        EncodeCtnWithIndex *last_pos = _stack_vars.ctn_stack + (--_stack_vars.cur_nested_depth);
+        assert(cur_nested_depth);
+        EncodeCtnWithIndex *last_pos = ctn_stack + (--cur_nested_depth);
 
-        GOTO_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_ARR_END(&_unicode_buffer_info, _stack_vars.cur_nested_depth));
-        if (unlikely(_stack_vars.cur_nested_depth == 0)) {
+        GOTO_FAIL_ON_UNLIKELY_ERR(!UNICODE_BUFFER_APPEND_ARR_END(&_unicode_buffer_info, cur_nested_depth));
+        if (unlikely(cur_nested_depth == 0)) {
             goto success;
         }
 
         // update cur_obj and cur_pos
-        _stack_vars.cur_obj = last_pos->ctn;
-        _stack_vars.cur_pos = last_pos->index;
+        cur_obj = last_pos->ctn;
+        cur_pos = last_pos->index;
 
-        if (PyDict_CheckExact(_stack_vars.cur_obj)) {
+        if (PyDict_CheckExact(cur_obj)) {
             goto dict_pair_begin;
-        } else if (PyList_CheckExact(_stack_vars.cur_obj)) {
-            _stack_vars.cur_list_size = PyList_GET_SIZE(_stack_vars.cur_obj);
-            _stack_vars.cur_is_tuple = false;
+        } else if (PyList_CheckExact(cur_obj)) {
+            cur_list_size = PyList_GET_SIZE(cur_obj);
+            cur_is_tuple = false;
             goto arr_val_begin;
         } else {
-            assert(PyTuple_CheckExact(_stack_vars.cur_obj));
-            _stack_vars.cur_list_size = PyTuple_GET_SIZE(_stack_vars.cur_obj);
-            _stack_vars.cur_is_tuple = true;
+            assert(PyTuple_CheckExact(cur_obj));
+            cur_list_size = PyTuple_GET_SIZE(cur_obj);
+            cur_is_tuple = true;
             goto arr_val_begin;
         }
     }
     PYYJSON_UNREACHABLE();
 
 success:;
-    assert(_stack_vars.cur_nested_depth == 0);
+    assert(cur_nested_depth == 0);
     // remove trailing comma
     (_WRITER(&_unicode_buffer_info))--;
 
 #if COMPILE_UCS_LEVEL == 4
-    ucs2_elevate4(&_unicode_buffer_info, &_stack_vars.unicode_info);
-    ucs1_elevate4(&_unicode_buffer_info, &_stack_vars.unicode_info);
-    ascii_elevate4(&_unicode_buffer_info, &_stack_vars.unicode_info);
+    ucs2_elevate4(&_unicode_buffer_info, &unicode_info);
+    ucs1_elevate4(&_unicode_buffer_info, &unicode_info);
+    ascii_elevate4(&_unicode_buffer_info, &unicode_info);
 #endif
 #if COMPILE_UCS_LEVEL == 2
-    ucs1_elevate2(&_unicode_buffer_info, &_stack_vars.unicode_info);
-    ascii_elevate2(&_unicode_buffer_info, &_stack_vars.unicode_info);
+    ucs1_elevate2(&_unicode_buffer_info, &unicode_info);
+    ascii_elevate2(&_unicode_buffer_info, &unicode_info);
 #endif
 #if COMPILE_UCS_LEVEL == 1
-    ascii_elevate1(&_unicode_buffer_info, &_stack_vars.unicode_info);
+    ascii_elevate1(&_unicode_buffer_info, &unicode_info);
 #endif
-    assert(_stack_vars.unicode_info.cur_ucs_type == COMPILE_UCS_LEVEL);
+    assert(unicode_info.cur_ucs_type == COMPILE_UCS_LEVEL);
     Py_ssize_t final_len = GET_UNICODE_BUFFER_FINAL_LEN(&_unicode_buffer_info);
     GOTO_FAIL_ON_UNLIKELY_ERR(!resize_to_fit_pyunicode(&_unicode_buffer_info, final_len, COMPILE_UCS_LEVEL));
     init_pyunicode(_unicode_buffer_info.head, final_len, COMPILE_UCS_LEVEL);
@@ -940,6 +969,8 @@ fail_keytype:;
     PyErr_SetString(JSONEncodeError, "Expected `str` as key");
     goto fail;
 }
+
+#undef _DUMPS_PASS_PARAMS
 
 #include "compile_context/iw_out.inl.h"
 #include "compile_context/sw_out.inl.h"

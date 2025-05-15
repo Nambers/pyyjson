@@ -2,8 +2,8 @@
 #define PYYJSON_ENCODE_SHARED_H
 
 #include "pyyjson.h"
+#include "simd/simd_detect.h"
 #include <stddef.h>
-
 
 #define CONTROL_SEQ_ESCAPE_PREFIX _Slash, 'u', '0', '0'
 #define CONTROL_SEQ_ESCAPE_SUFFIX '\0', '\0'
@@ -137,8 +137,9 @@ force_inline int pydict_next(PyObject *op, Py_ssize_t *ppos, PyObject **pkey,
 typedef enum PyFastTypes {
     T_Unicode,
     T_Long,
-    T_False,
-    T_True,
+    T_Bool,
+    // T_False,
+    // T_True,
     T_None,
     T_Float,
     T_List,
@@ -159,17 +160,67 @@ extern PyTypeObject *PyNone_Type;
 /* Get the value type as fast as possible. */
 force_inline PyFastTypes fast_type_check(PyObject *val) {
     PyTypeObject *type = Py_TYPE(val);
+    assert(type);
+    // #if PYYJSON_X86 && __AVX2__
+    // #    if PY_MINOR_VERSION >= 13
+    //     static const pyyjson_align(64) PyTypeObject *vector_py_types[8] = {
+    //             &PyUnicode_Type,
+    //             &PyLong_Type,
+    //             &PyBool_Type,
+    //             0,
+    //             &PyFloat_Type,
+    //             &PyList_Type,
+    //             &PyDict_Type,
+    //             &PyTuple_Type,
+    //     };
+    // #    else
+    //     static const pyyjson_align(64) PyTypeObject *vector_py_types[8] = {
+    //             &PyUnicode_Type,
+    //             &PyLong_Type,
+    //             &PyBool_Type,
+    //             PyNone_Type,
+    //             &PyFloat_Type,
+    //             &PyList_Type,
+    //             &PyDict_Type,
+    //             &PyTuple_Type,
+    //     };
+    // #    endif
+    // #    if __AVX512F__
+    //     __m512i vec = _mm512_set1_epi64((i64)(uintptr_t)type);
+    //     u8 mask = (u8)_mm512_cmpeq_epi64_mask(vec, *(__m512i *)vector_py_types);
+    //     if (unlikely(!mask)) {
+    //         if (PY_MINOR_VERSION >= 13 && type == PyNone_Type) {
+    //             return T_None;
+    //         }
+    //         return Unknown;
+    //     }
+    //     usize index = u32_tz_bits(mask);
+    //     assert(index < 8);
+    //     return (PyFastTypes)index;
+    // #    else
+    //     __m256i vec = _mm256_set1_epi64x((i64)(uintptr_t)type);
+    //     __m256i m1 = _mm256_cmpeq_epi64(vec, *(PYYJSON_CAST(__m256i *, vector_py_types) + 0));
+    //     if (likely(!_mm256_testz_si256(m1, m1))) {
+    //         u32 mask = (u32)_mm256_movemask_epi8(m1);
+    //         return PYYJSON_CAST(PyFastTypes, u32_tz_bits(mask) / 8);
+    //     }
+    //     if (PY_MINOR_VERSION >= 13 && type == PyNone_Type) {
+    //         return T_None;
+    //     }
+    //     m1 = _mm256_cmpeq_epi64(vec, *(PYYJSON_CAST(__m256i *, vector_py_types) + 1));
+    //     if (likely(!_mm256_testz_si256(m1, m1))) {
+    //         u32 mask = (u32)_mm256_movemask_epi8(m1);
+    //         return PYYJSON_CAST(PyFastTypes, u32_tz_bits(mask) / 8 + 4);
+    //     }
+    //     return Unknown;
+    // #    endif
+    // #else
     if (type == &PyUnicode_Type) {
         return T_Unicode;
     } else if (type == &PyLong_Type) {
         return T_Long;
     } else if (type == &PyBool_Type) {
-        if (val == Py_False) {
-            return T_False;
-        } else {
-            assert(val == Py_True);
-            return T_True;
-        }
+        return T_Bool;
     } else if (type == PyNone_Type) {
         return T_None;
     } else if (type == &PyFloat_Type) {
@@ -183,6 +234,7 @@ force_inline PyFastTypes fast_type_check(PyObject *val) {
     } else {
         return Unknown;
     }
+    // #endif
 }
 
 /*==============================================================================
