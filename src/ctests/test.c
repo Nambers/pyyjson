@@ -296,7 +296,7 @@ int SIMD_NAME_MODIFIER(test_ucs4_encode_2bytes_utf8)(void) {
     for (int i = 0; i < COUNT_OF(input); ++i) {
         input[i] = get_random_2bytes_u16();
     }
-    ucs4_encode_2bytes_utf8_sse2((vector_a_u8_128) * (vector_u_u8_128 *)input, output);
+    ucs4_encode_2bytes_utf8_sse2(output, (vector_a_u8_128) * (vector_u_u8_128 *)input);
     return check_ucs4_2bytes(input, output, COUNT_OF(input));
 #    endif
 #endif

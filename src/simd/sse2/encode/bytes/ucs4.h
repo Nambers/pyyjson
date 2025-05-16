@@ -46,7 +46,7 @@ force_inline void ucs4_encode_3bytes_utf8_ssse3(u8 *writer, vector_a x) {
 }
 #endif
 
-force_inline void ucs4_encode_2bytes_utf8_sse2(vector_a x, u8 *writer) {
+force_inline void ucs4_encode_2bytes_utf8_sse2(u8 *writer, vector_a x) {
     /* abcdefgh|12300000|00000000|00000000 -> gh123[mmm]|abcdef[mm] */
     vector_a_u8_128 m1 = broadcast_u32_128(0xfff83f00);
     vector_a_u16_64 m2 = {0x80c0, 0x80c0, 0x80c0, 0x80c0};
@@ -162,7 +162,7 @@ _2bytes:;
         m = high_mask(m_not_2bytes, len);
         shift = sizeof(u32) * (READ_BATCH_COUNT - len);
         tail_vec = runtime_byte_rshift_128(vec, shift);
-        ucs4_encode_2bytes_utf8_sse2(tail_vec, writer);
+        ucs4_encode_2bytes_utf8_sse2(writer, tail_vec);
         if (likely(testz(m))) {
             writer += len * 2;
             goto finished;
