@@ -453,7 +453,7 @@ force_inline bool _2bytes_in_ucs2_encode_loop(u8 **dst_addr, const u16 **src_add
 #    elif COMPILE_SIMD_BITS == 256
     ucs2_encode_2bytes_utf8_avx2(dst, vec);
 #    else
-    ucs2_encode_2bytes_utf8_sse2(vec, dst);
+    ucs2_encode_2bytes_utf8_sse2(dst, vec);
 #    endif
 #else
     // TODO

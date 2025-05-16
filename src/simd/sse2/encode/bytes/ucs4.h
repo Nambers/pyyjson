@@ -15,26 +15,53 @@
 #include "compile_context/srw_in.inl.h"
 
 #if __SSSE3__
-force_inline void ucs4_encode_3bytes_utf8_ssse3(vector_a x, u8 *writer);
+force_inline void ucs4_encode_3bytes_utf8_ssse3(u8 *writer, vector_a x) {
+    static const vector_a_u8_128 t1 = {
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            0x80, 0x80, 0x80, 0x80};
+    static const vector_a_u8_128 m1 = {
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0xff, 0xff, 0xff};
+    static const vector_a_u8_128 m2 = {
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0, 0, 0, 0};
+    vector_a x1 = rshift_u32_128(x, 6);
+    vector_a x2 = rshift_u32_128(x, 12);
+    vector_a_u8_128 x3 = shuffle_128(x, t1);
+    vector_a_u8_128 x4 = shuffle_128(x1, t1);
+    x4 = byte_rshift_128(x4, 1);
+    vector_a_u8_128 x5 = shuffle_128(x2, t1);
+    x5 = byte_rshift_128(x5, 2);
+    vector_a_u8_128 x6 = ((x3 | x4 | x5) & m1) | m2;
+    memcpy(writer, &x6, 12);
+}
 #endif
 
-force_inline void ucs4_encode_2bytes_utf8_sse2(vector_a_u32_128 x, u8 *writer) {
+force_inline void ucs4_encode_2bytes_utf8_sse2(vector_a x, u8 *writer) {
     /* abcdefgh|12300000|00000000|00000000 -> gh123[mmm]|abcdef[mm] */
     vector_a_u8_128 m1 = broadcast_u32_128(0xfff83f00);
     vector_a_u16_64 m2 = {0x80c0, 0x80c0, 0x80c0, 0x80c0};
     /* x1 = gh123000|00000000|00000000|00000000 */
-    vector_a_u32_128 x1 = rshift_u32_128(x, 6);
+    vector_a x1 = rshift_u32_128(x, 6);
     /* x2 = ????????|abcdefgh|12300000|00000000 */
-    vector_a_u32_128 x2 = byte_lshift_128(x, 1);
+    vector_a x2 = byte_lshift_128(x, 1);
     /* x3 = 00000000|abcdef00|00000000|00000000 */
-    vector_a_u32_128 x3 = x2 & m1;
+    vector_a x3 = x2 & m1;
     /* x4 = gh123000|abcdef00|00000000|00000000 */
-    vector_a_u32_128 x4 = x1 | x3;
+    vector_a x4 = x1 | x3;
     /* u = gh123000|abcdef00 */
     vector_a_u16_64 u = cvt_u32_to_u16_128(x4);
     u = u | m2;
     *(vector_u_u16_64 *)writer = u;
-    // memcpy(writer, &u, 8);
 }
 
 /* 
@@ -164,7 +191,7 @@ _3bytes:;
         m = high_mask(m_not_3bytes, len);
         shift = sizeof(u32) * (READ_BATCH_COUNT - len);
         tail_vec = runtime_byte_rshift_128(vec, shift);
-        ucs4_encode_3bytes_utf8_ssse3(tail_vec, writer);
+        ucs4_encode_3bytes_utf8_ssse3(writer, tail_vec);
         if (likely(testz(m))) {
             writer += len * 3;
             goto finished;
