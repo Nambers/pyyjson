@@ -31,7 +31,6 @@ force_inline void check_ascii_in_ucs1_and_get_done_countx4(unionvector_a_x4 vec,
     vector_a t1 = broadcast(_Quote);
     vector_a t2 = broadcast(_Slash);
     vector_a t3 = broadcast(ControlMax);
-    vector_a t4 = broadcast(0x80);
 #if PYYJSON_X86 && COMPILE_SIMD_BITS == 512
     struct {
         u64 x[4];
@@ -41,50 +40,46 @@ force_inline void check_ascii_in_ucs1_and_get_done_countx4(unionvector_a_x4 vec,
 
     m.x[0] = cmpeq_bitmask(vec.x[0], t1) |
              cmpeq_bitmask(vec.x[0], t2) |
-             unsigned_cmplt_bitmask(vec.x[0], t3) |
-             get_bitmask_from(vec.x[0]);
+             signed_cmpgt_bitmask(t3, vec.x[0]);
     m.x[1] = cmpeq_bitmask(vec.x[1], t1) |
              cmpeq_bitmask(vec.x[1], t2) |
-             unsigned_cmplt_bitmask(vec.x[1], t3) |
-             get_bitmask_from(vec.x[1]);
+             signed_cmpgt_bitmask(t3, vec.x[1]);
     m.x[2] = cmpeq_bitmask(vec.x[2], t1) |
              cmpeq_bitmask(vec.x[2], t2) |
-             unsigned_cmplt_bitmask(vec.x[2], t3) |
-             get_bitmask_from(vec.x[2]);
+             signed_cmpgt_bitmask(t3, vec.x[2]);
     m.x[3] = cmpeq_bitmask(vec.x[3], t1) |
              cmpeq_bitmask(vec.x[3], t2) |
-             unsigned_cmplt_bitmask(vec.x[3], t3) |
-             get_bitmask_from(vec.x[3]);
+             signed_cmpgt_bitmask(t3, vec.x[3]);
 #elif PYYJSON_X86
     // see CHECK_ESCAPE_LT512_USE_SIGNED_SATURATED_MINUS
     unionvector_a_x4 m;
     vector_a r;
-    m.x[0] = (vec.x[0] == t1) | (vec.x[0] == t2) | unsigned_saturate_minus(t3, vec.x[0]) | (vec.x[0] & t4);
-    m.x[1] = (vec.x[1] == t1) | (vec.x[1] == t2) | unsigned_saturate_minus(t3, vec.x[1]) | (vec.x[1] & t4);
-    m.x[2] = (vec.x[2] == t1) | (vec.x[2] == t2) | unsigned_saturate_minus(t3, vec.x[2]) | (vec.x[2] & t4);
-    m.x[3] = (vec.x[3] == t1) | (vec.x[3] == t2) | unsigned_saturate_minus(t3, vec.x[3]) | (vec.x[3] & t4);
-#else
+    m.x[0] = (vec.x[0] == t1) | (vec.x[0] == t2) | signed_cmpgt(t3, vec.x[0]);
+    m.x[1] = (vec.x[1] == t1) | (vec.x[1] == t2) | signed_cmpgt(t3, vec.x[1]);
+    m.x[2] = (vec.x[2] == t1) | (vec.x[2] == t2) | signed_cmpgt(t3, vec.x[2]);
+    m.x[3] = (vec.x[3] == t1) | (vec.x[3] == t2) | signed_cmpgt(t3, vec.x[3]);
+#elif PYYJSON_AARCH
     unionvector_a_x4 m;
     vector_a r;
-    m.x[0] = (vec.x[0] == t1) | (vec.x[0] == t2) | (vec.x[0] < t3) | (vec.x[0] >= t4);
-    m.x[1] = (vec.x[1] == t1) | (vec.x[1] == t2) | (vec.x[1] < t3) | (vec.x[1] >= t4);
-    m.x[2] = (vec.x[2] == t1) | (vec.x[2] == t2) | (vec.x[2] < t3) | (vec.x[2] >= t4);
-    m.x[3] = (vec.x[3] == t1) | (vec.x[3] == t2) | (vec.x[3] < t3) | (vec.x[3] >= t4);
+    m.x[0] = (vec.x[0] == t1) | (vec.x[0] == t2) | signed_cmpgt(t3, vec.x[0]);
+    m.x[1] = (vec.x[1] == t1) | (vec.x[1] == t2) | signed_cmpgt(t3, vec.x[1]);
+    m.x[2] = (vec.x[2] == t1) | (vec.x[2] == t2) | signed_cmpgt(t3, vec.x[2]);
+    m.x[3] = (vec.x[3] == t1) | (vec.x[3] == t2) | signed_cmpgt(t3, vec.x[3]);
 #endif
 
     r = m.x[0] | m.x[1];
     r = r | (m.x[2] | m.x[3]);
-
-    if (testz_escape_mask(r)) {
-        *out_checked = true;
-    } else {
-        *out_checked = false;
+    //
+    bool checked = testz_escape_mask(r);
+    *out_checked = checked;
+    //
+    if (unlikely(!checked)) {
         usize done_count = 0;
         for (int i = 0; i < 4; ++i) {
             if (testz_escape_mask(m.x[i])) {
                 done_count += READ_BATCH_COUNT;
             } else {
-                done_count += escape_anymask_to_done_count(m.x[i]);
+                done_count += escape_anymask_to_done_count_no_eq0(m.x[i]);
                 break;
             }
         }
@@ -96,26 +91,24 @@ force_inline void check_ascii_in_ucs1_and_get_done_count(vector_a vec, bool *out
     vector_a t1 = broadcast(_Quote);
     vector_a t2 = broadcast(_Slash);
     vector_a t3 = broadcast(ControlMax);
-    vector_a t4 = broadcast(0x80);
 #if PYYJSON_X86 && COMPILE_SIMD_BITS == 512
     u64 m;
 
     m = cmpeq_bitmask(vec, t1) |
         cmpeq_bitmask(vec, t2) |
-        unsigned_cmplt_bitmask(vec, t3) |
-        get_bitmask_from(vec);
+        signed_cmpgt_bitmask(t3, vec);
 #elif PYYJSON_X86
     // see CHECK_ESCAPE_LT512_USE_SIGNED_SATURATED_MINUS
     vector_a m;
-    m = (vec == t1) | (vec == t2) | unsigned_saturate_minus(t3, vec) | (vec & t4);
+    m = (vec == t1) | (vec == t2) | signed_cmpgt(t3, vec);
 #else
     vector_a m;
-    m = (vec == t1) | (vec == t2) | (vec < t3) | (vec >= t4);
+    m = (vec == t1) | (vec == t2) | signed_cmpgt(t3, vec);
 #endif
     bool checked = testz_escape_mask(m);
     *out_checked = checked;
-    if (!checked) {
-        *out_done_count = escape_anymask_to_done_count(m);
+    if (unlikely(!checked)) {
+        *out_done_count = escape_anymask_to_done_count_no_eq0(m);
     }
 }
 
@@ -246,60 +239,58 @@ force_inline void check_ascii_in_ucs2_and_get_done_countx4(unionvector_a_x4 vec,
     vector_a t1 = broadcast(_Quote);
     vector_a t2 = broadcast(_Slash);
     vector_a t3 = broadcast(ControlMax);
-    vector_a t4 = broadcast(0x80);
+    vector_a t4 = broadcast(0x7f);
 #if PYYJSON_X86 && COMPILE_SIMD_BITS == 512
     struct {
         u32 x[4];
     } m;
 
     u32 r;
-
     m.x[0] = cmpeq_bitmask(vec.x[0], t1) |
              cmpeq_bitmask(vec.x[0], t2) |
-             unsigned_cmplt_bitmask(vec.x[0], t3) |
-             unsigned_cmpge_bitmask(vec.x[0], t4);
+             signed_cmpgt_bitmask(t3, vec.x[0]) |
+             signed_cmpgt_bitmask(vec.x[0], t4);
     m.x[1] = cmpeq_bitmask(vec.x[1], t1) |
              cmpeq_bitmask(vec.x[1], t2) |
-             unsigned_cmplt_bitmask(vec.x[1], t3) |
-             unsigned_cmpge_bitmask(vec.x[1], t4);
+             signed_cmpgt_bitmask(t3, vec.x[1]) |
+             signed_cmpgt_bitmask(vec.x[1], t4);
     m.x[2] = cmpeq_bitmask(vec.x[2], t1) |
              cmpeq_bitmask(vec.x[2], t2) |
-             unsigned_cmplt_bitmask(vec.x[2], t3) |
-             unsigned_cmpge_bitmask(vec.x[2], t4);
+             signed_cmpgt_bitmask(t3, vec.x[2]) |
+             signed_cmpgt_bitmask(vec.x[2], t4);
     m.x[3] = cmpeq_bitmask(vec.x[3], t1) |
              cmpeq_bitmask(vec.x[3], t2) |
-             unsigned_cmplt_bitmask(vec.x[3], t3) |
-             unsigned_cmpge_bitmask(vec.x[3], t4);
+             signed_cmpgt_bitmask(t3, vec.x[3]) |
+             signed_cmpgt_bitmask(vec.x[3], t4);
 #elif PYYJSON_X86
     // see CHECK_ESCAPE_LT512_USE_SIGNED_SATURATED_MINUS
     unionvector_a_x4 m;
     vector_a r;
-    m.x[0] = (vec.x[0] == t1) | (vec.x[0] == t2) | unsigned_saturate_minus(t3, vec.x[0]) | unsigned_saturate_minus(vec.x[0], broadcast(0x7f));
-    m.x[1] = (vec.x[1] == t1) | (vec.x[1] == t2) | unsigned_saturate_minus(t3, vec.x[1]) | unsigned_saturate_minus(vec.x[1], broadcast(0x7f));
-    m.x[2] = (vec.x[2] == t1) | (vec.x[2] == t2) | unsigned_saturate_minus(t3, vec.x[2]) | unsigned_saturate_minus(vec.x[2], broadcast(0x7f));
-    m.x[3] = (vec.x[3] == t1) | (vec.x[3] == t2) | unsigned_saturate_minus(t3, vec.x[3]) | unsigned_saturate_minus(vec.x[3], broadcast(0x7f));
+    m.x[0] = (vec.x[0] == t1) | (vec.x[0] == t2) | signed_cmpgt(t3, vec.x[0]) | signed_cmpgt(vec.x[0], t4);
+    m.x[1] = (vec.x[1] == t1) | (vec.x[1] == t2) | signed_cmpgt(t3, vec.x[1]) | signed_cmpgt(vec.x[1], t4);
+    m.x[2] = (vec.x[2] == t1) | (vec.x[2] == t2) | signed_cmpgt(t3, vec.x[2]) | signed_cmpgt(vec.x[2], t4);
+    m.x[3] = (vec.x[3] == t1) | (vec.x[3] == t2) | signed_cmpgt(t3, vec.x[3]) | signed_cmpgt(vec.x[3], t4);
 #else
     unionvector_a_x4 m;
     vector_a r;
-    m.x[0] = (vec.x[0] == t1) | (vec.x[0] == t2) | (vec.x[0] < t3) | (vec.x[0] >= t4);
-    m.x[1] = (vec.x[1] == t1) | (vec.x[1] == t2) | (vec.x[1] < t3) | (vec.x[1] >= t4);
-    m.x[2] = (vec.x[2] == t1) | (vec.x[2] == t2) | (vec.x[2] < t3) | (vec.x[2] >= t4);
-    m.x[3] = (vec.x[3] == t1) | (vec.x[3] == t2) | (vec.x[3] < t3) | (vec.x[3] >= t4);
+    m.x[0] = (vec.x[0] == t1) | (vec.x[0] == t2) | (vec.x[0] < t3) | (vec.x[0] > t4);
+    m.x[1] = (vec.x[1] == t1) | (vec.x[1] == t2) | (vec.x[1] < t3) | (vec.x[1] > t4);
+    m.x[2] = (vec.x[2] == t1) | (vec.x[2] == t2) | (vec.x[2] < t3) | (vec.x[2] > t4);
+    m.x[3] = (vec.x[3] == t1) | (vec.x[3] == t2) | (vec.x[3] < t3) | (vec.x[3] > t4);
 #endif
 
     r = m.x[0] | m.x[1];
     r = r | (m.x[2] | m.x[3]);
-
-    if (testz_escape_mask(r)) {
-        *out_checked = true;
-    } else {
-        *out_checked = false;
+    //
+    bool checked = testz_escape_mask(r);
+    *out_checked = checked;
+    if (unlikely(!checked)) {
         usize done_count = 0;
         for (int i = 0; i < 4; ++i) {
             if (testz_escape_mask(m.x[i])) {
                 done_count += READ_BATCH_COUNT;
             } else {
-                done_count += escape_anymask_to_done_count(m.x[i]);
+                done_count += escape_anymask_to_done_count_no_eq0(m.x[i]);
                 break;
             }
         }
@@ -311,28 +302,24 @@ force_inline void check_ascii_in_ucs2_and_get_done_count(vector_a vec, bool *out
     vector_a t1 = broadcast(_Quote);
     vector_a t2 = broadcast(_Slash);
     vector_a t3 = broadcast(ControlMax);
-    vector_a t4 = broadcast(0x80);
+    vector_a t4 = broadcast(0x7f);
 #if PYYJSON_X86 && COMPILE_SIMD_BITS == 512
     u32 m;
-
     m = cmpeq_bitmask(vec, t1) |
         cmpeq_bitmask(vec, t2) |
-        unsigned_cmplt_bitmask(vec, t3) |
-        unsigned_cmpge_bitmask(vec, t4);
+        signed_cmpgt_bitmask(t3, vec) |
+        signed_cmpgt_bitmask(vec, t4);
 #elif PYYJSON_X86
-    // see CHECK_ESCAPE_LT512_USE_SIGNED_SATURATED_MINUS
     vector_a m;
-    m = (vec == t1) | (vec == t2) | unsigned_saturate_minus(t3, vec) | unsigned_saturate_minus(vec, broadcast(0x7f));
+    m = (vec == t1) | (vec == t2) | signed_cmpgt(t3, vec) | signed_cmpgt(vec, t4);
 #else
     vector_a m;
-    m = (vec == t1) | (vec == t2) | (vec < t3) | (vec >= t4);
+    m = (vec == t1) | (vec == t2) | (vec < t3) | (vec > t4);
 #endif
-
-    if (testz_escape_mask(m)) {
-        *out_checked = true;
-    } else {
-        *out_checked = false;
-        *out_done_count = escape_anymask_to_done_count(m);
+    bool checked = testz_escape_mask(m);
+    *out_checked = checked;
+    if (unlikely(!checked)) {
+        *out_done_count = escape_anymask_to_done_count_no_eq0(m);
     }
 }
 
@@ -414,24 +401,21 @@ force_inline bool ascii_in_ucs2_encode_loop(u8 **dst_addr, const u16 **src_addr,
 
 force_inline void check_2bytes_in_ucs2_and_get_done_count(vector_a vec, bool *out_checked, usize *out_done_count) {
     vector_a t1 = broadcast(0x80);
-    vector_a t2 = broadcast(0x800);
+    vector_a t2 = broadcast(0x7ff);
 #if PYYJSON_X86 && COMPILE_SIMD_BITS == 512
     u32 m;
-    m = unsigned_cmplt_bitmask(vec, t1) | unsigned_cmpge_bitmask(vec, t2);
+    m = unsigned_cmpgt_bitmask(t1, vec) | unsigned_cmpgt_bitmask(vec, t2);
 #elif PYYJSON_X86
-    // see CHECK_ESCAPE_LT512_USE_SIGNED_SATURATED_MINUS
     vector_a m;
-    m = unsigned_saturate_minus(t1, vec) | unsigned_saturate_minus(vec, broadcast(0x7ff));
+    m = signed_cmpgt(t1, vec) | signed_cmpgt(vec, t2);
 #else
     vector_a m;
-    m = (vec < t1) | (vec >= t2);
+    m = (vec < t1) | (vec > t2);
 #endif
-
-    if (testz_escape_mask(m)) {
-        *out_checked = true;
-    } else {
-        *out_checked = false;
-        *out_done_count = escape_anymask_to_done_count(m);
+    bool checked = testz_escape_mask(m);
+    *out_checked = checked;
+    if (unlikely(!checked)) {
+        *out_done_count = escape_anymask_to_done_count_no_eq0(m);
     }
 }
 
@@ -482,28 +466,27 @@ force_inline bool _2bytes_in_ucs2_encode_loop(u8 **dst_addr, const u16 **src_add
 
 force_inline void check_3bytes_in_ucs2_and_get_done_count(vector_a vec, bool *out_checked, usize *out_done_count) {
     vector_a t1 = broadcast(0x800);
-    vector_a t2 = broadcast(0xd800);
-    vector_a t3 = broadcast(0xdfff);
+    vector_a t2 = broadcast(0xd7ff);
+    vector_a t3 = broadcast(0xe000);
 
 #if PYYJSON_X86 && COMPILE_SIMD_BITS == 512
     u32 m;
 
     m = unsigned_cmplt_bitmask(vec, t1) |
-        (unsigned_cmpge_bitmask(vec, t2) &
-         unsigned_cmple_bitmask(vec, t3));
+        (unsigned_cmpgt_bitmask(vec, t2) &
+         unsigned_cmplt_bitmask(vec, t3));
 #elif PYYJSON_X86
     // see CHECK_ESCAPE_LT512_USE_SIGNED_SATURATED_MINUS
     vector_a m;
-    m = unsigned_saturate_minus(t1, vec) | (signed_cmpgt(vec, broadcast(0xd7ff)) & signed_cmpgt(broadcast(0xe000), vec)); // use 2 signed_cmpgt to do unsigned range check
+    // use 2 signed_cmpgt to do unsigned range check
+    m = unsigned_saturate_minus(t1, vec) | (signed_cmpgt(vec, t2) & signed_cmpgt(t3, vec));
 #else
     vector_a m;
-    m = (vec < t1) | ((vec >= t2) & (vec <= t3));
+    m = (vec < t1) | ((vec > t2) & (vec < t3));
 #endif
-
-    if (testz_escape_mask(m)) {
-        *out_checked = true;
-    } else {
-        *out_checked = false;
+    bool checked = testz_escape_mask(m);
+    *out_checked = checked;
+    if (unlikely(!checked)) {
         *out_done_count = escape_anymask_to_done_count(m);
     }
 }

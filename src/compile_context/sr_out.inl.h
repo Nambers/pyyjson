@@ -49,6 +49,7 @@
 //
 #undef testz_escape_mask
 #undef escape_anymask_to_done_count
+#undef escape_anymask_to_done_count_no_eq0
 //
 #undef __check_vector_max_char_internal
 #undef check_vector_max_char

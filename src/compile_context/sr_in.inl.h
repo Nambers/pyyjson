@@ -78,9 +78,11 @@
 #if COMPILE_SIMD_BITS == 512
 #    define testz_escape_mask(_x_) ((_x_) == 0)
 #    define escape_anymask_to_done_count escape_bitmask_to_done_count
+#    define escape_anymask_to_done_count_no_eq0 escape_bitmask_to_done_count
 #else
 #    define testz_escape_mask testz
 #    define escape_anymask_to_done_count escape_mask_to_done_count
+#    define escape_anymask_to_done_count_no_eq0 escape_mask_to_done_count_no_eq0
 #endif
 
 #ifdef COMPILE_UCS_LEVEL

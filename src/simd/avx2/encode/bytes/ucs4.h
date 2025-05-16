@@ -171,8 +171,6 @@ force_inline bool bytes_write_ucs4_trailing_256(u8 **writer_addr, const u32 *src
     const u32 *const last_batch_start = src_end - READ_BATCH_COUNT;
     const vector_a vec = *(const vector_u *)last_batch_start;
     u8 *writer = *writer_addr;
-    //
-
 restart:;
     if (len == 1) {
         if (unlikely(!encode_one_ucs4(&writer, *src))) return false;
@@ -215,8 +213,6 @@ ascii:;
     {
         const vector_a m_not_ascii = (vec == broadcast(_Quote)) | (vec == broadcast(_Slash)) | signed_cmpgt(broadcast(ControlMax), vec) | signed_cmpgt(vec, broadcast(0x7f));
         vector_a m = high_mask(m_not_ascii, len);
-        // shift = sizeof(u32) * (READ_BATCH_COUNT - len);
-        // tail_vec = runtime_byte_rshift_128(vec, shift);
         cvt_to_dst_blendhigh(writer, vec, len);
         if (likely(testz(m))) {
             writer += len;
