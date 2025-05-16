@@ -114,7 +114,7 @@ bool run_c_tests(void) {
     RUN_TESTS(test_ucs2_encode_2bytes_utf8);
     RUN_TESTS(test_ucs4_encode_3bytes_utf8);
     RUN_TESTS(test_ucs4_encode_2bytes_utf8);
-    RUN_TESTS(test_long_elevate_1_2);
+    RUN_TESTS(test_long_cvt_u8_u16);
 
     return show_test_counter(&counter);
 }

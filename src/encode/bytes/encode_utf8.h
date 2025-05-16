@@ -526,7 +526,7 @@ force_inline bool _3bytes_in_ucs2_encode_loop(u8 **dst_addr, const u16 **src_add
 #    elif SUPPORT_SIMD_256BITS
     ucs2_encode_3bytes_utf8_avx2(dst, vec);
 #    elif __SSSE3__
-    ucs2_encode_3bytes_utf8_ssse3(vec, dst);
+    ucs2_encode_3bytes_utf8_ssse3(dst, vec);
 #    else
     PYYJSON_UNREACHABLE();
 #    endif

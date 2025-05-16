@@ -15,7 +15,50 @@
 #include "compile_context/srw_in.inl.h"
 
 #if __SSSE3__
-force_inline void ucs2_encode_3bytes_utf8_ssse3(vector_a x, u8 *writer);
+#    include "simd/ssse3/common.h"
+
+force_inline void ucs2_encode_3bytes_utf8_ssse3(u8 *writer, vector_a x) {
+    static const vector_a_u8_128 t1 = {
+            0x80, 0x80, 0,
+            0x80, 0x80, 4,
+            0x80, 0x80, 8,
+            0x80, 0x80, 12,
+            0x80, 0x80, 0x80, 0x80};
+    static const vector_a_u8_128 m1 = {
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0x3f, 0x3f,
+            0xff, 0xff, 0xff, 0xff};
+    static const vector_a_u8_128 m2 = {
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0xe0, 0x80, 0x80,
+            0, 0, 0, 0};
+    vector_a_u32_128 x1 = cvt_u16_to_u32_128(x);
+    vector_a_u32_128 x2 = cvt_u16_to_u32_128(_mm_unpackhi_epi64(x, x));
+    vector_a_u32_128 x3 = rshift_u32_128(x1, 6);
+    vector_a_u32_128 x4 = rshift_u32_128(x1, 12);
+    vector_a_u32_128 x5 = rshift_u32_128(x2, 6);
+    vector_a_u32_128 x6 = rshift_u32_128(x2, 12);
+    vector_a_u8_128 x7 = shuffle_128(x1, t1);
+    vector_a_u8_128 x8 = shuffle_128(x3, t1);
+    x8 = byte_rshift_128(x8, 1);
+    vector_a_u8_128 x9 = shuffle_128(x4, t1);
+    x9 = byte_rshift_128(x9, 2);
+    vector_a_u8_128 x10 = shuffle_128(x2, t1);
+    vector_a_u8_128 x11 = shuffle_128(x5, t1);
+    x11 = byte_rshift_128(x11, 1);
+    vector_a_u8_128 x12 = shuffle_128(x6, t1);
+    x12 = byte_rshift_128(x12, 2);
+    vector_a_u8_128 x13 = ((x7 | x8 | x9) & m1) | m2;
+    vector_a_u8_128 x14 = ((x10 | x11 | x12) & m1) | m2;
+    vector_a_u8_128 x15 = alignr_128(byte_lshift_128(x13, 4), x14, 4);
+    vector_a_u8_128 x16 = byte_rshift_128(x14, 4);
+    *(vector_u_u8_128 *)(writer + 0) = x15;
+    *(vector_u_u8_128 *)(writer + 16) = x16;
+}
 #endif
 
 force_inline void ucs2_encode_2bytes_utf8_sse2(vector_a x, u8 *writer) {
@@ -152,11 +195,12 @@ _3bytes:;
         m = high_mask(m_not_3bytes, len);
         shift = sizeof(u16) * (READ_BATCH_COUNT - len);
         tail_vec = runtime_byte_rshift_128(vec, shift);
-        ucs2_encode_3bytes_utf8_ssse3(tail_vec, writer);
+        ucs2_encode_3bytes_utf8_ssse3(writer, tail_vec);
         if (likely(testz(m))) {
             writer += len * 3;
             goto finished;
         } else {
+            // cannot use no_eq0 version
             usize done_count = escape_mask_to_done_count(m);
             usize real_done_count = done_count - (READ_BATCH_COUNT - len);
             assert(real_done_count < len);
@@ -175,130 +219,6 @@ _3bytes:;
         PYYJSON_UNREACHABLE();
     }
 #endif
-//     const u16 *src_end = src + len;
-//     const u16 *last_batch_start = src_end - READ_BATCH_COUNT;
-//     u8 *writer = *writer_addr;
-//     vector_a vec = *(const vector_u *)last_batch_start;
-//     const vector_a t1 = broadcast(_Quote);
-//     const vector_a t2 = broadcast(_Slash);
-//     const vector_a t3 = broadcast(ControlMax);
-//     const vector_a t4 = broadcast(0x80);
-//     const vector_a t5 = broadcast(0x800);
-//     const vector_a t6 = broadcast(0xd800);
-//     const vector_a t7 = broadcast(0xdfff);
-
-//     vector_a m_not_ascii = (vec == t1) | (vec == t2) | (vec < t3) | (vec >= t4);
-//     vector_a m_not_2bytes = (vec < t4) | (vec >= t5);
-//     vector_a m_not_3bytes = (vec < t5) | ((vec >= t6) & (vec <= t7));
-//     vector_a m_tmp;
-//     vector_a x_tmp;
-// restart:;
-//     u16 cur_unicode = *src;
-//     bool is_escaped;
-//     int unicode_type = ucs2_get_type(cur_unicode, &is_escaped);
-//     switch (unicode_type) {
-//         case 1: {
-//             if (likely(!is_escaped)) {
-//                 goto restart_ascii;
-//             }
-//             memcpy(writer, &ControlEscapeTable_u8[cur_unicode * 8], 8);
-//             writer += _ControlJump[cur_unicode];
-//             src++;
-//             len--;
-//             if (len) goto restart;
-//             goto finished;
-//         }
-//         case 2: {
-//             goto restart_2bytes;
-//         }
-//         case 3: {
-//             if (unlikely(cur_unicode >= 0xd800 && cur_unicode <= 0xdfff)) {
-//                 PyErr_SetString(JSONEncodeError, "Cannot encode unicode character in range [0xd800, 0xdfff] to utf-8");
-//                 return false;
-//             }
-// #if __SSSE3__
-//             goto restart_3bytes;
-// #else
-//             *writer++ = (cur_unicode >> 12) | 0xe0;
-//             *writer++ = ((cur_unicode & 0xfc0) >> 6) | 0x80;
-//             *writer++ = (cur_unicode & 0x3f) | 0x80;
-//             if (len) goto restart;
-//             goto finished;
-// #endif
-//         }
-//         default: {
-//             PYYJSON_UNREACHABLE();
-//         }
-//     }
-// restart_ascii:;
-//     {
-//         int shift = sizeof(u16) * PYYJSON_CAST(int, READ_BATCH_COUNT - len);
-//         x_tmp = runtime_byte_rshift_128(vec, shift);
-//         m_tmp = runtime_byte_rshift_128(m_not_ascii, shift);
-//     }
-//     cvt_to_dst_u16_u8_128(writer, x_tmp);
-//     // *(_WVEC_half_U_ *)writer = (_WVEC_half_U_)zip_simd_16_to_8(x_tmp);
-//     if (likely(testz(m_tmp))) {
-//         writer += len;
-//     } else {
-//         usize done_count = escape_mask_to_done_count(m_tmp);
-//         assert(done_count < len);
-//         len -= done_count + 1;
-//         writer += done_count;
-//         src += done_count;
-//         u16 unicode = *src++;
-//         if (unlikely(unicode < 128)) {
-//             memcpy(writer, &ControlEscapeTable_u8[unicode * 8], 8);
-//             writer += _ControlJump[unicode];
-//         } else {
-//             encode_one_ucs2(&writer, unicode);
-//         }
-//         if (len) goto restart;
-//     }
-//     goto finished;
-
-// restart_2bytes:;
-//     {
-//         int shift = sizeof(u16) * PYYJSON_CAST(int, READ_BATCH_COUNT - len);
-//         x_tmp = runtime_byte_rshift_128(vec, shift);
-//         m_tmp = runtime_byte_rshift_128(m_not_2bytes, shift);
-//     }
-//     ucs2_encode_2bytes_utf8_sse2(x_tmp, writer);
-//     if (likely(testz(m_tmp))) {
-//         writer += 2 * len;
-//     } else {
-//         usize done_count = escape_mask_to_done_count(m_tmp);
-//         assert(done_count < len);
-//         len -= done_count + 1;
-//         writer += 2 * done_count;
-//         src += done_count;
-//         u16 unicode = *src++;
-//         encode_one_ucs2(&writer, unicode);
-//         if (len) goto restart;
-//     }
-//     goto finished;
-// #if __SSSE3__
-// restart_3bytes:;
-//     {
-//         int shift = sizeof(u16) * PYYJSON_CAST(int, READ_BATCH_COUNT - len);
-//         x_tmp = runtime_byte_rshift_128(vec, shift);
-//         m_tmp = runtime_byte_rshift_128(m_not_3bytes, shift);
-//     }
-//     ucs2_encode_3bytes_utf8_ssse3(x_tmp, writer);
-//     if (likely(testz(m_tmp))) {
-//         writer += 3 * len;
-//     } else {
-//         usize done_count = escape_mask_to_done_count(m_tmp);
-//         assert(done_count < len);
-//         len -= done_count + 1;
-//         writer += 3 * done_count;
-//         src += done_count;
-//         u16 unicode = *src++;
-//         encode_one_ucs2(&writer, unicode);
-//         if (len) goto restart;
-//     }
-//     goto finished;
-// #endif
 finished:;
     *writer_addr = writer;
     return true;

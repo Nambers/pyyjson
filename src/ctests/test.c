@@ -141,6 +141,18 @@ int SIMD_NAME_MODIFIER(test_cvt_u16_to_u32)(void) {
 #endif
 }
 
+#if __SSSE3__
+force_inline int _test_ucs2_encode_ssse3(void) {
+    u16 input[8];
+    u8 output[24];
+    for (int i = 0; i < COUNT_OF(input); ++i) {
+        input[i] = get_random_3bytes_u16();
+    }
+    ucs2_encode_3bytes_utf8_ssse3(output, (vector_a_u8_128) * (vector_u_u8_128 *)input);
+    return check_ucs2_3bytes(input, output, COUNT_OF(input));
+}
+#endif
+
 int SIMD_NAME_MODIFIER(test_ucs2_encode_3bytes_utf8)(void) {
 #if PYYJSON_AARCH
     return INVALID;
@@ -156,13 +168,21 @@ int SIMD_NAME_MODIFIER(test_ucs2_encode_3bytes_utf8)(void) {
     return check_ucs2_3bytes(input, output, COUNT_OF(input));
 #    elif __AVX2__
     GUARDED_SIMD;
-    u16 input[16];
-    u8 output[48];
-    for (int i = 0; i < COUNT_OF(input); ++i) {
-        input[i] = get_random_3bytes_u16();
+    {
+        u16 input[16];
+        u8 output[48];
+        for (int i = 0; i < COUNT_OF(input); ++i) {
+            input[i] = get_random_3bytes_u16();
+        }
+        ucs2_encode_3bytes_utf8_avx2(output, (vector_a_u8_256) * (vector_u_u8_256 *)input);
+        CHECK(check_ucs2_3bytes(input, output, COUNT_OF(input)));
     }
-    ucs2_encode_3bytes_utf8_avx2(output, (vector_a_u8_256) * (vector_u_u8_256 *)input);
-    return check_ucs2_3bytes(input, output, COUNT_OF(input));
+    {
+        // also check ssse3 encoder
+        return _test_ucs2_encode_ssse3();
+    }
+#    elif __SSSE3__
+    return _test_ucs2_encode_ssse3();
 #    else
     return INVALID;
 #    endif
@@ -265,7 +285,7 @@ int SIMD_NAME_MODIFIER(test_ucs4_encode_2bytes_utf8)(void) {
 #endif
 }
 
-int SIMD_NAME_MODIFIER(test_long_elevate_1_2)(void) {
+int SIMD_NAME_MODIFIER(test_long_cvt_u8_u16)(void) {
     GUARDED_SIMD;
     for (usize _ = 0; _ < 10; _++) {
         static const usize buffer_len = (1 << 11);
