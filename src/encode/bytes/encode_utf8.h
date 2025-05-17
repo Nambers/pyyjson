@@ -1,13 +1,12 @@
 #ifndef PYYJSON_ENCODE_UTF8_H
 #define PYYJSON_ENCODE_UTF8_H
 #ifdef PYYJSON_CLANGD_DUMMY
-#    ifndef COMPILE_CONTEXT_DECODE
-#        define COMPILE_CONTEXT_DECODE
+#    ifndef COMPILE_CONTEXT_ENCODE
+#        define COMPILE_CONTEXT_ENCODE
 #    endif
+#    include "simd/simd_detect.h"
+#    include "simd/simd_impl.h"
 #endif
-#include "encode/encode_utf8_shared.h"
-#include "pyyjson.h"
-#include "simd/simd_impl.h"
 #include "simd/union_vector.h"
 //
 #include "simd/compile_feature_check.h"
@@ -221,7 +220,6 @@ force_inline void bytes_write_ucs1(u8 **writer_addr, const u8 *src, usize len) {
     }
     if (!len) return;
     bytes_write_ucs1_trailing(writer_addr, src, len);
-
 #undef CAN_LOOP
 #undef CAN_LOOP4
 }

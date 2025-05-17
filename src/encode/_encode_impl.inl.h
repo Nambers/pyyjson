@@ -1,21 +1,22 @@
 #ifdef PYYJSON_CLANGD_DUMMY
-#    include "encode_shared.h"
-#    include "encode_unicode_impl_wrap.h"
-#    include "pyyjson.h"
-#    include "states.h"
-#    include "unicode/unicode_buffer.h"
-#    ifndef COMPILE_UCS_LEVEL
-#        define COMPILE_UCS_LEVEL 0
+#    ifndef COMPILE_CONTEXT_ENCODE
+#        define COMPILE_CONTEXT_ENCODE
 #    endif
 #    ifndef COMPILE_INDENT_LEVEL
-#        define COMPILE_INDENT_LEVEL 2
+#        include "encode_shared.h"
+#        include "encode_unicode_impl_wrap.h"
+#        include "encode_utils_impl_wrap.h"
+#        include "states.h"
+#        include "tls.h"
+#        define COMPILE_UCS_LEVEL 0
+#        define COMPILE_INDENT_LEVEL 0
+#        include "simd/compile_feature_check.h"
 #    endif
 #endif
 
 #ifndef COMPILE_UCS_LEVEL
 #    error "COMPILE_UCS_LEVEL is not defined"
 #endif
-
 #ifndef COMPILE_INDENT_LEVEL
 #    error "COMPILE_INDENT_LEVEL is not defined"
 #endif
@@ -594,19 +595,20 @@ force_inline EncodeValJumpFlag ENCODE_PROCESS_VAL(
 #undef CTN_SIZE_GROW
 }
 
-#define PYYJSON_DUMPS_OBJ PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, COMPILE_UCS_LEVEL)
-
+#define pyyjson_dumps_obj PYYJSON_CONCAT3(_pyyjson_dumps_obj, __UCS_NAME, __IDENT_NAME)
+#define dumps_next(_u_) PYYJSON_CONCAT3(_pyyjson_dumps_obj, _u_, __IDENT_NAME)
+#define _DUMPS_PASS_ARGSDECL EncodeUnicodeWriter writer, PyObject *key, PyObject *val, PyObject *cur_obj, Py_ssize_t cur_pos, Py_ssize_t cur_nested_depth, Py_ssize_t cur_list_size, EncodeCtnWithIndex *ctn_stack, UnicodeInfo unicode_info, bool cur_is_tuple, EncodeUnicodeBufferInfo _unicode_buffer_info, EncodeCallFlag encode_call_flag
 #define _DUMPS_PASS_PARAMS writer, key, val, cur_obj, cur_pos, cur_nested_depth, cur_list_size, ctn_stack, unicode_info, cur_is_tuple
 
+// forward declaration
+static force_noinline PyObject *dumps_next(ucs1)(_DUMPS_PASS_ARGSDECL);
+static force_noinline PyObject *dumps_next(ucs2)(_DUMPS_PASS_ARGSDECL);
+static force_noinline PyObject *dumps_next(ucs4)(_DUMPS_PASS_ARGSDECL);
+
 static force_noinline PyObject *
-PYYJSON_DUMPS_OBJ(
+pyyjson_dumps_obj(
 #if COMPILE_UCS_LEVEL > 0
-        EncodeUnicodeWriter writer,
-        PyObject *key, PyObject *val, PyObject *cur_obj,
-        Py_ssize_t cur_pos, Py_ssize_t cur_nested_depth, Py_ssize_t cur_list_size,
-        EncodeCtnWithIndex *ctn_stack, UnicodeInfo unicode_info, bool cur_is_tuple,
-        EncodeUnicodeBufferInfo _unicode_buffer_info,
-        EncodeCallFlag encode_call_flag
+        _DUMPS_PASS_ARGSDECL
 #else
         PyObject *in_obj
 #endif
@@ -723,17 +725,17 @@ dict_pair_begin:;
         {
 #if COMPILE_UCS_LEVEL < 1
             if (unlikely(unicode_info.cur_ucs_type == 1)) {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_Key);
+                return dumps_next(ucs1)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_Key);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 2
             if (unlikely(unicode_info.cur_ucs_type == 2)) {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_Key);
+                return dumps_next(ucs2)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_Key);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 4
             if (unlikely(unicode_info.cur_ucs_type == 4)) {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_Key);
+                return dumps_next(ucs4)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_Key);
             }
 #endif
         }
@@ -760,17 +762,17 @@ dict_pair_begin:;
             }
 #if COMPILE_UCS_LEVEL < 1
             case JumpFlag_Elevate1_ObjVal: {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ObjVal);
+                return dumps_next(ucs1)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ObjVal);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 2
             case JumpFlag_Elevate2_ObjVal: {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ObjVal);
+                return dumps_next(ucs2)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ObjVal);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 4
             case JumpFlag_Elevate4_ObjVal: {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ObjVal);
+                return dumps_next(ucs4)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ObjVal);
             }
 #endif
             default: {
@@ -840,17 +842,17 @@ arr_val_begin:;
             }
 #if COMPILE_UCS_LEVEL < 1
             case JumpFlag_Elevate1_ArrVal: {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 1)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ArrVal);
+                return dumps_next(ucs1)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ArrVal);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 2
             case JumpFlag_Elevate2_ArrVal: {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 2)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ArrVal);
+                return dumps_next(ucs2)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ArrVal);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 4
             case JumpFlag_Elevate4_ArrVal: {
-                return PYYJSON_CONCAT3(pyyjson_dumps_obj, COMPILE_INDENT_LEVEL, 4)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ArrVal);
+                return dumps_next(ucs4)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ArrVal);
             }
 #endif
             default: {
@@ -924,11 +926,12 @@ fail_keytype:;
 }
 
 #undef _DUMPS_PASS_PARAMS
-
+#undef _DUMPS_PASS_ARGSDECL
+#undef dumps_next
+#undef pyyjson_dumps_obj
 
 #include "compile_context/sirw_out.inl.h"
 
-#undef PYYJSON_DUMPS_OBJ
 #undef ENCODE_PROCESS_VAL
 #undef VEC_BACK1
 #undef WRITE_INDENT_RETURN_IF_FAIL

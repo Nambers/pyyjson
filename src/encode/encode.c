@@ -15,53 +15,6 @@
 #include "encode_cvt.h"
 #include "states.h"
 
-typedef enum EncodeValJumpFlag {
-    JumpFlag_Default,
-    JumpFlag_ArrValBegin,
-    JumpFlag_DictPairBegin,
-    JumpFlag_TupleValBegin,
-    JumpFlag_Elevate1_ArrVal,
-    JumpFlag_Elevate1_ObjVal,
-    JumpFlag_Elevate1_Key,
-    JumpFlag_Elevate2_ArrVal,
-    JumpFlag_Elevate2_ObjVal,
-    JumpFlag_Elevate2_Key,
-    JumpFlag_Elevate4_ArrVal,
-    JumpFlag_Elevate4_ObjVal,
-    JumpFlag_Elevate4_Key,
-    JumpFlag_Fail,
-} EncodeValJumpFlag;
-
-typedef enum EncodeCallFlag {
-    CallFlag_ObjVal,
-    CallFlag_ArrVal,
-    CallFlag_Key,
-} EncodeCallFlag;
-
-force_inline bool init_encode_ctn_stack(EncodeCtnWithIndex **ctn_stack_addr) {
-    EncodeCtnWithIndex *ctn_stack = get_encode_obj_stack_buffer();
-    *ctn_stack_addr = ctn_stack;
-    if (unlikely(!ctn_stack)) {
-        PyErr_NoMemory();
-        return false;
-    }
-    return true;
-}
-
-force_inline bool init_unicode_buffer(EncodeUnicodeWriter *writer_addr, EncodeUnicodeBufferInfo *unicode_buffer_info) {
-    unicode_buffer_info->head = PyObject_Malloc(PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
-    if (likely(unicode_buffer_info->head)) {
-#ifndef NDEBUG
-        memset(unicode_buffer_info->head, 0, PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
-#endif
-        writer_addr->writer_void = PYYJSON_CAST(PyASCIIObject *, unicode_buffer_info->head) + 1;
-        unicode_buffer_info->end = PYYJSON_CAST(u8 *, unicode_buffer_info->head) + PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE;
-    } else {
-        PyErr_NoMemory();
-        return false;
-    }
-    return true;
-}
 
 typedef struct {
     u8 *writer;
@@ -143,14 +96,14 @@ force_inline bool bytes_buffer_reserve(EncodeUnicodeWriter *writer_addr, EncodeU
  *      COMPILE_READ_UCS_LEVEL, value: 1, 2, or 4.
  *      COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4.
  */
-#include "encode_unicode_impl_wrap.h"
+// #include "encode_unicode_impl_wrap.h"
 
 /* 
  * Top-level encode functions for encoding container types: dict, list and tuple.
  * need macro:
  *      COMPILE_UCS_LEVEL, value: 0, 1, 2, or 4. COMPILE_UCS_LEVEL is the current writing level.
  *          This differs from COMPILE_WRITE_UCS_LEVEL: `0` stands for ascii. Since we always start from
- *          writing ascii, `0` also defines the entrance of encoding containers. See `PYYJSON_DUMPS_OBJ`
+ *          writing ascii, `0` also defines the entrance of encoding containers. See `pyyjson_dumps_obj`
  *          for more details.
  *      COMPILE_INDENT_LEVEL, value: 0, 2, or 4.
  */
@@ -396,15 +349,15 @@ dumps_container:;
 
     switch (indent_int) {
         case 0: {
-            ret = pyyjson_dumps_obj_0_0(obj);
+            ret = _pyyjson_dumps_obj_ascii_indent0(obj);
             break;
         }
         case 2: {
-            ret = pyyjson_dumps_obj_2_0(obj);
+            ret = _pyyjson_dumps_obj_ascii_indent2(obj);
             break;
         }
         case 4: {
-            ret = pyyjson_dumps_obj_4_0(obj);
+            ret = _pyyjson_dumps_obj_ascii_indent4(obj);
             break;
         }
         default: {

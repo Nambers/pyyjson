@@ -1,6 +1,10 @@
 #ifndef ENCODE_IMPL_WRAP_H
 #define ENCODE_IMPL_WRAP_H
 
+#include "encode_shared.h"
+#include "encode_unicode_impl_wrap.h"
+#include "tls.h"
+
 #include "simd/compile_feature_check.h"
 #define COMPILE_INDENT_LEVEL 0
 

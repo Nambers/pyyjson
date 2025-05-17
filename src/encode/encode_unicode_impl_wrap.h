@@ -1,9 +1,8 @@
-#ifndef ENCODE_UNICODE_IMPL_WRAP_H
-#define ENCODE_UNICODE_IMPL_WRAP_H
+#ifndef PYYJSON_ENCODE_UNICODE_IMPL_WRAP_H
+#define PYYJSON_ENCODE_UNICODE_IMPL_WRAP_H
 
 #include "encode/indent_writer.h"
 #include "encode_shared.h"
-#include "simd/simd_detect.h"
 #include "simd/simd_detect.h"
 #include "simd/simd_impl.h"
 #include "unicode/unicode_buffer.h"
@@ -132,4 +131,4 @@
 
 #undef COMPILE_SIMD_BITS
 
-#endif // ENCODE_UNICODE_IMPL_WRAP_H
+#endif // PYYJSON_ENCODE_UNICODE_IMPL_WRAP_H

@@ -3,6 +3,7 @@
 
 #include "pyyjson.h"
 #include "simd/simd_detect.h"
+#include "tls.h"
 #include "unicode/unicode_buffer.h"
 
 #define CONTROL_SEQ_ESCAPE_PREFIX _Slash, 'u', '0', '0'
@@ -459,4 +460,54 @@ force_inline Py_ssize_t get_unicode_buffer_final_len_ucs2(EncodeUnicodeWriter wr
 force_inline Py_ssize_t get_unicode_buffer_final_len_ucs4(EncodeUnicodeWriter writer, EncodeUnicodeBufferInfo *unicode_buffer_info) {
     return writer.writer_u32 - (u32 *)GET_VEC_COMPACT_START(unicode_buffer_info);
 }
+
+typedef enum EncodeValJumpFlag {
+    JumpFlag_Default,
+    JumpFlag_ArrValBegin,
+    JumpFlag_DictPairBegin,
+    JumpFlag_TupleValBegin,
+    JumpFlag_Elevate1_ArrVal,
+    JumpFlag_Elevate1_ObjVal,
+    JumpFlag_Elevate1_Key,
+    JumpFlag_Elevate2_ArrVal,
+    JumpFlag_Elevate2_ObjVal,
+    JumpFlag_Elevate2_Key,
+    JumpFlag_Elevate4_ArrVal,
+    JumpFlag_Elevate4_ObjVal,
+    JumpFlag_Elevate4_Key,
+    JumpFlag_Fail,
+} EncodeValJumpFlag;
+
+typedef enum EncodeCallFlag {
+    CallFlag_ObjVal,
+    CallFlag_ArrVal,
+    CallFlag_Key,
+} EncodeCallFlag;
+
+force_inline bool init_encode_ctn_stack(EncodeCtnWithIndex **ctn_stack_addr) {
+    EncodeCtnWithIndex *ctn_stack = get_encode_obj_stack_buffer();
+    *ctn_stack_addr = ctn_stack;
+    if (unlikely(!ctn_stack)) {
+        PyErr_NoMemory();
+        return false;
+    }
+    return true;
+}
+
+force_inline bool init_unicode_buffer(EncodeUnicodeWriter *writer_addr, EncodeUnicodeBufferInfo *unicode_buffer_info) {
+    unicode_buffer_info->head = PyObject_Malloc(PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
+    if (likely(unicode_buffer_info->head)) {
+#ifndef NDEBUG
+        memset(unicode_buffer_info->head, 0, PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
+#endif
+        writer_addr->writer_void = PYYJSON_CAST(PyASCIIObject *, unicode_buffer_info->head) + 1;
+        unicode_buffer_info->end = PYYJSON_CAST(u8 *, unicode_buffer_info->head) + PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE;
+    } else {
+        PyErr_NoMemory();
+        return false;
+    }
+    return true;
+}
+
+
 #endif // PYYJSON_ENCODE_SHARED_H

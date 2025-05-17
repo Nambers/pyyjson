@@ -1,20 +1,17 @@
 #ifdef PYYJSON_CLANGD_DUMMY
+#    ifndef COMPILE_CONTEXT_ENCODE
+#        define COMPILE_CONTEXT_ENCODE
+#    endif
 #    ifndef COMPILE_INDENT_LEVEL
 #        include "encode/indent_writer.h"
 #        include "encode_shared.h"
 #        include "simd/simd_detect.h"
 #        include "simd/simd_impl.h"
 #        include "unicode/unicode_buffer.h"
-#        define COMPILE_INDENT_LEVEL 2
-#        ifndef COMPILE_READ_UCS_LEVEL
-#            define COMPILE_READ_UCS_LEVEL 1
-#        endif
-#        ifndef COMPILE_WRITE_UCS_LEVEL
-#            define COMPILE_WRITE_UCS_LEVEL 1
-#        endif
-#        ifndef COMPILE_SIMD_BITS
-#            define COMPILE_SIMD_BITS 128
-#        endif
+#        define COMPILE_INDENT_LEVEL 0
+#        define COMPILE_READ_UCS_LEVEL 1
+#        define COMPILE_WRITE_UCS_LEVEL 1
+#        include "simd/compile_feature_check.h"
 #    endif
 #endif
 

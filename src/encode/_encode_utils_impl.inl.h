@@ -1,8 +1,14 @@
-#include "ryu/ryu.h"
-#include "simd/simd_impl.h"
-
-#ifndef COMPILE_WRITE_UCS_LEVEL
-#    error "COMPILE_WRITE_UCS_LEVEL is not defined"
+#ifdef PYYJSON_CLANGD_DUMMY
+#    ifndef COMPILE_CONTEXT_ENCODE
+#        define COMPILE_CONTEXT_ENCODE
+#    endif
+#    ifndef COMPILE_WRITE_UCS_LEVEL
+#        include "encode_shared.h"
+#        include "ryu/ryu.h"
+#        include "simd/simd_impl.h"
+#        define COMPILE_WRITE_UCS_LEVEL 1
+#        include "simd/compile_feature_check.h"
+#    endif
 #endif
 
 #include "compile_context/w_in.inl.h"

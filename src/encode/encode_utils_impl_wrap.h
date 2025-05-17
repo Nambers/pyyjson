@@ -1,12 +1,15 @@
 #ifndef ENCODE_UTILS_IMPL_WRAP_H
 #define ENCODE_UTILS_IMPL_WRAP_H
 
-
+#include "encode_shared.h"
+#include "ryu/ryu.h"
+#include "simd/simd_impl.h"
+//
+#include "simd/compile_feature_check.h"
 /* 
  * Some utility functions only related to *write*, like unicode buffer reserve, writing number
  * need macro: COMPILE_WRITE_UCS_LEVEL, value: 1, 2, or 4.
  */
-#include "simd/compile_feature_check.h"
 
 #define COMPILE_WRITE_UCS_LEVEL 1
 #include "_encode_utils_impl.inl.h"
