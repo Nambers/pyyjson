@@ -1,21 +1,20 @@
 #ifdef PYYJSON_CLANGD_DUMMY
-#    include "encode/indent_writer.h"
-#    include "encode_shared.h"
-#    include "encode_unicode_impl_wrap.h"
-#    include "simd/simd_detect.h"
-#    include "simd/simd_impl.h"
-#    include "unicode/unicode_buffer.h"
-#    ifndef COMPILE_READ_UCS_LEVEL
-#        define COMPILE_READ_UCS_LEVEL 1
-#    endif
-#    ifndef COMPILE_WRITE_UCS_LEVEL
-#        define COMPILE_WRITE_UCS_LEVEL 1
-#    endif
 #    ifndef COMPILE_INDENT_LEVEL
+#        include "encode/indent_writer.h"
+#        include "encode_shared.h"
+#        include "simd/simd_detect.h"
+#        include "simd/simd_impl.h"
+#        include "unicode/unicode_buffer.h"
 #        define COMPILE_INDENT_LEVEL 2
-#    endif
-#    ifndef COMPILE_SIMD_BITS
-#        define COMPILE_SIMD_BITS 256
+#        ifndef COMPILE_READ_UCS_LEVEL
+#            define COMPILE_READ_UCS_LEVEL 1
+#        endif
+#        ifndef COMPILE_WRITE_UCS_LEVEL
+#            define COMPILE_WRITE_UCS_LEVEL 1
+#        endif
+#        ifndef COMPILE_SIMD_BITS
+#            define COMPILE_SIMD_BITS 128
+#        endif
 #    endif
 #endif
 
@@ -51,7 +50,6 @@ bool unicode_buffer_append_key_internal(PyObject *key, Py_ssize_t len, _dst_t **
     _dst_t *writer = *writer_addr;
     *writer++ = '"';
     encode_unicode_impl(&writer, (_src_t *)get_unicode_data(key), (usize)len);
-    // _dst_t *writer = _WRITER(unicode_buffer_info);
     *writer++ = '"';
     *writer++ = ':';
 #if COMPILE_INDENT_LEVEL > 0
@@ -61,7 +59,6 @@ bool unicode_buffer_append_key_internal(PyObject *key, Py_ssize_t len, _dst_t **
 #    endif // SIZEOF_VOID_P == 8 || COMPILE_WRITE_UCS_LEVEL != 4
 #endif     // COMPILE_INDENT_LEVEL > 0
     *writer_addr = writer;
-    // _WRITER(unicode_buffer_info) += (COMPILE_INDENT_LEVEL > 0) ? 3 : 2;
     assert(check_unicode_writer_valid(writer, unicode_buffer_info));
     return true;
 }
@@ -82,7 +79,6 @@ bool unicode_buffer_append_str_internal(PyObject *str, Py_ssize_t len, _dst_t **
     encode_unicode_impl(&writer, (_src_t *)get_unicode_data(str), (usize)len);
     *writer++ = '"';
     *writer++ = ',';
-    // _WRITER(unicode_buffer_info) += 2;
     *writer_addr = writer;
     assert(check_unicode_writer_valid(writer, unicode_buffer_info));
     return true;

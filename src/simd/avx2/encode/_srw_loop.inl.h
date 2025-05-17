@@ -9,7 +9,6 @@
 #    ifndef COMPILE_WRITE_UCS_LEVEL
 #        define COMPILE_WRITE_UCS_LEVEL 1
 #    endif
-
 #endif
 //
 #define COMPILE_SIMD_BITS 256

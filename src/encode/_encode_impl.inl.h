@@ -1,5 +1,6 @@
 #ifdef PYYJSON_CLANGD_DUMMY
 #    include "encode_shared.h"
+#    include "encode_unicode_impl_wrap.h"
 #    include "pyyjson.h"
 #    include "states.h"
 #    include "unicode/unicode_buffer.h"

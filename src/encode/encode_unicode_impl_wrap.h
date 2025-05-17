@@ -1,8 +1,12 @@
 #ifndef ENCODE_UNICODE_IMPL_WRAP_H
 #define ENCODE_UNICODE_IMPL_WRAP_H
 
+#include "encode/indent_writer.h"
+#include "encode_shared.h"
+#include "simd/simd_detect.h"
 #include "simd/simd_detect.h"
 #include "simd/simd_impl.h"
+#include "unicode/unicode_buffer.h"
 //
 #include "simd/compile_feature_check.h"
 #define COMPILE_INDENT_LEVEL 0
