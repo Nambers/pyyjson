@@ -598,7 +598,7 @@ force_inline EncodeValJumpFlag ENCODE_PROCESS_VAL(
 #define pyyjson_dumps_obj PYYJSON_CONCAT3(_pyyjson_dumps_obj, __UCS_NAME, __IDENT_NAME)
 #define dumps_next(_u_) PYYJSON_CONCAT3(_pyyjson_dumps_obj, _u_, __IDENT_NAME)
 #define _DUMPS_PASS_ARGSDECL EncodeUnicodeWriter writer, PyObject *key, PyObject *val, PyObject *cur_obj, Py_ssize_t cur_pos, Py_ssize_t cur_nested_depth, Py_ssize_t cur_list_size, EncodeCtnWithIndex *ctn_stack, UnicodeInfo unicode_info, bool cur_is_tuple, EncodeUnicodeBufferInfo _unicode_buffer_info, EncodeCallFlag encode_call_flag
-#define _DUMPS_PASS_PARAMS writer, key, val, cur_obj, cur_pos, cur_nested_depth, cur_list_size, ctn_stack, unicode_info, cur_is_tuple
+#define _DUMPS_PASS_ARGS writer, key, val, cur_obj, cur_pos, cur_nested_depth, cur_list_size, ctn_stack, unicode_info, cur_is_tuple
 
 // forward declaration
 static force_noinline PyObject *dumps_next(ucs1)(_DUMPS_PASS_ARGSDECL);
@@ -725,17 +725,17 @@ dict_pair_begin:;
         {
 #if COMPILE_UCS_LEVEL < 1
             if (unlikely(unicode_info.cur_ucs_type == 1)) {
-                return dumps_next(ucs1)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_Key);
+                return dumps_next(ucs1)(_DUMPS_PASS_ARGS, _unicode_buffer_info, CallFlag_Key);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 2
             if (unlikely(unicode_info.cur_ucs_type == 2)) {
-                return dumps_next(ucs2)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_Key);
+                return dumps_next(ucs2)(_DUMPS_PASS_ARGS, _unicode_buffer_info, CallFlag_Key);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 4
             if (unlikely(unicode_info.cur_ucs_type == 4)) {
-                return dumps_next(ucs4)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_Key);
+                return dumps_next(ucs4)(_DUMPS_PASS_ARGS, _unicode_buffer_info, CallFlag_Key);
             }
 #endif
         }
@@ -762,17 +762,17 @@ dict_pair_begin:;
             }
 #if COMPILE_UCS_LEVEL < 1
             case JumpFlag_Elevate1_ObjVal: {
-                return dumps_next(ucs1)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ObjVal);
+                return dumps_next(ucs1)(_DUMPS_PASS_ARGS, _unicode_buffer_info, CallFlag_ObjVal);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 2
             case JumpFlag_Elevate2_ObjVal: {
-                return dumps_next(ucs2)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ObjVal);
+                return dumps_next(ucs2)(_DUMPS_PASS_ARGS, _unicode_buffer_info, CallFlag_ObjVal);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 4
             case JumpFlag_Elevate4_ObjVal: {
-                return dumps_next(ucs4)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ObjVal);
+                return dumps_next(ucs4)(_DUMPS_PASS_ARGS, _unicode_buffer_info, CallFlag_ObjVal);
             }
 #endif
             default: {
@@ -842,17 +842,17 @@ arr_val_begin:;
             }
 #if COMPILE_UCS_LEVEL < 1
             case JumpFlag_Elevate1_ArrVal: {
-                return dumps_next(ucs1)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ArrVal);
+                return dumps_next(ucs1)(_DUMPS_PASS_ARGS, _unicode_buffer_info, CallFlag_ArrVal);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 2
             case JumpFlag_Elevate2_ArrVal: {
-                return dumps_next(ucs2)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ArrVal);
+                return dumps_next(ucs2)(_DUMPS_PASS_ARGS, _unicode_buffer_info, CallFlag_ArrVal);
             }
 #endif
 #if COMPILE_UCS_LEVEL < 4
             case JumpFlag_Elevate4_ArrVal: {
-                return dumps_next(ucs4)(_DUMPS_PASS_PARAMS, _unicode_buffer_info, CallFlag_ArrVal);
+                return dumps_next(ucs4)(_DUMPS_PASS_ARGS, _unicode_buffer_info, CallFlag_ArrVal);
             }
 #endif
             default: {
@@ -925,7 +925,7 @@ fail_keytype:;
     goto fail;
 }
 
-#undef _DUMPS_PASS_PARAMS
+#undef _DUMPS_PASS_ARGS
 #undef _DUMPS_PASS_ARGSDECL
 #undef dumps_next
 #undef pyyjson_dumps_obj
