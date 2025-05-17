@@ -494,19 +494,27 @@ force_inline bool init_encode_ctn_stack(EncodeCtnWithIndex **ctn_stack_addr) {
     return true;
 }
 
-force_inline bool init_unicode_buffer(EncodeUnicodeWriter *writer_addr, EncodeUnicodeBufferInfo *unicode_buffer_info) {
+force_inline bool _init_encode_buffer(EncodeUnicodeWriter *writer_addr, EncodeUnicodeBufferInfo *unicode_buffer_info, usize u8_start_offset) {
     unicode_buffer_info->head = PyObject_Malloc(PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
     if (likely(unicode_buffer_info->head)) {
 #ifndef NDEBUG
         memset(unicode_buffer_info->head, 0, PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
 #endif
-        writer_addr->writer_void = PYYJSON_CAST(PyASCIIObject *, unicode_buffer_info->head) + 1;
+        writer_addr->writer_void = PYYJSON_CAST(u8 *, unicode_buffer_info->head) + u8_start_offset;
         unicode_buffer_info->end = PYYJSON_CAST(u8 *, unicode_buffer_info->head) + PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE;
     } else {
         PyErr_NoMemory();
         return false;
     }
     return true;
+}
+
+force_inline bool init_unicode_buffer(EncodeUnicodeWriter *writer_addr, EncodeUnicodeBufferInfo *unicode_buffer_info) {
+    return _init_encode_buffer(writer_addr, unicode_buffer_info, sizeof(PyASCIIObject));
+}
+
+force_inline bool init_bytes_buffer(EncodeUnicodeWriter *writer_addr, EncodeUnicodeBufferInfo *unicode_buffer_info) {
+    return _init_encode_buffer(writer_addr, unicode_buffer_info, PYBYTES_START_OFFSET);
 }
 
 

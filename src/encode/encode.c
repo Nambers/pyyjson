@@ -16,51 +16,51 @@
 #include "states.h"
 
 
-typedef struct {
-    u8 *writer;
-    void *head;
-    void *end;
-} EncodeUTF8BufferInfo;
+// typedef struct {
+//     u8 *writer;
+//     void *head;
+//     void *end;
+// } EncodeUTF8BufferInfo;
 
-typedef struct {
-    // cache
-    PyObject *key, *val;
-    PyObject *cur_obj;           // = in_obj;
-    Py_ssize_t cur_pos;          // = 0;
-    Py_ssize_t cur_nested_depth; // = 0;
-    Py_ssize_t cur_list_size;
-    // alias thread local buffer
-    EncodeCtnWithIndex *ctn_stack;
-    bool cur_is_tuple;
-} EncodeUTF8StackVars;
+// typedef struct {
+//     // cache
+//     PyObject *key, *val;
+//     PyObject *cur_obj;           // = in_obj;
+//     Py_ssize_t cur_pos;          // = 0;
+//     Py_ssize_t cur_nested_depth; // = 0;
+//     Py_ssize_t cur_list_size;
+//     // alias thread local buffer
+//     EncodeCtnWithIndex *ctn_stack;
+//     bool cur_is_tuple;
+// } EncodeUTF8StackVars;
 
-force_inline bool init_utf8_buffer(EncodeUTF8BufferInfo *utf8_buffer_info) {
-    utf8_buffer_info->head = PyObject_Malloc(PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
-    if (likely(utf8_buffer_info->head)) {
-#ifndef NDEBUG
-        memset(utf8_buffer_info->head, 0, PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
-#endif
-        const usize offset = PYBYTES_START_OFFSET;
-        utf8_buffer_info->writer = PYYJSON_CAST(u8 *, utf8_buffer_info->head) + offset;
-        utf8_buffer_info->end = PYYJSON_CAST(u8 *, utf8_buffer_info->head) + PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE;
-    } else {
-        PyErr_NoMemory();
-        return false;
-    }
-    return true;
-}
+// force_inline bool init_utf8_buffer(EncodeUTF8BufferInfo *utf8_buffer_info) {
+//     utf8_buffer_info->head = PyObject_Malloc(PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
+//     if (likely(utf8_buffer_info->head)) {
+// #ifndef NDEBUG
+//         memset(utf8_buffer_info->head, 0, PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
+// #endif
+//         const usize offset = PYBYTES_START_OFFSET;
+//         utf8_buffer_info->writer = PYYJSON_CAST(u8 *, utf8_buffer_info->head) + offset;
+//         utf8_buffer_info->end = PYYJSON_CAST(u8 *, utf8_buffer_info->head) + PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE;
+//     } else {
+//         PyErr_NoMemory();
+//         return false;
+//     }
+//     return true;
+// }
 
-force_inline bool init_utf8_stack_vars(EncodeUTF8StackVars *stack_vars, PyObject *in_obj) {
-    stack_vars->cur_obj = in_obj;
-    stack_vars->cur_pos = 0;
-    stack_vars->cur_nested_depth = 0;
-    stack_vars->ctn_stack = get_encode_obj_stack_buffer();
-    if (unlikely(!stack_vars->ctn_stack)) {
-        PyErr_NoMemory();
-        return false;
-    }
-    return true;
-}
+// force_inline bool init_utf8_stack_vars(EncodeUTF8StackVars *stack_vars, PyObject *in_obj) {
+//     stack_vars->cur_obj = in_obj;
+//     stack_vars->cur_pos = 0;
+//     stack_vars->cur_nested_depth = 0;
+//     stack_vars->ctn_stack = get_encode_obj_stack_buffer();
+//     if (unlikely(!stack_vars->ctn_stack)) {
+//         PyErr_NoMemory();
+//         return false;
+//     }
+//     return true;
+// }
 
 force_inline void init_pybytes(PyObject *in_new_bytes, usize final_len) {
     PyBytesObject *new_bytes = PYYJSON_CAST(PyBytesObject *, in_new_bytes);
@@ -71,9 +71,9 @@ force_inline void init_pybytes(PyObject *in_new_bytes, usize final_len) {
     new_bytes->ob_sval[final_len] = 0;
 }
 
-force_inline bool bytes_buffer_reserve(EncodeUnicodeWriter *writer_addr, EncodeUTF8BufferInfo *utf8_buffer_info, Py_ssize_t target_size) {
-    return unicode_buffer_reserve_u8(&writer_addr->writer_u8, PYYJSON_CAST(EncodeUnicodeBufferInfo *, utf8_buffer_info), target_size);
-}
+// force_inline bool bytes_buffer_reserve(EncodeUnicodeWriter *writer_addr, EncodeUTF8BufferInfo *utf8_buffer_info, Py_ssize_t target_size) {
+//     return unicode_buffer_reserve_u8(&writer_addr->writer_u8, PYYJSON_CAST(EncodeUnicodeBufferInfo *, utf8_buffer_info), target_size);
+// }
 
 /* 
  * Some utility functions only related to *write*, like unicode buffer reserve, writing number
@@ -116,7 +116,7 @@ force_inline bool bytes_buffer_reserve(EncodeUnicodeWriter *writer_addr, EncodeU
  * need macro:
  *      COMPILE_INDENT_LEVEL, value: 0, 2, or 4.
  */
-// #include "bytes/encode_bytes_impl_wrap.h"
+#include "bytes/encode_bytes_impl_wrap.h"
 
 #include "simd/compile_feature_check.h"
 //

@@ -39,14 +39,14 @@
 #endif
 
 _IMPL_INLINE_SPECIFIER
-bool unicode_buffer_append_key_internal(PyObject *key, Py_ssize_t len, _dst_t **writer_addr, EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t cur_nested_depth) {
+bool unicode_buffer_append_key_internal(PyObject *key, usize len, _dst_t **writer_addr, EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t cur_nested_depth) {
     static_assert(COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL, "COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL");
-    assert(PyUnicode_GET_LENGTH(key) == len);
+    assert((usize)PyUnicode_GET_LENGTH(key) == len);
     RETURN_ON_UNLIKELY_ERR(!unicode_buffer_reserve(writer_addr, unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 5 + 6 * len + TAIL_PADDING));
     write_unicode_indent(writer_addr, cur_nested_depth);
     _dst_t *writer = *writer_addr;
     *writer++ = '"';
-    encode_unicode_impl(&writer, (_src_t *)get_unicode_data(key), (usize)len);
+    encode_unicode_impl(&writer, (_src_t *)get_unicode_data(key), len);
     *writer++ = '"';
     *writer++ = ':';
 #if COMPILE_INDENT_LEVEL > 0
@@ -61,10 +61,10 @@ bool unicode_buffer_append_key_internal(PyObject *key, Py_ssize_t len, _dst_t **
 }
 
 _IMPL_INLINE_SPECIFIER
-bool unicode_buffer_append_str_internal(PyObject *str, Py_ssize_t len, _dst_t **writer_addr,
+bool unicode_buffer_append_str_internal(PyObject *str, usize len, _dst_t **writer_addr,
                                         EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t cur_nested_depth, bool is_in_obj) {
     static_assert(COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL, "COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL");
-    assert(PyUnicode_GET_LENGTH(str) == len);
+    assert((usize)PyUnicode_GET_LENGTH(str) == len);
     if (is_in_obj) {
         RETURN_ON_UNLIKELY_ERR(!unicode_buffer_reserve(writer_addr, unicode_buffer_info, 3 + 6 * len + TAIL_PADDING));
     } else {
@@ -73,7 +73,7 @@ bool unicode_buffer_append_str_internal(PyObject *str, Py_ssize_t len, _dst_t **
     }
     _dst_t *writer = *writer_addr;
     *writer++ = '"';
-    encode_unicode_impl(&writer, (_src_t *)get_unicode_data(str), (usize)len);
+    encode_unicode_impl(&writer, (_src_t *)get_unicode_data(str), len);
     *writer++ = '"';
     *writer++ = ',';
     *writer_addr = writer;

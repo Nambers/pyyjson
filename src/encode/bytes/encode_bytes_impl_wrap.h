@@ -1,6 +1,14 @@
 #ifndef ENCODE_BYTES_IMPL_WRAP_H
 #define ENCODE_BYTES_IMPL_WRAP_H
 
+#include "encode/encode_impl_wrap.h"
+#include "encode/encode_shared.h"
+#include "encode_utf8.h"
+#include "pyyjson.h"
+#include "tls.h"
+#include "unicode/unicode_buffer.h"
+
+
 #define COMPILE_INDENT_LEVEL 0
 #include "_encode_bytes_impl.inl.h"
 #undef COMPILE_INDENT_LEVEL
