@@ -48,13 +48,13 @@ force_inline bool init_encode_ctn_stack(EncodeCtnWithIndex **ctn_stack_addr) {
     return true;
 }
 
-force_inline bool init_unicode_buffer(EncodeUnicodeBufferInfo *unicode_buffer_info) {
+force_inline bool init_unicode_buffer(EncodeUnicodeWriter *writer_addr, EncodeUnicodeBufferInfo *unicode_buffer_info) {
     unicode_buffer_info->head = PyObject_Malloc(PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
     if (likely(unicode_buffer_info->head)) {
 #ifndef NDEBUG
         memset(unicode_buffer_info->head, 0, PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
 #endif
-        unicode_buffer_info->writer.writer_void = PYYJSON_CAST(PyASCIIObject *, unicode_buffer_info->head) + 1;
+        writer_addr->writer_void = PYYJSON_CAST(PyASCIIObject *, unicode_buffer_info->head) + 1;
         unicode_buffer_info->end = PYYJSON_CAST(u8 *, unicode_buffer_info->head) + PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE;
     } else {
         PyErr_NoMemory();
@@ -118,8 +118,8 @@ force_inline void init_pybytes(PyObject *in_new_bytes, usize final_len) {
     new_bytes->ob_sval[final_len] = 0;
 }
 
-force_inline bool bytes_buffer_reserve(EncodeUTF8BufferInfo *utf8_buffer_info, Py_ssize_t target_size) {
-    return unicode_buffer_reserve_u8(PYYJSON_CAST(EncodeUnicodeBufferInfo *, utf8_buffer_info), target_size);
+force_inline bool bytes_buffer_reserve(EncodeUnicodeWriter *writer_addr, EncodeUTF8BufferInfo *utf8_buffer_info, Py_ssize_t target_size) {
+    return unicode_buffer_reserve_u8(&writer_addr->writer_u8, PYYJSON_CAST(EncodeUnicodeBufferInfo *, utf8_buffer_info), target_size);
 }
 
 /* 
@@ -165,8 +165,12 @@ force_inline bool bytes_buffer_reserve(EncodeUTF8BufferInfo *utf8_buffer_info, P
  */
 // #include "bytes/encode_bytes_impl_wrap.h"
 
+#include "simd/compile_feature_check.h"
+//
+#include "compile_context/s_in.inl.h"
 /* Encodes non-container types. */
 force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {
+    EncodeUnicodeWriter writer;
     EncodeUnicodeBufferInfo _unicode_buffer_info; //, new_unicode_buffer_info;
     _unicode_buffer_info.head = PyObject_Malloc(PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
     RETURN_ON_UNLIKELY_ERR(!_unicode_buffer_info.head);
@@ -181,25 +185,25 @@ force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {
     } else {
         offset = sizeof(PyCompactUnicodeObject);
     }
-    U8_WRITER(&_unicode_buffer_info) = PYYJSON_CAST(u8 *, _unicode_buffer_info.head) + offset;
+    writer.writer_u8 = PYYJSON_CAST(u8 *, _unicode_buffer_info.head) + offset;
     _unicode_buffer_info.end = PYYJSON_CAST(u8 *, _unicode_buffer_info.head) + PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE;
     //
     bool success;
     switch (unicode_kind) {
         // pass `is_in_obj = true` to avoid unwanted indent check
         case 1: {
-            success = unicode_buffer_append_str_internal_0_1_1(unicode, len, &_unicode_buffer_info, true, 0);
-            _unicode_buffer_info.writer.writer_u8--;
+            success = STR_WRITER_NOINDENT_IMPL(u8, u8)(unicode, len, &writer.writer_u8, &_unicode_buffer_info, true, 0);
+            writer.writer_u8--;
             break;
         }
         case 2: {
-            success = unicode_buffer_append_str_internal_0_2_2(unicode, len, &_unicode_buffer_info, true, 0);
-            _unicode_buffer_info.writer.writer_u16--;
+            success = STR_WRITER_NOINDENT_IMPL(u16, u16)(unicode, len, &writer.writer_u16, &_unicode_buffer_info, true, 0);
+            writer.writer_u16--;
             break;
         }
         case 4: {
-            success = unicode_buffer_append_str_internal_0_4_4(unicode, len, &_unicode_buffer_info, true, 0);
-            _unicode_buffer_info.writer.writer_u32--;
+            success = STR_WRITER_NOINDENT_IMPL(u32, u32)(unicode, len, &writer.writer_u32, &_unicode_buffer_info, true, 0);
+            writer.writer_u32--;
             break;
         }
         default: {
@@ -211,7 +215,7 @@ force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {
         PyObject_Free(_unicode_buffer_info.head);
         return NULL;
     }
-    Py_ssize_t written_len = (uintptr_t)_unicode_buffer_info.writer.writer_u8 - (uintptr_t)_unicode_buffer_info.head - offset;
+    Py_ssize_t written_len = (uintptr_t)writer.writer_u8 - (uintptr_t)_unicode_buffer_info.head - offset;
     written_len /= unicode_kind;
     assert(written_len >= 2);
     if (unlikely(!resize_to_fit_pyunicode(&_unicode_buffer_info, written_len, is_ascii ? 0 : unicode_kind))) {
@@ -221,6 +225,9 @@ force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode) {
     init_pyunicode(_unicode_buffer_info.head, written_len, is_ascii ? 0 : unicode_kind);
     return (PyObject *)_unicode_buffer_info.head;
 }
+
+#include "compile_context/s_out.inl.h"
+#undef COMPILE_SIMD_BITS
 
 force_inline PyObject *pyyjson_dumps_single_long(PyObject *val) {
     PyObject *ret;
@@ -272,11 +279,11 @@ force_inline PyObject *pyyjson_dumps_single_float(PyObject *val) {
     return unicode;
 }
 
-force_inline PyObject *pyyjson_dumps_single_constant(PyFastTypes py_type, PyObject* obj) {
+force_inline PyObject *pyyjson_dumps_single_constant(PyFastTypes py_type, PyObject *obj) {
     PyObject *ret;
     switch (py_type) {
         case T_Bool: {
-            if(obj == Py_False) {
+            if (obj == Py_False) {
                 ret = PyUnicode_New(5, 127);
                 RETURN_ON_UNLIKELY_ERR(!ret);
                 u8 *writer = (u8 *)(((PyASCIIObject *)ret) + 1);

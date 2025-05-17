@@ -3,7 +3,7 @@
 
 #include "pyyjson.h"
 #include "simd/simd_detect.h"
-#include <stddef.h>
+#include "unicode/unicode_buffer.h"
 
 #define CONTROL_SEQ_ESCAPE_PREFIX _Slash, 'u', '0', '0'
 #define CONTROL_SEQ_ESCAPE_SUFFIX '\0', '\0'
@@ -437,4 +437,26 @@ force_inline u8 *write_u64(u64 val, u8 *buf) {
     }
 }
 
+force_inline Py_ssize_t get_unicode_buffer_final_len_ascii(EncodeUnicodeWriter writer, EncodeUnicodeBufferInfo *unicode_buffer_info) {
+#if COMPILE_UCS_LEVEL == 0
+    return writer.writer_u8 - (u8 *)GET_VEC_ASCII_START(unicode_buffer_info);
+#elif COMPILE_UCS_LEVEL == 1
+#elif COMPILE_UCS_LEVEL == 2
+    return unicode_buffer_info->writer.writer_u16 - (u16 *)GET_VEC_COMPACT_START(unicode_buffer_info);
+#elif COMPILE_UCS_LEVEL == 4
+    return unicode_buffer_info->writer.writer_u32 - (u32 *)GET_VEC_COMPACT_START(unicode_buffer_info);
+#endif
+}
+
+force_inline Py_ssize_t get_unicode_buffer_final_len_ucs1(EncodeUnicodeWriter writer, EncodeUnicodeBufferInfo *unicode_buffer_info) {
+    return writer.writer_u8 - (u8 *)GET_VEC_COMPACT_START(unicode_buffer_info);
+}
+
+force_inline Py_ssize_t get_unicode_buffer_final_len_ucs2(EncodeUnicodeWriter writer, EncodeUnicodeBufferInfo *unicode_buffer_info) {
+    return writer.writer_u16 - (u16 *)GET_VEC_COMPACT_START(unicode_buffer_info);
+}
+
+force_inline Py_ssize_t get_unicode_buffer_final_len_ucs4(EncodeUnicodeWriter writer, EncodeUnicodeBufferInfo *unicode_buffer_info) {
+    return writer.writer_u32 - (u32 *)GET_VEC_COMPACT_START(unicode_buffer_info);
+}
 #endif // PYYJSON_ENCODE_SHARED_H

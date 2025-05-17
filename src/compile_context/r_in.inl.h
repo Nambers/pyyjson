@@ -43,6 +43,14 @@
 // Name creation macro.
 #define MAKE_R_NAME(_x_) PYYJSON_CONCAT2(_x_, _src_t)
 
+#ifdef COMPILE_UCS_LEVEL
+#    if COMPILE_UCS_LEVEL == 0
+#        define __UCS_NAME ascii
+#    else
+#        define __UCS_NAME PYYJSON_SIMPLE_CONCAT2(ucs, COMPILE_UCS_LEVEL)
+#    endif
+#    define MAKE_UCS_NAME(_x_) PYYJSON_CONCAT2(_x_, __UCS_NAME)
+#endif
 /*
  * Names using R context.
  */
@@ -57,4 +65,7 @@
 #define _read_nan MAKE_R_NAME(_read_nan)
 #define read_inf_or_nan MAKE_R_NAME(read_inf_or_nan)
 
+#ifdef COMPILE_UCS_LEVEL
+#    define get_unicode_buffer_final_len MAKE_UCS_NAME(get_unicode_buffer_final_len)
+#endif
 #endif // PYYJSON_COMPILE_CONTEXT_R

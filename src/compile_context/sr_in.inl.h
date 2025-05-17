@@ -11,11 +11,6 @@
 // Name creation macros.
 #define MAKE_SR_NAME(_x_) PYYJSON_CONCAT3(_x_, _src_t, COMPILE_SIMD_BITS)
 #ifdef COMPILE_UCS_LEVEL
-#    if COMPILE_UCS_LEVEL == 0
-#        define __UCS_NAME ascii
-#    else
-#        define __UCS_NAME PYYJSON_SIMPLE_CONCAT2(ucs, COMPILE_UCS_LEVEL)
-#    endif
 #    define MAKE_S_UCS_NAME(_x_) PYYJSON_CONCAT3(_x_, __UCS_NAME, COMPILE_SIMD_BITS)
 #endif
 

@@ -1,9 +1,9 @@
 #ifdef PYYJSON_CLANGD_DUMMY
+#    include "encode/indent_writer.h"
 #    include "encode_shared.h"
 #    include "encode_unicode_impl_wrap.h"
 #    include "simd/simd_detect.h"
 #    include "simd/simd_impl.h"
-#    include "encode/indent_writer.h"
 #    include "unicode/unicode_buffer.h"
 #    ifndef COMPILE_READ_UCS_LEVEL
 #        define COMPILE_READ_UCS_LEVEL 1
@@ -19,32 +19,39 @@
 #    endif
 #endif
 
-#include "compile_context/iw_in.inl.h"
-#include "compile_context/rw_in.inl.h"
-
-
 /* Macro IN */
-#include "compile_context/iw_in.inl.h"
-//
-#include "compile_context/w_out.inl.h"
-//
-#include "compile_context/srw_in.inl.h"
+#include "compile_context/sirw_in.inl.h"
 
-
-#if COMPILE_READ_UCS_LEVEL > 1
-static force_noinline
-#else
-force_inline
+#if COMPILE_READ_UCS_LEVEL == 1
+#    if PYYJSON_ENCODE_UCS1_IMPL_INLINE
+#        define _IMPL_INLINE_SPECIFIER force_inline
+#    else
+#        define _IMPL_INLINE_SPECIFIER static force_noinline
+#    endif
+#elif COMPILE_READ_UCS_LEVEL == 2
+#    if PYYJSON_ENCODE_UCS2_IMPL_INLINE
+#        define _IMPL_INLINE_SPECIFIER force_inline
+#    else
+#        define _IMPL_INLINE_SPECIFIER static force_noinline
+#    endif
+#elif COMPILE_READ_UCS_LEVEL == 4
+#    if PYYJSON_ENCODE_UCS4_IMPL_INLINE
+#        define _IMPL_INLINE_SPECIFIER force_inline
+#    else
+#        define _IMPL_INLINE_SPECIFIER static force_noinline
+#    endif
 #endif
-        bool
-        PYYJSON_CONCAT4(unicode_buffer_append_key_internal, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)(PyObject *key, Py_ssize_t len, EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t cur_nested_depth) {
+
+_IMPL_INLINE_SPECIFIER
+bool unicode_buffer_append_key_internal(PyObject *key, Py_ssize_t len, _dst_t **writer_addr, EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t cur_nested_depth) {
     static_assert(COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL, "COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL");
     assert(PyUnicode_GET_LENGTH(key) == len);
-    RETURN_ON_UNLIKELY_ERR(!unicode_buffer_reserve(unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 5 + 6 * len + TAIL_PADDING));
-    write_unicode_indent(&_WRITER(unicode_buffer_info), cur_nested_depth);
-    *_WRITER(unicode_buffer_info)++ = '"';
-    encode_unicode_impl(&_WRITER(unicode_buffer_info), (_src_t *)get_unicode_data(key), (usize)len);
-    _dst_t *writer = _WRITER(unicode_buffer_info);
+    RETURN_ON_UNLIKELY_ERR(!unicode_buffer_reserve(writer_addr, unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 5 + 6 * len + TAIL_PADDING));
+    write_unicode_indent(writer_addr, cur_nested_depth);
+    _dst_t *writer = *writer_addr;
+    *writer++ = '"';
+    encode_unicode_impl(&writer, (_src_t *)get_unicode_data(key), (usize)len);
+    // _dst_t *writer = _WRITER(unicode_buffer_info);
     *writer++ = '"';
     *writer++ = ':';
 #if COMPILE_INDENT_LEVEL > 0
@@ -53,35 +60,34 @@ force_inline
     *writer = 0;
 #    endif // SIZEOF_VOID_P == 8 || COMPILE_WRITE_UCS_LEVEL != 4
 #endif     // COMPILE_INDENT_LEVEL > 0
-    _WRITER(unicode_buffer_info) += (COMPILE_INDENT_LEVEL > 0) ? 3 : 2;
-    assert(check_unicode_writer_valid(unicode_buffer_info));
+    *writer_addr = writer;
+    // _WRITER(unicode_buffer_info) += (COMPILE_INDENT_LEVEL > 0) ? 3 : 2;
+    assert(check_unicode_writer_valid(writer, unicode_buffer_info));
     return true;
 }
 
-#if COMPILE_READ_UCS_LEVEL > 1
-static force_noinline
-#else
-force_inline
-#endif
-        bool
-        PYYJSON_CONCAT4(unicode_buffer_append_str_internal, COMPILE_INDENT_LEVEL, COMPILE_READ_UCS_LEVEL, COMPILE_WRITE_UCS_LEVEL)(PyObject *restrict str, Py_ssize_t len, EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t cur_nested_depth, bool is_in_obj) {
+_IMPL_INLINE_SPECIFIER
+bool unicode_buffer_append_str_internal(PyObject *str, Py_ssize_t len, _dst_t **writer_addr,
+                                        EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t cur_nested_depth, bool is_in_obj) {
     static_assert(COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL, "COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL");
     assert(PyUnicode_GET_LENGTH(str) == len);
     if (is_in_obj) {
-        RETURN_ON_UNLIKELY_ERR(!unicode_buffer_reserve(unicode_buffer_info, 3 + 6 * len + TAIL_PADDING));
+        RETURN_ON_UNLIKELY_ERR(!unicode_buffer_reserve(writer_addr, unicode_buffer_info, 3 + 6 * len + TAIL_PADDING));
     } else {
-        RETURN_ON_UNLIKELY_ERR(!unicode_buffer_reserve(unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 3 + 6 * len + TAIL_PADDING));
-        write_unicode_indent(&_WRITER(unicode_buffer_info), cur_nested_depth);
+        RETURN_ON_UNLIKELY_ERR(!unicode_buffer_reserve(writer_addr, unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 3 + 6 * len + TAIL_PADDING));
+        write_unicode_indent(writer_addr, cur_nested_depth);
     }
-    *_WRITER(unicode_buffer_info)++ = '"';
-    encode_unicode_impl(&_WRITER(unicode_buffer_info), (_src_t *)get_unicode_data(str), (usize)len);
-    _dst_t *writer = _WRITER(unicode_buffer_info);
+    _dst_t *writer = *writer_addr;
+    *writer++ = '"';
+    encode_unicode_impl(&writer, (_src_t *)get_unicode_data(str), (usize)len);
     *writer++ = '"';
     *writer++ = ',';
-    _WRITER(unicode_buffer_info) += 2;
-    assert(check_unicode_writer_valid(unicode_buffer_info));
+    // _WRITER(unicode_buffer_info) += 2;
+    *writer_addr = writer;
+    assert(check_unicode_writer_valid(writer, unicode_buffer_info));
     return true;
 }
 
-#include "compile_context/iw_out.inl.h"
-#include "compile_context/srw_out.inl.h"
+#undef _IMPL_INLINE_SPECIFIER
+
+#include "compile_context/sirw_out.inl.h"

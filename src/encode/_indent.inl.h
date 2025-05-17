@@ -23,14 +23,14 @@ force_inline void write_unicode_indent(_dst_t **writer_addr, Py_ssize_t _cur_nes
 }
 
 // forward declaration
-force_inline bool unicode_buffer_reserve(EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t size);
+force_inline bool unicode_buffer_reserve(_dst_t **writer_addr, EncodeUnicodeBufferInfo *unicode_buffer_info, usize size);
 
-force_inline bool unicode_indent_writer(EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t cur_nested_depth, bool is_in_obj, Py_ssize_t additional_reserve_count) {
+force_inline bool unicode_indent_writer(_dst_t **writer_addr, EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t cur_nested_depth, bool is_in_obj, Py_ssize_t additional_reserve_count) {
     if (!is_in_obj && COMPILE_INDENT_LEVEL != 0) {
-        RETURN_ON_UNLIKELY_ERR(!unicode_buffer_reserve(unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + additional_reserve_count));
-        write_unicode_indent(&_WRITER(unicode_buffer_info), cur_nested_depth);
+        RETURN_ON_UNLIKELY_ERR(!unicode_buffer_reserve(writer_addr, unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + additional_reserve_count));
+        write_unicode_indent(writer_addr, cur_nested_depth);
     } else {
-        RETURN_ON_UNLIKELY_ERR(!unicode_buffer_reserve(unicode_buffer_info, additional_reserve_count));
+        RETURN_ON_UNLIKELY_ERR(!unicode_buffer_reserve(writer_addr, unicode_buffer_info, additional_reserve_count));
     }
     return true;
 }

@@ -45,4 +45,8 @@
 #define fast_skip_spaces_u8 MAKE_S_NAME(fast_skip_spaces_u8)
 #define fast_skip_spaces_u16 MAKE_S_NAME(fast_skip_spaces_u16)
 #define fast_skip_spaces_u32 MAKE_S_NAME(fast_skip_spaces_u32)
+//
+#define STR_WRITER_NOINDENT_IMPL(r_t, w_t) PYYJSON_CONCAT5(_unicode_buffer_append_str_internal, r_t, w_t, indent0, COMPILE_SIMD_BITS)
+#define KEY_WRITER_NOINDENT_IMPL(r_t, w_t) PYYJSON_CONCAT5(_unicode_buffer_append_key_internal, r_t, w_t, indent0, COMPILE_SIMD_BITS)
+
 #endif // PYYJSON_COMPILE_CONTEXT_S

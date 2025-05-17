@@ -7,7 +7,6 @@
 //
 #undef MAKE_SR_NAME
 //
-#undef __UCS_NAME
 #undef MAKE_S_UCS_NAME
 //
 #undef vector_a

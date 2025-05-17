@@ -14,20 +14,20 @@ typedef struct UnicodeInfo {
 } UnicodeInfo;
 
 typedef struct EncodeUnicodeBufferInfo {
-    union {
-        u8 *writer_u8;
-        u16 *writer_u16;
-        u32 *writer_u32;
-        void *writer_void;
-    } writer;
-
     void *head;
     void *end;
 } EncodeUnicodeBufferInfo;
 
-#define U8_WRITER(_unicode_buffer_info_) ((_unicode_buffer_info_)->writer.writer_u8)
-#define U16_WRITER(_unicode_buffer_info_) ((_unicode_buffer_info_)->writer.writer_u16)
-#define U32_WRITER(_unicode_buffer_info_) ((_unicode_buffer_info_)->writer.writer_u32)
+typedef union {
+    u8 *writer_u8;
+    u16 *writer_u16;
+    u32 *writer_u32;
+    void *writer_void;
+} EncodeUnicodeWriter;
+
+#define U8_WRITER(_writer_addr_) ((_writer_addr_)->writer_u8)
+#define U16_WRITER(_writer_addr_) ((_writer_addr_)->writer_u16)
+#define U32_WRITER(_writer_addr_) ((_writer_addr_)->writer_u32)
 
 #define GET_VEC_ASCII_START(_unicode_buffer_info_) (PYYJSON_CAST(PyASCIIObject *, (_unicode_buffer_info_)->head) + 1)
 #define GET_VEC_COMPACT_START(_unicode_buffer_info_) (PYYJSON_CAST(PyCompactUnicodeObject *, (_unicode_buffer_info_)->head) + 1)
@@ -35,13 +35,13 @@ typedef struct EncodeUnicodeBufferInfo {
 #define VEC_END(_unicode_buffer_info_) ((_unicode_buffer_info_)->end)
 
 
-force_noinline bool _unicode_buffer_reserve(EncodeUnicodeBufferInfo *unicode_buffer_info, void *target_ptr);
+bool _unicode_buffer_reserve(EncodeUnicodeBufferInfo *unicode_buffer_info, usize target_size);
 
 
 force_noinline void init_pyunicode(void *, Py_ssize_t size, int kind);
 
-force_inline bool check_unicode_writer_valid(EncodeUnicodeBufferInfo *unicode_buffer_info) {
-    return unicode_buffer_info->writer.writer_u8 <= (u8 *)unicode_buffer_info->end && unicode_buffer_info->writer.writer_u8 >= (u8 *)unicode_buffer_info->head;
+force_inline bool check_unicode_writer_valid(void *writer, EncodeUnicodeBufferInfo *unicode_buffer_info) {
+    return PYYJSON_CAST(u8 *, writer) <= (u8 *)unicode_buffer_info->end && PYYJSON_CAST(u8 *, writer) >= (u8 *)unicode_buffer_info->head;
 }
 
 /* Resize the buffer described by `unicode_buffer_info`.

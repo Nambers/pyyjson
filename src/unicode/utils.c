@@ -10,37 +10,56 @@
 extern int _PyUnicode_CheckConsistency(PyObject *op, int check_content);
 #endif
 
+#define RESERVE_MAX ((~(usize)PY_SSIZE_T_MAX) >> 1)
+static_assert((PYYJSON_CAST(usize, RESERVE_MAX) & (PYYJSON_CAST(usize, RESERVE_MAX) - 1)) == 0, "");
 
-force_noinline bool _unicode_buffer_reserve(EncodeUnicodeBufferInfo *unicode_buffer_info, void *target_ptr) {
-    const usize u8_diff = VEC_MEM_U8_DIFF(unicode_buffer_info->head, target_ptr);
-    assert(u8_diff >= 0);
-    usize target_size = VEC_MEM_U8_DIFF(unicode_buffer_info->head, unicode_buffer_info->end);
-    assert(target_size >= 0);
-#if PYYJSON_ASAN_CHECK
-    // for sanitize=address build, only resize to the *just enough* size.
-    usize inc_size = 0;
-#else
-    usize inc_size = target_size;
-#endif
-    if (unlikely(target_size > (PY_SSIZE_T_MAX - inc_size))) {
-        PyErr_NoMemory();
-        return false;
+bool _unicode_buffer_reserve(EncodeUnicodeBufferInfo *unicode_buffer_info, usize target_size) {
+    usize u8len = PYYJSON_CAST(uintptr_t, unicode_buffer_info->end) - PYYJSON_CAST(uintptr_t, unicode_buffer_info->head);
+    assert((u8len & (u8len - 1)) == 0);
+    while (target_size > u8len) {
+        if (u8len & RESERVE_MAX) {
+            PyErr_NoMemory();
+            return false;
+        }
+        u8len = (u8len << 1);
     }
-    target_size = target_size + inc_size;
-    target_size = (target_size > u8_diff) ? target_size : u8_diff;
-    Py_ssize_t w_diff = VEC_MEM_U8_DIFF(unicode_buffer_info->head, unicode_buffer_info->writer.writer_u8);
-    void *new_ptr = PyObject_Realloc(unicode_buffer_info->head, target_size);
+    void *new_ptr = PyObject_Realloc(unicode_buffer_info->head, u8len);
     if (unlikely(!new_ptr)) {
-        PyErr_NoMemory();
+        assert(PyErr_Occurred());
         return false;
     }
     unicode_buffer_info->head = new_ptr;
-    unicode_buffer_info->writer.writer_u8 = PYYJSON_CAST(u8 *, unicode_buffer_info->head) + w_diff;
-    unicode_buffer_info->end = PYYJSON_CAST(u8 *, unicode_buffer_info->head) + target_size;
-#ifndef NDEBUG
-    memset(unicode_buffer_info->writer.writer_u8, 0, PYYJSON_CAST(u8 *, unicode_buffer_info->end) - unicode_buffer_info->writer.writer_u8);
-#endif
+    unicode_buffer_info->end = PYYJSON_CAST(u8 *, unicode_buffer_info->head) + u8len;
     return true;
+    // const usize u8_diff = VEC_MEM_U8_DIFF(unicode_buffer_info->head, target_ptr);
+    //     assert(u8_diff >= 0);
+    //     usize target_size = VEC_MEM_U8_DIFF(unicode_buffer_info->head, unicode_buffer_info->end);
+    //     assert(target_size >= 0);
+    // #if PYYJSON_ASAN_CHECK
+    //     // for sanitize=address build, only resize to the *just enough* size.
+    //     usize inc_size = 0;
+    // #else
+    //     usize inc_size = target_size;
+    // #endif
+    //     if (unlikely(target_size > (PY_SSIZE_T_MAX - inc_size))) {
+    //         PyErr_NoMemory();
+    //         return false;
+    //     }
+    //     target_size = target_size + inc_size;
+    //     target_size = (target_size > u8_diff) ? target_size : u8_diff;
+    //     Py_ssize_t w_diff = VEC_MEM_U8_DIFF(unicode_buffer_info->head, unicode_buffer_info->writer.writer_u8);
+    //     void *new_ptr = PyObject_Realloc(unicode_buffer_info->head, target_size);
+    //     if (unlikely(!new_ptr)) {
+    //         PyErr_NoMemory();
+    //         return false;
+    //     }
+    //     unicode_buffer_info->head = new_ptr;
+    //     unicode_buffer_info->writer.writer_u8 = PYYJSON_CAST(u8 *, unicode_buffer_info->head) + w_diff;
+    //     unicode_buffer_info->end = PYYJSON_CAST(u8 *, unicode_buffer_info->head) + target_size;
+    // #ifndef NDEBUG
+    //     memset(unicode_buffer_info->writer.writer_u8, 0, PYYJSON_CAST(u8 *, unicode_buffer_info->end) - unicode_buffer_info->writer.writer_u8);
+    // #endif
+    //     return true;
 }
 
 force_noinline void init_pyunicode(void *head, Py_ssize_t size, int kind) {

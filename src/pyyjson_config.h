@@ -10,8 +10,8 @@
 #endif
 #include <stdalign.h>
 #include <stdbool.h>
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 #if defined(_POSIX_THREADS)
 #    include <pthread.h>
 #    define TLS_KEY_TYPE pthread_key_t
@@ -94,6 +94,21 @@
  */
 #ifndef PYYJSON_ENCODE_ESCAPE_ONCE_BYTES
 #    define PYYJSON_ENCODE_ESCAPE_ONCE_BYTES (16)
+#endif
+
+/* Whether implementation of encoding ASCII/UCS1 string is inlined. */
+#ifndef PYYJSON_ENCODE_UCS1_IMPL_INLINE
+#    define PYYJSON_ENCODE_UCS1_IMPL_INLINE 1
+#endif
+
+/* Whether implementation of encoding UCS2 string is inlined. */
+#ifndef PYYJSON_ENCODE_UCS2_IMPL_INLINE
+#    define PYYJSON_ENCODE_UCS2_IMPL_INLINE 0
+#endif
+
+/* Whether implementation of encoding UCS4 string is inlined. */
+#ifndef PYYJSON_ENCODE_UCS4_IMPL_INLINE
+#    define PYYJSON_ENCODE_UCS4_IMPL_INLINE 0
 #endif
 
 /** Type define for primitive types. */
