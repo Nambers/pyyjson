@@ -62,6 +62,8 @@ bool _unicode_buffer_reserve(EncodeUnicodeBufferInfo *unicode_buffer_info, usize
     //     return true;
 }
 
+
+
 force_noinline void init_pyunicode(void *head, Py_ssize_t size, int kind) {
     PyCompactUnicodeObject *unicode = PYYJSON_CAST(PyCompactUnicodeObject *, head);
     PyASCIIObject *ascii = PYYJSON_CAST(PyASCIIObject *, head);
@@ -129,8 +131,7 @@ force_noinline bool resize_to_fit_pyunicode(EncodeUnicodeBufferInfo *unicode_buf
     void *new_ptr = PyObject_Realloc(unicode_buffer_info->head, struct_size + (len + 1) * char_size);
     if (unlikely(!new_ptr)) {
         return false;
-    } else {
-        unicode_buffer_info->head = new_ptr;
     }
+    unicode_buffer_info->head = new_ptr;
     return true;
 }

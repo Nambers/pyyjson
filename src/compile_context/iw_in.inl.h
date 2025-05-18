@@ -23,6 +23,7 @@
 
 #define __INDENT_NAME PYYJSON_SIMPLE_CONCAT2(indent, COMPILE_INDENT_LEVEL)
 
+#define MAKE_I_NAME(_x_) PYYJSON_CONCAT2(_x_, __INDENT_NAME)
 #define MAKE_IW_NAME(_x_) PYYJSON_CONCAT3(_x_, __INDENT_NAME, _dst_t)
 
 /*
@@ -35,9 +36,9 @@
  */
 #define unicode_indent_writer MAKE_IW_NAME(unicode_indent_writer)
 
-#define bytes_buffer_append_key MAKE_IW_NAME(bytes_buffer_append_key)
-#define bytes_buffer_append_str MAKE_IW_NAME(bytes_buffer_append_str)
-#define encode_bytes_process_val MAKE_IW_NAME(encode_bytes_process_val)
-#define pyyjson_dumps_to_bytes_obj MAKE_IW_NAME(pyyjson_dumps_to_bytes_obj)
+#define bytes_buffer_append_key MAKE_I_NAME(bytes_buffer_append_key)
+#define bytes_buffer_append_str MAKE_I_NAME(bytes_buffer_append_str)
+#define encode_bytes_process_val MAKE_I_NAME(encode_bytes_process_val)
+#define pyyjson_dumps_to_bytes_obj MAKE_I_NAME(pyyjson_dumps_to_bytes_obj)
 
 #endif // PYYJSON_COMPILE_CONTEXT_IW

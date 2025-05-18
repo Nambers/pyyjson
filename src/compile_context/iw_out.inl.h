@@ -3,6 +3,7 @@
 #include "w_out.inl.h"
 //
 #undef __INDENT_NAME
+#undef MAKE_I_NAME
 #undef MAKE_IW_NAME
 //
 #undef write_unicode_indent

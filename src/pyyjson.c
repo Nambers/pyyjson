@@ -24,6 +24,7 @@ typedef PyObject *pyyjson_cache_type;
 extern pyyjson_cache_type AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
 
 PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject *kwargs);
+PyObject *pyyjson_EncodeToBytes(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *pyyjson_Decode(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *pyyjson_FileEncode(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *pyyjson_DecodeFile(PyObject *self, PyObject *args, PyObject *kwargs);
@@ -43,6 +44,7 @@ static PyMethodDef pyyjson_Methods[] = {
         {"encode", (PyCFunction)pyyjson_Encode, METH_VARARGS | METH_KEYWORDS, "dumps(obj, indent=None)\n--\n\nConverts arbitrary object recursively into JSON."},
         {"decode", (PyCFunction)pyyjson_Decode, METH_VARARGS | METH_KEYWORDS, "decode(s)\n--\n\nConverts JSON as string to dict object structure."},
         {"dumps", (PyCFunction)pyyjson_Encode, METH_VARARGS | METH_KEYWORDS, "dumps(obj, indent=None)\n--\n\nConverts arbitrary object recursively into JSON."},
+        {"dumps_to_bytes", (PyCFunction)pyyjson_EncodeToBytes, METH_VARARGS | METH_KEYWORDS, "dumps_to_bytes(obj, indent=None)\n--\n\nConverts arbitrary object recursively into JSON."},
         {"loads", (PyCFunction)pyyjson_Decode, METH_VARARGS | METH_KEYWORDS, "loads(s)\n--\n\nConverts JSON as string to dict object structure."},
         {"print_current_features", pyyjson_print_current_features, METH_NOARGS, "print_current_features()\n--\n\nPrints current features."},
         {"get_current_features", pyyjson_get_current_features, METH_NOARGS, "get_current_features()\n--\n\nGet current features."},
@@ -177,11 +179,14 @@ PyObject *pyyjson_Decode_avx512(PyObject *self, PyObject *args, PyObject *kwargs
 PyObject *pyyjson_Decode_avx2(PyObject *self, PyObject *args, PyObject *kwargs);
 // PyObject *pyyjson_Decode_sse4_2(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *pyyjson_Decode_sse2(PyObject *self, PyObject *args, PyObject *kwargs);
-
+PyObject *pyyjson_EncodeToBytes_sse2(PyObject *self, PyObject *args, PyObject *kwargs);
+PyObject *pyyjson_EncodeToBytes_avx2(PyObject *self, PyObject *args, PyObject *kwargs);
+PyObject *pyyjson_EncodeToBytes_avx512(PyObject *self, PyObject *args, PyObject *kwargs);
 
 int CurrentSIMDFeatureLevel = -1;
 PyCFunctionWithKeywords _pyyjson_encode_interface = NULL;
 PyCFunctionWithKeywords _pyyjson_decode_interface = NULL;
+PyCFunctionWithKeywords _pyyjson_encode_bytes_interface = NULL;
 
 PLATFORM_SIMD_LEVEL get_simd_feature(void) {
 #    if PYYJSON_X86
@@ -217,21 +222,25 @@ force_inline void _update_simd_features(void) {
             case X86SIMDFeatureLevelSSE2: {
                 _pyyjson_encode_interface = pyyjson_Encode_sse2;
                 _pyyjson_decode_interface = pyyjson_Decode_sse2;
+                _pyyjson_encode_bytes_interface = pyyjson_EncodeToBytes_sse2;
                 break;
             }
             // case X86SIMDFeatureLevelSSE4_2: {
             //     _pyyjson_encode_interface = pyyjson_Encode_sse4_2;
             //     _pyyjson_decode_interface = pyyjson_Decode_sse4_2;
+            //     _pyyjson_encode_bytes_interface = pyyjson_EncodeToBytes_sse4_2;
             //     break;
             // }
             case X86SIMDFeatureLevelAVX2: {
                 _pyyjson_encode_interface = pyyjson_Encode_avx2;
                 _pyyjson_decode_interface = pyyjson_Decode_avx2;
+                _pyyjson_encode_bytes_interface = pyyjson_EncodeToBytes_avx2;
                 break;
             }
             case X86SIMDFeatureLevelAVX512: {
                 _pyyjson_encode_interface = pyyjson_Encode_avx512;
                 _pyyjson_decode_interface = pyyjson_Decode_avx512;
+                _pyyjson_encode_bytes_interface = pyyjson_EncodeToBytes_avx512;
                 break;
             }
             default: {
@@ -250,6 +259,12 @@ PyObject *pyyjson_Encode(PyObject *self, PyObject *args, PyObject *kwargs) {
     _update_simd_features();
     assert(_pyyjson_encode_interface);
     return _pyyjson_encode_interface(self, args, kwargs);
+}
+
+PyObject *pyyjson_EncodeToBytes(PyObject *self, PyObject *args, PyObject *kwargs) {
+    _update_simd_features();
+    assert(_pyyjson_encode_interface);
+    return _pyyjson_encode_bytes_interface(self, args, kwargs);
 }
 
 PyObject *pyyjson_Decode(PyObject *self, PyObject *args, PyObject *kwargs) {
