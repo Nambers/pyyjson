@@ -17,11 +17,15 @@ class TestIndentedOutput:
         assert pyyjson.dumps(obj, indent=2) == json.dumps(
             obj, indent=2
         )
+        assert pyyjson.dumps_to_bytes(obj, indent=2) == json.dumps(
+            obj, indent=2
+        ).encode("utf-8")
 
     def test_empty(self):
         obj = [{}, [[[]]], {"key": []}]
         ref = '[\n  {},\n  [\n    [\n      []\n    ]\n  ],\n  {\n    "key": []\n  }\n]'
         assert pyyjson.dumps(obj, indent=2) == ref
+        assert pyyjson.dumps_to_bytes(obj, indent=2) == ref.encode("utf-8")
 
     # def test_twitter_pretty(self):
     #     """
@@ -40,6 +44,9 @@ class TestIndentedOutput:
         assert pyyjson.dumps(obj, indent=2) == json.dumps(
             obj, indent=2, ensure_ascii=False
         )
+        assert pyyjson.dumps_to_bytes(obj, indent=2) == json.dumps(
+            obj, indent=2, ensure_ascii=False
+        ).encode("utf-8")
 
     # def test_canada_pretty(self):
     #     """
@@ -58,3 +65,6 @@ class TestIndentedOutput:
         assert pyyjson.dumps(obj, indent=2) == json.dumps(
             obj, indent=2, ensure_ascii=False
         )
+        assert pyyjson.dumps_to_bytes(obj, indent=2) == json.dumps(
+            obj, indent=2, ensure_ascii=False
+        ).encode("utf-8")

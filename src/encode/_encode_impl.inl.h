@@ -923,6 +923,7 @@ fail_ctntype:;
 fail_keytype:;
     PyErr_SetString(JSONEncodeError, "Expected `str` as key");
     goto fail;
+#undef GOTO_FAIL_ON_UNLIKELY_ERR
 }
 
 #undef _DUMPS_PASS_ARGS

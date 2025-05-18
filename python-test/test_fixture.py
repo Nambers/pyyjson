@@ -15,6 +15,7 @@ class TestFixture:
         val = read_fixture_str("twitter.json")
         read = pyyjson.loads(val)
         assert pyyjson.loads(pyyjson.dumps(read)) == read
+        assert pyyjson.dumps(read).encode("utf-8") == pyyjson.dumps_to_bytes(read)
 
     def test_canada(self):
         """
@@ -23,6 +24,7 @@ class TestFixture:
         val = read_fixture_str("canada.json")
         read = pyyjson.loads(val)
         assert pyyjson.loads(pyyjson.dumps(read)) == read
+        assert pyyjson.loads(pyyjson.dumps_to_bytes(read)) == read
 
     def test_citm_catalog(self):
         """
@@ -31,6 +33,7 @@ class TestFixture:
         val = read_fixture_str("ctm.json")
         read = pyyjson.loads(val)
         assert pyyjson.loads(pyyjson.dumps(read)) == read
+        assert pyyjson.loads(pyyjson.dumps_to_bytes(read)) == read
 
     def test_github(self):
         """
@@ -39,6 +42,7 @@ class TestFixture:
         val = read_fixture_str("github.json")
         read = pyyjson.loads(val)
         assert pyyjson.loads(pyyjson.dumps(read)) == read
+        assert pyyjson.loads(pyyjson.dumps_to_bytes(read)) == read
 
     def test_blns(self):
         """

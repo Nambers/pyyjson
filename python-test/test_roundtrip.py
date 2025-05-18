@@ -9,6 +9,7 @@ class TestJsonChecker:
     def _run_roundtrip_json(self, filename):
         data = read_fixture_str("json/test_roundtrip/" + filename)
         assert pyyjson.dumps(pyyjson.loads(data)) == data
+        assert pyyjson.dumps_to_bytes(pyyjson.loads(data)) == data.encode("utf-8")
 
     def test_roundtrip001(self):
         """

@@ -1,5 +1,3 @@
-
-
 import json
 
 import pyyjson
@@ -22,7 +20,10 @@ def fuzz_bytes_input(input_bytes: bytes):
     # if not should_success and success:
     #     print(f"pyyjson.loads should have failed on input_bytes: {input_bytes}")
     if success:
-        pyyjson.dumps(decoded)
+        success_test(pyyjson.dumps, decoded)
+        success_test(pyyjson.dumps_to_bytes, decoded)
+        # pyyjson.dumps(decoded)
+        # pyyjson.dumps_to_bytes(decoded)
     _, input_str = success_test(input_bytes.decode, "utf-8")
     if input_str is not None:
         fuzz_str_input(input_str)
@@ -36,4 +37,5 @@ def fuzz_str_input(input_str: str):
     # if not should_success and success:
     #     print(f"pyyjson.loads should have failed on input_str: {input_str}")
     if success:
-        pyyjson.dumps(decoded)
+        success_test(pyyjson.dumps, decoded)
+        success_test(pyyjson.dumps_to_bytes, decoded)

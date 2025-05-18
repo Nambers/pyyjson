@@ -20,6 +20,7 @@ class TestJsonChecker:
     def _run_pass_json(self, filename, match=""):
         data = read_fixture_str("json/test_checker/" + filename)
         assert pyyjson.dumps(pyyjson.loads(data)) == match
+        assert pyyjson.dumps_to_bytes(pyyjson.loads(data)) == match.encode("utf-8")
 
     def test_fail01(self):
         """

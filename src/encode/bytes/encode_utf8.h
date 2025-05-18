@@ -561,7 +561,7 @@ force_inline bool _3bytes_in_ucs2_encode_loop(u8 **dst_addr, const u16 **src_add
 }
 
 force_inline bool bytes_write_ucs2(u8 **writer_addr, const u16 *src, usize len) {
-#define CAN_LOOP4 (len >= READ_BATCH_COUNT)
+#define CAN_LOOP4 (len >= 4 * READ_BATCH_COUNT)
 #define CAN_LOOP (len >= READ_BATCH_COUNT)
     while (CAN_LOOP) {
         u16 unicode;
@@ -910,7 +910,7 @@ force_inline bool _3bytes_in_ucs4_encode_loop(u8 **dst_addr, const u32 **src_add
 }
 
 force_inline bool bytes_write_ucs4(u8 **writer_addr, const u32 *src, usize len) {
-#define CAN_LOOP4 (len >= READ_BATCH_COUNT)
+#define CAN_LOOP4 (len >= 4 * READ_BATCH_COUNT)
 #define CAN_LOOP (len >= READ_BATCH_COUNT)
     while (CAN_LOOP) {
         u32 unicode;

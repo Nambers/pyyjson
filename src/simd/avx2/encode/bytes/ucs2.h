@@ -178,13 +178,20 @@ force_inline void ucs2_encode_3bytes_utf8_avx2_blendhigh(u8 *writer, vector_a y,
     switch (parts) {
         case 0: {
             // len is 1 or 2
-            u64 w1, w2;
-            memcpy(&w1, writer + 40, 8);
-            w1 = w1 & ((len & 1) ? 0xffffffffff : 0xffffff);
-            memcpy(&w2, &x4, 8);
-            w2 = w2 & ((len & 1) ? 0xffffff0000000000 : 0xffffffffffff0000);
-            w1 = w1 | w2;
-            memcpy(writer + 40, &w1, 8);
+            assert(len == 1 || len == 2);
+
+            union {
+                u8 _xbuf[16];
+                vector_a_u8_128 _x;
+            } tmp;
+
+            tmp._x = x4;
+            if (len & 1) {
+                // len == 1
+                memcpy(writer + 40 + 5, tmp._xbuf + 5, 3);
+            } else {
+                memcpy(writer + 40 + 2, tmp._xbuf + 2, 6);
+            }
             break;
         }
         case 1:
@@ -198,16 +205,24 @@ force_inline void ucs2_encode_3bytes_utf8_avx2_blendhigh(u8 *writer, vector_a y,
             break;
         }
         case 3: {
+            // len is 9 or 10
+            assert(len == 9 || len == 10);
             memcpy(writer + 40, &x4, 8);
             *(vector_u_u8_128 *)(writer + 24) = x3;
-            // len is 9 or 10, high_blend_bytes is 3 or 6
-            u64 w1, w2;
-            memcpy(&w1, writer + 16, 8);
-            w1 = w1 & ((len & 1) ? 0xffffffffff : 0xffffff);
-            memcpy(&w2, &x2, 8);
-            w2 = w2 & ((len & 1) ? 0xffffff0000000000 : 0xffffffffffff0000);
-            w1 = w1 | w2;
-            memcpy(writer + 16, &w1, 8);
+
+            // high_blend_bytes is 3 or 6
+            union {
+                u8 _xbuf[16];
+                vector_a_u8_128 _x;
+            } tmp;
+
+            tmp._x = x2;
+            if (len & 1) {
+                // len == 1
+                memcpy(writer + 16 + 5, tmp._xbuf + 5, 3);
+            } else {
+                memcpy(writer + 16 + 2, tmp._xbuf + 2, 6);
+            }
             break;
         }
         case 4:
@@ -277,7 +292,7 @@ ascii:;
     {
         const vector_a m_not_ascii = (vec == broadcast(_Quote)) | (vec == broadcast(_Slash)) | signed_cmpgt(broadcast(ControlMax), vec) | signed_cmpgt(vec, broadcast(0x7f));
         vector_a m = high_mask(m_not_ascii, len);
-        cvt_to_dst_blendhigh(writer, vec, len);
+        cvt_to_dst_blendhigh(writer + len - READ_BATCH_COUNT, vec, len);
         if (likely(testz(m))) {
             writer += len;
             goto finished;

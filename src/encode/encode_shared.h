@@ -517,5 +517,30 @@ force_inline bool init_bytes_buffer(EncodeUnicodeWriter *writer_addr, EncodeUnic
     return _init_encode_buffer(writer_addr, unicode_buffer_info, PYBYTES_START_OFFSET);
 }
 
+force_inline usize get_bytes_buffer_final_len(u8 *writer, void *head) {
+    assert(writer >= PYYJSON_CAST(u8 *, head) + PYBYTES_START_OFFSET);
+    usize ret = writer - PYYJSON_CAST(u8 *, head) - PYBYTES_START_OFFSET;
+    return ret;
+}
+
+force_inline bool resize_to_fit_pybytes(EncodeUnicodeBufferInfo *unicode_buffer_info, usize len) {
+    usize buffer_total_size = PYBYTES_START_OFFSET + len + 1;
+    void *new_ptr = PyObject_Realloc(unicode_buffer_info->head, buffer_total_size);
+    if (unlikely(!new_ptr)) {
+        return false;
+    }
+    unicode_buffer_info->head = new_ptr;
+    return true;
+}
+
+force_inline void init_pybytes(PyObject *in_new_bytes, usize final_len) {
+    PyBytesObject *new_bytes = PYYJSON_CAST(PyBytesObject *, in_new_bytes);
+    PyObject_Init(in_new_bytes, &PyBytes_Type);
+    new_bytes->ob_base.ob_size = (Py_ssize_t)final_len;
+#if PY_MINOR_VERSION < 11
+    new_bytes->ob_shash = -1;
+#endif
+    new_bytes->ob_sval[final_len] = 0;
+}
 
 #endif // PYYJSON_ENCODE_SHARED_H

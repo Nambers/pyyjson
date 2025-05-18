@@ -199,6 +199,24 @@ class TestMemory:
 
     @pytest.mark.skipif(psutil is None, reason="psutil not installed")
     @pytest.mark.skipif(asan_loaded, reason="libasan loaded")
+    def test_memory_dumps_to_bytes(self):
+        """
+        dumps_to_bytes() memory leak
+        """
+        proc = psutil.Process()
+        gc.collect()
+        fixture = pyyjson.loads(FIXTURE)
+        val = pyyjson.dumps_to_bytes(fixture)
+        assert val
+        mem = proc.memory_info().rss
+        for _ in range(10000):
+            val = pyyjson.dumps_to_bytes(fixture)
+            assert val
+        gc.collect()
+        assert proc.memory_info().rss - mem <= MAX_INCREASE
+
+    @pytest.mark.skipif(psutil is None, reason="psutil not installed")
+    @pytest.mark.skipif(asan_loaded, reason="libasan loaded")
     def test_memory_loads_exc(self):
         """
         loads() memory leak exception without a GC pause
@@ -232,6 +250,27 @@ class TestMemory:
         for _ in range(n):
             try:
                 pyyjson.dumps(data)
+            except pyyjson.JSONEncodeError:
+                i += 1
+        assert n == i
+        assert proc.memory_info().rss - mem <= MAX_INCREASE
+        gc.enable()
+
+    @pytest.mark.skipif(psutil is None, reason="psutil not installed")
+    @pytest.mark.skipif(asan_loaded, reason="libasan loaded")
+    def test_memory_dumps_to_bytes_exc(self):
+        """
+        dumps_to_bytes() memory leak exception without a GC pause
+        """
+        proc = psutil.Process()
+        gc.disable()
+        data = Unsupported()
+        mem = proc.memory_info().rss
+        n = 10000
+        i = 0
+        for _ in range(n):
+            try:
+                pyyjson.dumps_to_bytes(data)
             except pyyjson.JSONEncodeError:
                 i += 1
         assert n == i

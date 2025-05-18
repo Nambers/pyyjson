@@ -115,10 +115,12 @@ force_inline PyObject *READ_NUMBER(const _src_t **ptr, const _src_t *buffer_end)
             return PyLong_FromLongLong(0); \
         } while (false)
 
-#    define return_i64(_v)                                                          \
-        do {                                                                        \
-            *end = cur;                                                             \
-            return PyLong_FromLongLong((i64)(sign ? (u64)(~(_v) + 1) : (u64)(_v))); \
+#    define return_i64(_v)                                                                                \
+        do {                                                                                              \
+            *end = cur;                                                                                   \
+            u64 temp = (sign ? (u64)(~(_v) + 1) : (u64)(_v));                                             \
+            if (unlikely(PYYJSON_CAST(i64, temp) < 0 && !sign)) return PyLong_FromUnsignedLongLong(temp); \
+            return PyLong_FromLongLong((i64)temp);                                                        \
         } while (false)
 
 #    define return_u64(_v)                                                                  \
@@ -728,10 +730,12 @@ force_inline PyObject *READ_NUMBER(const _src_t **ptr, const _src_t *buffer_end)
             return PyLong_FromLongLong(0); \
         } while (false)
 
-#    define return_i64(_v)                                                          \
-        do {                                                                        \
-            *end = cur;                                                             \
-            return PyLong_FromLongLong((i64)(sign ? (u64)(~(_v) + 1) : (u64)(_v))); \
+#    define return_i64(_v)                                                                                \
+        do {                                                                                              \
+            *end = cur;                                                                                   \
+            u64 temp = (sign ? (u64)(~(_v) + 1) : (u64)(_v));                                             \
+            if (unlikely(PYYJSON_CAST(i64, temp) < 0 && !sign)) return PyLong_FromUnsignedLongLong(temp); \
+            return PyLong_FromLongLong((i64)temp);                                                        \
         } while (false)
 
 #    define return_u64(_v)                                                                  \

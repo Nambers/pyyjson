@@ -37,8 +37,7 @@ class TestApi:
         """
         for obj in SIMPLE_TYPES:
             assert pyyjson.dumps(obj) == json.dumps(obj)
-            # TODO
-            # assert pyyjson.dumps(obj, to_bytes=True) == json.dumps(obj).encode("utf-8")
+            assert pyyjson.dumps_to_bytes(obj) == json.dumps(obj).encode("utf-8")
 
     def test_simple_round_trip(self):
         """
@@ -46,6 +45,7 @@ class TestApi:
         """
         for obj in SIMPLE_TYPES:
             assert pyyjson.loads(pyyjson.dumps(obj)) == obj
+            assert pyyjson.loads(pyyjson.dumps_to_bytes(obj)) == obj
 
     def test_loads_type(self):
         """
@@ -82,7 +82,7 @@ class TestApi:
         loads() recursion limit at limit mixed
         """
         n = LOADS_RECURSION_LIMIT
-        value = b"[" b'{"key":' * n + b'{"key":true}' + b"}" * n + b"]"
+        value = b'[{"key":' * n + b'{"key":true}' + b"}" * n + b"]"
         pytest.raises(pyyjson.JSONDecodeError, pyyjson.loads, value)
 
     def test_loads_recursion_valid_excessive_array(self):
@@ -114,7 +114,7 @@ class TestApi:
         loads() recursion limit at limit mixed pretty
         """
         n = LOADS_RECURSION_LIMIT
-        value = b"[\n  " b'{"key":' * n + b'{"key":true}' + b"}" * n + b"]"
+        value = b'[\n  {"key":' * n + b'{"key":true}' + b"}" * n + b"]"
         pytest.raises(pyyjson.JSONDecodeError, pyyjson.loads, value)
 
     def test_loads_recursion_valid_excessive_array_pretty(self):
@@ -146,6 +146,10 @@ class TestApi:
             pyyjson.dumps(__obj={})  # type: ignore
         with pytest.raises(TypeError):
             pyyjson.dumps(zxc={})  # type: ignore
+        with pytest.raises(TypeError):
+            pyyjson.dumps_to_bytes(__obj={})  # type: ignore
+        with pytest.raises(TypeError):
+            pyyjson.dumps_to_bytes(zxc={})  # type: ignore
 
     def test_default_unknown_kwarg(self):
         """
@@ -159,8 +163,7 @@ class TestApi:
         dumps() empty kwarg
         """
         assert pyyjson.dumps(None, **{}) == "null"
-        # TODO
-        # assert pyyjson.dumps(None, **{}) == b"null"
+        assert pyyjson.dumps_to_bytes(None, **{}) == b"null"
 
     def test_dumps_signature(self):
         """
@@ -168,6 +171,10 @@ class TestApi:
         """
         assert (
             str(inspect.signature(pyyjson.dumps))
+            == "(obj, indent=None)"
+        )
+        assert (
+            str(inspect.signature(pyyjson.dumps_to_bytes))
             == "(obj, indent=None)"
         )
 
@@ -197,6 +204,7 @@ class TestApi:
         b = "b" * 4096
         c = "c" * 4096 * 4096
         assert pyyjson.dumps([a, b, c]) == f'["{a}","{b}","{c}"]'
+        assert pyyjson.dumps_to_bytes([a, b, c]) == f'["{a}","{b}","{c}"]'.encode("utf-8")
 
     def test_bytes_null_terminated(self):
         """
@@ -204,3 +212,4 @@ class TestApi:
         """
         # would raise ValueError: invalid literal for int() with base 10: b'1596728892'
         int(pyyjson.dumps(1596728892))
+        int(pyyjson.dumps_to_bytes(1596728892))

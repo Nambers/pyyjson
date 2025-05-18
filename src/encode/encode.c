@@ -113,37 +113,6 @@
 //
 #include "compile_context/s_in.inl.h"
 
-force_inline bool resize_to_fit_pybytes(EncodeUnicodeBufferInfo *unicode_buffer_info, usize len) {
-    usize buffer_total_size = PYBYTES_START_OFFSET + len + 1;
-    void *new_ptr = PyObject_Realloc(unicode_buffer_info->head, buffer_total_size);
-    if (unlikely(!new_ptr)) {
-        return false;
-    }
-    unicode_buffer_info->head = new_ptr;
-    return true;
-}
-
-force_inline void init_pybytes(PyObject *in_new_bytes, usize final_len) {
-    PyBytesObject *new_bytes = PYYJSON_CAST(PyBytesObject *, in_new_bytes);
-    PyObject_Init(in_new_bytes, &PyBytes_Type);
-#if PY_MINOR_VERSION < 11
-    new_bytes->ob_shash = -1;
-#endif
-    new_bytes->ob_sval[final_len] = 0;
-}
-
-// force_inline PyObject *pyyjson_dumps_to_bytes_single_unicode(PyObject *unicode) {
-//     EncodeUnicodeWriter writer;
-//     EncodeUnicodeBufferInfo _unicode_buffer_info;
-//     _unicode_buffer_info.head = PyObject_Malloc(PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE);
-//     RETURN_ON_UNLIKELY_ERR(!_unicode_buffer_info.head);
-//     const usize offset = PYBYTES_START_OFFSET;
-//     writer.writer_u8 = PYYJSON_CAST(u8 *, _unicode_buffer_info.head) + offset;
-//     _unicode_buffer_info.end = PYYJSON_CAST(u8 *, _unicode_buffer_info.head) + PYYJSON_ENCODE_DST_BUFFER_INIT_SIZE;
-//     bool success;
-
-// }
-
 /* Encodes non-container types. */
 force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode, bool to_bytes_obj) {
     EncodeUnicodeWriter writer;
@@ -234,6 +203,7 @@ force_inline PyObject *pyyjson_dumps_single_long(PyObject *val, bool to_bytes_ob
     if (pylong_is_zero(val)) {
         if (to_bytes_obj) {
             ret = PyObject_Malloc(PYBYTES_START_OFFSET + 1 + 1);
+            RETURN_ON_UNLIKELY_ERR(!ret);
             init_pybytes(ret, 1);
             PyBytesObject *b = _PyBytes_CAST(ret);
             b->ob_sval[0] = '0';
@@ -250,12 +220,18 @@ force_inline PyObject *pyyjson_dumps_single_long(PyObject *val, bool to_bytes_ob
         usize sign;
         if (pylong_is_unsigned(val)) {
             bool _c = pylong_value_unsigned(val, &v);
-            RETURN_ON_UNLIKELY_ERR(!_c);
+            if (unlikely(!_c)) {
+                PyErr_SetString(JSONEncodeError, "convert value to unsigned long long failed");
+                return NULL;
+            }
             sign = 0;
         } else {
             i64 v2;
             bool _c = pylong_value_signed(val, &v2);
-            RETURN_ON_UNLIKELY_ERR(!_c);
+            if (unlikely(!_c)) {
+                PyErr_SetString(JSONEncodeError, "convert value to long long failed");
+                return NULL;
+            }
             assert(v2 <= 0);
             v = -v2;
             sign = 1;

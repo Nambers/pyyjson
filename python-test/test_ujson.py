@@ -14,29 +14,35 @@ class TestUltraJSON:
         encoded = pyyjson.dumps(sut)
         decoded = pyyjson.loads(encoded)
         assert sut == decoded
+        assert encoded == pyyjson.dumps_to_bytes(sut).decode("utf-8")
         encoded = pyyjson.dumps(sut)
         decoded = pyyjson.loads(encoded)
         assert sut == decoded
+        assert encoded == pyyjson.dumps_to_bytes(sut).decode("utf-8")
 
     def test_doubleLongDecimalIssue(self):
         sut = {"a": -12345678901234.56789012}
         encoded = pyyjson.dumps(sut)
         decoded = pyyjson.loads(encoded)
         assert sut == decoded
+        assert encoded == pyyjson.dumps_to_bytes(sut).decode("utf-8")
         encoded = pyyjson.dumps(sut)
         decoded = pyyjson.loads(encoded)
         assert sut == decoded
+        assert encoded == pyyjson.dumps_to_bytes(sut).decode("utf-8")
 
     def test_encodeDecodeLongDecimal(self):
         sut = {"a": -528656961.4399388}
         encoded = pyyjson.dumps(sut)
         pyyjson.loads(encoded)
+        assert encoded == pyyjson.dumps_to_bytes(sut).decode("utf-8")
 
     def test_decimalDecodeTest(self):
         sut = {"a": 4.56}
         encoded = pyyjson.dumps(sut)
         decoded = pyyjson.loads(encoded)
         pytest.approx(sut["a"], decoded["a"])
+        assert encoded == pyyjson.dumps_to_bytes(sut).decode("utf-8")
 
     def test_encodeDictWithUnicodeKeys(self):
         val = {
@@ -47,7 +53,7 @@ class TestUltraJSON:
             "key1": "value1",
             "key1": "value1",
         }
-        pyyjson.dumps(val)
+        assert pyyjson.dumps(val).encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
         val = {
             "بن": "value1",
@@ -58,19 +64,21 @@ class TestUltraJSON:
             "بن": "value1",
             "بن": "value1",
         }
-        pyyjson.dumps(val)
+        assert pyyjson.dumps(val).encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
     def test_encodeArrayOfNestedArrays(self):
         val = [[[[]]]] * 20  # type: ignore
         output = pyyjson.dumps(val)
         assert val == pyyjson.loads(output)
         assert val == pyyjson.loads(output)
+        assert output.encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
     def test_encodeArrayOfDoubles(self):
         val = [31337.31337, 31337.31337, 31337.31337, 31337.31337] * 10
         output = pyyjson.dumps(val)
         assert val == pyyjson.loads(output)
         assert val == pyyjson.loads(output)
+        assert output.encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
     def test_encodeStringConversion2(self):
         val = "A string \\ / \b \f \n \r \t"
@@ -78,6 +86,7 @@ class TestUltraJSON:
         assert val == pyyjson.loads(output)
         assert output == '"A string \\\\ / \\b \\f \\n \\r \\t"'
         assert val == pyyjson.loads(output)
+        assert output.encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
     def test_decodeUnicodeConversion(self):
         pass
@@ -88,6 +97,7 @@ class TestUltraJSON:
         dec = pyyjson.loads(enc)
         assert enc == pyyjson.dumps(val)
         assert dec == pyyjson.loads(enc)
+        assert enc.encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
     def test_encodeControlEscaping(self):
         val = "\x19"
@@ -95,6 +105,7 @@ class TestUltraJSON:
         dec = pyyjson.loads(enc)
         assert val == dec
         assert enc == pyyjson.dumps(val)
+        assert enc.encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
     def test_encodeUnicodeConversion2(self):
         val = "\xe6\x97\xa5\xd1\x88"
@@ -102,6 +113,7 @@ class TestUltraJSON:
         dec = pyyjson.loads(enc)
         assert enc == pyyjson.dumps(val)
         assert dec == pyyjson.loads(enc)
+        assert enc.encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
     def test_encodeUnicodeSurrogatePair(self):
         val = "\xf0\x90\x8d\x86"
@@ -110,6 +122,7 @@ class TestUltraJSON:
 
         assert enc == pyyjson.dumps(val)
         assert dec == pyyjson.loads(enc)
+        assert enc.encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
     def test_encodeUnicode4BytesUTF8(self):
         val = "\xf0\x91\x80\xb0TRAILINGNORMAL"
@@ -118,6 +131,7 @@ class TestUltraJSON:
 
         assert enc == pyyjson.dumps(val)
         assert dec == pyyjson.loads(enc)
+        assert enc.encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
     def test_encodeUnicode4BytesUTF8Highest(self):
         val = "\xf3\xbf\xbf\xbfTRAILINGNORMAL"
@@ -126,6 +140,7 @@ class TestUltraJSON:
 
         assert enc == pyyjson.dumps(val)
         assert dec == pyyjson.loads(enc)
+        assert enc.encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
     def testEncodeUnicodeBMP(self):
         s = "\U0001f42e\U0001f42e\U0001f42d\U0001f42d"  # 🐮🐮🐭🐭
@@ -134,6 +149,7 @@ class TestUltraJSON:
 
         assert json.loads(json.dumps(s)) == s
         assert pyyjson.loads(pyyjson.dumps(s)) == s
+        assert pyyjson.loads(pyyjson.dumps_to_bytes(s)) == s
 
     def testEncodeSymbols(self):
         s = "\u273f\u2661\u273f"  # ✿♡✿
@@ -144,6 +160,7 @@ class TestUltraJSON:
         assert s == decoded
 
         encoded = pyyjson.dumps(s)
+        assert encoded.encode("utf-8") == pyyjson.dumps_to_bytes(s)
 
         # json outputs an unicode object
         encoded_json = json.dumps(s, ensure_ascii=False)
@@ -158,6 +175,7 @@ class TestUltraJSON:
         assert val == pyyjson.loads(output)
         assert output == pyyjson.dumps(val)
         assert val == pyyjson.loads(output)
+        assert output.encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
     def test_encodeIntConversion(self):
         val = 31337
@@ -165,6 +183,7 @@ class TestUltraJSON:
         assert val == pyyjson.loads(output)
         assert output == pyyjson.dumps(val)
         assert val == pyyjson.loads(output)
+        assert output.encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
     def test_encodeIntNegConversion(self):
         val = -31337
@@ -172,6 +191,7 @@ class TestUltraJSON:
         assert val == pyyjson.loads(output)
         assert output == pyyjson.dumps(val)
         assert val == pyyjson.loads(output)
+        assert output.encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
     def test_encodeLongNegConversion(self):
         val = -9223372036854775808
@@ -183,12 +203,14 @@ class TestUltraJSON:
         assert val == pyyjson.loads(output)
         assert output == pyyjson.dumps(val)
         assert val == pyyjson.loads(output)
+        assert output.encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
     def test_encodeListConversion(self):
         val = [1, 2, 3, 4]
         output = pyyjson.dumps(val)
         assert val == pyyjson.loads(output)
         assert val == pyyjson.loads(output)
+        assert output.encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
     def test_encodeDictConversion(self):
         val = {"k1": 1, "k2": 2, "k3": 3, "k4": 4}
@@ -196,6 +218,7 @@ class TestUltraJSON:
         assert val == pyyjson.loads(output)
         assert val == pyyjson.loads(output)
         assert val == pyyjson.loads(output)
+        assert output.encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
     def test_encodeNoneConversion(self):
         val = None
@@ -203,6 +226,7 @@ class TestUltraJSON:
         assert val == pyyjson.loads(output)
         assert output == pyyjson.dumps(val)
         assert val == pyyjson.loads(output)
+        assert output.encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
     def test_encodeTrueConversion(self):
         val = True
@@ -210,6 +234,7 @@ class TestUltraJSON:
         assert val == pyyjson.loads(output)
         assert output == pyyjson.dumps(val)
         assert val == pyyjson.loads(output)
+        assert output.encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
     def test_encodeFalseConversion(self):
         val = False
@@ -217,6 +242,7 @@ class TestUltraJSON:
         assert val == pyyjson.loads(output)
         assert output == pyyjson.dumps(val)
         assert val == pyyjson.loads(output)
+        assert output.encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
     def test_encodeToUTF8(self):
         val = b"\xe6\x97\xa5\xd1\x88".decode("utf-8")
@@ -224,6 +250,7 @@ class TestUltraJSON:
         dec = pyyjson.loads(enc)
         assert enc == pyyjson.dumps(val)
         assert dec == pyyjson.loads(enc)
+        assert enc.encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
     def test_decodeFromUnicode(self):
         val = '{"obj": 31337}'
@@ -319,14 +346,17 @@ class TestUltraJSON:
         assert val == pyyjson.loads(output)
         assert output == pyyjson.dumps(val)
         assert val == pyyjson.loads(output)
+        assert output.encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
         val = "\x00"
         output = pyyjson.dumps(val)
         assert val == pyyjson.loads(output)
         assert output == pyyjson.dumps(val)
         assert val == pyyjson.loads(output)
+        assert output.encode("utf-8") == pyyjson.dumps_to_bytes(val)
 
         assert '"  \\u0000\\r\\n "' == pyyjson.dumps("  \u0000\r\n ")
+        assert b'"  \\u0000\\r\\n "' == pyyjson.dumps_to_bytes("  \u0000\r\n ")
 
     def test_decodeNullCharacter(self):
         val = '"31337 \\u0000 31337"'

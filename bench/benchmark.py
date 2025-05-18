@@ -10,6 +10,7 @@ import pyyjson
 
 CUR_FILE = os.path.abspath(__file__)
 CUR_DIR = os.path.dirname(CUR_FILE)
+_NS_IN_ONE_S = 1000000000
 
 
 class ObjectDict(dict):
@@ -83,13 +84,19 @@ def benchmark_invalidate_dump_cache(repeat_time: int, func, raw_bytes: bytes, *a
 
 
 def get_benchmark_libraries():
-    dumps_setting = LibrarySetting()
-    dumps_setting.function_catagory = "dumps"
-    dumps_setting.orjson_function = lambda x: orjson.dumps(x).decode("utf-8")
-    dumps_setting.orjson_function = orjson.dumps
-    dumps_setting.pyyjson_function = pyyjson.dumps
-    dumps_setting.orjson_function_name = "orjson.dumps"
-    dumps_setting.pyyjson_function_name = "pyyjson.dumps"
+    dumps_setting_to_str = LibrarySetting()
+    dumps_setting_to_str.function_catagory = "dumps"
+    dumps_setting_to_str.orjson_function = lambda x: orjson.dumps(x).decode("utf-8")
+    dumps_setting_to_str.pyyjson_function = pyyjson.dumps
+    dumps_setting_to_str.orjson_function_name = "orjson.dumps+decode"
+    dumps_setting_to_str.pyyjson_function_name = "pyyjson.dumps"
+
+    dumps_setting_to_bytes = LibrarySetting()
+    dumps_setting_to_bytes.function_catagory = "dumps_to_bytes"
+    dumps_setting_to_bytes.orjson_function = orjson.dumps
+    dumps_setting_to_bytes.pyyjson_function = pyyjson.dumps_to_bytes
+    dumps_setting_to_bytes.orjson_function_name = "orjson.dumps"
+    dumps_setting_to_bytes.pyyjson_function_name = "pyyjson.dumps_to_bytes"
 
     loads_setting_str = LibrarySetting()
     loads_setting_str.function_catagory = "loads(str)"
@@ -105,7 +112,12 @@ def get_benchmark_libraries():
     loads_setting_bytes.orjson_function_name = "orjson.loads"
     loads_setting_bytes.pyyjson_function_name = "pyyjson.loads"
 
-    return dumps_setting, loads_setting_str, loads_setting_bytes
+    return (
+        dumps_setting_to_str,
+        dumps_setting_to_bytes,
+        loads_setting_str,
+        loads_setting_bytes,
+    )
 
 
 def get_benchmark_files():
@@ -119,12 +131,120 @@ def get_benchmark_files():
     )
 
 
+def run_dumps_to_str_benchmark(
+    curfile_obj: defaultdict[str, Any],
+    dumps_setting_to_str: LibrarySetting,
+    repeat_times: int,
+    raw_bytes_json_encoded: bytes,
+):
+    cur_obj = curfile_obj[dumps_setting_to_str.function_catagory]
+    gc.collect()
+    cur_obj[dumps_setting_to_str.orjson_function_name] = orjson_time = (
+        benchmark_invalidate_dump_cache(
+            repeat_times, dumps_setting_to_str.orjson_function, raw_bytes_json_encoded
+        )
+    )
+    gc.collect()
+    cur_obj[dumps_setting_to_str.pyyjson_function_name] = pyyjson_time = (
+        benchmark_invalidate_dump_cache(
+            repeat_times, dumps_setting_to_str.pyyjson_function, raw_bytes_json_encoded
+        )
+    )
+    _, str_size_dumped, _, _ = pyyjson.inspect_pyunicode(
+        pyyjson.dumps(json.loads(raw_bytes_json_encoded))
+    )
+    cur_obj["ratio"] = pyyjson_time / orjson_time
+    cur_obj["pyyjson_bytes_per_sec"] = pyyjson.dumps(
+        str_size_dumped * repeat_times / (pyyjson_time / _NS_IN_ONE_S)
+    )
+
+
+def run_dumps_to_bytes_benchmark(
+    curfile_obj: defaultdict[str, Any],
+    dumps_setting_to_bytes: LibrarySetting,
+    repeat_times: int,
+    raw_bytes_json_encoded: bytes,
+):
+    cur_obj = curfile_obj[dumps_setting_to_bytes.function_catagory]
+    gc.collect()
+    cur_obj[dumps_setting_to_bytes.orjson_function_name] = orjson_time = (
+        benchmark_invalidate_dump_cache(
+            repeat_times, dumps_setting_to_bytes.orjson_function, raw_bytes_json_encoded
+        )
+    )
+    gc.collect()
+    cur_obj[dumps_setting_to_bytes.pyyjson_function_name] = pyyjson_time = (
+        benchmark_invalidate_dump_cache(
+            repeat_times,
+            dumps_setting_to_bytes.pyyjson_function,
+            raw_bytes_json_encoded,
+        )
+    )
+    bytes_size_dumped = len(pyyjson.dumps_to_bytes(json.loads(raw_bytes_json_encoded)))
+    cur_obj["ratio"] = pyyjson_time / orjson_time
+    cur_obj["pyyjson_bytes_per_sec"] = pyyjson.dumps(
+        bytes_size_dumped * repeat_times / (pyyjson_time / _NS_IN_ONE_S)
+    )
+
+
+def run_loads_str_benchmark(
+    curfile_obj: defaultdict[str, Any],
+    loads_setting_str: LibrarySetting,
+    repeat_times: int,
+    raw_str_json_encoded: str,
+):
+    cur_obj = curfile_obj[loads_setting_str.function_catagory]
+    gc.collect()
+    cur_obj[loads_setting_str.orjson_function_name] = orjson_time = (
+        benchmark_unicode_arg(
+            repeat_times, loads_setting_str.orjson_function, raw_str_json_encoded
+        )
+    )
+    gc.collect()
+    cur_obj[loads_setting_str.pyyjson_function_name] = pyyjson_time = (
+        benchmark_unicode_arg(
+            repeat_times, loads_setting_str.pyyjson_function, raw_str_json_encoded
+        )
+    )
+    _, str_size, _, _ = pyyjson.inspect_pyunicode(raw_str_json_encoded)
+    cur_obj["ratio"] = pyyjson_time / orjson_time
+    cur_obj["pyyjson_bytes_per_sec"] = pyyjson.dumps(
+        str_size * repeat_times / (pyyjson_time / _NS_IN_ONE_S)
+    )
+
+
+def run_loads_bytes_benchmark(
+    curfile_obj: defaultdict[str, Any],
+    loads_setting_bytes: LibrarySetting,
+    repeat_times: int,
+    raw_bytes_json_encoded: bytes,
+):
+    cur_obj = curfile_obj[loads_setting_bytes.function_catagory]
+    gc.collect()
+    cur_obj[loads_setting_bytes.orjson_function_name] = orjson_time = benchmark(
+        repeat_times, loads_setting_bytes.orjson_function, raw_bytes_json_encoded
+    )
+    gc.collect()
+    cur_obj[loads_setting_bytes.pyyjson_function_name] = pyyjson_time = benchmark(
+        repeat_times, loads_setting_bytes.pyyjson_function, raw_bytes_json_encoded
+    )
+    cur_obj["ratio"] = pyyjson_time / orjson_time
+    cur_obj["pyyjson_bytes_per_sec"] = pyyjson.dumps(
+        len(raw_bytes_json_encoded) * repeat_times / (pyyjson_time / _NS_IN_ONE_S)
+    )
+
+
 def run_file_benchmark(
     file: str, result: defaultdict[str, defaultdict[str, Any]], process_bytes: int
 ):
     # if not file.endswith("apache.json"):
     #     return
-    dumps_setting, loads_setting_str, loads_setting_bytes = get_benchmark_libraries()
+    (
+        dumps_setting_to_str,
+        dumps_setting_to_bytes,
+        loads_setting_str,
+        loads_setting_bytes,
+    ) = get_benchmark_libraries()
     with open(file, "rb") as f:
         raw_bytes = f.read()
     raw = raw_bytes.decode("utf-8")
@@ -136,54 +256,18 @@ def run_file_benchmark(
     curfile_obj["pyunicode_kind"] = kind
     curfile_obj["pyunicode_is_ascii"] = is_ascii
     repeat_times = (process_bytes + bytes_size - 1) // bytes_size
-    real_process_bytes = repeat_times * bytes_size
-    process_str_size = repeat_times * str_size
-    # dumps
-    cur_obj = curfile_obj[dumps_setting.function_catagory]
-    gc.collect()
-    cur_obj[dumps_setting.orjson_function_name] = orjson_time = (
-        benchmark_invalidate_dump_cache(
-            repeat_times, dumps_setting.orjson_function, raw_bytes
-        )
+    # dumps (to str)
+    run_dumps_to_str_benchmark(
+        curfile_obj, dumps_setting_to_str, repeat_times, raw_bytes
     )
-    gc.collect()
-    cur_obj[dumps_setting.pyyjson_function_name] = pyyjson_time = (
-        benchmark_invalidate_dump_cache(
-            repeat_times, dumps_setting.pyyjson_function, raw_bytes
-        )
-    )
-    cur_obj["ratio"] = pyyjson_time / orjson_time
-    cur_obj["pyyjson_bytes_per_sec"] = pyyjson.dumps(
-        real_process_bytes / (pyyjson_time / 1000000000)
+    # dumps (to bytes)
+    run_dumps_to_bytes_benchmark(
+        curfile_obj, dumps_setting_to_bytes, repeat_times, raw_bytes
     )
     # loads (str)
-    cur_obj = curfile_obj[loads_setting_str.function_catagory]
-    gc.collect()
-    cur_obj[loads_setting_str.orjson_function_name] = orjson_time = (
-        benchmark_unicode_arg(repeat_times, loads_setting_str.orjson_function, raw)
-    )
-    gc.collect()
-    cur_obj[loads_setting_str.pyyjson_function_name] = pyyjson_time = (
-        benchmark_unicode_arg(repeat_times, loads_setting_str.pyyjson_function, raw)
-    )
-    cur_obj["ratio"] = pyyjson_time / orjson_time
-    cur_obj["pyyjson_bytes_per_sec"] = pyyjson.dumps(
-        process_str_size / (pyyjson_time / 1000000000)
-    )
+    run_loads_str_benchmark(curfile_obj, loads_setting_str, repeat_times, raw)
     # loads (bytes)
-    cur_obj = curfile_obj[loads_setting_bytes.function_catagory]
-    gc.collect()
-    cur_obj[loads_setting_bytes.orjson_function_name] = orjson_time = benchmark(
-        repeat_times, loads_setting_bytes.orjson_function, raw_bytes
-    )
-    gc.collect()
-    cur_obj[loads_setting_bytes.pyyjson_function_name] = pyyjson_time = benchmark(
-        repeat_times, loads_setting_bytes.pyyjson_function, raw_bytes
-    )
-    cur_obj["ratio"] = pyyjson_time / orjson_time
-    cur_obj["pyyjson_bytes_per_sec"] = pyyjson.dumps(
-        real_process_bytes / (pyyjson_time / 1000000000)
-    )
+    run_loads_bytes_benchmark(curfile_obj, loads_setting_bytes, repeat_times, raw_bytes)
 
 
 def get_head_rev_name():

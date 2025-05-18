@@ -14,6 +14,8 @@ class TestCircular:
         obj["obj"] = obj
         with pytest.raises(pyyjson.JSONEncodeError):
             pyyjson.dumps(obj)
+        with pytest.raises(pyyjson.JSONEncodeError):
+            pyyjson.dumps_to_bytes(obj)
 
     # def test_circular_dict_sort_keys(self):
     #     """
@@ -41,6 +43,8 @@ class TestCircular:
         obj.append(obj)  # type: ignore
         with pytest.raises(pyyjson.JSONEncodeError):
             pyyjson.dumps(obj)
+        with pytest.raises(pyyjson.JSONEncodeError):
+            pyyjson.dumps_to_bytes(obj)
 
     def test_circular_nested(self):
         """
@@ -50,6 +54,8 @@ class TestCircular:
         obj["list"] = [{"obj": obj}]
         with pytest.raises(pyyjson.JSONEncodeError):
             pyyjson.dumps(obj)
+        with pytest.raises(pyyjson.JSONEncodeError):
+            pyyjson.dumps_to_bytes(obj)
 
     # def test_circular_nested_sort_keys(self):
     #     """

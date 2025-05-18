@@ -154,6 +154,7 @@ force_inline void ucs4_encode_3bytes_utf8_avx2_blendhigh(u8 *writer, vector_a_u3
     } else {
         vector_u_u8_128 *uvec = (vector_u_u8_128 *)writer;
         *uvec = blendv_128(*uvec, x1, get_high_mask_u8_128(3 * len - 8));
+        memcpy(writer + 16, &x2, 8);
     }
 }
 
@@ -213,7 +214,7 @@ ascii:;
     {
         const vector_a m_not_ascii = (vec == broadcast(_Quote)) | (vec == broadcast(_Slash)) | signed_cmpgt(broadcast(ControlMax), vec) | signed_cmpgt(vec, broadcast(0x7f));
         vector_a m = high_mask(m_not_ascii, len);
-        cvt_to_dst_blendhigh(writer, vec, len);
+        cvt_to_dst_blendhigh(writer + len - READ_BATCH_COUNT, vec, len);
         if (likely(testz(m))) {
             writer += len;
             goto finished;
@@ -239,7 +240,7 @@ _2bytes:;
     {
         const vector_a m_not_2bytes = signed_cmpgt(broadcast(0x80), vec) | signed_cmpgt(vec, broadcast(0x7ff));
         vector_a m = high_mask(m_not_2bytes, len);
-        ucs4_encode_2bytes_utf8_avx2_blendhigh(writer, vec, len);
+        ucs4_encode_2bytes_utf8_avx2_blendhigh(writer + len * 2 - READ_BATCH_COUNT * 2, vec, len);
         if (likely(testz(m))) {
             writer += len * 2;
             goto finished;
@@ -265,7 +266,7 @@ _3bytes:;
     {
         const vector_a m_not_3bytes = signed_cmpgt(broadcast(0x800), vec) | (signed_cmpgt(vec, broadcast(0xd7ff)) & signed_cmpgt(broadcast(0xe000), vec)) | signed_cmpgt(vec, broadcast(0xffff));
         vector_a m = high_mask(m_not_3bytes, len);
-        ucs4_encode_3bytes_utf8_avx2_blendhigh(writer, vec, len);
+        ucs4_encode_3bytes_utf8_avx2_blendhigh(writer + len * 3 - READ_BATCH_COUNT * 3, vec, len);
         if (likely(testz(m))) {
             writer += len * 3;
             goto finished;

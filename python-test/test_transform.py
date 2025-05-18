@@ -15,6 +15,7 @@ class TestJSONTestSuiteTransform:
     def _pass_transform(self, filename, reference=None):
         data = _read_file(filename)
         assert pyyjson.dumps(pyyjson.loads(data)) == (reference or data.decode("utf-8"))
+        assert pyyjson.dumps_to_bytes(pyyjson.loads(data)) == (reference and reference.encode("utf-8") or data)
 
     def _fail_transform(self, filename):
         data = _read_file(filename)

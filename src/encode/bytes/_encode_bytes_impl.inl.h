@@ -25,6 +25,7 @@ force_inline bool bytes_buffer_append_key(PyObject *key, EncodeUnicodeWriter *wr
     usize len = PyUnicode_GET_LENGTH(key);
     //
     RETURN_ON_UNLIKELY_ERR(!unicode_buffer_reserve(&writer_addr->writer_u8, unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 5 + 6 * len + TAIL_PADDING));
+    write_unicode_indent(&writer_addr->writer_u8, cur_nested_depth);
     *writer_addr->writer_u8++ = '"';
     if (is_ascii) {
         bytes_write_ascii(&writer_addr->writer_u8, PYYJSON_CAST(const u8 *, _PyASCIIObject_CAST(key) + 1), len);
@@ -32,12 +33,18 @@ force_inline bool bytes_buffer_append_key(PyObject *key, EncodeUnicodeWriter *wr
         switch (read_kind_val) {
             case 1: {
                 bytes_write_ucs1(&writer_addr->writer_u8, PYYJSON_CAST(const u8 *, _PyCompactUnicodeObject_CAST(key) + 1), len);
+                break;
             }
             case 2: {
                 if (unlikely(!bytes_write_ucs2(&writer_addr->writer_u8, PYYJSON_CAST(const u16 *, _PyCompactUnicodeObject_CAST(key) + 1), len))) return false;
+                break;
             }
             case 4: {
                 if (unlikely(!bytes_write_ucs4(&writer_addr->writer_u8, PYYJSON_CAST(const u32 *, _PyCompactUnicodeObject_CAST(key) + 1), len))) return false;
+                break;
+            }
+            default: {
+                PYYJSON_UNREACHABLE();
             }
         }
     }
@@ -69,12 +76,18 @@ force_inline bool bytes_buffer_append_str(PyObject *str, EncodeUnicodeWriter *wr
         switch (read_kind_val) {
             case 1: {
                 bytes_write_ucs1(&writer_addr->writer_u8, PYYJSON_CAST(const u8 *, _PyCompactUnicodeObject_CAST(str) + 1), len);
+                break;
             }
             case 2: {
                 if (unlikely(!bytes_write_ucs2(&writer_addr->writer_u8, PYYJSON_CAST(const u16 *, _PyCompactUnicodeObject_CAST(str) + 1), len))) return false;
+                break;
             }
             case 4: {
                 if (unlikely(!bytes_write_ucs4(&writer_addr->writer_u8, PYYJSON_CAST(const u32 *, _PyCompactUnicodeObject_CAST(str) + 1), len))) return false;
+                break;
+            }
+            default: {
+                PYYJSON_UNREACHABLE();
             }
         }
     }
@@ -196,11 +209,12 @@ force_inline EncodeValJumpFlag encode_bytes_process_val(
 }
 
 static force_noinline PyObject *
-pyyjson_dumps_to_bytes_obj(
-        PyObject *in_obj) {
+pyyjson_dumps_to_bytes_obj(PyObject *in_obj) {
 #define GOTO_FAIL_ON_UNLIKELY_ERR(_condition) \
     do {                                      \
-        if (unlikely(_condition)) goto fail;  \
+        if (unlikely(_condition)) {           \
+            goto fail;                        \
+        }                                     \
     } while (0)
 
     EncodeUnicodeWriter writer;
@@ -405,11 +419,9 @@ success:;
     assert(cur_nested_depth == 0);
     // remove trailing comma
     (_WRITER(&writer))--;
-
-    // assert(unicode_info.cur_ucs_type == COMPILE_UCS_LEVEL);
-    Py_ssize_t final_len = get_unicode_buffer_final_len(writer, &_unicode_buffer_info);
-    GOTO_FAIL_ON_UNLIKELY_ERR(!resize_to_fit_pyunicode(&_unicode_buffer_info, final_len, COMPILE_UCS_LEVEL));
-    init_pyunicode(_unicode_buffer_info.head, final_len, COMPILE_UCS_LEVEL);
+    usize final_len = get_bytes_buffer_final_len(writer.writer_u8, _unicode_buffer_info.head);
+    GOTO_FAIL_ON_UNLIKELY_ERR(!resize_to_fit_pybytes(&_unicode_buffer_info, final_len));
+    init_pybytes(_unicode_buffer_info.head, final_len);
     return (PyObject *)_unicode_buffer_info.head;
 fail:;
     if (_unicode_buffer_info.head) {
@@ -422,6 +434,7 @@ fail_ctntype:;
 fail_keytype:;
     PyErr_SetString(JSONEncodeError, "Expected `str` as key");
     goto fail;
+#undef GOTO_FAIL_ON_UNLIKELY_ERR
 }
 
 #include "compile_context/sirw_out.inl.h"
