@@ -195,25 +195,34 @@ force_inline void ucs4_encode_3bytes_utf8_avx512(u8 *writer, vector_a z) {
 force_inline bool bytes_write_ucs4_trailing_512(u8 **writer_addr, const u32 *src, usize len) {
     assert(len && len < READ_BATCH_COUNT);
     //
+    u8 *writer = *writer_addr;
+    //
     u16 maskz = len_to_maskz(len);
     vector_a vec = maskz_loadu(maskz, src);
-    u8 *writer = *writer_addr;
     if (len == 1) {
+    one_left:;
         if (unlikely(!encode_one_ucs4(&writer, *src))) return false;
         goto finished;
     }
     u32 cur_unicode = *src;
-    bool is_escaped;
+    bool is_escaped = false;
 restart:;
     int unicode_type = ucs4_get_type(cur_unicode, &is_escaped);
     switch (unicode_type) {
         case 1: {
             if (unlikely(is_escaped)) {
+                is_escaped = false;
                 memcpy(writer, &ControlEscapeTable_u8[cur_unicode * 8], 8);
                 writer += _ControlJump[cur_unicode];
                 src++;
                 len--;
-                if (len) goto restart;
+                if (len) {
+                    if (len == 1) goto one_left;
+                    maskz = maskz >> 1;
+                    vec = maskz_loadu(maskz, src);
+                    cur_unicode = *src;
+                    goto restart;
+                }
                 goto finished;
             }
             goto ascii;
@@ -228,7 +237,13 @@ restart:;
             if (unlikely(!encode_one_ucs4(&writer, cur_unicode))) return false;
             src++;
             len--;
-            if (len) goto restart;
+            if (len) {
+                if (len == 1) goto one_left;
+                maskz = maskz >> 1;
+                vec = maskz_loadu(maskz, src);
+                cur_unicode = *src;
+                goto restart;
+            }
             goto finished;
         }
         default: {
@@ -260,7 +275,6 @@ ascii:;
                 maskz = maskz >> (done_count + 1);
                 cur_unicode = *src;
                 vec = maskz_loadu(maskz, src);
-                is_escaped = false;
                 if (escape_unicode >= ControlMax && escape_unicode < 0x80 && escape_unicode != _Slash && escape_unicode != _Quote) {
                     m_not_ascii = m_not_ascii >> (done_count + 1);
                     goto __ascii;
@@ -294,7 +308,6 @@ _2bytes:;
                 maskz = maskz >> (done_count + 1);
                 cur_unicode = *src;
                 vec = maskz_loadu(maskz, src);
-                is_escaped = false;
                 if (cur_unicode >= 0x80 && cur_unicode <= 0x7ff) {
                     m_not_2bytes = m_not_2bytes >> (done_count + 1);
                     goto __2bytes;
@@ -328,7 +341,6 @@ _3bytes:;
                 maskz = maskz >> (done_count + 1);
                 cur_unicode = *src;
                 vec = maskz_loadu(maskz, src);
-                is_escaped = false;
                 if (cur_unicode >= 0x800 && cur_unicode <= 0xffff && (cur_unicode <= 0xd7ff || cur_unicode >= 0xe000)) {
                     m_not_3bytes = m_not_3bytes >> (done_count + 1);
                     goto __3bytes;
