@@ -28,19 +28,19 @@ force_inline bool bytes_buffer_append_key(PyObject *key, EncodeUnicodeWriter *wr
     write_unicode_indent(&writer_addr->writer_u8, cur_nested_depth);
     *writer_addr->writer_u8++ = '"';
     if (is_ascii) {
-        bytes_write_ascii(&writer_addr->writer_u8, PYYJSON_CAST(const u8 *, _PyASCIIObject_CAST(key) + 1), len);
+        bytes_write_ascii(&writer_addr->writer_u8, PYYJSON_CAST(const u8 *, PYYJSON_CAST(PyASCIIObject *, key) + 1), len);
     } else {
         switch (read_kind_val) {
             case 1: {
-                bytes_write_ucs1(&writer_addr->writer_u8, PYYJSON_CAST(const u8 *, _PyCompactUnicodeObject_CAST(key) + 1), len);
+                bytes_write_ucs1(&writer_addr->writer_u8, PYYJSON_CAST(const u8 *, PYYJSON_CAST(PyCompactUnicodeObject *, key) + 1), len);
                 break;
             }
             case 2: {
-                if (unlikely(!bytes_write_ucs2(&writer_addr->writer_u8, PYYJSON_CAST(const u16 *, _PyCompactUnicodeObject_CAST(key) + 1), len))) return false;
+                if (unlikely(!bytes_write_ucs2(&writer_addr->writer_u8, PYYJSON_CAST(const u16 *, PYYJSON_CAST(PyCompactUnicodeObject *, key) + 1), len))) return false;
                 break;
             }
             case 4: {
-                if (unlikely(!bytes_write_ucs4(&writer_addr->writer_u8, PYYJSON_CAST(const u32 *, _PyCompactUnicodeObject_CAST(key) + 1), len))) return false;
+                if (unlikely(!bytes_write_ucs4(&writer_addr->writer_u8, PYYJSON_CAST(const u32 *, PYYJSON_CAST(PyCompactUnicodeObject *, key) + 1), len))) return false;
                 break;
             }
             default: {
@@ -71,19 +71,19 @@ force_inline bool bytes_buffer_append_str(PyObject *str, EncodeUnicodeWriter *wr
     }
     *writer_addr->writer_u8++ = '"';
     if (is_ascii) {
-        bytes_write_ascii(&writer_addr->writer_u8, PYYJSON_CAST(const u8 *, _PyASCIIObject_CAST(str) + 1), len);
+        bytes_write_ascii(&writer_addr->writer_u8, PYYJSON_CAST(const u8 *, PYYJSON_CAST(PyASCIIObject *, str) + 1), len);
     } else {
         switch (read_kind_val) {
             case 1: {
-                bytes_write_ucs1(&writer_addr->writer_u8, PYYJSON_CAST(const u8 *, _PyCompactUnicodeObject_CAST(str) + 1), len);
+                bytes_write_ucs1(&writer_addr->writer_u8, PYYJSON_CAST(const u8 *, PYYJSON_CAST(PyCompactUnicodeObject *, str) + 1), len);
                 break;
             }
             case 2: {
-                if (unlikely(!bytes_write_ucs2(&writer_addr->writer_u8, PYYJSON_CAST(const u16 *, _PyCompactUnicodeObject_CAST(str) + 1), len))) return false;
+                if (unlikely(!bytes_write_ucs2(&writer_addr->writer_u8, PYYJSON_CAST(const u16 *, PYYJSON_CAST(PyCompactUnicodeObject *, str) + 1), len))) return false;
                 break;
             }
             case 4: {
-                if (unlikely(!bytes_write_ucs4(&writer_addr->writer_u8, PYYJSON_CAST(const u32 *, _PyCompactUnicodeObject_CAST(str) + 1), len))) return false;
+                if (unlikely(!bytes_write_ucs4(&writer_addr->writer_u8, PYYJSON_CAST(const u32 *, PYYJSON_CAST(PyCompactUnicodeObject *, str) + 1), len))) return false;
                 break;
             }
             default: {

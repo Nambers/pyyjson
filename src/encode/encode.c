@@ -205,7 +205,7 @@ force_inline PyObject *pyyjson_dumps_single_long(PyObject *val, bool to_bytes_ob
             ret = PyObject_Malloc(PYBYTES_START_OFFSET + 1 + 1);
             RETURN_ON_UNLIKELY_ERR(!ret);
             init_pybytes(ret, 1);
-            PyBytesObject *b = _PyBytes_CAST(ret);
+            PyBytesObject *b = PYYJSON_CAST(PyBytesObject *, ret);
             b->ob_sval[0] = '0';
             b->ob_sval[1] = 0;
         } else {
@@ -245,7 +245,7 @@ force_inline PyObject *pyyjson_dumps_single_long(PyObject *val, bool to_bytes_ob
             ret = PyObject_Malloc(PYBYTES_START_OFFSET + string_size + 1);
             RETURN_ON_UNLIKELY_ERR(!ret);
             init_pybytes(ret, string_size);
-            writer = PYYJSON_CAST(u8 *, _PyBytes_CAST(ret)->ob_sval);
+            writer = PYYJSON_CAST(u8 *, PYYJSON_CAST(PyBytesObject *, ret)->ob_sval);
         } else {
             ret = PyUnicode_New(string_size, 127);
             RETURN_ON_UNLIKELY_ERR(!ret);
@@ -276,7 +276,7 @@ force_inline PyObject *pyyjson_dumps_single_float(PyObject *val, bool to_bytes_o
     }
     char *write_pos;
     if (to_bytes_obj) {
-        write_pos = _PyBytes_CAST(unicode)->ob_sval;
+        write_pos = PYYJSON_CAST(PyBytesObject *, unicode)->ob_sval;
     } else {
         write_pos = (char *)(((PyASCIIObject *)unicode) + 1);
     }
@@ -295,7 +295,7 @@ force_inline PyObject *pyyjson_dumps_single_constant(PyFastTypes py_type, PyObje
                     ret = PyObject_Malloc(PYBYTES_START_OFFSET + 5 + 1);
                     RETURN_ON_UNLIKELY_ERR(!ret);
                     init_pybytes(ret, 5);
-                    writer = PYYJSON_CAST(u8 *, _PyBytes_CAST(ret)->ob_sval);
+                    writer = PYYJSON_CAST(u8 *, PYYJSON_CAST(PyBytesObject *, ret)->ob_sval);
                 } else {
                     ret = PyUnicode_New(5, 127);
                     RETURN_ON_UNLIKELY_ERR(!ret);
@@ -308,7 +308,7 @@ force_inline PyObject *pyyjson_dumps_single_constant(PyFastTypes py_type, PyObje
                     ret = PyObject_Malloc(PYBYTES_START_OFFSET + 4 + 1);
                     RETURN_ON_UNLIKELY_ERR(!ret);
                     init_pybytes(ret, 4);
-                    writer = PYYJSON_CAST(u8 *, _PyBytes_CAST(ret)->ob_sval);
+                    writer = PYYJSON_CAST(u8 *, PYYJSON_CAST(PyBytesObject *, ret)->ob_sval);
                 } else {
                     ret = PyUnicode_New(4, 127);
                     RETURN_ON_UNLIKELY_ERR(!ret);
@@ -324,7 +324,7 @@ force_inline PyObject *pyyjson_dumps_single_constant(PyFastTypes py_type, PyObje
                 ret = PyObject_Malloc(PYBYTES_START_OFFSET + 4 + 1);
                 RETURN_ON_UNLIKELY_ERR(!ret);
                 init_pybytes(ret, 4);
-                writer = PYYJSON_CAST(u8 *, _PyBytes_CAST(ret)->ob_sval);
+                writer = PYYJSON_CAST(u8 *, PYYJSON_CAST(PyBytesObject *, ret)->ob_sval);
             } else {
                 ret = PyUnicode_New(4, 127);
                 RETURN_ON_UNLIKELY_ERR(!ret);
