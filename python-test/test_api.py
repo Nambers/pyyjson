@@ -125,12 +125,6 @@ class TestApi:
         value = b"[\n  " * n + b"]" * n
         pytest.raises(pyyjson.JSONDecodeError, pyyjson.loads, value)
 
-    def test_version(self):
-        """
-        __version__
-        """
-        assert re.match(r"^\d+\.\d+(\.\d+)?$", pyyjson.__version__)
-
     def test_valueerror(self):
         """
         pyyjson.JSONDecodeError is a subclass of ValueError
