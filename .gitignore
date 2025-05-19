@@ -13,6 +13,7 @@
 /*.json
 *.ll
 *.s
+/src/version.h
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

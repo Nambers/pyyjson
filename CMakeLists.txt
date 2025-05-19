@@ -80,6 +80,15 @@ if(MSVC)
     target_compile_options(commonBuild INTERFACE /FAcs)
 endif()
 
+# custom target: update SCM file
+add_custom_target(update_version_header ALL
+    COMMAND python dev_tools/scm.py src/version.h.in
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Update SCM file"
+)
+
+add_dependencies(commonBuild update_version_header)
+
 if(BUILD_AVX512)
     add_avx512_compile_option(commonBuild INTERFACE)
 endif()

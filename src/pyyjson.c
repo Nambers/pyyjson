@@ -112,7 +112,7 @@ PyMODINIT_FUNC PyInit_pyyjson(void) {
         return NULL;
     }
 
-    PyModule_AddStringConstant(module, "__version__", PYYJSON_VERSION_STRING);
+    PyModule_AddStringConstant(module, "__version__", PYYJSON_VERSION);
 
     JSONDecodeError = PyErr_NewException("pyyjson.JSONDecodeError", PyExc_ValueError, NULL);
     Py_XINCREF(JSONDecodeError);

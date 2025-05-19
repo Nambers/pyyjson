@@ -1,6 +1,8 @@
 #ifndef PYYJSON_CONFIG_H
 #define PYYJSON_CONFIG_H
 
+#include "version.h"
+
 #ifdef _DEBUG
 #    undef _DEBUG
 #    include <Python.h>
@@ -23,7 +25,6 @@
 #    error "Unknown thread model"
 #endif
 
-#define PYYJSON_VERSION_STRING "0.0.1"
 
 // feature checks
 #if INTPTR_MAX == INT64_MAX
