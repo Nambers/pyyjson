@@ -1,4 +1,4 @@
-name: "Run Test"
+name: "Build Package"
 on:
   workflow_dispatch:
 
