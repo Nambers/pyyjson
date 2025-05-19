@@ -16,14 +16,15 @@ def generate_scm_version_and_copy(repo: str, template_file: str):
         version_part, gitver = scm_raw, "0"
     nums = version_part.split(".")
     if len(nums) != 3:
-        raise ValueError(
-            f"SCM style incorrect, expected a string like 'x.y.z' or 'x.y.z-a-bbbbbbbb', got '{scm_raw}'"
-        )
-    major, minor, patch = nums
-    if any(not x.isdigit() for x in [major, minor, patch]):
-        raise ValueError(
-            f"SCM version should be digits, got '{major}', '{minor}' and '{patch}'"
-        )
+        major, minor, patch = "0", "0", "0"
+        gitver = scm_raw
+        scm_raw = f"0.0.0-{gitver}"
+    else:
+        major, minor, patch = nums
+        if any(not x.isdigit() for x in [major, minor, patch]):
+            raise ValueError(
+                f"SCM version should be digits, got '{major}', '{minor}' and '{patch}'"
+            )
     new_file = template_file[:-len(".in")]
     with open(template_file, "r") as f:
         content = f.read()

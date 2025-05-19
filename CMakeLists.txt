@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
-project(pyyjson VERSION 0.9.0 LANGUAGES C)
+project(pyyjson LANGUAGES C)
 set(CMAKE_C_STANDARD 17)
-set(PYYJSON_SOVERSION 0)
 
 # ------------------------------------------------------------------------------
 # Build Options for tests and docs
@@ -253,8 +252,6 @@ if(ASAN_ENABLED AND MSVC)
         message(WARNING "AddressSanitizer runtime DLL not found at: ${ASAN_DLL_PATH}")
     endif()
 endif()
-
-# set_target_properties(pyyjson PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PYYJSON_SOVERSION})
 
 # ------------------------------------------------------------------------------
 if(XCODE)
