@@ -2,14 +2,19 @@ import os
 import subprocess
 
 
-def generate_scm_version_and_copy(repo: str, template_file: str):
+def generate_scm_version_and_copy(
+    repo: str, template_file: str, version: "str | None" = None
+):
     if not template_file.endswith(".in"):
         raise ValueError("Template file should ends with '.in'")
-    scm_raw = (
-        subprocess.check_output(["git", "describe", "--always"], cwd=repo)
-        .decode()
-        .strip()
-    )
+    if not version:
+        scm_raw = (
+            subprocess.check_output(["git", "describe", "--always"], cwd=repo)
+            .decode()
+            .strip()
+        )
+    else:
+        scm_raw = version
     if "-" in scm_raw:
         version_part, gitver = scm_raw.split("-", 1)
     else:
@@ -25,8 +30,8 @@ def generate_scm_version_and_copy(repo: str, template_file: str):
             raise ValueError(
                 f"SCM version should be digits, got '{major}', '{minor}' and '{patch}'"
             )
-    new_file = template_file[:-len(".in")]
-    with open(template_file, "r") as f:
+    new_file = template_file[: -len(".in")]
+    with open(template_file, "r", encoding="utf-8") as f:
         content = f.read()
     new_content = (
         content.replace("@VERSION@", scm_raw)
@@ -50,9 +55,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("template", type=str)
     parser.add_argument("--directory", default=".")
+    parser.add_argument("--version", default=None, help="Specify a version.")
     args = parser.parse_args()
 
-    generate_scm_version_and_copy(args.directory, args.template)
+    generate_scm_version_and_copy(args.directory, args.template, version=args.version)
 
 
 if __name__ == "__main__":

@@ -80,11 +80,19 @@ if(MSVC)
 endif()
 
 # custom target: update SCM file
-add_custom_target(update_version_header ALL
-    COMMAND python dev_tools/scm.py src/version.h.in
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    COMMENT "Update SCM file"
-)
+if(DEFINED PREDEFINED_VERSION)
+    add_custom_target(update_version_header ALL
+        COMMAND python dev_tools/scm.py src/version.h.in --version ${PREDEFINED_VERSION}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Update SCM file"
+    )
+else()
+    add_custom_target(update_version_header ALL
+        COMMAND python dev_tools/scm.py src/version.h.in
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Update SCM file"
+    )
+endif()
 
 add_dependencies(commonBuild update_version_header)
 

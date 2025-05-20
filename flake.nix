@@ -76,5 +76,21 @@
           debugLLVM = mkMyShell { shell = debugLLVMInternal; };
         }
       );
+      packages = forAllSystems (
+        pkgs:
+        let
+          pkgs-24-05 = import nixpkgs-24-05 { inherit (pkgs) system; };
+          pythonVerConfig = pkgs.lib.importJSON ./dev_tools/pyver.json;
+        in
+        rec {
+          pyyjson-py39 = pkgs.callPackage ./dev_tools/build_package.nix { python = pkgs-24-05.python39; };
+          pyyjson-py310 = pkgs.callPackage ./dev_tools/build_package.nix { python = pkgs-24-05.python310; };
+          pyyjson-py311 = pkgs.callPackage ./dev_tools/build_package.nix { python = pkgs-24-05.python311; };
+          pyyjson-py312 = pkgs.callPackage ./dev_tools/build_package.nix { python = pkgs-24-05.python312; };
+          pyyjson-py313 = pkgs.callPackage ./dev_tools/build_package.nix { python = pkgs.python313; };
+          pyyjson-py314 = pkgs.callPackage ./dev_tools/build_package.nix { python = pkgs.python314; };
+          default = pyyjson-py313;
+        }
+      );
     };
 }
