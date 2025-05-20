@@ -14,6 +14,8 @@
 *.ll
 *.s
 /src/version.h
+/result
+/wheelhouse
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
