@@ -74,6 +74,12 @@
           default = mkMyShell { shell = defaultShell; };
           inherit debugLLVMInternal;
           debugLLVM = mkMyShell { shell = debugLLVMInternal; };
+          packShell39 = pkgs.callPackage ./dev_tools/pack_shell.nix { py = pkgs-24-05.python39; };
+          packShell310 = pkgs.callPackage ./dev_tools/pack_shell.nix { py = pkgs-24-05.python310; };
+          packShell311 = pkgs.callPackage ./dev_tools/pack_shell.nix { py = pkgs-24-05.python311; };
+          packShell312 = pkgs.callPackage ./dev_tools/pack_shell.nix { py = pkgs-24-05.python312; };
+          packShell313 = pkgs.callPackage ./dev_tools/pack_shell.nix { py = pkgs.python313; };
+          packShell314 = pkgs.callPackage ./dev_tools/pack_shell.nix { py = pkgs.python314; };
         }
       );
       packages = forAllSystems (

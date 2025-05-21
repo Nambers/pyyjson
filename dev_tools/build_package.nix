@@ -6,14 +6,14 @@
 }:
 clangStdenv.mkDerivation rec {
   pname = "pyyjson";
-  version = "0.0.1";
+  version = "0.0.0";
   src = ./.;
   unpackPhase = ''
     cp -r ${./..}/* .
     chmod -R 700 .
   '';
+  # TODO aarch64?
   postInstall = ''
-    patchelf --remove-needed $(patchelf --print-needed $out/pyyjson.so | grep libpython3) $out/pyyjson.so
     patchelf --set-rpath /lib64 $out/pyyjson.so
     mv $out/pyyjson.so $out/pyyjson.cpython-3${python.sourceVersion.minor}-x86_64-linux-gnu.so
   '';
