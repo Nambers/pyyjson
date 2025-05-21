@@ -8,28 +8,23 @@
 
 #include "compile_context/r_in.inl.h"
 
-typedef struct DecodeSrcInfo {
-    const _src_t *src;
-    const _src_t *const src_start;
-    const _src_t *const src_end;
-} DecodeSrcInfo;
 
-force_inline bool verify_escape_hex(DecodeSrcInfo *decode_src_info, int offset) {
-    if (unlikely(decode_src_info->src + 4 + offset > decode_src_info->src_end)) {
+force_inline bool verify_escape_hex(const _src_t *src, const _src_t *src_end, int offset) {
+    if (unlikely(src + 4 + offset > src_end)) {
         PyErr_SetString(JSONDecodeError, "Unexpected ending when reading escaped sequence in string");
         return false;
     }
     // need to verify the next 4 unicode for u16 and u32, since the size of hex conv table is 256
     // u8: no need to check
 #if COMPILE_READ_UCS_LEVEL == 2
-    u64 to_verify = *(u64 *)(decode_src_info->src + offset);
+    u64 to_verify = *(u64 *)(src + offset);
     const u64 verify_mask = 0xff00ff00ff00ff00ULL;
     if (unlikely((to_verify & verify_mask) != 0)) {
         PyErr_SetString(JSONDecodeError, "Invalid escape sequence in string");
         return false;
     }
 #elif COMPILE_READ_UCS_LEVEL == 4
-    vector_a_u32_128 to_verify = *(vector_u_u32_128 *)(decode_src_info->src + offset); //load_128((void *)(decode_src_info->src + offset));
+    vector_a_u32_128 to_verify = *(vector_u_u32_128 *)(src + offset); //load_128((void *)(decode_src_info->src + offset));
     const vector_a_u32_128 verify_mask = broadcast_u64_128((i64)0xffffff00ffffff00ULL);
     if (unlikely(!testz2_128(to_verify, verify_mask))) {
         PyErr_SetString(JSONDecodeError, "Invalid escape sequence in string");

@@ -55,7 +55,6 @@
  * Names using R context.
  */
 #define cmpeq_2chars MAKE_R_NAME(cmpeq_2chars)
-#define DecodeSrcInfo MAKE_R_NAME(DecodeSrcInfo)
 #define verify_escape_hex MAKE_R_NAME(verify_escape_hex)
 #define read_to_hex MAKE_R_NAME(read_to_hex)
 #define _read_true MAKE_R_NAME(_read_true)

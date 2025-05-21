@@ -14,7 +14,6 @@
 #undef MAKE_UCS_NAME
 //
 #undef cmpeq_2chars
-#undef DecodeSrcInfo
 #undef verify_escape_hex
 #undef read_to_hex
 #undef _read_true

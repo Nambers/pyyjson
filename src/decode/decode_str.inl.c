@@ -237,82 +237,67 @@ force_inline void UPDATE_WRITE_TYPE(DECODE_UNICODE_INFO *restrict decode_unicode
     PYYJSON_UNREACHABLE();
 }
 
-// force_inline bool verify_escape_hex(DecodeSrcInfo *decode_src_info, int offset) {
-//     if (unlikely(decode_src_info->src + 4 + offset > decode_src_info->src_end)) {
-//         PyErr_SetString(JSONDecodeError, "Unexpected ending when reading escaped sequence in string");
-//         return false;
-//     }
-//     // need to verify the next 4 unicode for u16 and u32, since the size of hex conv table is 256
-// #if COMPILE_READ_UCS_LEVEL == 2
-//     u64 to_verify = *(u64 *)(decode_src_info->src + offset);
-//     const u64 verify_mask = 0xff00ff00ff00ff00ULL;
-//     if (unlikely((to_verify & verify_mask) != 0)) {
-//         PyErr_SetString(JSONDecodeError, "Invalid escape sequence in string");
-//         return false;
-//     }
-// #elif COMPILE_READ_UCS_LEVEL == 4
-//     SIMD_128 to_verify = load_128((void *)(decode_src_info->src + offset));
-//     const SIMD_128 verify_mask = broadcast_u64_128((i64)0xffffff00ffffff00ULL);
-//     if (unlikely(!testz_128(to_verify, verify_mask))) {
-//         PyErr_SetString(JSONDecodeError, "Invalid escape sequence in string");
-//         return false;
-//     }
-// #endif
-//     return true;
-// }
-
 /* noinline this to reduce binary size */
-static force_noinline u32 DECODE_ESCAPE_UNICODE(DecodeSrcInfo *restrict decode_src_info) {
+static force_noinline u32 DECODE_ESCAPE_UNICODE(const _src_t **src_addr, const _src_t *src_end) {
+    const _src_t *src = *src_addr;
     // escape
-    switch (*++decode_src_info->src) { // clang-format off
-        case '"':  decode_src_info->src++; return '"';
-        case '\\': decode_src_info->src++; return '\\';
-        case '/':  decode_src_info->src++; return '/';
-        case 'b':  decode_src_info->src++; return '\b';
-        case 'f':  decode_src_info->src++; return '\f';
-        case 'n':  decode_src_info->src++; return '\n';
-        case 'r':  decode_src_info->src++; return '\r';
-        case 't':  decode_src_info->src++; return '\t';
+    switch (*++src) { // clang-format off
+        case '"':  src++; *src_addr= src; return '"';
+        case '\\': src++; *src_addr= src;return '\\';
+        case '/':  src++; *src_addr= src;return '/';
+        case 'b':  src++; *src_addr= src;return '\b';
+        case 'f':  src++; *src_addr= src;return '\f';
+        case 'n':  src++; *src_addr= src;return '\n';
+        case 'r':  src++; *src_addr= src;return '\r';
+        case 't':  src++; *src_addr= src;return '\t';
         // clang-format on
         case 'u': {
             u16 hi;
 
-            decode_src_info->src++;
-            if (unlikely(!verify_escape_hex(decode_src_info, 0) || !read_to_hex(decode_src_info->src, &hi))) {
+            src++;
+            if (unlikely(!verify_escape_hex(src, src_end, 0) || !read_to_hex(src, &hi))) {
                 if (unlikely(!PyErr_Occurred())) {
                     PyErr_SetString(JSONDecodeError, "Invalid escape sequence in string");
                 }
+                *src_addr = src;
                 return (u32)0xffffffff;
             }
-            decode_src_info->src += 4;
+            src += 4;
             if (likely((hi & 0xF800) != 0xD800)) {
+                *src_addr = src;
                 return hi;
             } else {
                 u16 lo;
                 /* a non-BMP character, represented as a surrogate pair */
                 if (unlikely((hi & 0xFC00) != 0xD800)) {
                     PyErr_SetString(JSONDecodeError, "Invalid high surrogate in string");
+                    *src_addr = src;
                     return (u32)0xffffffff;
                 }
-                if (unlikely(decode_src_info->src + 6 > decode_src_info->src_end || decode_src_info->src[0] != '\\' || decode_src_info->src[1] != 'u')) {
+                if (unlikely(src + 6 > src_end || src[0] != '\\' || src[1] != 'u')) {
                     PyErr_SetString(JSONDecodeError, "No low surrogate in string");
+                    *src_addr = src;
                     return (u32)0xffffffff;
                 }
-                if (unlikely(!verify_escape_hex(decode_src_info, 2) || !read_to_hex(decode_src_info->src + 2, &lo))) {
+                if (unlikely(!verify_escape_hex(src, src_end, 2) || !read_to_hex(src + 2, &lo))) {
                     PyErr_SetString(JSONDecodeError, "Invalid escaped sequence in string");
+                    *src_addr = src;
                     return (u32)0xffffffff;
                 }
                 if (unlikely((lo & 0xFC00) != 0xDC00)) {
                     PyErr_SetString(JSONDecodeError, "Invalid low surrogate in string");
+                    *src_addr = src;
                     return (u32)0xffffffff;
                 }
-                decode_src_info->src += 6;
+                src += 6;
+                *src_addr = src;
                 return ((((u32)hi - 0xD800) << 10) | ((u32)lo - 0xDC00)) + 0x10000;
             }
         }
         default: {
             // invalid
             PyErr_SetString(JSONDecodeError, "Invalid escape sequence in string");
+            *src_addr = src;
             return (u32)0xffffffff;
         }
     }
@@ -322,26 +307,30 @@ static force_noinline u32 DECODE_ESCAPE_UNICODE(DecodeSrcInfo *restrict decode_s
  * Call this when find a quote, slash or control character.
  * In most cases, the function returns an ASCII value.
  */
-force_inline SpecialCharReadResult DO_SPECIAL(DecodeSrcInfo *restrict decode_src_info) {
+force_inline SpecialCharReadResult DO_SPECIAL(const _src_t **src_addr, const _src_t *src_end) {
+    const _src_t *src = *src_addr;
     SpecialCharReadResult result;
-    _src_t u = *decode_src_info->src;
+    _src_t u = *src;
     if (likely(u == _Quote)) {
         // end of string
-        decode_src_info->src++;
+        src++;
         result.flag = StrEnd;
+        *src_addr = src;
         return result;
     } else if (u == _Slash) {
-        result.value = DECODE_ESCAPE_UNICODE(decode_src_info);
+        result.value = DECODE_ESCAPE_UNICODE(&src, src_end);
         result.flag = StrContinue;
         if (unlikely(result.value == (u32)0xffffffff)) {
             assert(PyErr_Occurred());
             result.flag = StrInvalid;
         }
+        *src_addr = src;
         return result;
     } else if (u < ControlMax) {
         // invalid
         PyErr_SetString(JSONDecodeError, "Invalid control character in string");
         result.flag = StrInvalid;
+        *src_addr = src;
         return result;
     } else {
         PYYJSON_UNREACHABLE();
@@ -351,7 +340,7 @@ force_inline SpecialCharReadResult DO_SPECIAL(DecodeSrcInfo *restrict decode_src
 static force_noinline void PROCESS_ESCAPE(
         DECODE_UNICODE_INFO *decode_unicode_info,
         ReadStrState *read_state,
-        DecodeSrcInfo *decode_src_info,
+        const _src_t *src_start,
         u32 value,
         int write_as, // one of 1,2,4
         bool do_copy) {
@@ -369,7 +358,7 @@ static force_noinline void PROCESS_ESCAPE(
         // should be in range of `COMPILE_READ_UCS_LEVEL`
         assert(write_as == COMPILE_READ_UCS_LEVEL);
         Py_ssize_t copy_count = UNICODE_DECODE_GET_COPY_COUNT(decode_unicode_info);
-        pyyjson_memcpy(decode_unicode_info->write_head, decode_src_info->src_start, COMPILE_READ_UCS_LEVEL * copy_count);
+        pyyjson_memcpy(decode_unicode_info->write_head, src_start, COMPILE_READ_UCS_LEVEL * copy_count);
         read_state->state_dirty = true;
         // write need_copy as true, so in following loops we know that a copy is needed
         read_state->need_copy = true;
@@ -468,12 +457,16 @@ static force_noinline void PROCESS_ESCAPE(
 force_inline void READ_STR_IN_LOOP(
         DECODE_UNICODE_INFO *restrict decode_unicode_info,
         ReadStrState *restrict read_state,
-        DecodeSrcInfo *restrict decode_src_info,
+        const _src_t **src_addr,
+        const _src_t *src_start,
+        const _src_t *src_end,
         /* some immediate numbers*/
         int write_as, // one of 1,2,4
         bool do_copy,
         bool need_check_max_char) {
-    vector_a vec = *(vector_u *)decode_src_info->src;
+    const _src_t *src = *src_addr;
+    //
+    const vector_a vec = *(const vector_u *)src;
 #if COMPILE_SIMD_BITS == 512
     avx512_bitmask_t check_mask = get_escape_bitmask(vec);
 #else
@@ -507,7 +500,7 @@ force_inline void READ_STR_IN_LOOP(
     if (checked) {
         // no special characters in this slice, won't be an ending
         // should be extremely fast if the string is long enough
-        decode_src_info->src += READ_BATCH_COUNT;
+        src += READ_BATCH_COUNT;
         MOVE_WRITER(decode_unicode_info, write_as, READ_BATCH_COUNT);
         if (need_check_max_char) check_vector_max_char(vec, read_state, false, READ_BATCH_COUNT); // compile time determined
     } else {
@@ -515,31 +508,33 @@ force_inline void READ_STR_IN_LOOP(
         // for example, for short keys less than 16 bytes,
         // `QUOTE` will be found and `check_mask_zero` returns false
         usize done_count = escape_anymask_to_done_count(check_mask);
-        decode_src_info->src += done_count;
+        src += done_count;
         MOVE_WRITER(decode_unicode_info, write_as, done_count);
-        SpecialCharReadResult escape_result = DO_SPECIAL(decode_src_info);
+        SpecialCharReadResult escape_result = DO_SPECIAL(&src, src_end);
         if (likely(escape_result.flag == StrEnd)) {
             if (need_check_max_char) check_vector_max_char(vec, read_state, true, (Py_ssize_t)done_count);
             read_state->scan_flag = StrEnd;
             read_state->state_dirty = true;
-            return;
+            goto done;
         }
         if (unlikely(escape_result.flag == StrInvalid)) {
             assert(PyErr_Occurred());
             read_state->scan_flag = StrInvalid;
             read_state->state_dirty = true;
-            return;
+            goto done;
         }
         // slow path (escape character)
-        PROCESS_ESCAPE(decode_unicode_info, read_state, decode_src_info, escape_result.value, write_as, do_copy);
+        PROCESS_ESCAPE(decode_unicode_info, read_state, src_start, escape_result.value, write_as, do_copy);
         if (need_check_max_char && read_state->max_char_type < COMPILE_UCS_LEVEL) {
             check_vector_max_char(vec, read_state, true, (Py_ssize_t)done_count);
         }
     }
+done:;
+    *src_addr = src;
 }
 
 force_inline PyObject *DECODE_LOOP_DONE_MAKE_STRING(
-        DecodeSrcInfo *restrict decode_src_info,
+        const _src_t *src_start,
         DECODE_UNICODE_INFO *restrict decode_unicode_info,
         bool need_copy,
         int max_char_type,
@@ -552,18 +547,18 @@ force_inline PyObject *DECODE_LOOP_DONE_MAKE_STRING(
         if (COMPILE_READ_UCS_LEVEL == 1 || max_char_type == COMPILE_READ_UCS_LEVEL) {
             // simplest case, copy the buffer directly to the unicode object.
             // for COMPILE_UCS_LEVEL == 1: since max_char_type <= COMPILE_UCS_LEVEL == 1, this is also a copy-only case.
-            return make_string((const u8 *)decode_src_info->src_start, copy_count, max_char_type, is_key);
+            return make_string((const u8 *)src_start, copy_count, max_char_type, is_key);
         } else {
 #if COMPILE_UCS_LEVEL > 1
 // need to zip the buffer down to `max_char_type`.
 // use simd to make this faster.
 #    if COMPILE_UCS_LEVEL == 4
             if (max_char_type == 2) {
-                PYYJSON_CONCAT2(long_cvt_u32_u16, COMPILE_SIMD_BITS)((u16 *)decode_unicode_info->write_head, decode_src_info->src_start, copy_count);
-                // downgrade_string_4_2(decode_src_info->src_start, copy_count, (u16 *)decode_unicode_info->write_head);
+                PYYJSON_CONCAT2(long_cvt_u32_u16, COMPILE_SIMD_BITS)((u16 *)decode_unicode_info->write_head, src_start, copy_count);
+                // downgrade_string_4_2(src_start, copy_count, (u16 *)decode_unicode_info->write_head);
             } else
 #    endif
-                PYYJSON_CONCAT5(long, cvt, _src_t, u8, COMPILE_SIMD_BITS)((u8 *)decode_unicode_info->write_head, decode_src_info->src_start, copy_count);
+                PYYJSON_CONCAT5(long, cvt, _src_t, u8, COMPILE_SIMD_BITS)((u8 *)decode_unicode_info->write_head, src_start, copy_count);
             return make_string((const u8 *)decode_unicode_info->write_head, copy_count, max_char_type, is_key);
 #else
             PYYJSON_UNREACHABLE();
@@ -609,85 +604,71 @@ force_inline PyObject *DECODE_LOOP_DONE_MAKE_STRING(
 force_inline void PROCESS_TAIL_COPY(
         int write_as,
         int really_write_count,
-        DecodeSrcInfo *restrict decode_src_info,
+        const _src_t *src,
         DECODE_UNICODE_INFO *restrict decode_unicode_info) {
 #if COMPILE_UCS_LEVEL <= 1
     if (write_as <= 1) {
         assert(decode_unicode_info->unicode_ucs1);
         u8 *dst = decode_unicode_info->unicode_ucs1;
-        PYYJSON_CONCAT2(trailing_copy_with_cvt_u8_u8, COMPILE_SIMD_BITS)(&dst, decode_src_info->src, really_write_count);
-        // #    define TAIL_WRITER PYYJSON_CONCAT3(tail_write_simd_impl, COMPILE_READ_UCS_LEVEL, 1)
-        //         TAIL_WRITER(decode_src_info->src, decode_unicode_info->unicode_ucs1, really_write_count);
-        //         // decode_unicode_info->unicode_ucs1 += really_write_count;
-        // #    undef TAIL_WRITER
+        PYYJSON_CONCAT2(trailing_copy_with_cvt_u8_u8, COMPILE_SIMD_BITS)(&dst, src, really_write_count);
         return;
     }
 #endif
 #if COMPILE_UCS_LEVEL <= 2
     if (write_as == 2) {
-        // #    define TAIL_WRITER PYYJSON_CONCAT3(tail_write_simd_impl, COMPILE_READ_UCS_LEVEL, 2)
         assert(decode_unicode_info->unicode_ucs2);
         u16 *dst = decode_unicode_info->unicode_ucs2;
-        PYYJSON_CONCAT5(trailing_copy_with, cvt, _src_t, u16, COMPILE_SIMD_BITS)(&dst, decode_src_info->src, really_write_count);
-        // TAIL_WRITER(decode_src_info->src, decode_unicode_info->unicode_ucs2, really_write_count);
-        // decode_unicode_info->unicode_ucs2 += really_write_count;
-        // #    undef TAIL_WRITER
+        PYYJSON_CONCAT5(trailing_copy_with, cvt, _src_t, u16, COMPILE_SIMD_BITS)(&dst, src, really_write_count);
         return;
     }
 #endif
-    // #define TAIL_WRITER PYYJSON_CONCAT3(tail_write_simd_impl, COMPILE_READ_UCS_LEVEL, 4)
-
     assert(decode_unicode_info->unicode_ucs4);
     u32 *dst = decode_unicode_info->unicode_ucs4;
-    PYYJSON_CONCAT5(trailing_copy_with, cvt, _src_t, u32, COMPILE_SIMD_BITS)(&dst, decode_src_info->src, really_write_count);
-    // TAIL_WRITER(decode_src_info->src, decode_unicode_info->unicode_ucs4, really_write_count);
-    // decode_unicode_info->unicode_ucs4 += really_write_count;
-    // #undef TAIL_WRITER
+    PYYJSON_CONCAT5(trailing_copy_with, cvt, _src_t, u32, COMPILE_SIMD_BITS)(&dst, src, really_write_count);
 }
 
 force_inline void READ_STR_TAIL(
-        DecodeSrcInfo *restrict decode_src_info,
+        const _src_t **src_addr,
+        const _src_t *src_start,
+        const _src_t *src_end,
         DECODE_UNICODE_INFO *restrict decode_unicode_info,
         ReadStrState *read_state,
         int write_as, // one of 1,2,4
         bool do_copy,
         bool need_check_max_char) {
+    const _src_t *src = *src_addr;
 #if COMPILE_SIMD_BITS == 512
-    // load use maskz
-    // #    define _MASKZ_LOADU PYYJSON_SIMPLE_CONCAT2(_mm512_maskz_loadu_epi, READ_BIT_SIZE)
     u64 rw_mask;
     avx512_bitmask_t tail_mask;
-    rw_mask = len_to_maskz(decode_src_info->src_end - decode_src_info->src);
-    // rw_mask = ((u64)1 << (usize)(decode_src_info->src_end - decode_src_info->src)) - 1;
-    SIMD_512 vec = maskz_loadu(rw_mask, (const void *)decode_src_info->src);
-    // #    undef _MASKZ_LOADU
+    rw_mask = len_to_maskz(src_end - src);
+    SIMD_512 vec = maskz_loadu(rw_mask, (const void *)src);
     tail_mask = get_escape_bitmask(vec) & rw_mask;
     if (likely(tail_mask)) {
         usize done_count = escape_bitmask_to_done_count(tail_mask);
         if (do_copy && done_count) {
-            PROCESS_TAIL_COPY(write_as, (Py_ssize_t)done_count, decode_src_info, decode_unicode_info);
+            PROCESS_TAIL_COPY(write_as, (Py_ssize_t)done_count, src, decode_unicode_info);
         }
         // move reader and writer
-        decode_src_info->src += done_count;
+        src += done_count;
         MOVE_WRITER(decode_unicode_info, write_as, done_count);
         // get the special value (expecting '"')
-        SpecialCharReadResult escape_result = DO_SPECIAL(decode_src_info);
+        SpecialCharReadResult escape_result = DO_SPECIAL(&src, src_end);
         if (likely(escape_result.flag == StrEnd)) {
             if (need_check_max_char) {
                 check_vector_max_char(vec, read_state, true, (Py_ssize_t)done_count);
             }
             read_state->scan_flag = StrEnd;
             read_state->state_dirty = true;
-            return;
+            goto done;
         }
         if (unlikely(escape_result.flag == StrInvalid)) {
             assert(PyErr_Occurred());
             read_state->scan_flag = StrInvalid;
             read_state->state_dirty = true;
-            return;
+            goto done;
         }
         // slow path (escape character)
-        PROCESS_ESCAPE(decode_unicode_info, read_state, decode_src_info, escape_result.value, write_as, do_copy);
+        PROCESS_ESCAPE(decode_unicode_info, read_state, src_start, escape_result.value, write_as, do_copy);
         if (need_check_max_char && read_state->max_char_type < COMPILE_UCS_LEVEL) {
             check_vector_max_char(vec, read_state, true, (Py_ssize_t)done_count);
         }
@@ -698,21 +679,20 @@ force_inline void READ_STR_TAIL(
     }
 #else
     // load backward
-    assert(decode_src_info->src + READ_BATCH_COUNT > decode_src_info->src_end);
+    assert(src + READ_BATCH_COUNT > src_end);
     vector_a vec;
     // simd_load_head points to the addr to load
     // always assume that the 32 bytes before `src` is readable
-    const _src_t *simd_load_head = decode_src_info->src_end - READ_BATCH_COUNT;
+    const _src_t *simd_load_head = src_end - READ_BATCH_COUNT;
     vec = *(const vector_u *)simd_load_head;
     vector_a check_mask = get_escape_mask(vec);
-    Py_ssize_t invalid_head_count = decode_src_info->src - simd_load_head;
+    Py_ssize_t invalid_head_count = src - simd_load_head;
     vector_a tail_mask;
     // process `check_mask`, removing the invalid head content
     {
         const void *tail_mask_addr = PYYJSON_CONCAT2(read_tail_mask_table, READ_BIT_SIZE)(invalid_head_count);
-        tail_mask = *(const vector_a *)tail_mask_addr; //load_simd_aligned(tail_mask_addr);
+        tail_mask = *(const vector_a *)tail_mask_addr;
         check_mask = tail_mask & check_mask;
-        // check_mask = SIMD_AND(tail_mask, check_mask);
     }
     // the read buffer is ended, there should be a '"' here
     if (likely(!testz(check_mask))) {
@@ -720,13 +700,13 @@ force_inline void READ_STR_TAIL(
         //
         Py_ssize_t really_write_count = (Py_ssize_t)done_count - invalid_head_count;
         if (do_copy && really_write_count) {
-            PROCESS_TAIL_COPY(write_as, really_write_count, decode_src_info, decode_unicode_info);
+            PROCESS_TAIL_COPY(write_as, really_write_count, src, decode_unicode_info);
         }
         // move reader and writer
-        decode_src_info->src += really_write_count;
+        src += really_write_count;
         MOVE_WRITER(decode_unicode_info, write_as, really_write_count);
         // get the special value (expecting '"')
-        SpecialCharReadResult escape_result = DO_SPECIAL(decode_src_info);
+        SpecialCharReadResult escape_result = DO_SPECIAL(&src, src_end);
         if (likely(escape_result.flag == StrEnd)) {
             if (need_check_max_char) {
                 // the first `invalid_head_count` unicodes are not valid, remove this part using AND with tail_mask
@@ -734,16 +714,16 @@ force_inline void READ_STR_TAIL(
             }
             read_state->scan_flag = StrEnd;
             read_state->state_dirty = true;
-            return;
+            goto done;
         }
         if (unlikely(escape_result.flag == StrInvalid)) {
             assert(PyErr_Occurred());
             read_state->scan_flag = StrInvalid;
             read_state->state_dirty = true;
-            return;
+            goto done;
         }
         // slow path (escape character)
-        PROCESS_ESCAPE(decode_unicode_info, read_state, decode_src_info, escape_result.value, write_as, do_copy);
+        PROCESS_ESCAPE(decode_unicode_info, read_state, src_start, escape_result.value, write_as, do_copy);
         if (need_check_max_char && read_state->max_char_type < COMPILE_UCS_LEVEL) {
             // the first `invalid_head_count` unicodes are not valid, remove this part using AND with tail_mask
             check_vector_max_char(vec & tail_mask, read_state, true, (Py_ssize_t)done_count);
@@ -754,6 +734,8 @@ force_inline void READ_STR_TAIL(
         read_state->scan_flag = StrInvalid;
     }
 #endif
+done:;
+    *src_addr = src;
 }
 
 /**
@@ -776,15 +758,13 @@ static force_noinline PyObject *READ_STR(
     _src_t *const temp_write_buffer = _temp_write_buffer;
     INIT_DECODE_UNICODE_INFO(&_decode_unicode_info, (u8 *)temp_write_buffer);
     init_read_state(&_read_state);
-    DecodeSrcInfo _decode_src_info = {
-            .src = *reader_addr,
-            .src_start = *reader_addr,
-            .src_end = _reader_end,
-    };
+    const _src_t *src = *reader_addr;
+    const _src_t *const src_start = src;
+    const _src_t *const src_end = _reader_end;
 
-    const _src_t *const last_src_batch = _decode_src_info.src_end - READ_BATCH_COUNT;
+    const _src_t *const last_src_batch = src_end - READ_BATCH_COUNT;
 
-    if (unlikely(_decode_src_info.src > last_src_batch)) goto read_tail;
+    if (unlikely(src > last_src_batch)) goto read_tail;
 #if COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_ASCII
     goto loop_1_f_f;
 #elif COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_LATIN1
@@ -813,18 +793,18 @@ loop_1_f_f:;
         // this implies max_char_type == COMPILE_UCS_LEVEL && max_char_type <= 1
         assert(_read_state.max_char_type == COMPILE_UCS_LEVEL && _read_state.max_char_type <= 1);
         // BEGIN
-        assert(_decode_src_info.src <= last_src_batch);
-        while (_decode_src_info.src <= last_src_batch) {
+        assert(src <= last_src_batch);
+        while (src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
-                             &_decode_src_info,
+                             &src, src_start, src_end,
                              /* some immediate numbers*/
                              1, false, false);
             if (unlikely(_read_state.state_dirty)) {
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > last_src_batch)) break;
+                if (unlikely(src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
@@ -846,18 +826,18 @@ loop_1_f_t:;
         // this implies max_char_type == 0 && COMPILE_UCS_LEVEL == 1
         assert(_read_state.max_char_type == 0 && COMPILE_UCS_LEVEL == 1);
         // BEGIN
-        assert(_decode_src_info.src <= last_src_batch);
-        while (_decode_src_info.src <= last_src_batch) {
+        assert(src <= last_src_batch);
+        while (src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
-                             &_decode_src_info,
+                             &src, src_start, src_end,
                              /* some immediate numbers*/
                              1, false, true);
             if (unlikely(_read_state.state_dirty)) {
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > last_src_batch)) break;
+                if (unlikely(src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
@@ -879,18 +859,18 @@ loop_1_t_f:;
         // this implies 1 >= max_char_type >= COMPILE_UCS_LEVEL
         assert(_read_state.max_char_type >= COMPILE_UCS_LEVEL && _read_state.max_char_type <= 1);
         // BEGIN
-        assert(_decode_src_info.src <= last_src_batch);
-        while (_decode_src_info.src <= last_src_batch) {
+        assert(src <= last_src_batch);
+        while (src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
-                             &_decode_src_info,
+                             &src, src_start, src_end,
                              /* some immediate numbers*/
                              1, true, false);
             if (unlikely(_read_state.state_dirty)) {
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > last_src_batch)) break;
+                if (unlikely(src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
@@ -912,18 +892,18 @@ loop_1_t_t:;
         // this implies max_char_type == 0 && COMPILE_UCS_LEVEL == 1
         assert(_read_state.max_char_type == 0);
         // BEGIN
-        assert(_decode_src_info.src <= last_src_batch);
-        while (_decode_src_info.src <= last_src_batch) {
+        assert(src <= last_src_batch);
+        while (src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
-                             &_decode_src_info,
+                             &src, src_start, src_end,
                              /* some immediate numbers*/
                              1, true, true);
             if (unlikely(_read_state.state_dirty)) {
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > last_src_batch)) break;
+                if (unlikely(src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
@@ -945,18 +925,18 @@ loop_2_f_f:;
         // this implies 2 == max_char_type == COMPILE_UCS_LEVEL
         assert(_read_state.max_char_type == 2 && _read_state.max_char_type <= 2);
         // BEGIN
-        assert(_decode_src_info.src <= last_src_batch);
-        while (_decode_src_info.src <= last_src_batch) {
+        assert(src <= last_src_batch);
+        while (src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
-                             &_decode_src_info,
+                             &src, src_start, src_end,
                              /* some immediate numbers*/
                              2, false, false);
             if (unlikely(_read_state.state_dirty)) {
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > last_src_batch)) break;
+                if (unlikely(src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
@@ -978,18 +958,18 @@ loop_2_f_t:;
         // this implies max_char_type < COMPILE_UCS_LEVEL == 2
         assert(_read_state.max_char_type < COMPILE_UCS_LEVEL && COMPILE_UCS_LEVEL <= 2);
         // BEGIN
-        assert(_decode_src_info.src <= last_src_batch);
-        while (_decode_src_info.src <= last_src_batch) {
+        assert(src <= last_src_batch);
+        while (src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
-                             &_decode_src_info,
+                             &src, src_start, src_end,
                              /* some immediate numbers*/
                              2, false, true);
             if (unlikely(_read_state.state_dirty)) {
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > last_src_batch)) break;
+                if (unlikely(src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
@@ -1011,18 +991,18 @@ loop_2_t_f:;
         // this implies max_char_type == 2 >= COMPILE_UCS_LEVEL
         assert(_read_state.max_char_type >= COMPILE_UCS_LEVEL && _read_state.max_char_type == 2);
         // BEGIN
-        assert(_decode_src_info.src <= last_src_batch);
-        while (_decode_src_info.src <= last_src_batch) {
+        assert(src <= last_src_batch);
+        while (src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
-                             &_decode_src_info,
+                             &src, src_start, src_end,
                              /* some immediate numbers*/
                              2, true, false);
             if (unlikely(_read_state.state_dirty)) {
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > last_src_batch)) break;
+                if (unlikely(src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
@@ -1044,18 +1024,18 @@ loop_2_t_t:;
         // this implies max_char_type < COMPILE_UCS_LEVEL == 2
         assert(_read_state.max_char_type < COMPILE_UCS_LEVEL && COMPILE_UCS_LEVEL == 2);
         // BEGIN
-        assert(_decode_src_info.src <= last_src_batch);
-        while (_decode_src_info.src <= last_src_batch) {
+        assert(src <= last_src_batch);
+        while (src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
-                             &_decode_src_info,
+                             &src, src_start, src_end,
                              /* some immediate numbers*/
                              2, true, true);
             if (unlikely(_read_state.state_dirty)) {
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > last_src_batch)) break;
+                if (unlikely(src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
@@ -1077,18 +1057,18 @@ loop_4_f_f:;
         // this implies 4 == max_char_type
         assert(_read_state.max_char_type == 4);
         // BEGIN
-        assert(_decode_src_info.src <= last_src_batch);
-        while (_decode_src_info.src <= last_src_batch) {
+        assert(src <= last_src_batch);
+        while (src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
-                             &_decode_src_info,
+                             &src, src_start, src_end,
                              /* some immediate numbers*/
                              4, false, false);
             if (unlikely(_read_state.state_dirty)) {
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > last_src_batch)) break;
+                if (unlikely(src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
@@ -1110,18 +1090,18 @@ loop_4_f_t:;
         // this implies max_char_type < COMPILE_UCS_LEVEL == 4
         assert(_read_state.max_char_type < 4);
         // BEGIN
-        assert(_decode_src_info.src <= last_src_batch);
-        while (_decode_src_info.src <= last_src_batch) {
+        assert(src <= last_src_batch);
+        while (src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
-                             &_decode_src_info,
+                             &src, src_start, src_end,
                              /* some immediate numbers*/
                              4, false, true);
             if (unlikely(_read_state.state_dirty)) {
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > last_src_batch)) break;
+                if (unlikely(src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
@@ -1143,16 +1123,16 @@ loop_4_t_f:;
         // also, **won't goto other labels from here**
         assert(_read_state.max_char_type >= COMPILE_UCS_LEVEL && _read_state.max_char_type == 4);
         // BEGIN
-        assert(_decode_src_info.src <= last_src_batch);
-        while (_decode_src_info.src <= last_src_batch) {
+        assert(src <= last_src_batch);
+        while (src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
-                             &_decode_src_info,
+                             &src, src_start, src_end,
                              /* some immediate numbers*/
                              4, true, false);
             if (_read_state.scan_flag == StrEnd) goto done;
             if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-            if (unlikely(_decode_src_info.src > last_src_batch)) break;
+            if (unlikely(src > last_src_batch)) break;
         }
         goto read_tail;
         // END
@@ -1167,18 +1147,18 @@ loop_4_t_t:;
         // this implies max_char_type < COMPILE_UCS_LEVEL == 4
         assert(_read_state.max_char_type < 4);
         // BEGIN
-        assert(_decode_src_info.src <= last_src_batch);
-        while (_decode_src_info.src <= last_src_batch) {
+        assert(src <= last_src_batch);
+        while (src <= last_src_batch) {
             READ_STR_IN_LOOP(&_decode_unicode_info,
                              &_read_state,
-                             &_decode_src_info,
+                             &src, src_start, src_end,
                              /* some immediate numbers*/
                              4, true, true);
             if (unlikely(_read_state.state_dirty)) {
                 _read_state.state_dirty = false;
                 if (_read_state.scan_flag == StrEnd) goto done;
                 if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
-                if (unlikely(_decode_src_info.src > last_src_batch)) break;
+                if (unlikely(src > last_src_batch)) break;
                 // escape, or max char updated
 
                 // clang-format off
@@ -1193,7 +1173,7 @@ loop_4_t_t:;
 read_tail:;
     // this is the really *unlikely* case
     {
-        READ_STR_TAIL(&_decode_src_info, &_decode_unicode_info, &_read_state, PYYJSON_MAX(_read_state.max_char_type, COMPILE_READ_UCS_LEVEL), _read_state.need_copy, _read_state.max_char_type < COMPILE_UCS_LEVEL);
+        READ_STR_TAIL(&src, src_start, src_end, &_decode_unicode_info, &_read_state, PYYJSON_MAX(_read_state.max_char_type, COMPILE_READ_UCS_LEVEL), _read_state.need_copy, _read_state.max_char_type < COMPILE_UCS_LEVEL);
         if (likely(_read_state.scan_flag == StrEnd)) goto done;
         if (unlikely(_read_state.scan_flag == StrInvalid)) goto fail;
         _read_state.state_dirty = false;
@@ -1201,7 +1181,7 @@ read_tail:;
     }
 done:;
     ret = DECODE_LOOP_DONE_MAKE_STRING(
-            &_decode_src_info,
+            src_start,
             &_decode_unicode_info,
             _read_state.need_copy,
             _read_state.max_char_type,
@@ -1209,7 +1189,7 @@ done:;
     if (unlikely(!ret)) goto fail;
 
 success_cleanup:;
-    *reader_addr = _decode_src_info.src;
+    *reader_addr = src;
     assert(ret);
     return ret;
 
