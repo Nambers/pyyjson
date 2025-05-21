@@ -27,9 +27,17 @@
 //     size by about 10x (only one case, and only double) at the cost of some
 //     performance. Currently requires MSVC intrinsics.
 
-#include "ryu/ryu.h"
+#ifndef RYUD2S_H
+#define RYUD2S_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include "pyyjson.h"
 
 #include <assert.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -37,7 +45,6 @@
 #include <string.h>
 
 #ifdef RYU_DEBUG
-#    include <inttypes.h>
 #    include <stdio.h>
 #endif
 
@@ -89,7 +96,7 @@ typedef struct floating_decimal_64 {
     int32_t exponent;
 } floating_decimal_64;
 
-static inline floating_decimal_64 d2d(const uint64_t ieeeMantissa, const uint32_t ieeeExponent) {
+force_inline floating_decimal_64 d2d(const uint64_t ieeeMantissa, const uint32_t ieeeExponent) {
     int32_t e2;
     uint64_t m2;
     if (ieeeExponent == 0) {
@@ -313,7 +320,7 @@ static inline floating_decimal_64 d2d(const uint64_t ieeeMantissa, const uint32_
 }
 
 // this function is modified to write float more human readable
-static inline int to_chars(const floating_decimal_64 v, const bool sign, char *const result) {
+force_inline int to_chars(const floating_decimal_64 v, const bool sign, char *const result) {
     // Step 5: Print the decimal representation.
     int index = 0;
     if (sign) {
@@ -502,7 +509,7 @@ static inline bool d2d_small_int(const uint64_t ieeeMantissa, const uint32_t iee
     return true;
 }
 
-int d2s_buffered_n(double f, char *result) {
+force_inline int d2s_buffered_n(double f, char *result) {
     // Step 1: Decode the floating-point number, and unify normalized and subnormal cases.
     const uint64_t bits = double_to_bits(f);
 
@@ -545,3 +552,9 @@ int d2s_buffered_n(double f, char *result) {
 
     return to_chars(v, ieeeSign, result);
 }
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // RYUD2S_H

@@ -173,7 +173,6 @@ set(SRC_FILES
     src/simd/mask_table.c
     src/tls.c
     src/float/tables.c
-    src/ryu/d2s.c
     src/decode/utils.c
 )
 

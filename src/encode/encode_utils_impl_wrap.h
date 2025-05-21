@@ -2,7 +2,7 @@
 #define ENCODE_UTILS_IMPL_WRAP_H
 
 #include "encode_shared.h"
-#include "ryu/ryu.h"
+#include "ryu/d2s.h"
 #include "simd/simd_impl.h"
 //
 #include "simd/compile_feature_check.h"

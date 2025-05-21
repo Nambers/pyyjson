@@ -4,7 +4,6 @@
 #    endif
 #    ifndef COMPILE_WRITE_UCS_LEVEL
 #        include "encode_shared.h"
-#        include "ryu/ryu.h"
 #        include "simd/simd_impl.h"
 #        define COMPILE_WRITE_UCS_LEVEL 1
 #        include "simd/compile_feature_check.h"
