@@ -242,14 +242,14 @@ static force_noinline u32 DECODE_ESCAPE_UNICODE(const _src_t **src_addr, const _
     const _src_t *src = *src_addr;
     // escape
     switch (*++src) { // clang-format off
-        case '"':  src++; *src_addr= src; return '"';
-        case '\\': src++; *src_addr= src;return '\\';
-        case '/':  src++; *src_addr= src;return '/';
-        case 'b':  src++; *src_addr= src;return '\b';
-        case 'f':  src++; *src_addr= src;return '\f';
-        case 'n':  src++; *src_addr= src;return '\n';
-        case 'r':  src++; *src_addr= src;return '\r';
-        case 't':  src++; *src_addr= src;return '\t';
+        case '"':  src++; *src_addr = src; return '"';
+        case '\\': src++; *src_addr = src; return '\\';
+        case '/':  src++; *src_addr = src; return '/';
+        case 'b':  src++; *src_addr = src; return '\b';
+        case 'f':  src++; *src_addr = src; return '\f';
+        case 'n':  src++; *src_addr = src; return '\n';
+        case 'r':  src++; *src_addr = src; return '\r';
+        case 't':  src++; *src_addr = src; return '\t';
         // clang-format on
         case 'u': {
             u16 hi;
@@ -492,8 +492,6 @@ force_inline void READ_STR_IN_LOOP(
         } else { // compile time determined
             assert(write_as == COMPILE_READ_UCS_LEVEL);
             *(vector_u *)GET_CUR_WRITER(decode_unicode_info) = vec;
-            // write_simd(GET_CUR_WRITER(decode_unicode_info), vec);
-            // cvt_to_dst(GET_CUR_WRITER(decode_unicode_info), vec);
         }
     }
 

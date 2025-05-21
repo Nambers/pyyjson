@@ -15,6 +15,7 @@ clangStdenv.mkDerivation rec {
   postInstall = ''
     patchelf --remove-needed $(patchelf --print-needed $out/pyyjson.so | grep libpython3) $out/pyyjson.so
     patchelf --set-rpath /lib64 $out/pyyjson.so
+    mv $out/pyyjson.so $out/pyyjson.cpython-3${python.sourceVersion.minor}-x86_64-linux-gnu.so
   '';
   nativeBuildInputs = [
     cmake
