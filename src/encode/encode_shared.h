@@ -246,7 +246,7 @@ force_inline PyFastTypes fast_type_check(PyObject *val) {
 
 
 /** Digit table from 00 to 99. */
-extern pyyjson_align(8) const char DIGIT_TABLE[200];
+extern pyyjson_align(8) const u8 DIGIT_TABLE[200];
 
 /** Normalized significant 128 bits of pow10, no rounded up (size: 10.4KB).
     This lookup table is used by both the double number reader and writer.
