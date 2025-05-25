@@ -468,8 +468,8 @@ decode_loop_ucs1:;
             int state_code = decode_str_copy_loop_ascii_u8(&u8writer, &src, src_end, &escape_info);
             LOOP_SWITCHER(state_code, ON_ESCAPE);
         }
-        {
-        trailing_ucs1:;
+    trailing_ucs1:;
+        if (likely(src < src_end)) {
             EscapeInfo escape_info;
             int status_code = decode_str_copy_trailing_ascii_u8(&u8writer, &src, src_end, &escape_info);
             switch (status_code) {
@@ -505,6 +505,9 @@ decode_loop_ucs1:;
                     PYYJSON_UNREACHABLE();
                 }
             }
+        } else {
+            PyErr_SetString(JSONDecodeError, "Unexpected end of string");
+            goto failed;
         }
 #undef ON_ESCAPE
 #undef LOOP_SWITCHER
@@ -556,8 +559,8 @@ decode_loop_ucs2:;
             LOOP_SWITCHER(state_code, ON_ESCAPE);
         }
 
-        {
-        trailing_ucs2:;
+    trailing_ucs2:;
+        if (likely(src < src_end)) {
             EscapeInfo escape_info;
             int status_code = decode_str_copy_trailing_ascii_u16(&u16writer, &src, src_end, &escape_info);
             switch (status_code) {
@@ -588,6 +591,9 @@ decode_loop_ucs2:;
                     PYYJSON_UNREACHABLE();
                 }
             }
+        } else {
+            PyErr_SetString(JSONDecodeError, "Unexpected end of string");
+            goto failed;
         }
 #undef ON_ESCAPE
 #undef LOOP_SWITCHER
@@ -628,8 +634,8 @@ decode_loop_ucs4:;
             int state_code = decode_str_copy_loop_ascii_u32(&u32writer, &src, src_end, &escape_info);
             LOOP_SWITCHER(state_code);
         }
-        {
-        trailing_ucs4:;
+    trailing_ucs4:;
+        if (likely(src < src_end)) {
             EscapeInfo escape_info;
             int status_code = decode_str_copy_trailing_ascii_u32(&u32writer, &src, src_end, &escape_info);
             switch (status_code) {
@@ -651,6 +657,9 @@ decode_loop_ucs4:;
                     PYYJSON_UNREACHABLE();
                 }
             }
+        } else {
+            PyErr_SetString(JSONDecodeError, "Unexpected end of string");
+            goto failed;
         }
 #undef LOOP_SWITCHER
     }
@@ -739,7 +748,7 @@ force_inline PyObject *decode_str_ascii(
         LOOP_SWITCHER(status_code);
     }
 
-    {
+    if (likely(src < src_end)) {
         EscapeInfo escape_info;
         int status_code = decode_str_fast_trailing_ascii(&src, src_end, &escape_info);
         switch (status_code) {
@@ -765,6 +774,9 @@ force_inline PyObject *decode_str_ascii(
                 PYYJSON_UNREACHABLE();
             }
         }
+    } else {
+        PyErr_SetString(JSONDecodeError, "Unexpected end of string");
+        goto failed;
     }
 
 done:;
