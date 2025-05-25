@@ -2,7 +2,7 @@
 #define PYYJSON_DECODE_STR_H
 
 #include "common.h"
-
+#include "simd/union_vector.h"
 // _r_tools
 #define COMPILE_READ_UCS_LEVEL 1
 #include "_r_tools.inl.h"
@@ -15,6 +15,29 @@
 #define COMPILE_READ_UCS_LEVEL 4
 #include "_r_tools.inl.h"
 #undef COMPILE_READ_UCS_LEVEL
+
+// decode impl
+
+#include "simd/compile_feature_check.h"
+
+#define COMPILE_READ_UCS_LEVEL 1
+#include "_r_impls.inl.h"
+#include "_sr_loop_impls.inl.h"
+#undef COMPILE_READ_UCS_LEVEL
+
+#define COMPILE_READ_UCS_LEVEL 2
+#include "_r_impls.inl.h"
+#include "_sr_loop_impls.inl.h"
+#undef COMPILE_READ_UCS_LEVEL
+
+#define COMPILE_READ_UCS_LEVEL 4
+#include "_r_impls.inl.h"
+#include "_sr_loop_impls.inl.h"
+#undef COMPILE_READ_UCS_LEVEL
+
+
+#undef COMPILE_SIMD_BITS
+
 
 // _sr_checkmax
 #define COMPILE_SIMD_BITS 128

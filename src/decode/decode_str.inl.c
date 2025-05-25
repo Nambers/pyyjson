@@ -736,6 +736,7 @@ done:;
     *src_addr = src;
 }
 
+#if COMPILE_UCS_LEVEL > 0
 /**
  Read a JSON string.
  @param reader The head pointer of string before '"' prefix (inout).
@@ -763,15 +764,15 @@ static force_noinline PyObject *READ_STR(
     const _src_t *const last_src_batch = src_end - READ_BATCH_COUNT;
 
     if (unlikely(src > last_src_batch)) goto read_tail;
-#if COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_ASCII
+#    if COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_ASCII
     goto loop_1_f_f;
-#elif COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_LATIN1
+#    elif COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_LATIN1
     goto loop_1_f_t;
-#elif COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_UCS2
+#    elif COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_UCS2
     goto loop_2_f_t;
-#elif COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_UCS4
+#    elif COMPILE_UCS_LEVEL == PYYJSON_STRING_TYPE_UCS4
     goto loop_4_f_t;
-#endif
+#    endif
     PYYJSON_UNREACHABLE();
 
 // three immediate numbers:
@@ -781,7 +782,7 @@ static force_noinline PyObject *READ_STR(
 // additional note:
 //   1. need_copy == false => max_char_type <= COMPILE_UCS_LEVEL
 //   2. COMPILE_READ_UCS_LEVEL = COMPILE_UCS_LEVEL ? COMPILE_UCS_LEVEL : 1
-#if COMPILE_UCS_LEVEL <= 1
+#    if COMPILE_UCS_LEVEL <= 1
 loop_1_f_f:;
     {
         // in this case:
@@ -813,8 +814,8 @@ loop_1_f_f:;
         goto read_tail;
         // END
     }
-#endif
-#if COMPILE_UCS_LEVEL == 1
+#    endif
+#    if COMPILE_UCS_LEVEL == 1
 loop_1_f_t:;
     {
         // in this case:
@@ -846,8 +847,8 @@ loop_1_f_t:;
         goto read_tail;
         // END
     }
-#endif
-#if COMPILE_UCS_LEVEL <= 1
+#    endif
+#    if COMPILE_UCS_LEVEL <= 1
 loop_1_t_f:;
     {
         // in this case:
@@ -879,8 +880,8 @@ loop_1_t_f:;
         goto read_tail;
         // END
     }
-#endif
-#if COMPILE_UCS_LEVEL == 1
+#    endif
+#    if COMPILE_UCS_LEVEL == 1
 loop_1_t_t:;
     {
         // in this case:
@@ -912,8 +913,8 @@ loop_1_t_t:;
         goto read_tail;
         // END
     }
-#endif
-#if COMPILE_UCS_LEVEL == 2
+#    endif
+#    if COMPILE_UCS_LEVEL == 2
 loop_2_f_f:;
     {
         // in this case:
@@ -945,8 +946,8 @@ loop_2_f_f:;
         goto read_tail;
         // END
     }
-#endif
-#if COMPILE_UCS_LEVEL == 2
+#    endif
+#    if COMPILE_UCS_LEVEL == 2
 loop_2_f_t:;
     {
         // in this case:
@@ -978,8 +979,8 @@ loop_2_f_t:;
         goto read_tail;
         // END
     }
-#endif
-#if COMPILE_UCS_LEVEL <= 2
+#    endif
+#    if COMPILE_UCS_LEVEL <= 2
 loop_2_t_f:;
     {
         // in this case:
@@ -1011,8 +1012,8 @@ loop_2_t_f:;
         goto read_tail;
         // END
     }
-#endif
-#if COMPILE_UCS_LEVEL == 2
+#    endif
+#    if COMPILE_UCS_LEVEL == 2
 loop_2_t_t:;
     {
         // in this case:
@@ -1044,8 +1045,8 @@ loop_2_t_t:;
         goto read_tail;
         // END
     }
-#endif
-#if COMPILE_UCS_LEVEL == 4
+#    endif
+#    if COMPILE_UCS_LEVEL == 4
 loop_4_f_f:;
     {
         // in this case:
@@ -1077,8 +1078,8 @@ loop_4_f_f:;
         goto read_tail;
         // END
     }
-#endif
-#if COMPILE_UCS_LEVEL == 4
+#    endif
+#    if COMPILE_UCS_LEVEL == 4
 loop_4_f_t:;
     {
         // in this case:
@@ -1110,7 +1111,7 @@ loop_4_f_t:;
         goto read_tail;
         // END
     }
-#endif
+#    endif
 loop_4_t_f:;
     {
         // in this case:
@@ -1135,7 +1136,7 @@ loop_4_t_f:;
         goto read_tail;
         // END
     }
-#if COMPILE_UCS_LEVEL == 4
+#    if COMPILE_UCS_LEVEL == 4
 loop_4_t_t:;
     {
         // in this case:
@@ -1167,7 +1168,7 @@ loop_4_t_t:;
         goto read_tail;
         // END
     }
-#endif
+#    endif
 read_tail:;
     // this is the really *unlikely* case
     {
@@ -1194,6 +1195,7 @@ success_cleanup:;
 fail:;
     return NULL;
 }
+#endif
 
 force_inline bool CHECK_AND_RESERVE_STR_BUFFER(Py_ssize_t len, _src_t **buffer_head_addr, bool *need_dealloc) {
     // consider the max length of the buffer we need
@@ -1275,7 +1277,11 @@ static force_noinline PyObject *READ_ROOT_SINGLE(const _src_t *dat, Py_ssize_t l
         bool need_dealloc = false;
         CHECK_AND_RESERVE_STR_BUFFER(len, &string_buffer_head, &need_dealloc);
         cur++;
+#if COMPILE_UCS_LEVEL == 0
+        ret = decode_str_ascii(&cur, end, string_buffer_head, false);
+#else
         ret = READ_STR(&cur, end, string_buffer_head, false);
+#endif
         if (need_dealloc) {
             free((void *)((u8 *)string_buffer_head - TAIL_PADDING));
         }

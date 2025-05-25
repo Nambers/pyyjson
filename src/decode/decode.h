@@ -1,8 +1,9 @@
 #ifndef PYYJSON_DECODE_H
 #define PYYJSON_DECODE_H
 #include "pyyjson.h"
+#include "simd/memcmp.h"
 #include "simd/simd_impl.h"
-#include <assert.h>
+#include "xxhash.h"
 
 typedef struct DecodeObjStackInfo {
     PyObject **cur_write_result_addr;
@@ -17,6 +18,22 @@ typedef struct DecodeCtnStackInfo {
     DecodeCtnWithSize *ctn_start;
     DecodeCtnWithSize *ctn_end;
 } DecodeCtnStackInfo;
+
+typedef union {
+    struct {
+        u32 escape_val;
+        u32 escape_size;
+    };
+
+    u64 union_value;
+} EscapeInfo;
+
+#define _DECODE_UNICODE_ERR PYYJSON_CAST(u32, -1)
+
+#define DECODE_LOOPSTATE_CONTINUE 0
+#define DECODE_LOOPSTATE_END 1
+#define DECODE_LOOPSTATE_ESCAPE 2
+#define DECODE_LOOPSTATE_INVALID 3
 
 extern PyObject *JSONDecodeError;
 
@@ -116,7 +133,6 @@ typedef struct SpecialCharReadResult {
 
 /* minimum binary power of double number */
 #define F64_MIN_BIN_EXP (-1021)
-
 
 /*==============================================================================
  * Hex Character Reader
@@ -227,6 +243,59 @@ force_inline void update_max_char_type(ReadStrState *read_state, int max_char_ty
 force_inline void init_read_state(ReadStrState *state) {
     // all initialized as 0 or false
     memset(state, 0, sizeof(ReadStrState));
+}
+
+/*==============================================================================
+ * xxhash and key cache utilities
+ *============================================================================*/
+#if PY_MINOR_VERSION >= 13
+// these are hidden in Python 3.13
+#    if PY_MINOR_VERSION == 13
+PyAPI_FUNC(Py_hash_t) _Py_HashBytes(const void *, Py_ssize_t);
+#    endif // PY_MINOR_VERSION == 13
+PyAPI_FUNC(int) _PyDict_SetItem_KnownHash_LockHeld(PyObject *mp, PyObject *key, PyObject *item, Py_hash_t hash);
+#    define _PyDict_SetItem_KnownHash _PyDict_SetItem_KnownHash_LockHeld
+#endif // PY_MINOR_VERSION >= 13
+
+#define REHASHER(_x) (((size_t)(_x)) % (PYYJSON_KEY_CACHE_SIZE))
+typedef XXH64_hash_t pyyjson_hash_t;
+extern pyyjson_cache_type AssociativeKeyCache[PYYJSON_KEY_CACHE_SIZE];
+
+force_inline void add_key_cache(pyyjson_hash_t hash, PyObject *obj) {
+    assert(PyUnicode_GET_LENGTH(obj) * PyUnicode_KIND(obj) <= 64);
+    size_t index = REHASHER(hash);
+    // PYYJSON_TRACE_HASH(index);
+    pyyjson_cache_type old = AssociativeKeyCache[index];
+    if (old) {
+        // PYYJSON_TRACE_HASH_CONFLICT(hash);
+        Py_DECREF(old);
+    }
+    Py_INCREF(obj);
+    AssociativeKeyCache[index] = obj;
+}
+
+force_inline PyObject *get_key_cache(const u8 *unicode_str, pyyjson_hash_t hash, size_t real_len, int kind, bool ascii) {
+    assert(real_len <= 64);
+    pyyjson_cache_type cache = AssociativeKeyCache[REHASHER(hash)];
+    if (!cache) return NULL;
+    PyASCIIObject *cache_ascii = PYYJSON_CAST(PyASCIIObject *, cache);
+    Py_ssize_t cache_length = cache_ascii->length;
+    Py_ssize_t cache_kind = cache_ascii->state.kind;
+    bool cache_is_ascii = cache_ascii->state.ascii;
+    Py_ssize_t cache_offset = cache_is_ascii ? sizeof(PyASCIIObject) : sizeof(PyCompactUnicodeObject);
+    if (likely(kind == cache_kind && ascii == cache_is_ascii && ((real_len == cache_length * cache_kind)) && (pyyjson_memcmp_neq_le64(PYYJSON_CAST(u8 *, unicode_str), PYYJSON_CAST(u8 *, cache) + cache_offset, real_len) == 0))) {
+        // PYYJSON_TRACE_CACHE_HIT();
+        return cache;
+    }
+    return NULL;
+}
+
+force_inline void make_hash(PyASCIIObject *ascii, const void *unicode_str, size_t real_len) {
+#if PY_MINOR_VERSION >= 14
+    ascii->hash = Py_HashBuffer(unicode_str, real_len);
+#else
+    ascii->hash = _Py_HashBytes(unicode_str, real_len);
+#endif
 }
 
 #endif // PYYJSON_DECODE_H

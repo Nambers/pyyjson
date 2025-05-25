@@ -63,6 +63,14 @@
 #define _read_inf MAKE_R_NAME(_read_inf)
 #define _read_nan MAKE_R_NAME(_read_nan)
 #define read_inf_or_nan MAKE_R_NAME(read_inf_or_nan)
+#define do_decode_escape MAKE_R_NAME(do_decode_escape)
+#define do_decode_escape_noinline MAKE_R_NAME(do_decode_escape_noinline)
+#define _decode_str_loop4_read_src_impl MAKE_R_NAME(_decode_str_loop4_read_src_impl)
+#define _decode_str_loop_read_src_impl MAKE_R_NAME(_decode_str_loop_read_src_impl)
+#define _decode_str_trailing_read_src_impl MAKE_R_NAME(_decode_str_trailing_read_src_impl)
+#define _decode_str_loop4_decoder_impl MAKE_R_NAME(_decode_str_loop4_decoder_impl)
+#define _decode_str_loop_decoder_impl MAKE_R_NAME(_decode_str_loop_decoder_impl)
+#define _decode_str_trailing_decoder_impl MAKE_R_NAME(_decode_str_trailing_decoder_impl)
 
 #ifdef COMPILE_UCS_LEVEL
 #    define get_unicode_buffer_final_len MAKE_UCS_NAME(get_unicode_buffer_final_len)

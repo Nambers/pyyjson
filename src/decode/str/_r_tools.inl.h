@@ -1,13 +1,12 @@
 #ifdef PYYJSON_CLANGD_DUMMY
-#    include "decode/decode.h"
-#    include "simd/simd_impl.h"
 #    ifndef COMPILE_READ_UCS_LEVEL
-#        define COMPILE_READ_UCS_LEVEL 4
+#        include "decode/decode.h"
+#        include "simd/simd_impl.h"
+#        define COMPILE_READ_UCS_LEVEL 2
 #    endif
 #endif
 
 #include "compile_context/r_in.inl.h"
-
 
 force_inline bool verify_escape_hex(const _src_t *src, const _src_t *src_end, int offset) {
     if (unlikely(src + 4 + offset > src_end)) {
@@ -17,15 +16,25 @@ force_inline bool verify_escape_hex(const _src_t *src, const _src_t *src_end, in
     // need to verify the next 4 unicode for u16 and u32, since the size of hex conv table is 256
     // u8: no need to check
 #if COMPILE_READ_UCS_LEVEL == 2
-    u64 to_verify = *(u64 *)(src + offset);
-    const u64 verify_mask = 0xff00ff00ff00ff00ULL;
-    if (unlikely((to_verify & verify_mask) != 0)) {
+    typedef union {
+        u64 u64_value;
+        vector_a_u16_64 vec;
+    } Verifier;
+
+    Verifier srcvec, mask;
+    const vector_a_u16_64 _template = {0xff00, 0xff00, 0xff00, 0xff00};
+
+    srcvec.vec = *(vector_u_u16_64 *)(src + offset);
+    mask.vec = _template;
+
+    // const vector_a_u16_64 verify_mask = {0xff00, 0xff00, 0xff00, 0xff00};
+    if (unlikely((srcvec.u64_value & mask.u64_value) != 0)) {
         PyErr_SetString(JSONDecodeError, "Invalid escape sequence in string");
         return false;
     }
 #elif COMPILE_READ_UCS_LEVEL == 4
     vector_a_u32_128 to_verify = *(vector_u_u32_128 *)(src + offset); //load_128((void *)(decode_src_info->src + offset));
-    const vector_a_u32_128 verify_mask = broadcast_u64_128((i64)0xffffff00ffffff00ULL);
+    const vector_a_u32_128 verify_mask = broadcast_u32_128(0xffffff00);
     if (unlikely(!testz2_128(to_verify, verify_mask))) {
         PyErr_SetString(JSONDecodeError, "Invalid escape sequence in string");
         return false;

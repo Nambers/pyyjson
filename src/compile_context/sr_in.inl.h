@@ -71,13 +71,19 @@
 
 //
 #if COMPILE_SIMD_BITS == 512
+#    define anymask_t avx512_bitmask_t
+#    define get_escape_anymask get_escape_bitmask
 #    define testz_escape_mask(_x_) ((_x_) == 0)
 #    define escape_anymask_to_done_count escape_bitmask_to_done_count
 #    define escape_anymask_to_done_count_no_eq0 escape_bitmask_to_done_count
+#    define joined4_escape_anymask_to_done_count joined4_escape_bitmask_to_done_count
 #else
+#    define anymask_t vector_a
+#    define get_escape_anymask get_escape_mask
 #    define testz_escape_mask testz
 #    define escape_anymask_to_done_count escape_mask_to_done_count
 #    define escape_anymask_to_done_count_no_eq0 escape_mask_to_done_count_no_eq0
+#    define joined4_escape_anymask_to_done_count joined4_escape_mask_to_done_count
 #endif
 
 #ifdef COMPILE_UCS_LEVEL

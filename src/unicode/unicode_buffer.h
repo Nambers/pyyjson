@@ -32,6 +32,11 @@ typedef union {
 #define GET_VEC_ASCII_START(_unicode_buffer_info_) (PYYJSON_CAST(PyASCIIObject *, (_unicode_buffer_info_)->head) + 1)
 #define GET_VEC_COMPACT_START(_unicode_buffer_info_) (PYYJSON_CAST(PyCompactUnicodeObject *, (_unicode_buffer_info_)->head) + 1)
 
+#define PYUNICODE_ASCII_START(_obj_) PYYJSON_CAST(u8 *, PYYJSON_CAST(PyASCIIObject *, (_obj_)) + 1)
+#define PYUNICODE_UCS1_START(_obj_) PYYJSON_CAST(u8 *, PYYJSON_CAST(PyCompactUnicodeObject *, (_obj_)) + 1)
+#define PYUNICODE_UCS2_START(_obj_) PYYJSON_CAST(u16 *, PYYJSON_CAST(PyCompactUnicodeObject *, (_obj_)) + 1)
+#define PYUNICODE_UCS4_START(_obj_) PYYJSON_CAST(u32 *, PYYJSON_CAST(PyCompactUnicodeObject *, (_obj_)) + 1)
+
 #define VEC_END(_unicode_buffer_info_) ((_unicode_buffer_info_)->end)
 
 

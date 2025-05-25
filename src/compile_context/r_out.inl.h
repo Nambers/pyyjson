@@ -22,5 +22,13 @@
 #undef _read_inf
 #undef _read_nan
 #undef read_inf_or_nan
+#undef do_decode_escape
+#undef do_decode_escape_noinline
+#undef _decode_str_loop4_read_src_impl
+#undef _decode_str_loop_read_src_impl
+#undef _decode_str_trailing_read_src_impl
+#undef _decode_str_loop4_decoder_impl
+#undef _decode_str_loop_decoder_impl
+#undef _decode_str_trailing_decoder_impl
 //
 #undef get_unicode_buffer_final_len
