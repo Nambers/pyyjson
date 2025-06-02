@@ -1,6 +1,8 @@
 #ifndef PYYJSON_DECODE_STR_UCS_H
 #define PYYJSON_DECODE_STR_UCS_H
 
+#include "cache_key.h"
+#include "copy_to_new.h"
 #include "escape.h"
 #include "pythonlib.h"
 #include "simd/long_cvt.h"

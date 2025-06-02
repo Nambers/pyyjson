@@ -1,5 +1,7 @@
 #ifdef PYYJSON_CLANGD_DUMMY
 #    ifndef COMPILE_UCS_LEVEL
+#        include "cache_key.h"
+#        include "copy_to_new.h"
 #        include "decode/decode.h"
 #        include "escape.h"
 #        include "simd/cvt.h"
@@ -75,19 +77,12 @@ force_inline int decode_str_fast_trailing(const _src_t **src_addr, const _src_t 
 
 // fast path unicode maker
 force_inline PyObject *make_unicode_from_src(const _src_t *start, usize count, bool is_key, vector_a maxvec, void *temp_buffer) {
+    const _src_t upper_bound = (COMPILE_UCS_LEVEL == 1) ? 0x7f : ((COMPILE_UCS_LEVEL == 2) ? 0xff : 0xffff);
+
     PyObject *ret;
     pyyjson_hash_t hash;
 
-    bool need_cvt = checkmax(maxvec,
-#if COMPILE_UCS_LEVEL == 1
-
-                             0x7f
-#elif COMPILE_UCS_LEVEL == 2
-                             0xff
-#else
-                             0xffff
-#endif
-    );
+    bool need_cvt = checkmax(maxvec, upper_bound);
     int kind = COMPILE_UCS_LEVEL;
     bool need_size_cvt = need_cvt && COMPILE_UCS_LEVEL > 1;
     if (need_cvt) {
@@ -117,41 +112,7 @@ force_inline PyObject *make_unicode_from_src(const _src_t *start, usize count, b
     if (should_cache) {
         const void *hash_string_ptr;
         usize hash_string_u8size;
-#if COMPILE_UCS_LEVEL > 1
-        // complicated case when ucs level > 1
-        if (need_size_cvt) {
-            // do inplace zip
-#    if COMPILE_UCS_LEVEL == 4
-            if (tpsize == 2) {
-                // count <= 32
-                u16 *temp_dst = temp_buffer;
-                const u32 *temp_src_ptr = start;
-                // use __small_cvt to copy a short buffer
-                // The last arg is the upper bound of `count`
-                MAKE_S_NAME(__small_cvt_u32_u16)(&temp_dst, &temp_src_ptr, count, 64 / 2);
-            } else
-#    endif
-            {
-                assert(tpsize == 1);
-                u8 *temp_dst = temp_buffer;
-                const _src_t *temp_src = start;
-                // use __small_cvt, same as above
-#    if COMPILE_UCS_LEVEL == 2
-                MAKE_S_NAME(__small_cvt_u16_u8)
-#    else
-                MAKE_S_NAME(__small_cvt_u32_u8)
-#    endif
-                (&temp_dst, &temp_src, count, 64 / 1);
-            }
-            hash_string_ptr = temp_buffer;
-            hash_string_u8size = count * tpsize;
-        } else
-#endif
-        {
-            // inplace case
-            hash_string_ptr = start;
-            hash_string_u8size = count * COMPILE_UCS_LEVEL;
-        } // 4274743011922427211
+        get_cache_key_hash_and_size(&hash_string_ptr, &hash_string_u8size, start, count, tpsize, need_size_cvt, temp_buffer);
         hash = XXH3_64bits(hash_string_ptr, hash_string_u8size);
         ret = get_key_cache(hash_string_ptr, hash, hash_string_u8size, kind ? kind : 1, kind == 0);
         if (ret) {
@@ -170,36 +131,7 @@ force_inline PyObject *make_unicode_from_src(const _src_t *start, usize count, b
             dst_void = temp_dst;
             __pyyjson_short_memcpy_small_first(&temp_dst, &temp_src, count * tpsize, 64);
         } else {
-#if COMPILE_UCS_LEVEL == 1
-            u8 *dst = need_cvt ? PYUNICODE_ASCII_START(ret) : PYUNICODE_UCS1_START(ret);
-            dst_void = dst;
-            pyyjson_memcpy(dst, start, count);
-#elif COMPILE_UCS_LEVEL == 2
-            if (!need_cvt) {
-                dst_void = PYUNICODE_UCS2_START(ret);
-                pyyjson_memcpy(dst_void, start, count * 2);
-            } else {
-                u8 *dst = (kind == 0) ? PYUNICODE_ASCII_START(ret) : PYUNICODE_UCS1_START(ret);
-                dst_void = dst;
-                MAKE_S_NAME(long_cvt_u16_u8)(dst, start, count);
-            }
-#else
-            if (!need_cvt) {
-                dst_void = PYUNICODE_UCS4_START(ret);
-                pyyjson_memcpy(dst_void, start, count * 4);
-            } else {
-                if (kind <= 1) {
-                    u8 *dst = (kind == 0) ? PYUNICODE_ASCII_START(ret) : PYUNICODE_UCS1_START(ret);
-                    dst_void = dst;
-                    MAKE_S_NAME(long_cvt_u32_u8)(dst, start, count);
-                } else {
-                    // this should be unlikely, use noinline version
-                    u16 *dst = PYUNICODE_UCS2_START(ret);
-                    dst_void = dst;
-                    long_cvt_noinline_u32_u16_interface(dst, start, count);
-                }
-            }
-#endif
+            MAKE_UCS_NAME(copy_to_new_unicode)(&dst_void, ret, need_cvt, start, count, kind);
         }
         if (should_cache) {
             add_key_cache(hash, ret);

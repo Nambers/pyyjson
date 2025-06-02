@@ -86,5 +86,6 @@
 #    define decode_str_fast_loop4 MAKE_UCS_NAME(decode_str_fast_loop4)
 #    define decode_str_fast_loop MAKE_UCS_NAME(decode_str_fast_loop)
 #    define decode_str_fast_trailing MAKE_UCS_NAME(decode_str_fast_trailing)
+#    define get_cache_key_hash_and_size MAKE_UCS_NAME(get_cache_key_hash_and_size)
 #endif
 #endif // PYYJSON_COMPILE_CONTEXT_R

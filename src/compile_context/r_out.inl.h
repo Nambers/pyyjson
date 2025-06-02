@@ -44,3 +44,4 @@
 #undef decode_str_fast_loop4
 #undef decode_str_fast_loop
 #undef decode_str_fast_trailing
+#undef get_cache_key_hash_and_size
