@@ -18,8 +18,7 @@
 /* Macro IN */
 #include "compile_context/sirw_in.inl.h"
 
-_IMPL_INLINE_SPECIFIER
-bool unicode_buffer_append_key_internal(PyObject *key, usize len, _dst_t **writer_addr, EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t cur_nested_depth) {
+force_inline bool unicode_buffer_append_key_internal(PyObject *key, usize len, _dst_t **writer_addr, EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t cur_nested_depth) {
     static_assert(COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL, "COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL");
     assert((usize)PyUnicode_GET_LENGTH(key) == len);
     RETURN_ON_UNLIKELY_ERR(!unicode_buffer_reserve(writer_addr, unicode_buffer_info, get_indent_char_count(cur_nested_depth, COMPILE_INDENT_LEVEL) + 5 + 6 * len + TAIL_PADDING));
@@ -40,9 +39,8 @@ bool unicode_buffer_append_key_internal(PyObject *key, usize len, _dst_t **write
     return true;
 }
 
-_IMPL_INLINE_SPECIFIER
-bool unicode_buffer_append_str_internal(PyObject *str, usize len, _dst_t **writer_addr,
-                                        EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t cur_nested_depth, bool is_in_obj) {
+force_inline bool unicode_buffer_append_str_internal(PyObject *str, usize len, _dst_t **writer_addr,
+                                                     EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t cur_nested_depth, bool is_in_obj) {
     static_assert(COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL, "COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL");
     assert((usize)PyUnicode_GET_LENGTH(str) == len);
     if (is_in_obj) {
