@@ -39,8 +39,6 @@ static force_noinline PyObject *READ_ROOT_IMPL(const _src_t *dat, Py_ssize_t len
     //
     memset(decode_ctn_info, 0, sizeof(DecodeCtnStackInfo));
     memset(decode_obj_stack_info, 0, sizeof(DecodeObjStackInfo));
-    //
-    // register int occur_once_function_jump_flag;
     // init
     if (!init_decode_ctn_stack_info(decode_ctn_info) || !init_decode_obj_stack_info(decode_obj_stack_info)) goto failed_cleanup;
     _src_t *string_buffer_head;
@@ -58,47 +56,6 @@ static force_noinline PyObject *READ_ROOT_IMPL(const _src_t *dat, Py_ssize_t len
         if (DECODE_READ_PRETTY && *cur == '\n') cur++;
         goto arr_val_begin;
     }
-
-    /* 2 labels below are used for reducing binary size when inlining. */
-    // process_str:;
-    //     {
-    //         // occur_once_function_jump_flag: 0 -> key, 1 -> obj value, 2 -> arr value
-    //         PyObject *str_obj = decode_str(&cur, end, string_buffer_head, occur_once_function_jump_flag == 0);
-    //         if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
-    //             if (occur_once_function_jump_flag) incr_decode_ctn_size(decode_ctn_info->ctn);
-    //             switch (occur_once_function_jump_flag) {
-    //                 case 0:
-    //                     goto obj_key_end;
-    //                 case 1:
-    //                     goto obj_val_end;
-    //                 case 2:
-    //                     goto arr_val_end;
-    //                 default: {
-    //                     PYYJSON_UNREACHABLE();
-    //                 }
-    //             }
-    //         }
-    //         goto fail_string;
-    //     }
-
-// process_number:;
-//     {
-//         // occur_once_function_jump_flag: 0 -> obj value, 1 -> arr value
-//         PyObject *number_obj = READ_NUMBER(&cur, end);
-//         if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
-//             incr_decode_ctn_size(decode_ctn_info->ctn);
-//             switch (occur_once_function_jump_flag) {
-//                 case 0:
-//                     goto obj_val_end;
-//                 case 1:
-//                     goto arr_val_end;
-//                 default: {
-//                     PYYJSON_UNREACHABLE();
-//                 }
-//             }
-//         }
-//         goto fail_number;
-//     }
 
 arr_begin:
     /* save current container */
@@ -141,8 +98,6 @@ arr_val_begin:
         goto arr_begin;
     }
     if (*cur <= U8MAX && char_is_number(*cur)) {
-        // occur_once_function_jump_flag = 1; // arr value
-        // goto process_number;
         PyObject *number_obj = READ_NUMBER(&cur, end);
         if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
             incr_decode_ctn_size(decode_ctn_info->ctn);
@@ -158,8 +113,6 @@ arr_val_begin:
             goto arr_val_end;
         }
         goto fail_string;
-        // occur_once_function_jump_flag = 2; // arr value
-        // goto process_str;
     }
     if (*cur == 't') {
         if (likely(_read_true(&cur, end) && pyyjson_decode_true(decode_obj_stack_info))) {
@@ -297,8 +250,6 @@ obj_key_begin:
             goto obj_key_end;
         }
         goto fail_string;
-        // occur_once_function_jump_flag = 0; // key
-        // goto process_str;
     }
     if (likely(*cur == '}')) {
         cur++;
@@ -316,13 +267,10 @@ obj_key_begin:
     goto fail_character_obj_key;
 
 obj_key_end:;
-    // #if DECODE_READ_PRETTY
-    // ": "
     if (cmpeq_2chars(cur, _ColonSpace, end)) {
         cur += 2;
         goto obj_val_begin;
     }
-    // #endif
     if (*cur == ':') {
         cur++;
         goto obj_val_begin;
@@ -348,8 +296,6 @@ obj_val_begin:
             goto obj_val_end;
         }
         goto fail_string;
-        // occur_once_function_jump_flag = 1; // obj value
-        // goto process_str;
     }
     if (char_is_number(*cur)) {
         PyObject *number_obj = READ_NUMBER(&cur, end);
@@ -358,8 +304,6 @@ obj_val_begin:
             goto obj_val_end;
         }
         goto fail_number;
-        // occur_once_function_jump_flag = 0; // obj value
-        // goto process_number;
     }
     if (*cur == '{') {
         cur++;
