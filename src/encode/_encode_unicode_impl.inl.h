@@ -18,26 +18,6 @@
 /* Macro IN */
 #include "compile_context/sirw_in.inl.h"
 
-#if COMPILE_READ_UCS_LEVEL == 1
-#    if PYYJSON_ENCODE_UCS1_IMPL_INLINE
-#        define _IMPL_INLINE_SPECIFIER force_inline
-#    else
-#        define _IMPL_INLINE_SPECIFIER static force_noinline
-#    endif
-#elif COMPILE_READ_UCS_LEVEL == 2
-#    if PYYJSON_ENCODE_UCS2_IMPL_INLINE
-#        define _IMPL_INLINE_SPECIFIER force_inline
-#    else
-#        define _IMPL_INLINE_SPECIFIER static force_noinline
-#    endif
-#elif COMPILE_READ_UCS_LEVEL == 4
-#    if PYYJSON_ENCODE_UCS4_IMPL_INLINE
-#        define _IMPL_INLINE_SPECIFIER force_inline
-#    else
-#        define _IMPL_INLINE_SPECIFIER static force_noinline
-#    endif
-#endif
-
 _IMPL_INLINE_SPECIFIER
 bool unicode_buffer_append_key_internal(PyObject *key, usize len, _dst_t **writer_addr, EncodeUnicodeBufferInfo *unicode_buffer_info, Py_ssize_t cur_nested_depth) {
     static_assert(COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL, "COMPILE_READ_UCS_LEVEL <= COMPILE_WRITE_UCS_LEVEL");
@@ -80,7 +60,5 @@ bool unicode_buffer_append_str_internal(PyObject *str, usize len, _dst_t **write
     assert(check_unicode_writer_valid(writer, unicode_buffer_info));
     return true;
 }
-
-#undef _IMPL_INLINE_SPECIFIER
 
 #include "compile_context/sirw_out.inl.h"

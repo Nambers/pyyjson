@@ -185,7 +185,7 @@ force_inline bool ascii_in_ucs1_encode_loop(u8 **dst_addr, const u8 **src_addr, 
     return checked;
 }
 
-force_inline void bytes_write_ucs1(u8 **writer_addr, const u8 *src, usize len) {
+_IMPL_INLINE_SPECIFIER void bytes_write_ucs1(u8 **writer_addr, const u8 *src, usize len) {
 #define CAN_LOOP4 (len >= 4 * READ_BATCH_COUNT)
 #define CAN_LOOP (len >= READ_BATCH_COUNT)
     while (CAN_LOOP) {
@@ -560,7 +560,7 @@ force_inline bool _3bytes_in_ucs2_encode_loop(u8 **dst_addr, const u16 **src_add
     return checked;
 }
 
-force_inline bool bytes_write_ucs2(u8 **writer_addr, const u16 *src, usize len) {
+_IMPL_INLINE_SPECIFIER bool bytes_write_ucs2(u8 **writer_addr, const u16 *src, usize len) {
 #define CAN_LOOP4 (len >= 4 * READ_BATCH_COUNT)
 #define CAN_LOOP (len >= READ_BATCH_COUNT)
     while (CAN_LOOP) {
@@ -909,7 +909,7 @@ force_inline bool _3bytes_in_ucs4_encode_loop(u8 **dst_addr, const u32 **src_add
     return checked;
 }
 
-force_inline bool bytes_write_ucs4(u8 **writer_addr, const u32 *src, usize len) {
+_IMPL_INLINE_SPECIFIER bool bytes_write_ucs4(u8 **writer_addr, const u32 *src, usize len) {
 #define CAN_LOOP4 (len >= 4 * READ_BATCH_COUNT)
 #define CAN_LOOP (len >= READ_BATCH_COUNT)
     while (CAN_LOOP) {
@@ -978,5 +978,9 @@ force_inline bool bytes_write_ucs4(u8 **writer_addr, const u32 *src, usize len) 
 #include "compile_context/srw_out.inl.h"
 #undef COMPILE_WRITE_UCS_LEVEL
 #undef COMPILE_READ_UCS_LEVEL
+
+#undef _IMPL_INLINE_SPECIFIER_UCS1
+#undef _IMPL_INLINE_SPECIFIER_UCS2
+#undef _IMPL_INLINE_SPECIFIER_UCS4
 
 #endif // PYYJSON_ENCODE_UTF8_H

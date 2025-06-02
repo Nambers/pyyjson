@@ -34,6 +34,27 @@
 #    error "COMPILE_READ_UCS_LEVEL must be 1, 2 or 4"
 #endif
 
+// Encode inline specifier.
+#if COMPILE_READ_UCS_LEVEL == 1
+#    if PYYJSON_ENCODE_UCS1_IMPL_INLINE
+#        define _IMPL_INLINE_SPECIFIER force_inline
+#    else
+#        define _IMPL_INLINE_SPECIFIER static force_noinline
+#    endif
+#elif COMPILE_READ_UCS_LEVEL == 2
+#    if PYYJSON_ENCODE_UCS2_IMPL_INLINE
+#        define _IMPL_INLINE_SPECIFIER force_inline
+#    else
+#        define _IMPL_INLINE_SPECIFIER static force_noinline
+#    endif
+#elif COMPILE_READ_UCS_LEVEL == 4
+#    if PYYJSON_ENCODE_UCS4_IMPL_INLINE
+#        define _IMPL_INLINE_SPECIFIER force_inline
+#    else
+#        define _IMPL_INLINE_SPECIFIER static force_noinline
+#    endif
+#endif
+
 // The source type.
 #define _src_t PYYJSON_SIMPLE_CONCAT2(u, READ_BIT_SIZE)
 

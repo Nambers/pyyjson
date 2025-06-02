@@ -36,10 +36,11 @@ static force_noinline PyObject *READ_ROOT_IMPL(const _src_t *dat, Py_ssize_t len
     // object stack info
     DecodeObjStackInfo _decode_obj_stack_info;
     DecodeObjStackInfo *const decode_obj_stack_info = &_decode_obj_stack_info;
-    // process str jump flag
-    int process_str_jump_flag;
+    //
     memset(decode_ctn_info, 0, sizeof(DecodeCtnStackInfo));
     memset(decode_obj_stack_info, 0, sizeof(DecodeObjStackInfo));
+    //
+    register int occur_once_function_jump_flag;
     // init
     if (!init_decode_ctn_stack_info(decode_ctn_info) || !init_decode_obj_stack_info(decode_obj_stack_info)) goto failed_cleanup;
     _src_t *string_buffer_head;
@@ -58,13 +59,14 @@ static force_noinline PyObject *READ_ROOT_IMPL(const _src_t *dat, Py_ssize_t len
         goto arr_val_begin;
     }
 
+    /* 2 labels below are used for reducing binary size when inlining. */
 process_str:;
     {
-        // process_str_jump_flag: 0 -> key, 1 -> obj value, 2 -> arr value
-        PyObject *str_obj = decode_str(&cur, end, string_buffer_head, process_str_jump_flag == 0);
+        // occur_once_function_jump_flag: 0 -> key, 1 -> obj value, 2 -> arr value
+        PyObject *str_obj = decode_str(&cur, end, string_buffer_head, occur_once_function_jump_flag == 0);
         if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
-            if (process_str_jump_flag) incr_decode_ctn_size(decode_ctn_info->ctn);
-            switch (process_str_jump_flag) {
+            if (occur_once_function_jump_flag) incr_decode_ctn_size(decode_ctn_info->ctn);
+            switch (occur_once_function_jump_flag) {
                 case 0:
                     goto obj_key_end;
                 case 1:
@@ -77,6 +79,25 @@ process_str:;
             }
         }
         goto fail_string;
+    }
+
+process_number:;
+    {
+        // occur_once_function_jump_flag: 0 -> obj value, 1 -> arr value
+        PyObject *number_obj = READ_NUMBER(&cur, end);
+        if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
+            incr_decode_ctn_size(decode_ctn_info->ctn);
+            switch (occur_once_function_jump_flag) {
+                case 0:
+                    goto obj_val_end;
+                case 1:
+                    goto arr_val_end;
+                default: {
+                    PYYJSON_UNREACHABLE();
+                }
+            }
+        }
+        goto fail_number;
     }
 
 arr_begin:
@@ -120,16 +141,18 @@ arr_val_begin:
         goto arr_begin;
     }
     if (*cur <= U8MAX && char_is_number(*cur)) {
-        PyObject *number_obj = READ_NUMBER(&cur, end);
-        if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
-            incr_decode_ctn_size(decode_ctn_info->ctn);
-            goto arr_val_end;
-        }
-        goto fail_number;
+        occur_once_function_jump_flag = 1; // arr value
+        goto process_number;
+        // PyObject *number_obj = READ_NUMBER(&cur, end);
+        // if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
+        //     incr_decode_ctn_size(decode_ctn_info->ctn);
+        //     goto arr_val_end;
+        // }
+        // goto fail_number;
     }
     if (*cur == '"') {
         cur++;
-        process_str_jump_flag = 2; // arr value
+        occur_once_function_jump_flag = 2; // arr value
         goto process_str;
     }
     if (*cur == 't') {
@@ -263,7 +286,7 @@ obj_key_begin:
 
     if (likely(*cur == '"')) {
         cur++;
-        process_str_jump_flag = 0; // key
+        occur_once_function_jump_flag = 0; // key
         goto process_str;
     }
     if (likely(*cur == '}')) {
@@ -308,16 +331,12 @@ obj_key_end:;
 obj_val_begin:
     if (*cur == '"') {
         cur++;
-        process_str_jump_flag = 1; // obj value
+        occur_once_function_jump_flag = 1; // obj value
         goto process_str;
     }
     if (char_is_number(*cur)) {
-        PyObject *number_obj = READ_NUMBER(&cur, end);
-        if (likely(number_obj && pyyjson_push_obj(decode_obj_stack_info, number_obj))) {
-            incr_decode_ctn_size(decode_ctn_info->ctn);
-            goto obj_val_end;
-        }
-        goto fail_number;
+        occur_once_function_jump_flag = 0; // obj value
+        goto process_number;
     }
     if (*cur == '{') {
         cur++;
