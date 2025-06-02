@@ -119,7 +119,7 @@ restart:;
     *dst_addr = dst;
 }
 
-force_inline void encode_unicode_impl(_dst_t **dst_addr, const _src_t *src, usize len) {
+static force_noinline void encode_unicode_impl(_dst_t **dst_addr, const _src_t *src, usize len) {
     encode_unicode_loop4(dst_addr, &src, &len);
     encode_unicode_loop(dst_addr, &src, &len);
     if (!len) return;
