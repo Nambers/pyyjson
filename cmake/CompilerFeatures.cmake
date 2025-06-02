@@ -26,12 +26,8 @@ function(add_sse4_compile_option TARGET)
         set(CO_TYPE "PRIVATE")
     endif()
 
-    if(MSVC)
-        message(FATAL_ERROR "sse4 options are not allowed in MSVC.")
-    endif()
-
     check_co_type(${CO_TYPE})
-    target_compile_options(${TARGET} ${CO_TYPE} -msse4.1 -msse4.2)
+    target_compile_options(${TARGET} ${CO_TYPE} $<$<C_COMPILER_ID:MSVC>:/arch:SSE4.2> $<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>,$<C_COMPILER_ID:Intel>>:-msse4.2>)
 endfunction(add_sse4_compile_option TARGET)
 
 function(add_avx2_compile_option TARGET)
