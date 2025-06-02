@@ -31,4 +31,16 @@
 #undef _decode_str_loop_decoder_impl
 #undef _decode_str_trailing_decoder_impl
 //
+#undef decode
+#undef should_read_pretty
+#undef decode_root_pretty
+#undef decode_root_minify
+#undef decode_root_single
+#undef check_and_reserve_str_buffer
 #undef get_unicode_buffer_final_len
+#undef decode_str
+#undef decode_str_with_escape
+#undef make_unicode_from_src
+#undef decode_str_fast_loop4
+#undef decode_str_fast_loop
+#undef decode_str_fast_trailing

@@ -36,7 +36,7 @@
 #define decode_str_copy_trailing_to_u16 PYYJSON_CONCAT2(MAKE_UCS_NAME(decode_str_copy_trailing), u16)
 #define decode_str_copy_trailing_to_u32 PYYJSON_CONCAT2(MAKE_UCS_NAME(decode_str_copy_trailing), u32)
 
-force_inline int MAKE_UCS_NAME(decode_str_fast_loop4)(const _src_t **src_addr, const _src_t *src_end, EscapeInfo *escapeval_addr, vector_a *maxvec_addr) {
+force_inline int decode_str_fast_loop4(const _src_t **src_addr, const _src_t *src_end, EscapeInfo *escapeval_addr, vector_a *maxvec_addr) {
     int ret;
     //
     unionvector_a_x4 vec;
@@ -49,7 +49,7 @@ force_inline int MAKE_UCS_NAME(decode_str_fast_loop4)(const _src_t **src_addr, c
     return ret;
 }
 
-force_inline int MAKE_UCS_NAME(decode_str_fast_loop)(const _src_t **src_addr, const _src_t *src_end, EscapeInfo *escapeval_addr, vector_a *maxvec_addr) {
+force_inline int decode_str_fast_loop(const _src_t **src_addr, const _src_t *src_end, EscapeInfo *escapeval_addr, vector_a *maxvec_addr) {
     int ret;
     //
     vector_a vec;
@@ -61,7 +61,7 @@ force_inline int MAKE_UCS_NAME(decode_str_fast_loop)(const _src_t **src_addr, co
     return ret;
 }
 
-force_inline int MAKE_UCS_NAME(decode_str_fast_trailing)(const _src_t **src_addr, const _src_t *src_end, EscapeInfo *escape_info_addr, vector_a *maxvec_addr) {
+force_inline int decode_str_fast_trailing(const _src_t **src_addr, const _src_t *src_end, EscapeInfo *escape_info_addr, vector_a *maxvec_addr) {
     int ret;
     //
     vector_a vec;
@@ -74,7 +74,7 @@ force_inline int MAKE_UCS_NAME(decode_str_fast_trailing)(const _src_t **src_addr
 }
 
 // fast path unicode maker
-force_inline PyObject *MAKE_UCS_NAME(make_unicode_from_src)(const _src_t *start, usize count, bool is_key, vector_a maxvec, void *temp_buffer) {
+force_inline PyObject *make_unicode_from_src(const _src_t *start, usize count, bool is_key, vector_a maxvec, void *temp_buffer) {
     PyObject *ret;
     pyyjson_hash_t hash;
 
@@ -213,7 +213,7 @@ done:;
     return ret;
 }
 
-static force_noinline PyObject *MAKE_UCS_NAME(decode_str_with_escape)(
+static force_noinline PyObject *decode_str_with_escape(
         const _src_t *src_start,
         const _src_t **src_addr,
         const _src_t *src_end,
@@ -550,12 +550,6 @@ decode_loop_ucs4:;
         }
 #undef LOOP_SWITCHER
     }
-// done_ascii:;
-//     {
-//         PyObject *ret = make_unicode_from_src_ascii(temp_buffer, u8writer - PYYJSON_CAST(u8 *, temp_buffer), is_key);
-//         *src_addr = src + 1;
-//         return ret;
-//     }
 #if COMPILE_UCS_LEVEL <= 1
 done_ucs1:;
     {
@@ -635,40 +629,40 @@ failed:;
 #undef CAN_LOOP
 }
 
-force_inline PyObject *MAKE_UCS_NAME(decode_str)(
+force_inline PyObject *decode_str(
         const _src_t **src_addr,
         const _src_t *const src_end,
         void *temp_buffer,
         bool is_key) {
 #define CAN_LOOP4() (src_end - 4 * READ_BATCH_COUNT >= src)
 #define CAN_LOOP() (src_end - 1 * READ_BATCH_COUNT >= src)
-#define LOOP_SWITCHER(_status_code_)                       \
-    switch (status_code) {                                 \
-        case DECODE_LOOPSTATE_CONTINUE: {                  \
-            continue;                                      \
-        }                                                  \
-        case DECODE_LOOPSTATE_END: {                       \
-            goto done;                                     \
-        }                                                  \
-        case DECODE_LOOPSTATE_ESCAPE: {                    \
-            PyObject *ret =                                \
-                    MAKE_UCS_NAME(decode_str_with_escape)( \
-                            original_src,                  \
-                            &src, src_end,                 \
-                            temp_buffer,                   \
-                            is_key,                        \
-                            escape_info,                   \
-                            maxvec);                       \
-            *src_addr = src;                               \
-            return ret;                                    \
-        }                                                  \
-        case DECODE_LOOPSTATE_INVALID: {                   \
-            assert(PyErr_Occurred());                      \
-            goto failed;                                   \
-        }                                                  \
-        default: {                                         \
-            PYYJSON_UNREACHABLE();                         \
-        }                                                  \
+#define LOOP_SWITCHER(_status_code_)        \
+    switch (status_code) {                  \
+        case DECODE_LOOPSTATE_CONTINUE: {   \
+            continue;                       \
+        }                                   \
+        case DECODE_LOOPSTATE_END: {        \
+            goto done;                      \
+        }                                   \
+        case DECODE_LOOPSTATE_ESCAPE: {     \
+            PyObject *ret =                 \
+                    decode_str_with_escape( \
+                            original_src,   \
+                            &src, src_end,  \
+                            temp_buffer,    \
+                            is_key,         \
+                            escape_info,    \
+                            maxvec);        \
+            *src_addr = src;                \
+            return ret;                     \
+        }                                   \
+        case DECODE_LOOPSTATE_INVALID: {    \
+            assert(PyErr_Occurred());       \
+            goto failed;                    \
+        }                                   \
+        default: {                          \
+            PYYJSON_UNREACHABLE();          \
+        }                                   \
     }
 
     const _src_t *src = *src_addr;
@@ -679,27 +673,27 @@ force_inline PyObject *MAKE_UCS_NAME(decode_str)(
     if (!is_key) {
         while (CAN_LOOP4()) {
             EscapeInfo escape_info;
-            int status_code = MAKE_UCS_NAME(decode_str_fast_loop4)(&src, src_end, &escape_info, &maxvec);
+            int status_code = decode_str_fast_loop4(&src, src_end, &escape_info, &maxvec);
             LOOP_SWITCHER(status_code);
         }
     }
 
     while (CAN_LOOP()) {
         EscapeInfo escape_info;
-        int status_code = MAKE_UCS_NAME(decode_str_fast_loop)(&src, src_end, &escape_info, &maxvec);
+        int status_code = decode_str_fast_loop(&src, src_end, &escape_info, &maxvec);
         LOOP_SWITCHER(status_code);
     }
 
     if (likely(src < src_end)) {
         EscapeInfo escape_info;
-        int status_code = MAKE_UCS_NAME(decode_str_fast_trailing)(&src, src_end, &escape_info, &maxvec);
+        int status_code = decode_str_fast_trailing(&src, src_end, &escape_info, &maxvec);
         switch (status_code) {
             case DECODE_LOOPSTATE_END: {
                 goto done;
             }
             case DECODE_LOOPSTATE_ESCAPE: {
                 PyObject *ret =
-                        MAKE_UCS_NAME(decode_str_with_escape)(
+                        decode_str_with_escape(
                                 original_src,
                                 &src, src_end,
                                 temp_buffer,
@@ -723,7 +717,7 @@ force_inline PyObject *MAKE_UCS_NAME(decode_str)(
 
 done:;
     *src_addr = src + 1; // skip the ending '"'
-    return MAKE_UCS_NAME(make_unicode_from_src)(original_src, src - original_src, is_key, maxvec, temp_buffer);
+    return make_unicode_from_src(original_src, src - original_src, is_key, maxvec, temp_buffer);
 
 failed:;
     *src_addr = src;

@@ -73,6 +73,18 @@
 #define _decode_str_trailing_decoder_impl MAKE_R_NAME(_decode_str_trailing_decoder_impl)
 
 #ifdef COMPILE_UCS_LEVEL
+#    define decode MAKE_UCS_NAME(decode)
+#    define should_read_pretty MAKE_UCS_NAME(should_read_pretty)
+#    define decode_root_pretty MAKE_UCS_NAME(decode_root_pretty)
+#    define decode_root_minify MAKE_UCS_NAME(decode_root_minify)
+#    define decode_root_single MAKE_UCS_NAME(decode_root_single)
+#    define check_and_reserve_str_buffer MAKE_UCS_NAME(check_and_reserve_str_buffer)
 #    define get_unicode_buffer_final_len MAKE_UCS_NAME(get_unicode_buffer_final_len)
+#    define decode_str MAKE_UCS_NAME(decode_str)
+#    define decode_str_with_escape MAKE_UCS_NAME(decode_str_with_escape)
+#    define make_unicode_from_src MAKE_UCS_NAME(make_unicode_from_src)
+#    define decode_str_fast_loop4 MAKE_UCS_NAME(decode_str_fast_loop4)
+#    define decode_str_fast_loop MAKE_UCS_NAME(decode_str_fast_loop)
+#    define decode_str_fast_trailing MAKE_UCS_NAME(decode_str_fast_trailing)
 #endif
 #endif // PYYJSON_COMPILE_CONTEXT_R

@@ -44,7 +44,7 @@ static force_noinline PyObject *READ_ROOT_IMPL(const _src_t *dat, Py_ssize_t len
     if (!init_decode_ctn_stack_info(decode_ctn_info) || !init_decode_obj_stack_info(decode_obj_stack_info)) goto failed_cleanup;
     _src_t *string_buffer_head;
     bool need_dealloc = false;
-    if (unlikely(!CHECK_AND_RESERVE_STR_BUFFER(len, &string_buffer_head, &need_dealloc))) {
+    if (unlikely(!check_and_reserve_str_buffer(len, &string_buffer_head, &need_dealloc))) {
         goto fail_alloc;
     }
 
@@ -61,7 +61,7 @@ static force_noinline PyObject *READ_ROOT_IMPL(const _src_t *dat, Py_ssize_t len
 process_str:;
     {
         // process_str_jump_flag: 0 -> key, 1 -> obj value, 2 -> arr value
-        PyObject *str_obj = MAKE_UCS_NAME(decode_str)(&cur, end, string_buffer_head, process_str_jump_flag == 0);
+        PyObject *str_obj = decode_str(&cur, end, string_buffer_head, process_str_jump_flag == 0);
         if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
             if (process_str_jump_flag) incr_decode_ctn_size(decode_ctn_info->ctn);
             switch (process_str_jump_flag) {
@@ -131,18 +131,6 @@ arr_val_begin:
         cur++;
         process_str_jump_flag = 2; // arr value
         goto process_str;
-        // PyObject *str_obj = MAKE_UCS_NAME(decode_str)(&cur, end, string_buffer_head, false);
-
-        // // #if COMPILE_UCS_LEVEL == 0
-        // //         PyObject *str_obj = decode_str_ascii(&cur, end, string_buffer_head, false);
-        // // #else
-        // //         PyObject *str_obj = READ_STR(&cur, end, string_buffer_head, false);
-        // // #endif
-        // if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
-        //     incr_decode_ctn_size(decode_ctn_info->ctn);
-        //     goto arr_val_end;
-        // }
-        // goto fail_string;
     }
     if (*cur == 't') {
         if (likely(_read_true(&cur, end) && pyyjson_decode_true(decode_obj_stack_info))) {
@@ -277,16 +265,6 @@ obj_key_begin:
         cur++;
         process_str_jump_flag = 0; // key
         goto process_str;
-        // PyObject *str_obj = MAKE_UCS_NAME(decode_str)(&cur, end, string_buffer_head, true);
-        // // #if COMPILE_UCS_LEVEL == 0
-        // //         PyObject *str_obj = decode_str_ascii(&cur, end, string_buffer_head, true);
-        // // #else
-        // //         PyObject *str_obj = READ_STR(&cur, end, string_buffer_head, true);
-        // // #endif
-        // if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
-        //     goto obj_key_end;
-        // }
-        // goto fail_string;
     }
     if (likely(*cur == '}')) {
         cur++;
@@ -332,17 +310,6 @@ obj_val_begin:
         cur++;
         process_str_jump_flag = 1; // obj value
         goto process_str;
-        // PyObject *str_obj = MAKE_UCS_NAME(decode_str)(&cur, end, string_buffer_head, false);
-        // // #if COMPILE_UCS_LEVEL == 0
-        // //         PyObject *str_obj = decode_str_ascii(&cur, end, string_buffer_head, false);
-        // // #else
-        // //         PyObject *str_obj = READ_STR(&cur, end, string_buffer_head, false);
-        // // #endif
-        // if (likely(str_obj && pyyjson_push_obj(decode_obj_stack_info, str_obj))) {
-        //     incr_decode_ctn_size(decode_ctn_info->ctn);
-        //     goto obj_val_end;
-        // }
-        // goto fail_string;
     }
     if (char_is_number(*cur)) {
         PyObject *number_obj = READ_NUMBER(&cur, end);

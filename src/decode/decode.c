@@ -463,19 +463,19 @@ PyObject *SIMD_NAME_MODIFIER(pyyjson_Decode)(PyObject *self, PyObject *args, PyO
         int kind = ascii_head->state.ascii ? 0 : ascii_head->state.kind;
         switch (kind) {
             case PYYJSON_STRING_TYPE_ASCII: {
-                ret = pyyjson_decode_str_0(in_unicode);
+                ret = decode_ascii(in_unicode);
                 break;
             }
             case PYYJSON_STRING_TYPE_LATIN1: {
-                ret = pyyjson_decode_str_1(in_unicode);
+                ret = decode_ucs1(in_unicode);
                 break;
             }
             case PYYJSON_STRING_TYPE_UCS2: {
-                ret = pyyjson_decode_str_2(in_unicode);
+                ret = decode_ucs2(in_unicode);
                 break;
             }
             case PYYJSON_STRING_TYPE_UCS4: {
-                ret = pyyjson_decode_str_4(in_unicode);
+                ret = decode_ucs4(in_unicode);
                 break;
             }
             default: {
