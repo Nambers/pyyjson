@@ -183,8 +183,8 @@
 /* x86: check cpu features */
 #if PYYJSON_X86
 #    if defined(_MSC_VER)
-#        define cpuid_count(info, x) __cpuidex(info, x, 0)
-#        define cpuid(info, x) __cpuid(info, x)
+#        define cpuid_count(info, leaf, count) __cpuidex(info, (leaf), (count))
+#        define cpuid(info, x) __cpuid(info, (x))
 #    else
 #        include <cpuid.h>
 
