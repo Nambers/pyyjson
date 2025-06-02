@@ -127,6 +127,51 @@
                 "isDefault": true
             },
             "detail": "Call build.sh with nix develop"
+        },
+        {
+            "label": "Bloaty: generate symbol size info",
+            "type": "shell",
+            "command": "${workspaceFolder}/dev_tools/run_bloaty.sh",
+            "options": {
+                "shell": {
+                    "executable": "nix",
+                    "args": [
+                        "develop",
+                        "--no-net",
+                        "-c",
+                        "zsh"
+                    ]
+                }
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Run bloaty to generate symbol size info"
+        },
+        {
+            "label": "Benchmark",
+            "type": "shell",
+            "command": "${workspaceFolder}/dev_tools/run_benchmark.sh",
+            "options": {
+                "shell": {
+                    "executable": "nix",
+                    "args": [
+                        "develop",
+                        "--no-net",
+                        "-c",
+                        "zsh"
+                    ]
+                },
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}/build"
+                }
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Run benchmark"
         }
     ]
 }
