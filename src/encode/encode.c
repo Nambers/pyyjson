@@ -6,11 +6,11 @@
 #include "simd/simd_detect.h"
 #include "simd/simd_impl.h"
 #include "tls.h"
-#include "unicode/unicode_buffer.h"
+#include "unicode/unicode.h"
 
 /* Implmentations of some inline functions used in current scope */
 #include "encode/indent_writer.h"
-#include "unicode/reserve_wrap.h"
+#include "reserve_wrap.h"
 
 #include "encode_cvt.h"
 #include "states.h"
@@ -190,7 +190,7 @@ force_inline PyObject *pyyjson_dumps_single_unicode(PyObject *unicode, bool to_b
     if (to_bytes_obj) {
         init_pybytes(_unicode_buffer_info.head, written_len);
     } else {
-        init_pyunicode(_unicode_buffer_info.head, written_len, is_ascii ? 0 : unicode_kind);
+        init_pyunicode_noinline(_unicode_buffer_info.head, written_len, is_ascii ? 0 : unicode_kind);
     }
     return (PyObject *)_unicode_buffer_info.head;
 }

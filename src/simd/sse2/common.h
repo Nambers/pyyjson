@@ -19,6 +19,8 @@
 #define rshift_u16_128 _mm_srli_epi16
 #define rshift_u32_128 _mm_srli_epi32
 
+#define unsigned_max_u8_128 _mm_max_epu8
+
 #define setzero_128 _mm_setzero_si128
 
 #define get_bitmask_from_u8_128(_x_) ((u16)_mm_movemask_epi8(_x_))

@@ -1,5 +1,6 @@
 #ifdef PYYJSON_CLANGD_DUMMY
 #    ifndef COMPILE_READ_UCS_LEVEL
+#        include "simd/union_vector.h"
 #        define COMPILE_READ_UCS_LEVEL 1
 #    endif
 #endif
@@ -9,6 +10,24 @@
 #define COMPILE_SIMD_BITS 128
 #include "compile_context/sr_in.inl.h"
 #include "simd/mask_table.h"
+
+force_inline vector_a get_high_mask(usize count) {
+    const vector_a *mask_ptr = read_tail_mask_table_8(16 - count * sizeof(_src_t));
+    return *mask_ptr;
+}
+
+force_inline vector_a high_mask(vector_a x, usize count) {
+    return x & get_high_mask(count);
+}
+
+force_inline vector_a get_low_mask(usize count) {
+    const vector_a *mask_ptr = read_head_mask_table_8(count * sizeof(_src_t));
+    return *mask_ptr;
+}
+
+force_inline vector_a low_mask(vector_a x, usize count) {
+    return x & get_low_mask(count);
+}
 
 force_inline vector_a get_escape_mask(vector_a x) {
     vector_a t1 = broadcast(_Slash);
@@ -59,24 +78,6 @@ force_inline usize joined4_escape_mask_to_done_count(vector_a mask1,
               (bitmask3 << 32) | (bitmask4 << 48);
     assert(bitmask);
     return u64_tz_bits(bitmask) / COMPILE_READ_UCS_LEVEL;
-}
-
-force_inline vector_a get_high_mask(usize count) {
-    const vector_a *mask_ptr = read_tail_mask_table_8(16 - count * sizeof(_src_t));
-    return *mask_ptr;
-}
-
-force_inline vector_a high_mask(vector_a x, usize count) {
-    return x & get_high_mask(count);
-}
-
-force_inline vector_a get_low_mask(usize count) {
-    const vector_a *mask_ptr = read_head_mask_table_8(count * sizeof(_src_t));
-    return *mask_ptr;
-}
-
-force_inline vector_a low_mask(vector_a x, usize count) {
-    return x & get_low_mask(count);
 }
 
 #include "compile_context/sr_out.inl.h"

@@ -4,7 +4,7 @@
 #    include "encode_utf8.h"
 #    include "pyyjson.h"
 #    include "tls.h"
-#    include "unicode/unicode_buffer.h"
+#    include "unicode/unicode.h"
 //
 #    ifndef COMPILE_INDENT_LEVEL
 #        define COMPILE_INDENT_LEVEL 2
@@ -104,7 +104,7 @@ force_inline EncodeValJumpFlag encode_bytes_process_val(
         Py_ssize_t *cur_nested_depth_addr,
         Py_ssize_t *cur_list_size_addr,
         EncodeCtnWithIndex *ctn_stack,
-        // UnicodeInfo *unicode_info_addr,
+        // EncodeUnicodeInfo *unicode_info_addr,
         bool is_in_obj) {
 #define CTN_SIZE_GROW()                                                         \
     do {                                                                        \
@@ -226,7 +226,7 @@ pyyjson_dumps_to_bytes_obj(PyObject *in_obj) {
     Py_ssize_t cur_list_size;
     // alias thread local buffer
     EncodeCtnWithIndex *ctn_stack;
-    // UnicodeInfo unicode_info;
+    // EncodeUnicodeInfo unicode_info;
     bool cur_is_tuple;
     // memset(&unicode_info, 0, sizeof(unicode_info));
     //

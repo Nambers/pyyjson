@@ -22,7 +22,9 @@
 #undef escape_mask_to_bitmask
 #undef escape_mask_to_done_count
 #undef escape_mask_to_done_count_no_eq0
+#undef escape_mask_to_done_count_track_max
 #undef joined4_escape_mask_to_done_count
+#undef joined4_escape_mask_to_done_count_track_max
 #undef broadcast
 #undef unsigned_saturate_minus
 #undef signed_cmplt
@@ -30,7 +32,9 @@
 #undef cmpeq
 #undef get_escape_bitmask
 #undef escape_bitmask_to_done_count
+#undef escape_bitmask_to_done_count_track_max
 #undef joined4_escape_bitmask_to_done_count
+#undef joined4_escape_bitmask_to_done_count_track_max
 #undef cmpeq_bitmask
 #undef cmpneq_bitmask
 #undef unsigned_cmple_bitmask
@@ -45,13 +49,17 @@
 #undef maskz_loadu
 #undef fast_skip_spaces
 #undef checkmax
+#undef unsigned_max
+#undef unsigned_max4
 //
 #undef anymask_t
 #undef get_escape_anymask
 #undef testz_escape_mask
 #undef escape_anymask_to_done_count
 #undef escape_anymask_to_done_count_no_eq0
+#undef escape_anymask_to_done_count_track_max
 #undef joined4_escape_anymask_to_done_count
+#undef joined4_escape_anymask_to_done_count_track_max
 //
 #undef __check_vector_max_char_internal
 #undef check_vector_max_char

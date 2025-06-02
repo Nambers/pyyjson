@@ -2,39 +2,46 @@
 #define PYYJSON_DECODE_STR_H
 
 #include "common.h"
+#include "decode/decode.h"
+#include "decoder_impl_wrap.h"
+#include "simd/simd_impl.h"
 #include "simd/union_vector.h"
-// _r_tools
-#define COMPILE_READ_UCS_LEVEL 1
-#include "_r_tools.inl.h"
-#undef COMPILE_READ_UCS_LEVEL
+#include "tools.h"
 
-#define COMPILE_READ_UCS_LEVEL 2
-#include "_r_tools.inl.h"
-#undef COMPILE_READ_UCS_LEVEL
-
-#define COMPILE_READ_UCS_LEVEL 4
-#include "_r_tools.inl.h"
-#undef COMPILE_READ_UCS_LEVEL
 
 // decode impl
 
 #include "simd/compile_feature_check.h"
 
-#define COMPILE_READ_UCS_LEVEL 1
-#include "_r_impls.inl.h"
-#include "_sr_loop_impls.inl.h"
-#undef COMPILE_READ_UCS_LEVEL
+#define COMPILE_UCS_LEVEL 1
+#define COMPILE_WRITE_UCS_LEVEL 1
+#include "_srw_ucs_decoder.inl.h"
+#undef COMPILE_WRITE_UCS_LEVEL
 
-#define COMPILE_READ_UCS_LEVEL 2
-#include "_r_impls.inl.h"
-#include "_sr_loop_impls.inl.h"
-#undef COMPILE_READ_UCS_LEVEL
+#define COMPILE_WRITE_UCS_LEVEL 2
+#include "_srw_ucs_decoder.inl.h"
+#undef COMPILE_WRITE_UCS_LEVEL
 
-#define COMPILE_READ_UCS_LEVEL 4
-#include "_r_impls.inl.h"
-#include "_sr_loop_impls.inl.h"
-#undef COMPILE_READ_UCS_LEVEL
+#define COMPILE_WRITE_UCS_LEVEL 4
+#include "_srw_ucs_decoder.inl.h"
+#undef COMPILE_WRITE_UCS_LEVEL
+#undef COMPILE_UCS_LEVEL
 
+#define COMPILE_UCS_LEVEL 2
+#define COMPILE_WRITE_UCS_LEVEL 2
+#include "_srw_ucs_decoder.inl.h"
+#undef COMPILE_WRITE_UCS_LEVEL
+
+#define COMPILE_WRITE_UCS_LEVEL 4
+#include "_srw_ucs_decoder.inl.h"
+#undef COMPILE_WRITE_UCS_LEVEL
+#undef COMPILE_UCS_LEVEL
+
+#define COMPILE_UCS_LEVEL 4
+#define COMPILE_WRITE_UCS_LEVEL 4
+#include "_srw_ucs_decoder.inl.h"
+#undef COMPILE_WRITE_UCS_LEVEL
+#undef COMPILE_UCS_LEVEL
 
 #undef COMPILE_SIMD_BITS
 

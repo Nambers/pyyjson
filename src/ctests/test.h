@@ -78,9 +78,9 @@ force_inline u32 get_random_4bytes_u32(void) {
 
 /* DECLARE_TEST macro. */
 #if BUILD_MULTI_LIB && PYYJSON_X86
-#    define DECLARE_TEST(_name) \
-        int _name##_sse2(void); \
-        int _name##_avx2(void); \
+#    define DECLARE_TEST(_name)   \
+        int _name##_sse4_2(void); \
+        int _name##_avx2(void);   \
         int _name##_avx512(void);
 #elif BUILD_MULTI_LIB && PYYJSON_AARCH
 #    define DECLARE_TEST(_name) int _name##_neon(void);

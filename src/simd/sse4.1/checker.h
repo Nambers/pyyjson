@@ -1,7 +1,10 @@
-#ifndef PYYJSON_SIMD_AVX2_CHECKER_H
-#define PYYJSON_SIMD_AVX2_CHECKER_H
+#ifndef PYYJSON_SIMD_SSE4_CHECKER_H
+#define PYYJSON_SIMD_SSE4_CHECKER_H
 
+#include "common.h"
 #include "simd/simd_detect.h"
+#include "simd/sse2/checker.h"
+#include "simd/sse2/common.h"
 #include "simd/union_vector.h"
 #include "simd/vector_types.h"
 
@@ -17,4 +20,4 @@
 #include "checker/_sr_escape.inl.h"
 #undef COMPILE_READ_UCS_LEVEL
 
-#endif // PYYJSON_SIMD_AVX2_CHECKER_H
+#endif // PYYJSON_SIMD_SSE4_CHECKER_H

@@ -180,6 +180,30 @@
 #define unlikely pyyjson_unlikely
 
 
+/* x86: check cpu features */
+#if PYYJSON_X86
+#    if defined(_MSC_VER)
+#        define cpuid_count(info, x) __cpuidex(info, x, 0)
+#        define cpuid(info, x) __cpuid(info, x)
+#    else
+#        include <cpuid.h>
+
+force_inline void cpuid_count(int *info, int leaf, int count) {
+    __cpuid_count(leaf, count, info[0], info[1], info[2], info[3]);
+}
+
+force_inline void cpuid(int *info, int x) {
+    __cpuid(x, info[0], info[1], info[2], info[3]);
+}
+#    endif
+
+force_inline int get_cpuid_max(void) {
+    int info[4];
+    cpuid(info, 0);
+    return info[0];
+}
+#endif
+
 /** repeat utils */
 #define REPEAT_2(x) x, x,
 #define REPEAT_4(x) REPEAT_2(x) REPEAT_2(x)
@@ -767,7 +791,7 @@ force_inline usize get_tail_len_parts_by_index(usize tail_len, usize batch_count
             break;                                                                                                                             \
         }                                                                                                                                      \
         default: {                                                                                                                             \
-            PYYJSON_UNREACHABLE();                                                                                                                  \
+            PYYJSON_UNREACHABLE();                                                                                                             \
         }                                                                                                                                      \
     }
 
@@ -800,7 +824,7 @@ force_inline usize get_tail_len_parts_by_index(usize tail_len, usize batch_count
             break;                                                                                                                               \
         }                                                                                                                                        \
         default: {                                                                                                                               \
-            PYYJSON_UNREACHABLE();                                                                                                                    \
+            PYYJSON_UNREACHABLE();                                                                                                               \
         }                                                                                                                                        \
     }
 

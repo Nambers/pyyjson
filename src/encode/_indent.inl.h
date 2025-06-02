@@ -1,6 +1,6 @@
 #ifdef PYYJSON_CLANGD_DUMMY
 #    include "encode/encode_shared.h"
-#    include "unicode/unicode_buffer.h"
+#    include "unicode/unicode.h"
 #endif
 
 #include "compile_context/iw_in.inl.h"

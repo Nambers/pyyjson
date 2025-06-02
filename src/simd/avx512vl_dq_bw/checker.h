@@ -1,7 +1,10 @@
 #ifndef PYYJSON_SIMD_AVX512VLDQBW_CHECKER_H
 #define PYYJSON_SIMD_AVX512VLDQBW_CHECKER_H
 
+#include "simd/avx512vl_dq_bw/common.h"
+#include "simd/mask_table.h"
 #include "simd/simd_detect.h"
+#include "simd/union_vector.h"
 #include "simd/vector_types.h"
 
 #define COMPILE_READ_UCS_LEVEL 1

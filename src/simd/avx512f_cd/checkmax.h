@@ -11,10 +11,7 @@
 
 force_inline bool checkmax_u32_512(vector_a_u32_512 z, u32 lower_bound_minus_1) {
     const vector_a_u32_512 t = broadcast_u32_512(lower_bound_minus_1);
-    if (unlikely(unsigned_cmplt_bitmask_u32_512(t, z))) {
-        return false;
-    }
-    return true;
+    return 0 == unsigned_cmpgt_bitmask_u32_512(z, t);
 }
 
 // checkmax_u16_512: AVX512VL+DQ+BW

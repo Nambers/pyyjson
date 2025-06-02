@@ -1,6 +1,7 @@
 #ifndef PYYJSON_SIMD_SSE2_CHECKER_H
 #define PYYJSON_SIMD_SSE2_CHECKER_H
 
+#include "common.h"
 #include "simd/simd_detect.h"
 #include "simd/vector_types.h"
 

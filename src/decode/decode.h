@@ -1,5 +1,6 @@
 #ifndef PYYJSON_DECODE_H
 #define PYYJSON_DECODE_H
+#include "pyutils.h"
 #include "pyyjson.h"
 #include "simd/memcmp.h"
 #include "simd/simd_impl.h"
@@ -248,14 +249,7 @@ force_inline void init_read_state(ReadStrState *state) {
 /*==============================================================================
  * xxhash and key cache utilities
  *============================================================================*/
-#if PY_MINOR_VERSION >= 13
-// these are hidden in Python 3.13
-#    if PY_MINOR_VERSION == 13
-PyAPI_FUNC(Py_hash_t) _Py_HashBytes(const void *, Py_ssize_t);
-#    endif // PY_MINOR_VERSION == 13
-PyAPI_FUNC(int) _PyDict_SetItem_KnownHash_LockHeld(PyObject *mp, PyObject *key, PyObject *item, Py_hash_t hash);
-#    define _PyDict_SetItem_KnownHash _PyDict_SetItem_KnownHash_LockHeld
-#endif // PY_MINOR_VERSION >= 13
+
 
 #define REHASHER(_x) (((size_t)(_x)) % (PYYJSON_KEY_CACHE_SIZE))
 typedef XXH64_hash_t pyyjson_hash_t;
@@ -274,7 +268,7 @@ force_inline void add_key_cache(pyyjson_hash_t hash, PyObject *obj) {
     AssociativeKeyCache[index] = obj;
 }
 
-force_inline PyObject *get_key_cache(const u8 *unicode_str, pyyjson_hash_t hash, size_t real_len, int kind, bool ascii) {
+force_inline PyObject *get_key_cache(const void *unicode_str, pyyjson_hash_t hash, size_t real_len, int kind, bool ascii) {
     assert(real_len <= 64);
     pyyjson_cache_type cache = AssociativeKeyCache[REHASHER(hash)];
     if (!cache) return NULL;
@@ -288,14 +282,6 @@ force_inline PyObject *get_key_cache(const u8 *unicode_str, pyyjson_hash_t hash,
         return cache;
     }
     return NULL;
-}
-
-force_inline void make_hash(PyASCIIObject *ascii, const void *unicode_str, size_t real_len) {
-#if PY_MINOR_VERSION >= 14
-    ascii->hash = Py_HashBuffer(unicode_str, real_len);
-#else
-    ascii->hash = _Py_HashBytes(unicode_str, real_len);
-#endif
 }
 
 #endif // PYYJSON_DECODE_H

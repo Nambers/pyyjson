@@ -14,7 +14,7 @@
 #include "simd/compile_feature_check.h"
 //
 #include "compile_context/sr_in.inl.h"
-#include "unicode/unicode_buffer.h"
+#include "unicode/unicode.h"
 
 force_inline PyObject *make_unicode_from_src_ascii(const _src_t *start, usize count, bool is_key) {
     PyObject *ret;
@@ -118,7 +118,7 @@ force_inline int decode_str_fast_loop4_ascii(const _src_t **src_addr, const _src
     anymask_t check_mask_total;
     //
     _decode_str_loop4_read_src_impl(*src_addr, &vec, check_mask, &check_mask_total);
-    _decode_str_loop4_decoder_impl(src_addr, src_end, check_mask, check_mask_total, &ret, true, escapeval_addr);
+    _decode_str_loop4_decoder_impl(src_addr, src_end, check_mask, check_mask_total, &ret, true, NULL, vec, escapeval_addr);
     //
     return ret;
 }
@@ -130,7 +130,7 @@ force_inline int decode_str_fast_loop_ascii(const _src_t **src_addr, const _src_
     anymask_t check_mask;
     //
     _decode_str_loop_read_src_impl(*src_addr, &vec, &check_mask);
-    _decode_str_loop_decoder_impl(src_addr, src_end, check_mask, &ret, true, escapeval_addr);
+    _decode_str_loop_decoder_impl(src_addr, src_end, check_mask, &ret, true, NULL, vec, escapeval_addr);
     //
     return ret;
 }
@@ -142,7 +142,7 @@ force_inline int decode_str_fast_trailing_ascii(const _src_t **src_addr, const _
     anymask_t check_mask;
     //
     _decode_str_trailing_read_src_impl(*src_addr, src_end, &vec, &check_mask);
-    _decode_str_trailing_decoder_impl(src_addr, src_end, check_mask, &ret, true, escape_info_addr);
+    _decode_str_trailing_decoder_impl(src_addr, src_end, check_mask, &ret, true, NULL, vec, escape_info_addr);
     //
     return ret;
 }
@@ -156,7 +156,7 @@ force_inline int decode_str_copy_loop4_ascii_u8(u8 **dst_addr, const _src_t **sr
     //
     _decode_str_loop4_read_src_impl(*src_addr, &vec, check_mask, &check_mask_total);
     memcpy(*dst_addr, &vec, sizeof(unionvector_a_x4));
-    usize moved_count = _decode_str_loop4_decoder_impl(src_addr, src_end, check_mask, check_mask_total, &ret, true, escapeval_addr);
+    usize moved_count = _decode_str_loop4_decoder_impl(src_addr, src_end, check_mask, check_mask_total, &ret, true, NULL, vec, escapeval_addr);
     *dst_addr += moved_count;
     return ret;
 }
@@ -169,7 +169,7 @@ force_inline int decode_str_copy_loop_ascii_u8(u8 **dst_addr, const _src_t **src
     //
     _decode_str_loop_read_src_impl(*src_addr, &vec, &check_mask);
     memcpy(*dst_addr, &vec, sizeof(vector_a));
-    usize moved_count = _decode_str_loop_decoder_impl(src_addr, src_end, check_mask, &ret, true, escapeval_addr);
+    usize moved_count = _decode_str_loop_decoder_impl(src_addr, src_end, check_mask, &ret, true, NULL, vec, escapeval_addr);
     *dst_addr += moved_count;
     return ret;
 }
@@ -189,7 +189,7 @@ force_inline int decode_str_copy_trailing_ascii_u8(u8 **dst_addr, const _src_t *
 #else
     *(vector_u *)(*dst_addr) = vec;
 #endif
-    usize done_count = _decode_str_trailing_decoder_impl(src_addr, src_end, check_mask, &ret, false, escape_info_addr);
+    usize done_count = _decode_str_trailing_decoder_impl(src_addr, src_end, check_mask, &ret, false, NULL, vec, escape_info_addr);
     *dst_addr += done_count;
     //
     return ret;
@@ -210,13 +210,15 @@ force_inline int decode_str_copy_trailing_ascii_u16(u16 **dst_addr, const _src_t
 #else
     MAKE_S_NAME(cvt_to_dst_u8_u16)(*dst_addr, vec);
 #endif
-    usize done_count = _decode_str_trailing_decoder_impl(src_addr, src_end, check_mask, &ret, false, escape_info_addr);
+    usize done_count = _decode_str_trailing_decoder_impl(src_addr, src_end, check_mask, &ret, false, NULL, vec, escape_info_addr);
     *dst_addr += done_count;
     //
     return ret;
 }
 
-force_inline int decode_str_copy_trailing_ascii_u32(u32 **dst_addr, const _src_t **src_addr, const _src_t *src_end,
+force_inline int decode_str_copy_trailing_ascii_u32(u32 **dst_addr,
+                                                    const _src_t **src_addr,
+                                                    const _src_t *src_end,
                                                     EscapeInfo *escape_info_addr) {
     int ret;
     //
@@ -231,7 +233,7 @@ force_inline int decode_str_copy_trailing_ascii_u32(u32 **dst_addr, const _src_t
 #else
     MAKE_S_NAME(cvt_to_dst_u8_u32)(*dst_addr, vec);
 #endif
-    usize done_count = _decode_str_trailing_decoder_impl(src_addr, src_end, check_mask, &ret, false, escape_info_addr);
+    usize done_count = _decode_str_trailing_decoder_impl(src_addr, src_end, check_mask, &ret, false, NULL, vec, escape_info_addr);
     *dst_addr += done_count;
     //
     return ret;
@@ -282,7 +284,7 @@ force_inline int decode_str_copy_loop4_ascii_u16(u16 **dst_addr, const _src_t **
     for (int i = 0; i < 4; ++i) {
         MAKE_S_NAME(cvt_to_dst_u8_u16)((dst + i * READ_BATCH_COUNT), vec.x[i]);
     }
-    usize moved_count = _decode_str_loop4_decoder_impl(src_addr, src_end, check_mask, check_mask_total, &ret, false, escapeval_addr);
+    usize moved_count = _decode_str_loop4_decoder_impl(src_addr, src_end, check_mask, check_mask_total, &ret, false, NULL, vec, escapeval_addr);
     *dst_addr += moved_count;
     return ret;
 }
@@ -295,7 +297,7 @@ force_inline int decode_str_copy_loop_ascii_u16(u16 **dst_addr, const _src_t **s
     //
     _decode_str_loop_read_src_impl(*src_addr, &vec, &check_mask);
     MAKE_S_NAME(cvt_to_dst_u8_u16)(*dst_addr, vec);
-    usize moved_count = _decode_str_loop_decoder_impl(src_addr, src_end, check_mask, &ret, false, escapeval_addr);
+    usize moved_count = _decode_str_loop_decoder_impl(src_addr, src_end, check_mask, &ret, false, NULL, vec, escapeval_addr);
     *dst_addr += moved_count;
     return ret;
 }
@@ -332,7 +334,7 @@ force_inline int decode_str_copy_loop4_ascii_u32(u32 **dst_addr, const _src_t **
     for (int i = 0; i < 4; ++i) {
         MAKE_S_NAME(cvt_to_dst_u8_u32)((dst + i * READ_BATCH_COUNT), vec.x[i]);
     }
-    usize moved_count = _decode_str_loop4_decoder_impl(src_addr, src_end, check_mask, check_mask_total, &ret, false, escapeval_addr);
+    usize moved_count = _decode_str_loop4_decoder_impl(src_addr, src_end, check_mask, check_mask_total, &ret, false, NULL, vec, escapeval_addr);
     *dst_addr += moved_count;
     return ret;
 }
@@ -345,7 +347,7 @@ force_inline int decode_str_copy_loop_ascii_u32(u32 **dst_addr, const _src_t **s
     //
     _decode_str_loop_read_src_impl(*src_addr, &vec, &check_mask);
     MAKE_S_NAME(cvt_to_dst_u8_u32)(*dst_addr, vec);
-    usize moved_count = _decode_str_loop_decoder_impl(src_addr, src_end, check_mask, &ret, false, escapeval_addr);
+    usize moved_count = _decode_str_loop_decoder_impl(src_addr, src_end, check_mask, &ret, false, NULL, vec, escapeval_addr);
     *dst_addr += moved_count;
     return ret;
 }
@@ -413,6 +415,9 @@ static force_noinline PyObject *decode_str_with_escape_ascii(
         case 4: {
             goto decode_loop_ucs4;
         }
+        default: {
+            PYYJSON_UNREACHABLE();
+        }
     }
 
 decode_loop_ucs1:;
@@ -452,6 +457,9 @@ decode_loop_ucs1:;
             case DECODE_LOOPSTATE_INVALID: {            \
                 assert(PyErr_Occurred());               \
                 goto failed;                            \
+            }                                           \
+            default: {                                  \
+                PYYJSON_UNREACHABLE();                  \
             }                                           \
         }                                               \
     }
@@ -543,6 +551,9 @@ decode_loop_ucs2:;
                 assert(PyErr_Occurred());               \
                 goto failed;                            \
             }                                           \
+            default: {                                  \
+                PYYJSON_UNREACHABLE();                  \
+            }                                           \
         }                                               \
     }
 #define ON_ESCAPE process_escape_ascii_u16(escape_info, &u16writer, &u32writer, &u16size, u8size, &temp_buffer)
@@ -619,6 +630,9 @@ decode_loop_ucs4:;
             case DECODE_LOOPSTATE_INVALID: {    \
                 assert(PyErr_Occurred());       \
                 goto failed;                    \
+            }                                   \
+            default: {                          \
+                PYYJSON_UNREACHABLE();          \
             }                                   \
         }                                       \
     }
@@ -786,7 +800,7 @@ done:;
 failed:;
     *src_addr = src;
     return NULL;
-
+#undef LOOP_SWITCHER
 #undef CAN_LOOP4
 #undef CAN_LOOP
 }

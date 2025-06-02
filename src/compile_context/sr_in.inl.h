@@ -43,7 +43,9 @@
 #define escape_mask_to_bitmask MAKE_SR_NAME(escape_mask_to_bitmask)
 #define escape_mask_to_done_count MAKE_SR_NAME(escape_mask_to_done_count)
 #define escape_mask_to_done_count_no_eq0 MAKE_SR_NAME(escape_mask_to_done_count_no_eq0)
+#define escape_mask_to_done_count_track_max MAKE_SR_NAME(escape_mask_to_done_count_track_max)
 #define joined4_escape_mask_to_done_count MAKE_SR_NAME(joined4_escape_mask_to_done_count)
+#define joined4_escape_mask_to_done_count_track_max MAKE_SR_NAME(joined4_escape_mask_to_done_count_track_max)
 #define broadcast MAKE_SR_NAME(broadcast)
 #define unsigned_saturate_minus MAKE_SR_NAME(unsigned_saturate_minus)
 // signed_cmplt availability: SSE2
@@ -53,7 +55,9 @@
 #define cmpeq MAKE_SR_NAME(cmpeq)
 #define get_escape_bitmask MAKE_SR_NAME(get_escape_bitmask)
 #define escape_bitmask_to_done_count MAKE_SR_NAME(escape_bitmask_to_done_count)
+#define escape_bitmask_to_done_count_track_max MAKE_SR_NAME(escape_bitmask_to_done_count_track_max)
 #define joined4_escape_bitmask_to_done_count MAKE_SR_NAME(joined4_escape_bitmask_to_done_count)
+#define joined4_escape_bitmask_to_done_count_track_max MAKE_SR_NAME(joined4_escape_bitmask_to_done_count_track_max)
 #define cmpeq_bitmask MAKE_SR_NAME(cmpeq_bitmask)
 #define cmpneq_bitmask MAKE_SR_NAME(cmpneq_bitmask)
 #define unsigned_cmple_bitmask MAKE_SR_NAME(unsigned_cmple_bitmask)
@@ -68,7 +72,8 @@
 #define maskz_loadu MAKE_SR_NAME(maskz_loadu)
 #define fast_skip_spaces MAKE_SR_NAME(fast_skip_spaces)
 #define checkmax MAKE_SR_NAME(checkmax)
-
+#define unsigned_max MAKE_SR_NAME(unsigned_max)
+#define unsigned_max4 MAKE_SR_NAME(unsigned_max4)
 //
 #if COMPILE_SIMD_BITS == 512
 #    define anymask_t avx512_bitmask_t
@@ -76,14 +81,18 @@
 #    define testz_escape_mask(_x_) ((_x_) == 0)
 #    define escape_anymask_to_done_count escape_bitmask_to_done_count
 #    define escape_anymask_to_done_count_no_eq0 escape_bitmask_to_done_count
+#    define escape_anymask_to_done_count_track_max escape_bitmask_to_done_count_track_max
 #    define joined4_escape_anymask_to_done_count joined4_escape_bitmask_to_done_count
+#    define joined4_escape_anymask_to_done_count_track_max joined4_escape_bitmask_to_done_count_track_max
 #else
 #    define anymask_t vector_a
 #    define get_escape_anymask get_escape_mask
 #    define testz_escape_mask testz
 #    define escape_anymask_to_done_count escape_mask_to_done_count
 #    define escape_anymask_to_done_count_no_eq0 escape_mask_to_done_count_no_eq0
+#    define escape_anymask_to_done_count_track_max escape_mask_to_done_count_track_max
 #    define joined4_escape_anymask_to_done_count joined4_escape_mask_to_done_count
+#    define joined4_escape_anymask_to_done_count_track_max joined4_escape_mask_to_done_count_track_max
 #endif
 
 #ifdef COMPILE_UCS_LEVEL

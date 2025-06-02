@@ -3,7 +3,7 @@
 
 #include "pyyjson.h"
 
-
+// provide inline version of memcpy.
 #if __AVX512F__
 #    define pyyjson_memcpy(_d, _s, _size) pyyjson_memcpy_simd((_d), (_s), (_size), 512)
 #    define PYYJSON_MEMCPY_SIMD_SIZE 64
@@ -14,7 +14,8 @@
 #    define pyyjson_memcpy(_d, _s, _size) pyyjson_memcpy_simd((_d), (_s), (_size), 128)
 #    define PYYJSON_MEMCPY_SIMD_SIZE 16
 #endif
-
+// use libc memcpy if need noinline version.
+#define pyyjson_memcpy_noinline memcpy
 
 #if defined(_MSC_VER) && !defined(__clang__)
 typedef __declspec(align(1)) struct {

@@ -6,22 +6,22 @@
 #include <stdlib.h>
 #include <time.h>
 
-#if PYYJSON_X86
-#    if defined(_MSC_VER)
-#        define cpuid_count(info, x) __cpuidex(info, x, 0)
-#        define cpuid(info, x) __cpuid(info, x)
-#    else
-#        include <cpuid.h>
+// #if PYYJSON_X86
+// #    if defined(_MSC_VER)
+// #        define cpuid_count(info, x) __cpuidex(info, x, 0)
+// #        define cpuid(info, x) __cpuid(info, x)
+// #    else
+// #        include <cpuid.h>
 
-force_inline void cpuid_count(int *info, int x) {
-    __cpuid_count(x, 0, info[0], info[1], info[2], info[3]);
-}
+// force_inline void cpuid_count(int *info, int x) {
+//     __cpuid_count(x, 0, info[0], info[1], info[2], info[3]);
+// }
 
-force_inline void cpuid(int *info, int x) {
-    __cpuid(x, info[0], info[1], info[2], info[3]);
-}
-#    endif
-#endif
+// force_inline void cpuid(int *info, int x) {
+//     __cpuid(x, info[0], info[1], info[2], info[3]);
+// }
+// #    endif
+// #endif
 
 #if PYYJSON_X86
 bool _SupportAVX512 = false;
@@ -29,14 +29,14 @@ bool _SupportAVX2 = false;
 
 void check_avx512(void) {
     int info[4];
-    cpuid_count(info, 7);
+    cpuid_count(info, 7, 0);
     int ebx = info[1];
     _SupportAVX512 = (ebx & (1 << 16)) && (ebx & (1 << 30));
 }
 
 void check_avx2(void) {
     int info[4];
-    cpuid_count(info, 7);
+    cpuid_count(info, 7, 0);
     int ebx = info[1];
     _SupportAVX2 = ebx & (1 << 5);
 }
@@ -76,7 +76,7 @@ bool wrap_run_test(int (*func)(void), const char *name, TestCounter *counter) {
         do {                              \
             RUN_ONE_TEST(_name##_avx512); \
             RUN_ONE_TEST(_name##_avx2);   \
-            RUN_ONE_TEST(_name##_sse2);   \
+            RUN_ONE_TEST(_name##_sse4_2); \
         } while (0)
 #elif BUILD_MULTI_LIB && PYYJSON_AARCH
 #    define RUN_TESTS(_name)            \

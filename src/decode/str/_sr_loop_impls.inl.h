@@ -13,6 +13,11 @@
 
 #include "compile_context/sr_in.inl.h"
 
+force_inline void unsigned_max4(vector_a *max_vec_addr, unionvector_a_x4 vec) {
+    *max_vec_addr = unsigned_max(*max_vec_addr, unsigned_max(unsigned_max(vec.x[0], vec.x[1]), unsigned_max(vec.x[2], vec.x[3])));
+}
+
+/* Read src. */
 force_inline void _decode_str_loop4_read_src_impl(
         const _src_t *src,
         unionvector_a_x4 *out_vec,
@@ -49,16 +54,17 @@ force_inline void _decode_str_trailing_read_src_impl(
 #elif PYYJSON_X86 && COMPILE_SIMD_BITS == 256
     vector_a vec = *(vector_u *)(src_end - READ_BATCH_COUNT);
     *out_vec = high_mask(vec, trailing_len);
-    *out_check_mask = high_mask(get_escape_anymask(vec), trailing_len);
+    *out_check_mask = high_mask(get_escape_mask(vec), trailing_len);
 #elif PYYJSON_X86
     vector_a vec = *(vector_u *)(src_end - READ_BATCH_COUNT);
     *out_vec = runtime_byte_rshift_128(vec, (READ_BATCH_COUNT - trailing_len) * sizeof(_src_t));
-    *out_check_mask = low_mask(get_escape_anymask(*out_vec), trailing_len);
+    *out_check_mask = low_mask(get_escape_mask(*out_vec), trailing_len);
 #elif PYYJSON_AARCH
 // TODO
 #endif
 }
 
+/* String decoder. */
 force_inline usize _decode_str_loop4_decoder_impl(
         const _src_t **src_addr,
         const _src_t *src_end,
@@ -66,6 +72,8 @@ force_inline usize _decode_str_loop4_decoder_impl(
         anymask_t check_mask_total,
         int *ret_addr,
         bool inline_escape, // immediate
+        vector_a *track_max,
+        unionvector_a_x4 src_vecs,
         EscapeInfo *escapeval_addr) {
     const _src_t *src = *src_addr;
     usize done_count;
@@ -73,8 +81,15 @@ force_inline usize _decode_str_loop4_decoder_impl(
         src += 4 * READ_BATCH_COUNT;
         done_count = 4 * READ_BATCH_COUNT;
         *ret_addr = DECODE_LOOPSTATE_CONTINUE;
+        if (track_max) { // compile time determined
+            unsigned_max4(track_max, src_vecs);
+        }
     } else {
-        done_count = joined4_escape_anymask_to_done_count(check_mask_arr4[0], check_mask_arr4[1], check_mask_arr4[2], check_mask_arr4[3]);
+        if (track_max) { // compile time determined
+            done_count = joined4_escape_anymask_to_done_count_track_max(check_mask_arr4[0], check_mask_arr4[1], check_mask_arr4[2], check_mask_arr4[3], track_max, src_vecs);
+        } else {
+            done_count = joined4_escape_anymask_to_done_count(check_mask_arr4[0], check_mask_arr4[1], check_mask_arr4[2], check_mask_arr4[3]);
+        }
         src += done_count;
         _src_t unicode = *src;
         if (unicode == _Quote) {
@@ -104,6 +119,8 @@ force_inline usize _decode_str_loop_decoder_impl(
         anymask_t check_mask,
         int *ret_addr,
         bool inline_escape, // immediate
+        vector_a *track_max,
+        vector_a src_vec,
         EscapeInfo *escapeval_addr) {
     usize done_count;
     const _src_t *src = *src_addr;
@@ -111,8 +128,15 @@ force_inline usize _decode_str_loop_decoder_impl(
         done_count = READ_BATCH_COUNT;
         src += READ_BATCH_COUNT;
         *ret_addr = DECODE_LOOPSTATE_CONTINUE;
+        if (track_max) { // compile time determined
+            *track_max = unsigned_max(*track_max, src_vec);
+        }
     } else {
-        done_count = escape_anymask_to_done_count(check_mask);
+        if (track_max) { // compile time determined
+            done_count = escape_anymask_to_done_count_track_max(check_mask, track_max, src_vec);
+        } else {
+            done_count = escape_anymask_to_done_count(check_mask);
+        }
         src += done_count;
         _src_t unicode = *src;
         if (unicode == _Quote) {
@@ -142,6 +166,8 @@ force_inline usize _decode_str_trailing_decoder_impl(
         anymask_t check_mask,
         int *ret_addr,
         bool inline_escape, // immediate
+        vector_a *track_max,
+        vector_a src_vec,
         EscapeInfo *escapeval_addr) {
 #if PYYJSON_X86 && COMPILE_SIMD_BITS == 256
 #    define BLEND 1
@@ -159,6 +185,9 @@ force_inline usize _decode_str_trailing_decoder_impl(
         *ret_addr = DECODE_LOOPSTATE_INVALID;
     } else {
         done_count = escape_anymask_to_done_count(check_mask);
+        if (track_max) { // compile time determined
+            *track_max = unsigned_max(*track_max, low_mask(src_vec, done_count));
+        }
         if (BLEND) { // compile time determined
             done_count -= READ_BATCH_COUNT - trailing_len;
         }

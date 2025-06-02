@@ -40,3 +40,18 @@ void SIMD_NAME_MODIFIER(long_cvt_noinline_u16_u32)(u32 *restrict write_start, co
     usize len = _len;
     MAKE_S_NAME(long_cvt_u16_u32)(write_start, read_start, len);
 }
+
+void SIMD_NAME_MODIFIER(long_cvt_noinline_u32_u16)(u16 *restrict write_start, const u32 *restrict read_start, usize _len) {
+    usize len = _len;
+    MAKE_S_NAME(long_cvt_u32_u16)(write_start, read_start, len);
+}
+
+void SIMD_NAME_MODIFIER(long_cvt_noinline_u32_u8)(u8 *restrict write_start, const u32 *restrict read_start, usize _len) {
+    usize len = _len;
+    MAKE_S_NAME(long_cvt_u32_u8)(write_start, read_start, len);
+}
+
+void SIMD_NAME_MODIFIER(long_cvt_noinline_u16_u8)(u8 *restrict write_start, const u16 *restrict read_start, usize _len) {
+    usize len = _len;
+    MAKE_S_NAME(long_cvt_u16_u8)(write_start, read_start, len);
+}

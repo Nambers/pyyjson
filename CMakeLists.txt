@@ -174,6 +174,8 @@ set(SRC_FILES
     src/tls.c
     src/float/tables.c
     src/decode/utils.c
+    src/pyutils.c
+    src/encode/encode_utils.c
 )
 
 set(SRC_WITH_SIMD
@@ -202,6 +204,8 @@ endif()
 
 # add library pyyjson
 if(BUILD_MULTI_LIB)
+    set(SRC_FILES ${SRC_FILES} src/multilib.c)
+
     if("${TARGET_SIMD_ARCH}" STREQUAL "x86")
         add_library(pyyjson_common OBJECT ${SRC_FILES})
         target_link_libraries(pyyjson_common PUBLIC commonBuild)
@@ -210,15 +214,16 @@ if(BUILD_MULTI_LIB)
         add_library(pyyjson_avx2 OBJECT ${SRC_WITH_SIMD})
         target_link_libraries(pyyjson_avx2 PUBLIC pyyjson_common)
 
-        # add_library(pyyjson_sse4 OBJECT ${SRC_WITH_SIMD})
-        # target_link_libraries(pyyjson_sse4 PUBLIC pyyjson_common)
-        add_library(pyyjson_sse2 OBJECT ${SRC_WITH_SIMD})
-        target_link_libraries(pyyjson_sse2 PUBLIC pyyjson_common)
-        add_library(pyyjson SHARED $<TARGET_OBJECTS:pyyjson_avx512> $<TARGET_OBJECTS:pyyjson_avx2> $<TARGET_OBJECTS:pyyjson_sse2> $<TARGET_OBJECTS:pyyjson_common>)
+        add_library(pyyjson_sse4 OBJECT ${SRC_WITH_SIMD})
+        target_link_libraries(pyyjson_sse4 PUBLIC pyyjson_common)
+        # add_library(pyyjson_sse2 OBJECT ${SRC_WITH_SIMD})
+        # target_link_libraries(pyyjson_sse2 PUBLIC pyyjson_common)
+        add_library(pyyjson SHARED $<TARGET_OBJECTS:pyyjson_avx512> $<TARGET_OBJECTS:pyyjson_avx2> $<TARGET_OBJECTS:pyyjson_sse4> $<TARGET_OBJECTS:pyyjson_common>)
         target_link_libraries(pyyjson PUBLIC ${Python3_LIBRARIES})
 
         add_avx512_compile_option(pyyjson_avx512)
         add_avx2_compile_option(pyyjson_avx2)
+        add_sse4_compile_option(pyyjson_sse4)
 
     elseif("${TARGET_SIMD_ARCH}" STREQUAL "aarch")
         add_library(pyyjson_common OBJECT ${SRC_FILES})
@@ -234,6 +239,7 @@ if(BUILD_MULTI_LIB)
         # TODO
     endif()
 else()
+    set(SRC_FILES ${SRC_FILES} src/singlelib.c)
     add_library(pyyjson SHARED ${SRC_FILES} ${SRC_WITH_SIMD})
     target_link_libraries(pyyjson PRIVATE commonBuild)
 endif()
@@ -247,7 +253,6 @@ if(ASAN_ENABLED AND MSVC)
     if(EXISTS "${ASAN_DLL_PATH}")
         message(STATUS "Found AddressSanitizer runtime DLL at: ${ASAN_DLL_PATH}")
 
-        # 在 my_target 构建完成后，将 DLL 复制到目标所在目录
         add_custom_command(
             TARGET pyyjson POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -344,8 +349,8 @@ if(BUILD_TEST)
 
     if(BUILD_MULTI_LIB)
         if("${TARGET_SIMD_ARCH}" STREQUAL "x86")
-            add_library(pyyjson_test_sse2 OBJECT ${SRC_TEST_WITH_SIMD})
-            target_link_libraries(pyyjson_test_sse2 PUBLIC commonBuild)
+            add_library(pyyjson_test_sse4 OBJECT ${SRC_TEST_WITH_SIMD})
+            target_link_libraries(pyyjson_test_sse4 PUBLIC commonBuild)
             add_library(pyyjson_test_avx2 OBJECT ${SRC_TEST_WITH_SIMD})
             target_link_libraries(pyyjson_test_avx2 PUBLIC commonBuild)
             add_library(pyyjson_test_avx512 OBJECT ${SRC_TEST_WITH_SIMD})
@@ -353,8 +358,9 @@ if(BUILD_TEST)
 
             add_avx512_compile_option(pyyjson_test_avx512)
             add_avx2_compile_option(pyyjson_test_avx2)
+            add_sse4_compile_option(pyyjson_test_sse4)
 
-            add_executable(pyyjson_test ${SRC_TEST} $<TARGET_OBJECTS:pyyjson_test_avx512> $<TARGET_OBJECTS:pyyjson_test_avx2> $<TARGET_OBJECTS:pyyjson_test_sse2>)
+            add_executable(pyyjson_test ${SRC_TEST} $<TARGET_OBJECTS:pyyjson_test_avx512> $<TARGET_OBJECTS:pyyjson_test_avx2> $<TARGET_OBJECTS:pyyjson_test_sse4>)
         elseif("${TARGET_SIMD_ARCH}" STREQUAL "aarch")
             add_library(pyyjson_test_neon OBJECT ${SRC_TEST_WITH_SIMD})
             target_link_libraries(pyyjson_test_neon PUBLIC commonBuild)

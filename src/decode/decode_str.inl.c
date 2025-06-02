@@ -1277,11 +1277,12 @@ static force_noinline PyObject *READ_ROOT_SINGLE(const _src_t *dat, Py_ssize_t l
         bool need_dealloc = false;
         CHECK_AND_RESERVE_STR_BUFFER(len, &string_buffer_head, &need_dealloc);
         cur++;
-#if COMPILE_UCS_LEVEL == 0
-        ret = decode_str_ascii(&cur, end, string_buffer_head, false);
-#else
-        ret = READ_STR(&cur, end, string_buffer_head, false);
-#endif
+        ret = MAKE_UCS_NAME(decode_str)(&cur, end, string_buffer_head, false);
+// #if COMPILE_UCS_LEVEL == 0
+//         ret = decode_str_ascii(&cur, end, string_buffer_head, false);
+// #else
+//         ret = READ_STR(&cur, end, string_buffer_head, false);
+// #endif
         if (need_dealloc) {
             free((void *)((u8 *)string_buffer_head - TAIL_PADDING));
         }

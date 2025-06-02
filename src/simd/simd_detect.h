@@ -80,4 +80,5 @@
 static_assert(__LITTLE_ENDIAN__, "currently only little endian is supported");
 #endif
 
+
 #endif // PYYJSON_SIMD_DETECT_H

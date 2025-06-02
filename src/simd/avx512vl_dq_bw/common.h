@@ -32,6 +32,9 @@
 #define signed_cmpgt_bitmask_u8_512(_a_, _b_) ((u64)_mm512_cmpgt_epi8_mask((_a_), (_b_)))
 #define signed_cmpgt_bitmask_u16_512(_a_, _b_) ((u32)_mm512_cmpgt_epi16_mask((_a_), (_b_)))
 
+#define unsigned_max_u8_512 _mm512_max_epu8
+#define unsigned_max_u16_512 _mm512_max_epu16
+
 #define shuffle_512 _mm512_shuffle_epi8
 
 #define rshift_u16_512 _mm512_srli_epi16

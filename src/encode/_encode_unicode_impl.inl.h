@@ -7,7 +7,7 @@
 #        include "encode_shared.h"
 #        include "simd/simd_detect.h"
 #        include "simd/simd_impl.h"
-#        include "unicode/unicode_buffer.h"
+#        include "unicode/unicode.h"
 #        define COMPILE_INDENT_LEVEL 0
 #        define COMPILE_READ_UCS_LEVEL 1
 #        define COMPILE_WRITE_UCS_LEVEL 1

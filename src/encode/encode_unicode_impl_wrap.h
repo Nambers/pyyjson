@@ -5,7 +5,7 @@
 #include "encode_shared.h"
 #include "simd/simd_detect.h"
 #include "simd/simd_impl.h"
-#include "unicode/unicode_buffer.h"
+#include "unicode/unicode.h"
 //
 #include "simd/compile_feature_check.h"
 #define COMPILE_INDENT_LEVEL 0

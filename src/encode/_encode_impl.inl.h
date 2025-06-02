@@ -37,7 +37,7 @@
         if (unlikely(!unicode_indent_writer(_writer_addr_, _unicode_buffer_info_, _cur_nested_depth_, _is_in_obj_, _additional_reserve_count_))) return false; \
     } while (0)
 
-force_inline void prepare_unicode_write(PyObject *obj, EncodeUnicodeWriter *writer_addr, EncodeUnicodeBufferInfo *unicode_buffer_info, UnicodeInfo *restrict unicode_info, usize *out_len, unsigned int *read_kind, unsigned int *write_kind) {
+force_inline void prepare_unicode_write(PyObject *obj, EncodeUnicodeWriter *writer_addr, EncodeUnicodeBufferInfo *unicode_buffer_info, EncodeUnicodeInfo *restrict unicode_info, usize *out_len, unsigned int *read_kind, unsigned int *write_kind) {
     usize out_len_val = (usize)PyUnicode_GET_LENGTH(obj);
     *out_len = out_len_val;
     unsigned int read_kind_val = PyUnicode_KIND(obj);
@@ -75,7 +75,7 @@ force_inline void prepare_unicode_write(PyObject *obj, EncodeUnicodeWriter *writ
 #endif
 }
 
-force_inline bool unicode_buffer_append_key(PyObject *key, EncodeUnicodeWriter *writer_addr, EncodeUnicodeBufferInfo *unicode_buffer_info, UnicodeInfo *unicode_info, Py_ssize_t cur_nested_depth) {
+force_inline bool unicode_buffer_append_key(PyObject *key, EncodeUnicodeWriter *writer_addr, EncodeUnicodeBufferInfo *unicode_buffer_info, EncodeUnicodeInfo *unicode_info, Py_ssize_t cur_nested_depth) {
     usize len;
     unsigned int kind, write_kind;
     prepare_unicode_write(key, writer_addr, unicode_buffer_info, unicode_info, &len, &kind, &write_kind);
@@ -135,7 +135,7 @@ force_inline bool unicode_buffer_append_key(PyObject *key, EncodeUnicodeWriter *
     return true;
 }
 
-force_inline bool unicode_buffer_append_str(PyObject *val, EncodeUnicodeWriter *writer_addr, EncodeUnicodeBufferInfo *unicode_buffer_info, UnicodeInfo *unicode_info, Py_ssize_t cur_nested_depth, bool is_in_obj) {
+force_inline bool unicode_buffer_append_str(PyObject *val, EncodeUnicodeWriter *writer_addr, EncodeUnicodeBufferInfo *unicode_buffer_info, EncodeUnicodeInfo *unicode_info, Py_ssize_t cur_nested_depth, bool is_in_obj) {
     usize len;
     unsigned int kind, write_kind;
     prepare_unicode_write(val, writer_addr, unicode_buffer_info, unicode_info, &len, &kind, &write_kind);
@@ -476,7 +476,7 @@ force_inline EncodeValJumpFlag ENCODE_PROCESS_VAL(
         Py_ssize_t *cur_nested_depth_addr,
         Py_ssize_t *cur_list_size_addr,
         EncodeCtnWithIndex *ctn_stack,
-        UnicodeInfo *unicode_info_addr,
+        EncodeUnicodeInfo *unicode_info_addr,
         bool is_in_obj) {
 #define CTN_SIZE_GROW()                                                         \
     do {                                                                        \
@@ -597,7 +597,7 @@ force_inline EncodeValJumpFlag ENCODE_PROCESS_VAL(
 
 #define pyyjson_dumps_obj PYYJSON_CONCAT3(_pyyjson_dumps_obj, __UCS_NAME, __INDENT_NAME)
 #define dumps_next(_u_) PYYJSON_CONCAT3(_pyyjson_dumps_obj, _u_, __INDENT_NAME)
-#define _DUMPS_PASS_ARGSDECL EncodeUnicodeWriter writer, PyObject *key, PyObject *val, PyObject *cur_obj, Py_ssize_t cur_pos, Py_ssize_t cur_nested_depth, Py_ssize_t cur_list_size, EncodeCtnWithIndex *ctn_stack, UnicodeInfo unicode_info, bool cur_is_tuple, EncodeUnicodeBufferInfo _unicode_buffer_info, EncodeCallFlag encode_call_flag
+#define _DUMPS_PASS_ARGSDECL EncodeUnicodeWriter writer, PyObject *key, PyObject *val, PyObject *cur_obj, Py_ssize_t cur_pos, Py_ssize_t cur_nested_depth, Py_ssize_t cur_list_size, EncodeCtnWithIndex *ctn_stack, EncodeUnicodeInfo unicode_info, bool cur_is_tuple, EncodeUnicodeBufferInfo _unicode_buffer_info, EncodeCallFlag encode_call_flag
 #define _DUMPS_PASS_ARGS writer, key, val, cur_obj, cur_pos, cur_nested_depth, cur_list_size, ctn_stack, unicode_info, cur_is_tuple
 
 // forward declaration
@@ -628,7 +628,7 @@ pyyjson_dumps_obj(
     Py_ssize_t cur_list_size;
     // alias thread local buffer
     EncodeCtnWithIndex *ctn_stack;
-    UnicodeInfo unicode_info;
+    EncodeUnicodeInfo unicode_info;
     bool cur_is_tuple;
     memset(&unicode_info, 0, sizeof(unicode_info));
     //
@@ -910,7 +910,7 @@ success:;
     assert(unicode_info.cur_ucs_type == COMPILE_UCS_LEVEL);
     Py_ssize_t final_len = get_unicode_buffer_final_len(writer, &_unicode_buffer_info);
     GOTO_FAIL_ON_UNLIKELY_ERR(!resize_to_fit_pyunicode(&_unicode_buffer_info, final_len, COMPILE_UCS_LEVEL));
-    init_pyunicode(_unicode_buffer_info.head, final_len, COMPILE_UCS_LEVEL);
+    init_pyunicode_noinline(_unicode_buffer_info.head, final_len, COMPILE_UCS_LEVEL);
     return (PyObject *)_unicode_buffer_info.head;
 fail:;
     if (_unicode_buffer_info.head) {

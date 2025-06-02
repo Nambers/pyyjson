@@ -32,6 +32,11 @@
 
 #define rshift_u32_512 _mm512_srli_epi32
 
+#define unsigned_max_u32_512 _mm512_max_epu32
+#define unsigned_max_u64_512 _mm512_max_epu64
+
+#define setzero_512 _mm512_setzero_si512
+
 force_inline u64 len_to_maskz(usize len) {
     return (1ULL << len) - 1;
 }

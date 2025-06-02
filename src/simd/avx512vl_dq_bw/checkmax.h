@@ -12,18 +12,12 @@
 
 force_inline bool checkmax_u16_512(vector_a_u16_512 z, u16 lower_bound_minus_1) {
     const vector_a_u16_512 t = broadcast_u16_512(lower_bound_minus_1);
-    if (unlikely(unsigned_cmplt_bitmask_u16_512(t, z))) {
-        return false;
-    }
-    return true;
+    return 0 == unsigned_cmpgt_bitmask_u16_512(z, t);
 }
 
 force_inline bool checkmax_u8_512(vector_a_u8_512 z, u8 lower_bound_minus_1) {
     const vector_a_u8_512 t = broadcast_u8_512(lower_bound_minus_1);
-    if (unlikely(unsigned_cmplt_bitmask_u8_512(t, z))) {
-        return false;
-    }
-    return true;
+    return 0 == unsigned_cmpgt_bitmask_u8_512(z, t);
 }
 
 #endif // PYYJSON_SIMD_AVX512VLDQBW_CHECKMAX_H

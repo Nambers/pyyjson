@@ -10,7 +10,7 @@
 #include "simd/simd_impl.h"
 #include "str/ascii.h"
 #include "tls.h"
-
+#include "str/ucs.h"
 
 extern thread_local u8 pyyjson_string_buffer[PYYJSON_STRING_BUFFER_SIZE];
 
