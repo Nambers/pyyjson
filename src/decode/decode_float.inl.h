@@ -102,7 +102,7 @@ static force_noinline void BIGINT_SET_BUF(
     number is infinite, the return value is based on flag.
  3. This function (with inline attribute) may generate a lot of instructions.
  */
-force_inline PyObject *READ_NUMBER(const _src_t **ptr, const _src_t *buffer_end) {
+static force_noinline PyObject *READ_NUMBER(const _src_t **ptr, const _src_t *buffer_end) {
 #    define return_err(_end, _msg)                                                  \
         do {                                                                        \
             PyErr_Format(JSONDecodeError, "%s, at position %zu", _msg, _end - hdr); \
@@ -716,7 +716,7 @@ digi_finish:
  This is a fallback function if the custom number reader is disabled.
  This function use libc's strtod() to read floating-point number.
  */
-force_inline PyObject *READ_NUMBER(const _src_t **ptr, const _src_t *buffer_end) {
+static force_noinline PyObject *READ_NUMBER(const _src_t **ptr, const _src_t *buffer_end) {
 
 #    define return_err(_end, _msg)                                                  \
         do {                                                                        \
